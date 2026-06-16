@@ -60,11 +60,11 @@
 > Every node declares what it is, in one consistent way, so the registry, codegen,
 > executor, and UI can all consume it uniformly.
 
-- [ ] Specify the contract: each node declares its **ports**, **typed params**, **codegen template**, **executor**, and (where relevant) a **shape/type-inference function**.
-- [ ] Define how a node declares **defaults and validation hints** (consumed later by Epic 4 config UI).
-- [ ] Define the **per-node version** field (catalog-level versioning, distinct from schema version).
-- [ ] Provide a base class / interface + at least two reference implementations conforming to it.
-- [ ] Document the contract with a "how to author a node" guide.
+- [x] Specify the contract: each node declares its **ports**, **typed params**, **codegen template**, **executor**, and (where relevant) a **shape/type-inference function**.
+- [x] Define how a node declares **defaults and validation hints** (consumed later by Epic 4 config UI).
+- [x] Define the **per-node version** field (catalog-level versioning, distinct from schema version).
+- [x] Provide a base class / interface + at least two reference implementations conforming to it.
+- [x] Document the contract with a "how to author a node" guide.
 
 ---
 
