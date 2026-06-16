@@ -1,6 +1,6 @@
 # Epic 1 — Core SDK & Graph Intermediate Representation (IR)
 
-> The spine of OmniCanvas AI / Colony Mind. A versioned, open-source Python SDK plus a
+> The spine of Colony Mind. A versioned, open-source Python SDK plus a
 > canonical graph schema (the IR) that every other layer reads and writes. Nothing else
 > can be built reliably until this is right — and the IR schema is the single hardest
 > thing to change later.
