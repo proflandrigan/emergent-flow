@@ -25,11 +25,10 @@ We will design the SDK and codegen around two first-class paradigms from day one
    ```python
    import colonymind as cm
 
-   graph = (
-       cm.load_csv("data/experiment.csv")
-         .impute_missing(strategy="median")
-         .anova(group_col="treatment", value_col="response")
-   )
+   # Each namespaced call adds a node to the graph (IR); execute(ir) runs it (ADR 0002).
+   df = cm.data.load_csv("data/experiment.csv")
+   df = cm.clean.impute_missing(df, strategy="median")
+   graph = cm.stats.anova(df, group_col="treatment", value_col="response")
    result = cm.execute(graph)
    ```
 

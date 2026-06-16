@@ -93,7 +93,7 @@
 
 ## Story 6 — SDK packaging, versioning & public API conventions
 
-- [ ] Establish the package layout and namespace (e.g. `import omnicanvas as oc`, `oc.data`, `oc.clean`, `oc.stats`, `oc.ml`, `oc.reports`).
+- [ ] Establish the package layout and namespace (e.g. `import colonymind as cm`, `cm.data`, `cm.clean`, `cm.stats`, `cm.ml`, `cm.reports`).
 - [ ] **Pin all dependency versions** (deterministic, reproducible installs).
 - [ ] Adopt a versioning scheme (semantic versioning) and document the release process.
 - [ ] Set up build + publish pipeline to a package index.
@@ -119,11 +119,11 @@
 > Deliberately narrow but end-to-end: the exact flow from the proposal example
 > (load → clean → one stats test → one model → HTML report). Breadth comes later (Epic 4).
 
-- [ ] **Data ingestion** wrapper (Pandas/Polars) — e.g. `oc.data.load_csv(...)`.
-- [ ] **Cleaning / imputation** wrapper — e.g. `oc.clean.impute_missing(...)`.
-- [ ] **Statistical analytics** wrapper (Pingouin/Statsmodels) — e.g. `oc.stats.anova(...)`.
-- [ ] **Classical ML** wrapper (Scikit-Learn) — e.g. `oc.ml.train_classifier(...)`.
-- [ ] **Automated reporting** wrapper (YData-Profiling / Sweetviz) — e.g. `oc.reports.generate_html_summary(...)`.
+- [ ] **Data ingestion** wrapper (Pandas/Polars) — e.g. `cm.data.load_csv(...)`.
+- [ ] **Cleaning / imputation** wrapper — e.g. `cm.clean.impute_missing(...)`.
+- [ ] **Statistical analytics** wrapper (Pingouin/Statsmodels) — e.g. `cm.stats.anova(...)`.
+- [ ] **Classical ML** wrapper (Scikit-Learn) — e.g. `cm.ml.train_classifier(...)`.
+- [ ] **Automated reporting** wrapper (YData-Profiling / Sweetviz) — e.g. `cm.reports.generate_html_summary(...)`.
 - [ ] Register all of the above as node definitions conforming to Story 3.
 - [ ] Author one worked example graph that exercises the full slice end to end.
 
