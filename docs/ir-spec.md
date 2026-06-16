@@ -164,15 +164,21 @@ See `examples/declarative_module.json` for an IR document using the declarative 
 `Node.subgraph` is an optional inner `Graph`. This single field covers three cases:
 
 1. **Collapsible visual groups** — a UI grouping node with a `subgraph` containing the
-   member nodes. Members also carry `group_id` pointing to the parent node's `id`.
+   member nodes. Membership is expressed by the nesting itself: the members live inside
+   the grouping node's `subgraph`.
 2. **Declarative module bodies** — a `paradigm="declarative"` node whose `subgraph`
    describes the internal layer topology of an `nn.Module`.
 3. **Agent sub-graphs** — an agent orchestration node whose `subgraph` is the agent's
    internal control-flow graph.
 
-`Node.group_id` records which parent group node a node belongs to. `Graph`'s structural
-validator enforces that any non-`None` `group_id` references an existing node in the same
-graph. Leaf nodes have `subgraph=None` and `group_id=None`.
+`Node.subgraph` (nesting) and `Node.group_id` (flat grouping) are **two distinct
+mechanisms**. `group_id` records which group node a node belongs to *within the same
+graph*: the grouping node and its members are siblings in one `nodes` map, and each
+member's `group_id` points at the grouping node's `id`. `Graph`'s structural validator
+enforces that any non-`None` `group_id` references an existing node in the **same** graph
+— it does not cross `subgraph` boundaries, so a member nested inside a `subgraph` must not
+set `group_id` to a node in the outer graph. Leaf nodes have `subgraph=None` and
+`group_id=None`.
 
 ---
 
