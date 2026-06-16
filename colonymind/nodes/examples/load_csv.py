@@ -18,6 +18,7 @@ from colonymind.ir.common import Direction
 from colonymind.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
+from ..registry import register
 from ..spec import ParamSpec, PortSpec, ValidationHints
 
 
@@ -31,6 +32,7 @@ def read_csv_rows(path: str, delimiter: str = ",") -> list[dict[str, str]]:
         return list(csv.DictReader(fh, delimiter=delimiter))
 
 
+@register
 class LoadCsv(NodeDefinition):
     """Load a CSV file into a table (list of row dicts)."""
 

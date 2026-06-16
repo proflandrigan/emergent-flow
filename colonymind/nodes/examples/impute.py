@@ -18,6 +18,7 @@ from colonymind.ir.common import Direction
 from colonymind.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
+from ..registry import register
 from ..spec import ParamSpec, PortSpec, ValidationHints
 
 STRATEGIES = ["mean", "median", "most_frequent"]
@@ -69,6 +70,7 @@ def impute_missing(
     return result
 
 
+@register
 class ImputeMissing(NodeDefinition):
     """Impute missing values in a table column-wise."""
 
