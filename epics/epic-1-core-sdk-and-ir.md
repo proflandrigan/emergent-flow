@@ -73,11 +73,11 @@
 > The difference between a fixed tool and a platform: nodes are registered declaratively
 > and the catalog can grow (eventually community-extensible) without touching core.
 
-- [ ] Implement a **registry** that discovers and indexes node definitions.
-- [ ] Support **declarative registration** (no core code change to add a node).
-- [ ] Expose registry lookup APIs (by family, by type, by port-type) for codegen/UI/validation.
-- [ ] Add a registry validation pass (fail fast on malformed/duplicate node definitions).
-- [ ] Write a plugin/extension stub demonstrating an out-of-core node being registered.
+- [x] Implement a **registry** that discovers and indexes node definitions.
+- [x] Support **declarative registration** (no core code change to add a node).
+- [x] Expose registry lookup APIs (by family, by type, by port-type) for codegen/UI/validation.
+- [x] Add a registry validation pass (fail fast on malformed/duplicate node definitions).
+- [x] Write a plugin/extension stub demonstrating an out-of-core node being registered.
 
 ---
 

@@ -92,7 +92,9 @@ See the [Architecture Decision Records](./docs/adr/) for the full context, decis
 consequences of each: [ADR 0001](./docs/adr/0001-graph-is-single-source-of-truth.md),
 [ADR 0002](./docs/adr/0002-execute-the-ir-not-the-string.md),
 [ADR 0003](./docs/adr/0003-sdk-supports-two-paradigms.md),
-[ADR 0004](./docs/adr/0004-storage-tiering.md).
+[ADR 0004](./docs/adr/0004-storage-tiering.md),
+[ADR 0005](./docs/adr/0005-node-definition-contract.md),
+[ADR 0006](./docs/adr/0006-node-registry-and-plugin-discovery.md).
 
 ### Example of generated code
 
@@ -167,10 +169,17 @@ with the IR designed CRDT-ready from the start.
 
 ```
 colony-mind/
+├── colonymind/               # Python SDK source
+│   └── nodes/                # Node contract, registry, and reference examples
 ├── docs/
-│   └── adr/                  # Architecture Decision Records (foundational decisions)
+│   ├── adr/                  # Architecture Decision Records (foundational decisions)
+│   ├── node-contract-spec.md # Node-definition contract reference
+│   ├── node-registry.md      # Registry and plugin discovery guide
+│   └── authoring-a-node.md   # Step-by-step guide to writing a node
 ├── epics/
 │   └── epic-1-core-sdk-and-ir.md  # Epic 1 — Core SDK & graph IR
+├── examples/
+│   └── plugin_stub/          # Out-of-core node plugin example (cm-texttools, text.reverse)
 ├── planning_docs/
 │   ├── proposal.md           # Product vision & market mapping
 │   └── technical_roadmap.md  # Engineering decomposition (epics, phases, decisions)
