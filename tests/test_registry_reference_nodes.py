@@ -1,10 +1,14 @@
 """Tests for declarative registration of the reference nodes.
 
-Importing ``colonymind.nodes.examples`` fires the ``@register`` decorators on
-``LoadCsv`` and ``ImputeMissing``, populating the default ``registry``.  These
-tests assert that the end-to-end registration path works correctly and that the
-registry public API is re-exported from ``colonymind.nodes``.
+Importing ``colonymind.nodes`` pulls in the reference-node package, firing the
+``@register`` decorators on ``LoadCsv`` and ``ImputeMissing`` and populating the
+default ``registry``.  These tests assert that the end-to-end registration path
+works correctly and that the registry public API is re-exported from
+``colonymind.nodes``.
 """
+
+import subprocess
+import sys
 
 import colonymind.nodes.examples  # noqa: F401 — import triggers registration
 from colonymind.nodes import registry
@@ -17,6 +21,25 @@ class TestReferenceNodesRegistered:
         """Both reference nodes are present in the default registry after import."""
         assert "data.load_csv" in registry
         assert "clean.impute_missing" in registry
+
+    def test_importing_package_alone_registers_reference_nodes(self):
+        """Importing only ``colonymind.nodes`` (not ``.examples``) registers them.
+
+        Runs in a fresh subprocess so no other test's ``import
+        colonymind.nodes.examples`` can mask the regression: ``colonymind.nodes``
+        must pull the reference nodes in on its own.
+        """
+        code = (
+            "import colonymind.nodes as n; "
+            "assert 'data.load_csv' in n.registry, 'load_csv not registered'; "
+            "assert 'clean.impute_missing' in n.registry, 'impute not registered'"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
 
     def test_get_returns_reference_class(self):
         """registry.get() returns the exact class objects, not copies."""

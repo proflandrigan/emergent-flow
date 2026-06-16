@@ -24,6 +24,13 @@ from .registry import (
 )
 from .spec import NodeSpec, ParamSpec, PortSpec, ValidationHints
 
+# Importing the reference-node package fires its ``@register`` decorators, so the
+# default ``registry`` is populated with the in-tree nodes (``data.load_csv``,
+# ``clean.impute_missing``) the moment ``colonymind.nodes`` is imported. Done last
+# so ``registry``/``contract``/``spec`` are fully initialised before the examples
+# import back from them. ``# noqa: E402,F401`` — deliberate import-for-side-effect.
+from . import examples  # noqa: E402,F401
+
 __all__ = [
     "CodeFragment",
     "ENTRY_POINT_GROUP",

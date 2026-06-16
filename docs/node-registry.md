@@ -51,13 +51,12 @@ class LoadCsv(NodeDefinition):
     ...
 ```
 
-Registration fires when the module is imported. Importing `colonymind.nodes.examples`
-populates the default `registry` with both reference nodes (`data.load_csv` and
-`clean.impute_missing`):
+Registration fires when the module is imported. Importing `colonymind.nodes` pulls in
+the reference-node package for you, so the default `registry` is populated with both
+reference nodes (`data.load_csv` and `clean.impute_missing`) on first import:
 
 ```python
-import colonymind.nodes.examples   # populates registry with reference nodes
-from colonymind.nodes import registry
+from colonymind.nodes import registry   # importing the package registers the in-tree nodes
 
 assert "data.load_csv" in registry
 assert "clean.impute_missing" in registry
