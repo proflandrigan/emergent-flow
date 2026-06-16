@@ -71,8 +71,9 @@ execution, and orchestration.
 
 ### Core design principles
 
-These cross-cutting decisions shape nearly every part of the system (see
-[§A of the roadmap](./planning_docs/technical_roadmap.md)):
+These cross-cutting decisions shape nearly every part of the system. Each is recorded as a
+formal Architecture Decision Record in [`docs/adr/`](./docs/adr/) and derives from
+[§A of the roadmap](./planning_docs/technical_roadmap.md):
 
 1. **The graph is the single source of truth; code is a compiled artifact.** The serialized
    graph (the intermediate representation, or *IR*) is canonical. Python is a one-way build
@@ -87,13 +88,19 @@ These cross-cutting decisions shape nearly every part of the system (see
    large artifacts (DataFrames, tensors, models, reports) serialize to a disk/object store
    via Arrow / Parquet / safetensors.
 
+See the [Architecture Decision Records](./docs/adr/) for the full context, decision, and
+consequences of each: [ADR 0001](./docs/adr/0001-graph-is-single-source-of-truth.md),
+[ADR 0002](./docs/adr/0002-execute-the-ir-not-the-string.md),
+[ADR 0003](./docs/adr/0003-sdk-supports-two-paradigms.md),
+[ADR 0004](./docs/adr/0004-storage-tiering.md).
+
 ### Example of generated code
 
 The visual builder compiles structured SDK objects rather than arbitrary code blocks, so the
 output stays clean and maintainable:
 
 ```python
-import colony_mind as cm
+import colonymind as cm
 
 # 1. Data ingestion & imputation
 df = cm.data.load_csv("customer_churn.csv")
@@ -160,6 +167,10 @@ with the IR designed CRDT-ready from the start.
 
 ```
 colony-mind/
+├── docs/
+│   └── adr/                  # Architecture Decision Records (foundational decisions)
+├── epics/
+│   └── epic-1-core-sdk-and-ir.md  # Epic 1 — Core SDK & graph IR
 ├── planning_docs/
 │   ├── proposal.md           # Product vision & market mapping
 │   └── technical_roadmap.md  # Engineering decomposition (epics, phases, decisions)

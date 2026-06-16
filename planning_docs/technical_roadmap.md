@@ -41,7 +41,7 @@ There are two ways to "run" a graph: (a) generate a Python string and `exec()` i
 
 ### A3. The SDK supports two paradigms, not one
 
-The clean example in the proposal (`oc.data.load_csv(...) → oc.clean.impute_missing(...) → oc.stats.anova(...)`) is a **functional pipeline**: each node is one function call returning an inspectable object. That maps beautifully to data prep, stats, and classical ML. It does **not** map to deep learning, where a model is a *declarative module graph* (a `nn.Module` class), nor cleanly to multi-agent graphs (stateful, cyclic-ish control flow).
+The clean example in the proposal (`cm.data.load_csv(...) → cm.clean.impute_missing(...) → cm.stats.anova(...)`) is a **functional pipeline**: each node is one function call returning an inspectable object. That maps beautifully to data prep, stats, and classical ML. It does **not** map to deep learning, where a model is a *declarative module graph* (a `nn.Module` class), nor cleanly to multi-agent graphs (stateful, cyclic-ish control flow).
 
 **Recommendation:** Design the SDK and codegen around two first-class shapes from day one:
 
