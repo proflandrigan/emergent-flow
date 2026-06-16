@@ -14,6 +14,7 @@ and Story 1 of [Epic 1](../../epics/epic-1-core-sdk-and-ir.md).
 | [0002](./0002-execute-the-ir-not-the-string.md) | Execute the IR, not the generated string | Accepted |
 | [0003](./0003-sdk-supports-two-paradigms.md) | The SDK supports two paradigms from day one | Accepted |
 | [0004](./0004-storage-tiering.md) | Storage tiering: metadata in Redis, artifacts on disk/object store | Accepted |
+| [0005](./0005-node-definition-contract.md) | Node-definition contract: a serializable spec plus Python behaviour | Accepted |
 
 ## Conventions
 
