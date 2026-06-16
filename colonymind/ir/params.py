@@ -11,12 +11,12 @@ The full type system lives in Epic 5; ``type_token`` is an opaque label for
 now (e.g. ``"str"``, ``"int"``, ``"DataFrame"``).
 """
 
-from typing import Union
+from typing import Annotated, Any, Union
 
-from pydantic import field_validator
+from pydantic import Discriminator, Tag, field_validator
 from typing_extensions import TypeAliasType
 
-from .common import ArtifactRef, IRModel
+from .common import ARTIFACT_REF_KIND, ArtifactRef, IRModel
 
 # ---------------------------------------------------------------------------
 # Value type alias
@@ -24,19 +24,45 @@ from .common import ArtifactRef, IRModel
 
 JsonScalar = Union[str, int, float, bool, None]
 
+
+def _param_value_discriminator(v: Any) -> str:
+    """Route a ParamValue to the right union member.
+
+    A serialized ArtifactRef is a JSON object that *also* validates as
+    ``dict[str, ParamValue]``, so a plain config mapping shaped like an ArtifactRef
+    (e.g. ``{"uri": "..."}``) would otherwise decay into — or masquerade as — an
+    ArtifactRef across a round-trip. The fixed ``kind="artifact_ref"`` tag
+    (``ArtifactRef.kind``) disambiguates: only mappings carrying that tag are parsed
+    as ArtifactRef; every other mapping stays a plain mapping. This makes JSON
+    round-trips lossless in both directions.
+    """
+    if isinstance(v, ArtifactRef):
+        return "artifact_ref"
+    if isinstance(v, dict):
+        return "artifact_ref" if v.get("kind") == ARTIFACT_REF_KIND else "mapping"
+    if isinstance(v, (list, tuple, set, frozenset)):
+        # set/frozenset are not JSON-native; the sequence member lax-coerces them
+        # to a list, preserving the prior "serializable, not identity" contract.
+        return "sequence"
+    return "scalar"
+
+
 # ParamValue covers JSON-native data plus ArtifactRef (artifact location pointer).
 # This is a *recursive* alias (lists/dicts of ParamValue). Pydantic v2 cannot build a
 # core schema for a bare recursive ``Union`` alias under ``from __future__ import
 # annotations`` (it recurses infinitely — see pydantic docs on named recursive types).
 # ``TypeAliasType`` gives the alias a name so Pydantic can tie the recursive knot. This
 # is the PEP-695-equivalent for Python 3.11, which lacks the native ``type`` statement.
-# ArtifactRef is placed before list/dict: a serialized ArtifactRef is a JSON object that
-# also validates as ``dict[str, ParamValue]``. Pydantic's smart union mode tie-breaks by
-# declaration order, so ArtifactRef must precede dict to be preserved across a round-trip
-# rather than decaying into a plain dict.
+# The members are a tagged (discriminated) union: ``_param_value_discriminator`` picks the
+# member by inspecting the value, so ArtifactRef and plain mappings never collide.
 ParamValue = TypeAliasType(
     "ParamValue",
-    "Union[JsonScalar, ArtifactRef, list[ParamValue], dict[str, ParamValue]]",
+    "Annotated[Union["
+    "Annotated[JsonScalar, Tag('scalar')],"
+    "Annotated[ArtifactRef, Tag('artifact_ref')],"
+    "Annotated[list[ParamValue], Tag('sequence')],"
+    "Annotated[dict[str, ParamValue], Tag('mapping')]"
+    "], Discriminator(_param_value_discriminator)]",
 )
 
 

@@ -14,8 +14,14 @@ ADR refs:
 
 import uuid
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+# Discriminator tag identifying a serialized ArtifactRef. See ``ARTIFACT_REF_KIND``
+# usage in ``colonymind.ir.params`` — it lets a serialized ArtifactRef be told apart
+# from a plain mapping that happens to share its shape, keeping round-trips lossless.
+ARTIFACT_REF_KIND: Literal["artifact_ref"] = "artifact_ref"
 
 # ---------------------------------------------------------------------------
 # ID helpers
@@ -77,8 +83,18 @@ class ArtifactRef(IRModel):
     Deliberately carries *no* bytes — only a location URI and an optional
     media-type hint.  Embedding artifact bytes in the IR is forbidden by
     ADR 0004.
+
+    The ``kind`` field is a fixed discriminator tag (``"artifact_ref"``). It is
+    always emitted on serialization so that an ArtifactRef can be distinguished
+    from a plain mapping that happens to share its shape (e.g. a config dict with
+    a ``uri`` key). ``ParamValue`` uses it to route deserialization, which keeps
+    JSON round-trips lossless. It defaults, so construction stays ``ArtifactRef(uri=...)``.
     """
 
+    kind: Literal["artifact_ref"] = Field(
+        default=ARTIFACT_REF_KIND,
+        description='Fixed discriminator tag; always "artifact_ref".',
+    )
     uri: str = Field(..., description="Location of the artifact (path or object-store URI).")
     media_type: str | None = Field(
         default=None,

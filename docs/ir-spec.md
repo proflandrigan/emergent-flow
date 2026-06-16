@@ -121,17 +121,23 @@ is enforced by `Graph`'s model validator.
 `str | int | float | bool | None | ArtifactRef | list[ParamValue] | dict[str, ParamValue]`.
 The full type system (Epic 5) will narrow this; `type_token` is a placeholder label now.
 
+It is a *discriminated* union: an `ArtifactRef` is recognized only by its `kind`
+discriminator tag (see below). A plain mapping that happens to share `ArtifactRef`'s
+shape (e.g. `{"uri": "..."}`) is preserved as a mapping, so JSON round-trips are lossless.
+
 ### ArtifactRef
 
 `colonymind.ir.common.ArtifactRef` — a pointer to a large artifact stored outside the IR.
 
 | Field | Type | Default | Semantics |
 |---|---|---|---|
+| `kind` | `Literal["artifact_ref"]` | `"artifact_ref"` | Fixed discriminator tag; always emitted so a serialized `ArtifactRef` is distinguishable from a plain mapping. |
 | `uri` | `str` | required | Location of the artifact (file path or object-store URI). Non-empty. |
 | `media_type` | `str \| None` | `None` | Optional MIME hint, e.g. `"application/parquet"`. |
 
 Artifact bytes are never embedded in the IR (ADR 0004). `ArtifactRef` carries only a
-location pointer and an optional media-type hint.
+location pointer and an optional media-type hint. The `kind` tag defaults, so construction
+stays `ArtifactRef(uri=...)`; it exists purely to make `ParamValue` round-trips lossless.
 
 ---
 

@@ -103,6 +103,42 @@ class TestArtifactRefValue:
         p = Param(name="frame", type_token="DataFrame", default=ref)
         assert isinstance(p.default, ArtifactRef)
 
+    def test_artifact_ref_construction_stays_ergonomic(self):
+        """The discriminator tag defaults, so ArtifactRef(uri=...) needs no kind."""
+        ref = ArtifactRef(uri="s3://b/k")
+        assert ref.kind == "artifact_ref"
+
+    def test_artifact_ref_emits_discriminator_tag(self):
+        """A serialized ArtifactRef carries kind='artifact_ref'."""
+        p = Param(name="frame", type_token="DataFrame", value=ArtifactRef(uri="s3://b/k"))
+        dumped = json.loads(p.model_dump_json())
+        assert dumped["value"]["kind"] == "artifact_ref"
+
+    def test_plain_dict_shaped_like_artifact_ref_stays_dict(self):
+        """A plain mapping that happens to share ArtifactRef's shape must NOT be
+        coerced into an ArtifactRef — the discriminator keeps the round-trip lossless.
+        """
+        value = {"uri": "http://example.com/webhook", "media_type": "application/json"}
+        original = Param(name="cfg", type_token="dict", value=value)
+        assert isinstance(original.value, dict)
+        reloaded = Param.model_validate_json(original.model_dump_json())
+        assert isinstance(reloaded.value, dict)
+        assert reloaded == original
+        assert reloaded.value == value
+
+    def test_nested_artifact_ref_round_trip(self):
+        """ArtifactRefs nested inside lists/dicts survive a round-trip as ArtifactRefs."""
+        original = Param(
+            name="frames",
+            type_token="list",
+            value=[ArtifactRef(uri="s3://a"), {"plain": {"uri": "not-an-artifact"}}],
+        )
+        reloaded = Param.model_validate_json(original.model_dump_json())
+        assert isinstance(reloaded.value[0], ArtifactRef)
+        assert isinstance(reloaded.value[1], dict)
+        assert isinstance(reloaded.value[1]["plain"], dict)
+        assert reloaded == original
+
 
 # ---------------------------------------------------------------------------
 # Validation rejections
