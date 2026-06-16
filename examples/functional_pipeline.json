@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "paradigm": "functional",
+  "name": "Functional Pipeline Example",
+  "nodes": {
+    "n-load": {
+      "id": "n-load",
+      "type": "data.load_csv",
+      "label": "Load CSV",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "path",
+          "type_token": "str",
+          "value": "data/experiment.csv",
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-load-out",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-impute": {
+      "id": "n-impute",
+      "type": "clean.impute_missing",
+      "label": "Impute Missing",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "strategy",
+          "type_token": "str",
+          "value": "median",
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-impute-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-impute-out",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 200.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-anova": {
+      "id": "n-anova",
+      "type": "stats.anova",
+      "label": "ANOVA",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "dv",
+          "type_token": "str",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "between",
+          "type_token": "str",
+          "value": null,
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-anova-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 400.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    }
+  },
+  "edges": {
+    "e-load-impute": {
+      "id": "e-load-impute",
+      "source": {
+        "node_id": "n-load",
+        "port_id": "p-load-out"
+      },
+      "target": {
+        "node_id": "n-impute",
+        "port_id": "p-impute-in"
+      },
+      "type_compatible": null
+    },
+    "e-impute-anova": {
+      "id": "e-impute-anova",
+      "source": {
+        "node_id": "n-impute",
+        "port_id": "p-impute-out"
+      },
+      "target": {
+        "node_id": "n-anova",
+        "port_id": "p-anova-in"
+      },
+      "type_compatible": null
+    }
+  }
+}

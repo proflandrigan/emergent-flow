@@ -42,16 +42,16 @@
 > The canonical, serializable graph representation. Declarative data (JSON/Protobuf-able),
 > not a runtime-only Python object graph — the frontend must produce valid IR with no Python present.
 
-- [ ] Define the **node** model (id, type/family, label, params, position, group membership).
-- [ ] Define the **port** model (id, direction in/out, declared data type, cardinality).
-- [ ] Define the **edge** model (source port → target port, with type-compatibility metadata).
-- [ ] Define **params** typing (typed, defaulted, serializable parameter values per node).
-- [ ] Define **sub-graphs / groups / nesting** (collapsible composite nodes).
-- [ ] Model the **two paradigms** in the schema (functional-pipeline vs. declarative-module graphs) per A3.
-- [ ] Embed a **schema version** field on every serialized graph.
-- [ ] Choose the serialization format (recommend JSON-first, Protobuf-able later) and document the choice.
-- [ ] Make the IR **CRDT-friendly** in shape (stable IDs, mergeable structure) so multiplayer (Epic 13) can be added without a rewrite.
-- [ ] Publish the schema as a formal spec (JSON Schema / Pydantic models) with examples.
+- [x] Define the **node** model (id, type/family, label, params, position, group membership).
+- [x] Define the **port** model (id, direction in/out, declared data type, cardinality).
+- [x] Define the **edge** model (source port → target port, with type-compatibility metadata).
+- [x] Define **params** typing (typed, defaulted, serializable parameter values per node).
+- [x] Define **sub-graphs / groups / nesting** (collapsible composite nodes).
+- [x] Model the **two paradigms** in the schema (functional-pipeline vs. declarative-module graphs) per A3.
+- [x] Embed a **schema version** field on every serialized graph.
+- [x] Choose the serialization format (recommend JSON-first, Protobuf-able later) and document the choice.
+- [x] Make the IR **CRDT-friendly** in shape (stable IDs, mergeable structure) so multiplayer (Epic 13) can be added without a rewrite.
+- [x] Publish the schema as a formal spec (JSON Schema / Pydantic models) with examples.
 
 ---
 
