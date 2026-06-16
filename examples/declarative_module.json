@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "paradigm": "declarative",
+  "name": "Declarative Module Example",
+  "nodes": {
+    "n-module": {
+      "id": "n-module",
+      "type": "nn.module",
+      "label": "SimpleClassifier",
+      "paradigm": "declarative",
+      "params": [],
+      "ports": [],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": {
+        "schema_version": 1,
+        "paradigm": "declarative",
+        "name": "SimpleClassifier body",
+        "nodes": {
+          "n-linear1": {
+            "id": "n-linear1",
+            "type": "nn.linear",
+            "label": "Linear 128→64",
+            "paradigm": "declarative",
+            "params": [
+              {
+                "name": "in_features",
+                "type_token": "int",
+                "value": 128,
+                "default": null
+              },
+              {
+                "name": "out_features",
+                "type_token": "int",
+                "value": 64,
+                "default": null
+              }
+            ],
+            "ports": [
+              {
+                "id": "p-linear1-in",
+                "name": "x",
+                "direction": "in",
+                "data_type": "Tensor",
+                "cardinality": "one"
+              },
+              {
+                "id": "p-linear1-out",
+                "name": "out",
+                "direction": "out",
+                "data_type": "Tensor",
+                "cardinality": "one"
+              }
+            ],
+            "position": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "group_id": null,
+            "subgraph": null
+          },
+          "n-relu": {
+            "id": "n-relu",
+            "type": "nn.relu",
+            "label": "ReLU",
+            "paradigm": "declarative",
+            "params": [],
+            "ports": [
+              {
+                "id": "p-relu-in",
+                "name": "x",
+                "direction": "in",
+                "data_type": "Tensor",
+                "cardinality": "one"
+              },
+              {
+                "id": "p-relu-out",
+                "name": "out",
+                "direction": "out",
+                "data_type": "Tensor",
+                "cardinality": "one"
+              }
+            ],
+            "position": {
+              "x": 200.0,
+              "y": 0.0
+            },
+            "group_id": null,
+            "subgraph": null
+          },
+          "n-linear2": {
+            "id": "n-linear2",
+            "type": "nn.linear",
+            "label": "Linear 64→10",
+            "paradigm": "declarative",
+            "params": [
+              {
+                "name": "in_features",
+                "type_token": "int",
+                "value": 64,
+                "default": null
+              },
+              {
+                "name": "out_features",
+                "type_token": "int",
+                "value": 10,
+                "default": null
+              }
+            ],
+            "ports": [
+              {
+                "id": "p-linear2-in",
+                "name": "x",
+                "direction": "in",
+                "data_type": "Tensor",
+                "cardinality": "one"
+              },
+              {
+                "id": "p-linear2-out",
+                "name": "out",
+                "direction": "out",
+                "data_type": "Tensor",
+                "cardinality": "one"
+              }
+            ],
+            "position": {
+              "x": 400.0,
+              "y": 0.0
+            },
+            "group_id": null,
+            "subgraph": null
+          }
+        },
+        "edges": {
+          "e-linear1-relu": {
+            "id": "e-linear1-relu",
+            "source": {
+              "node_id": "n-linear1",
+              "port_id": "p-linear1-out"
+            },
+            "target": {
+              "node_id": "n-relu",
+              "port_id": "p-relu-in"
+            },
+            "type_compatible": null
+          },
+          "e-relu-linear2": {
+            "id": "e-relu-linear2",
+            "source": {
+              "node_id": "n-relu",
+              "port_id": "p-relu-out"
+            },
+            "target": {
+              "node_id": "n-linear2",
+              "port_id": "p-linear2-in"
+            },
+            "type_compatible": null
+          }
+        }
+      }
+    }
+  },
+  "edges": {}
+}
