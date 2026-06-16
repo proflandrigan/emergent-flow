@@ -48,7 +48,11 @@ class PortSpec(IRModel):
     Fields
     ------
     name:
-        Port name, unique within its node (required, non-empty).
+        Port name, unique among the node's ports of the *same direction*
+        (required, non-empty).  IN and OUT ports may share a name — ``execute``
+        keys its ``inputs`` by IN-port name and its return by OUT-port name, so
+        the two namespaces are independent (e.g. ``clean.impute_missing`` has an
+        IN ``table`` and an OUT ``table``).
     direction:
         IN or OUT (required).
     data_type:

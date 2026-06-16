@@ -91,6 +91,16 @@ class TestImputeMissing:
         dirs = sorted(p.direction.value for p in spec.ports)
         assert dirs == ["in", "out"]
 
+    def test_in_and_out_ports_may_share_a_name(self):
+        # Contract: port names are unique only *within a direction*; the IN and
+        # OUT ``table`` namespaces are independent, and instantiate() must still
+        # mint a graph-valid node (distinct port ids).
+        node = ImputeMissing().instantiate()
+        by_dir = {p.direction: p for p in node.ports}
+        assert by_dir[Direction.IN].name == by_dir[Direction.OUT].name == "table"
+        assert by_dir[Direction.IN].id != by_dir[Direction.OUT].id
+        Graph(nodes={node.id: node})
+
     def test_strategy_choices_hint(self):
         spec = ImputeMissing().to_spec()
         strategy = next(p for p in spec.params if p.name == "strategy")

@@ -55,7 +55,7 @@ All spec models are Pydantic v2 subclasses of `IRModel` (`extra="forbid"`,
 
 | Field | Type | Default | Semantics |
 |---|---|---|---|
-| `name` | `str` | — | Port name, unique within the node (non-empty). |
+| `name` | `str` | — | Port name, unique among the node's ports of the same direction (non-empty). IN and OUT may share a name — `execute` keys inputs/outputs in separate namespaces. |
 | `direction` | `Direction` | — | `"in"` or `"out"`. |
 | `data_type` | `str` | `"any"` | Opaque data-type token (full type system is Epic 5). |
 | `cardinality` | `Cardinality` | `"one"` | How many edges may attach (`"one"`/`"many"`). |
