@@ -1,0 +1,246 @@
+{
+  "schema_version": 1,
+  "paradigm": "functional",
+  "name": "Vertical Slice Example",
+  "nodes": {
+    "n-load": {
+      "id": "n-load",
+      "type": "data.load_csv",
+      "label": "Load CSV",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "path",
+          "type_token": "str",
+          "value": "sample.csv",
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-load-frame",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-impute": {
+      "id": "n-impute",
+      "type": "clean.impute_missing",
+      "label": "Impute Missing",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "strategy",
+          "type_token": "str",
+          "value": "median",
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-impute-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-impute-out",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 200.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-anova": {
+      "id": "n-anova",
+      "type": "stats.anova",
+      "label": "ANOVA",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "group_col",
+          "type_token": "str",
+          "value": "cohort",
+          "default": null
+        },
+        {
+          "name": "value_col",
+          "type_token": "str",
+          "value": "score",
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-anova-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-anova-out",
+          "name": "result",
+          "direction": "out",
+          "data_type": "AnovaResult",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 400.0,
+        "y": -150.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-train": {
+      "id": "n-train",
+      "type": "ml.train_classifier",
+      "label": "Train Classifier",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "target",
+          "type_token": "str",
+          "value": "converted",
+          "default": null
+        },
+        {
+          "name": "features",
+          "type_token": "list[str]",
+          "value": [
+            "age",
+            "spend",
+            "score"
+          ],
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-train-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-train-out",
+          "name": "result",
+          "direction": "out",
+          "data_type": "ClassifierResult",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 400.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-report": {
+      "id": "n-report",
+      "type": "reports.generate_html_summary",
+      "label": "HTML Summary",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "title",
+          "type_token": "str",
+          "value": "Colony Mind — Vertical Slice",
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-report-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-report-out",
+          "name": "html",
+          "direction": "out",
+          "data_type": "HTML",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 400.0,
+        "y": 150.0
+      },
+      "group_id": null,
+      "subgraph": null
+    }
+  },
+  "edges": {
+    "e-load-impute": {
+      "id": "e-load-impute",
+      "source": {
+        "node_id": "n-load",
+        "port_id": "p-load-frame"
+      },
+      "target": {
+        "node_id": "n-impute",
+        "port_id": "p-impute-in"
+      },
+      "type_compatible": null
+    },
+    "e-impute-anova": {
+      "id": "e-impute-anova",
+      "source": {
+        "node_id": "n-impute",
+        "port_id": "p-impute-out"
+      },
+      "target": {
+        "node_id": "n-anova",
+        "port_id": "p-anova-in"
+      },
+      "type_compatible": null
+    },
+    "e-impute-train": {
+      "id": "e-impute-train",
+      "source": {
+        "node_id": "n-impute",
+        "port_id": "p-impute-out"
+      },
+      "target": {
+        "node_id": "n-train",
+        "port_id": "p-train-in"
+      },
+      "type_compatible": null
+    },
+    "e-impute-report": {
+      "id": "e-impute-report",
+      "source": {
+        "node_id": "n-impute",
+        "port_id": "p-impute-out"
+      },
+      "target": {
+        "node_id": "n-report",
+        "port_id": "p-report-in"
+      },
+      "type_compatible": null
+    }
+  }
+}

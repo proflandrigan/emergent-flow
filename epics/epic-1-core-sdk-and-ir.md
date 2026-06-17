@@ -119,13 +119,13 @@
 > Deliberately narrow but end-to-end: the exact flow from the proposal example
 > (load → clean → one stats test → one model → HTML report). Breadth comes later (Epic 4).
 
-- [ ] **Data ingestion** wrapper (Pandas/Polars) — e.g. `cm.data.load_csv(...)`.
-- [ ] **Cleaning / imputation** wrapper — e.g. `cm.clean.impute_missing(...)`.
-- [ ] **Statistical analytics** wrapper (Pingouin/Statsmodels) — e.g. `cm.stats.anova(...)`.
-- [ ] **Classical ML** wrapper (Scikit-Learn) — e.g. `cm.ml.train_classifier(...)`.
-- [ ] **Automated reporting** wrapper (YData-Profiling / Sweetviz) — e.g. `cm.reports.generate_html_summary(...)`.
-- [ ] Register all of the above as node definitions conforming to Story 3.
-- [ ] Author one worked example graph that exercises the full slice end to end.
+- [x] **Data ingestion** wrapper (Pandas/Polars) — e.g. `cm.data.load_csv(...)`.
+- [x] **Cleaning / imputation** wrapper — e.g. `cm.clean.impute_missing(...)`.
+- [x] **Statistical analytics** wrapper (Pingouin/Statsmodels) — e.g. `cm.stats.anova(...)`.
+- [x] **Classical ML** wrapper (Scikit-Learn) — e.g. `cm.ml.train_classifier(...)`.
+- [x] **Automated reporting** wrapper (YData-Profiling / Sweetviz) — e.g. `cm.reports.generate_html_summary(...)`.
+- [x] Register all of the above as node definitions conforming to Story 3.
+- [x] Author one worked example graph that exercises the full slice end to end.
 
 ---
 

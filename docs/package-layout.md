@@ -45,21 +45,26 @@ self-register at import time and serve as examples for authoring custom nodes.
 
 ## Public namespace convention (functional pipeline)
 
-The following `cm.*` namespaces define the functional-pipeline layer. They are a **documented
-convention**; the node families implementing these operations land in **Epic 1 Story 8** and
-are not yet importable.
+The following `cm.*` namespaces define the functional-pipeline layer. They are implemented as
+of **Epic 1 Story 8** — each is a thin, `@cm.public_op`-decorated wrapper over a trusted
+library (see [SDK Design Philosophy](sdk-design-philosophy.md)).
 
-| Namespace | Purpose | Representative call |
-|-----------|---------|----------------------|
-| `cm.data` | Data ingestion and source loading | `cm.data.load_csv(path)` |
-| `cm.clean` | Cleaning, transformation, and imputation | `cm.clean.impute_missing(table)` |
-| `cm.stats` | Statistical analytics and aggregation | `cm.stats.anova(groups)` |
-| `cm.ml` | Classical machine learning workflows | `cm.ml.train_classifier(X, y)` |
-| `cm.reports` | Automated reporting and visualization | `cm.reports.generate_html_summary(data)` |
+| Namespace | Purpose | Representative call | Backed by |
+|-----------|---------|----------------------|-----------|
+| `cm.data` | Data ingestion and source loading | `cm.data.load_csv(path)` | pandas |
+| `cm.clean` | Cleaning, transformation, and imputation | `cm.clean.impute_missing(df)` | scikit-learn |
+| `cm.stats` | Statistical analytics and aggregation | `cm.stats.anova(df, group_col=..., value_col=...)` | Pingouin |
+| `cm.ml` | Classical machine learning workflows | `cm.ml.train_classifier(df, target=...)` | scikit-learn |
+| `cm.reports` | Automated reporting and visualization | `cm.reports.generate_html_summary(df)` | ydata-profiling |
 
-**Important:** these namespaces are a documented convention describing the planned structure
-and API surface. The node implementations and Python functions are **not yet available for
-import**. They will be added as part of Epic 1 Story 8.
+Each family is registered as a node definition (`data.load_csv`, `clean.impute_missing`,
+`stats.anova`, `ml.train_classifier`, `reports.generate_html_summary`) conforming to the Story 3
+contract, and a worked end-to-end example lives in
+[`examples/vertical_slice/`](../examples/vertical_slice/).
+
+**Note:** the families are imported **lazily** — `import colonymind as cm` stays lightweight
+and the heavy scientific stack is only pulled in the first time you touch `cm.data`, `cm.stats`,
+etc. (or import the submodule directly, e.g. `from colonymind.stats import anova`).
 
 ---
 

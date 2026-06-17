@@ -3,18 +3,27 @@ colonymind.nodes.examples
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Reference node definitions that conform to the Story 3 contract.
 
-These are deliberately minimal, dependency-free implementations whose purpose is
-to *prove the contract* — not to be the production data-science wrappers (those
-arrive in Story 8 on top of this same base class, backed by pandas/Pingouin/etc.).
-
-To keep ADR 0002's "execute == compiled code" invariant trivially true and the
-test-suite dependency-free, each node's ``execute`` and ``codegen`` both route
-through the same small runtime helper (``read_csv_rows`` / ``impute_missing``).
-This also models the Story 7 "thin wrapper" rule: exported code calls SDK
-functions rather than re-implementing them inline.
+These are the real, library-backed Story 8 reference node families — no
+longer the dependency-free toys from Story 3. Each node's ``execute`` and
+``codegen`` both route through the same ``cm.*`` public-op wrapper
+(``colonymind.data``, ``colonymind.clean``, ``colonymind.stats``,
+``colonymind.ml``, ``colonymind.reports`` — backed by pandas, scikit-learn,
+Pingouin, and ydata-profiling respectively), which keeps ADR 0002's
+"execute == compiled code" invariant true by construction and models the
+Story 7 "thin wrapper" rule: exported code calls SDK functions rather than
+re-implementing them inline.
 """
 
+from .anova import Anova
 from .impute import ImputeMissing
 from .load_csv import LoadCsv
+from .report import GenerateHtmlSummary
+from .train import TrainClassifier
 
-__all__ = ["LoadCsv", "ImputeMissing"]
+__all__ = [
+    "LoadCsv",
+    "ImputeMissing",
+    "Anova",
+    "TrainClassifier",
+    "GenerateHtmlSummary",
+]

@@ -26,6 +26,17 @@ classifiers = [
 ]
 dependencies = [
     "pydantic>=2.5,<3",
+    # Story 8 functional-pipeline vertical slice. These are hard (required)
+    # dependencies: the SDK's first concrete node families are thin wrappers
+    # over these trusted libraries (see docs/sdk-design-philosophy.md).
+    "pandas>=2,<3",
+    "pingouin>=0.5",
+    "scikit-learn>=1.4",
+    "ydata-profiling>=4",
+    # ydata-profiling imports pkg_resources at runtime but does not declare
+    # setuptools as a dependency. Pin it explicitly, and below 81 where
+    # pkg_resources was removed, so the report family imports cleanly.
+    "setuptools>=68,<81",
 ]
 
 [project.urls]
@@ -72,3 +83,10 @@ check_untyped_defs = true
 [tool.pydantic-mypy]
 init_forbid_extra = true
 init_typed = true
+
+# Story 8 wrapped libraries that ship no type stubs / py.typed marker. Treat
+# their imports as untyped so mypy stays green without vendoring stubs; the
+# wrappers themselves remain fully annotated at their public boundary.
+[[tool.mypy.overrides]]
+module = ["pandas.*", "pingouin.*", "ydata_profiling.*", "sklearn.*"]
+ignore_missing_imports = true
