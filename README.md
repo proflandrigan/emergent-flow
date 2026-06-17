@@ -67,7 +67,7 @@ execution, and orchestration.
                              ▼
 ┌──────────────────────────────────────────────────────────┐
 │               CORE PYTHON SDK & EXECUTION                 │
-│     Pandas / Polars  |  Pingouin  |  Scikit-Learn         │
+│    Pandas / Polars  |  Statsmodels  |  Scikit-Learn       │
 │          PyTorch  |  LangGraph  |  YData-Profiling        │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -135,7 +135,7 @@ cm.reports.generate_html_summary(model, metrics, output_path="churn_report.html"
 | **Frontend canvas** | React Flow / Rete.js, Tailwind CSS, Vite |
 | **Backend engine** | FastAPI, Celery, Redis, Jinja2 |
 | **Data wrangling** | Pandas, Polars |
-| **Statistics** | Pingouin, Statsmodels |
+| **Statistics** | Statsmodels |
 | **Machine learning** | Scikit-Learn |
 | **Deep learning** | PyTorch |
 | **GenAI / agents** | LangGraph (provider-agnostic LLM nodes) |

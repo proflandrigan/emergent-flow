@@ -61,6 +61,13 @@ def anova(
         raise ValueError(f"unknown group_col {group_col!r}; expected one of {list(df.columns)!r}.")
     if value_col not in df.columns:
         raise ValueError(f"unknown value_col {value_col!r}; expected one of {list(df.columns)!r}.")
+    if group_col == value_col:
+        raise ValueError(f"group_col and value_col must differ; both were {group_col!r}.")
+    n_groups = int(df[group_col].nunique())
+    if n_groups < 2:
+        raise ValueError(
+            f"one-way ANOVA needs at least 2 distinct groups in {group_col!r}; found {n_groups}."
+        )
 
     # Rename to fixed, safe tokens so arbitrary column names (spaces, dots,
     # reserved words) cannot break the patsy/statsmodels formula parser.
