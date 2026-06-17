@@ -3,7 +3,7 @@ colonymind.nodes.examples.anova
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Reference node: ``stats.anova`` — a *transform* node (1 in, 1 out).
 
-Real, Pingouin-backed one-way ANOVA (Epic 1, Story 8). ``execute`` calls
+Real, statsmodels-backed one-way ANOVA (Epic 1, Story 8). ``execute`` calls
 ``colonymind.stats.anova`` directly and the code emitted by ``codegen`` calls
 the same wrapper via the ``cm.`` alias, so the two paths are equivalent by
 construction (ADR 0002).

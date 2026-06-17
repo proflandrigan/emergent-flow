@@ -81,5 +81,5 @@ in order.
 - **Discovery and registration** of definitions (the registry / plugin architecture) is
   Story 4; this ADR defines only the contract a registered node conforms to.
 - **Real type/shape inference** is Epic 5; `infer_types` here is a token-level placeholder.
-- The **production wrapped node families** (pandas, Pingouin, scikit-learn, …) are Story 8,
+- The **production wrapped node families** (pandas, statsmodels, scikit-learn, …) are Story 8,
   built on this base class; the nodes in `colonymind.nodes.examples` are minimal references.

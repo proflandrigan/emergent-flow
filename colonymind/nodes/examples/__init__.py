@@ -8,7 +8,7 @@ longer the dependency-free toys from Story 3. Each node's ``execute`` and
 ``codegen`` both route through the same ``cm.*`` public-op wrapper
 (``colonymind.data``, ``colonymind.clean``, ``colonymind.stats``,
 ``colonymind.ml``, ``colonymind.reports`` — backed by pandas, scikit-learn,
-Pingouin, and ydata-profiling respectively), which keeps ADR 0002's
+statsmodels, and ydata-profiling respectively), which keeps ADR 0002's
 "execute == compiled code" invariant true by construction and models the
 Story 7 "thin wrapper" rule: exported code calls SDK functions rather than
 re-implementing them inline.

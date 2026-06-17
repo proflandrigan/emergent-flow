@@ -51,6 +51,20 @@ def test_anova_missing_column_raises() -> None:
         anova(df, group_col="nope", value_col="score")
 
 
+def test_anova_same_column_raises() -> None:
+    df = _separable_groups_df()
+
+    with pytest.raises(ValueError, match="must differ"):
+        anova(df, group_col="score", value_col="score")
+
+
+def test_anova_single_group_raises() -> None:
+    df = pd.DataFrame({"grp": ["a", "a", "a"], "score": [1.0, 2.0, 3.0]})
+
+    with pytest.raises(ValueError, match="at least 2 distinct groups"):
+        anova(df, group_col="grp", value_col="score")
+
+
 def test_anova_deterministic() -> None:
     df = _separable_groups_df()
 

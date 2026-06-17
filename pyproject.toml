@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -12,8 +12,8 @@ authors = [
     { name = "Colony Mind" },
 ]
 keywords = ["data-science", "machine-learning", "visual-programming", "graph", "ir"]
-# NOTE: license intentionally omitted — the open-core SDK/platform license boundary is
-# decided in Epic 1 Story 10. Do not assert a license or add License classifiers here.
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -30,7 +30,10 @@ dependencies = [
     # dependencies: the SDK's first concrete node families are thin wrappers
     # over these trusted libraries (see docs/sdk-design-philosophy.md).
     "pandas>=2,<3",
-    "pingouin>=0.5",
+    # statsmodels (BSD-3-Clause) backs cm.stats.anova. It replaced pingouin,
+    # which is GPL-3.0 and incompatible with this SDK's Apache-2.0 license
+    # (see docs/licensing-and-dependencies.md).
+    "statsmodels>=0.14,<1",
     "scikit-learn>=1.4",
     "ydata-profiling>=4",
     # ydata-profiling imports pkg_resources at runtime but does not declare
@@ -88,5 +91,5 @@ init_typed = true
 # their imports as untyped so mypy stays green without vendoring stubs; the
 # wrappers themselves remain fully annotated at their public boundary.
 [[tool.mypy.overrides]]
-module = ["pandas.*", "pingouin.*", "ydata_profiling.*", "sklearn.*"]
+module = ["pandas.*", "statsmodels.*", "ydata_profiling.*", "sklearn.*"]
 ignore_missing_imports = true

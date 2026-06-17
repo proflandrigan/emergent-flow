@@ -67,7 +67,7 @@ execution, and orchestration.
                              ▼
 ┌──────────────────────────────────────────────────────────┐
 │               CORE PYTHON SDK & EXECUTION                 │
-│     Pandas / Polars  |  Pingouin  |  Scikit-Learn         │
+│    Pandas / Polars  |  Statsmodels  |  Scikit-Learn       │
 │          PyTorch  |  LangGraph  |  YData-Profiling        │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -135,7 +135,7 @@ cm.reports.generate_html_summary(model, metrics, output_path="churn_report.html"
 | **Frontend canvas** | React Flow / Rete.js, Tailwind CSS, Vite |
 | **Backend engine** | FastAPI, Celery, Redis, Jinja2 |
 | **Data wrangling** | Pandas, Polars |
-| **Statistics** | Pingouin, Statsmodels |
+| **Statistics** | Statsmodels |
 | **Machine learning** | Scikit-Learn |
 | **Deep learning** | PyTorch |
 | **GenAI / agents** | LangGraph (provider-agnostic LLM nodes) |
@@ -219,6 +219,14 @@ Python 3.11 and 3.12.
 
 ## License
 
-To be determined. Colony Mind follows an open-core model: the Python SDK is intended to be
-open-source, with the platform as the product. The exact SDK/platform boundary is being
-decided alongside the core SDK packaging work (see Epic 1 in the roadmap).
+The Colony Mind SDK in this repository is licensed under the
+[Apache License 2.0](./LICENSE). Colony Mind follows an **open-core** model: the
+Python SDK is open source, while the collaborative platform (visual canvas,
+real-time multiplayer, hosting, and enterprise features) is a separate
+proprietary product. See [Open-Core Boundary](./docs/open-core-boundary.md) for
+what is SDK vs. platform-only, and
+[Dependency Licensing & Compatibility](./docs/licensing-and-dependencies.md) for
+the dependency-license policy.
+
+Contributions are accepted under a license-grant CLA — see
+[CONTRIBUTING.md](./CONTRIBUTING.md).
