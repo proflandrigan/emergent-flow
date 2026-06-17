@@ -29,6 +29,12 @@ from .node import Node
 
 CURRENT_SCHEMA_VERSION: int = 1
 
+# The version assumed for a serialized graph that carries no ``schema_version`` field at
+# all — i.e. one written before versioning existed. Such a graph is treated as the earliest
+# schema and routed through the full migration chain. Both the loader (serialize) and the
+# migration walker default to THIS value, so they cannot drift apart when CURRENT bumps.
+INITIAL_SCHEMA_VERSION: int = 1
+
 
 # ---------------------------------------------------------------------------
 # Graph

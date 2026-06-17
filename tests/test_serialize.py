@@ -241,6 +241,23 @@ class TestSchemaVersionPolicy:
             deserialize_graph(json.dumps(raw))
         assert exc.value.found == CURRENT_SCHEMA_VERSION + 1
 
+    def test_unmigratable_older_version_raises_schema_version_error(self, monkeypatch):
+        """An older graph with NO registered migration path surfaces as SchemaVersionError.
+
+        Exercises the MigrationError -> SchemaVersionError translation in deserialize_graph.
+        With CURRENT == 1 the only older version (0) is always migratable, so we remove the
+        v0->v1 step to make a v0 graph unmigratable through the real load path.
+        """
+        from colonymind.ir import migrate as migrate_mod
+
+        monkeypatch.setattr(migrate_mod, "_MIGRATIONS", {}, raising=True)
+        raw = json.loads(serialize_graph(build_functional_pipeline()))
+        raw["schema_version"] = 0
+        with pytest.raises(SchemaVersionError, match="could not be migrated") as exc:
+            deserialize_graph(json.dumps(raw))
+        assert exc.value.found == 0
+        assert exc.value.expected == CURRENT_SCHEMA_VERSION
+
 
 # ---------------------------------------------------------------------------
 # On-disk migration fixtures

@@ -76,6 +76,9 @@ class TestMigrateToCurrent:
         doc = {"schema_version": 2, "name": "unchanged"}
         result = migrate_to_current(doc, found=2, target=2, migrations={})
         assert result == doc
+        # The no-op still returns a NEW top-level dict (never the caller's object), so a
+        # caller mutating the result cannot reach back into its input.
+        assert result is not doc
 
     def test_missing_step_raises_migration_error(self):
         migrations = {0: bump}

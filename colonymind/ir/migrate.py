@@ -32,7 +32,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any
 
-from .graph import CURRENT_SCHEMA_VERSION
+from .graph import CURRENT_SCHEMA_VERSION, INITIAL_SCHEMA_VERSION
 
 __all__ = [
     "MigrationStep",
@@ -119,14 +119,17 @@ def migrate_to_current(
     """Migrate a parsed graph dict from schema version `found` up to `target`.
 
     Chains registered migration steps in order, stamping ``doc["schema_version"]`` with
-    the new version after each step runs. Operates on a shallow copy of `doc` made at
-    entry, so a mid-chain failure never leaves the caller's object half-stamped.
+    the new version after each step runs. Always returns a NEW top-level dict — a shallow
+    copy of `doc` is taken before anything else (including on the no-op path) — so the
+    caller's object is never re-keyed in place. Steps are required to be pure: the
+    framework does not deep-copy, so a step that mutates a nested structure of the dict it
+    receives can still affect the caller.
 
     Parameters
     ----------
     doc:
         The parsed (pre-validation) graph dict, i.e. the output of ``json.loads(...)``.
-        Not mutated — a shallow copy is taken before any step runs.
+        Not re-keyed in place — a shallow copy is returned.
     found:
         The schema version `doc` is currently at.
     target:
@@ -150,6 +153,10 @@ def migrate_to_current(
     """
     reg = _MIGRATIONS if migrations is None else migrations
 
+    # Shallow-copy up front so every return path (including the no-op) hands back a new
+    # top-level dict and never re-keys the caller's object.
+    doc = dict(doc)
+
     if found == target:
         return doc
 
@@ -158,7 +165,6 @@ def migrate_to_current(
             f"cannot migrate v{found} -> v{target}: downgrading schema versions is not supported."
         )
 
-    doc = dict(doc)
     for v in range(found, target):
         step = reg.get(v)
         if step is None:
@@ -212,10 +218,12 @@ def migrate_document(parsed: dict[str, Any]) -> dict[str, Any]:
 
 
 def _migrate_graph_level(g: dict[str, Any]) -> dict[str, Any]:
-    found = g.get("schema_version", CURRENT_SCHEMA_VERSION)
-    # dict(...) guards against migrate_to_current returning the SAME object on a no-op,
-    # which would otherwise let the nodes-reassignment below mutate the caller's dict.
-    g = dict(migrate_to_current(g, found=found))
+    # Absent version => pre-versioning graph; treat as the earliest schema (shared with the
+    # loader's _coerce_version so the two cannot drift when CURRENT bumps).
+    found = g.get("schema_version", INITIAL_SCHEMA_VERSION)
+    # migrate_to_current always returns a fresh top-level dict, so reassigning g["nodes"]
+    # below never touches the caller's object.
+    g = migrate_to_current(g, found=found)
     nodes = g.get("nodes")
     if isinstance(nodes, dict):
         g["nodes"] = {nid: _migrate_node(node) for nid, node in nodes.items()}

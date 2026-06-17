@@ -34,7 +34,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from .graph import CURRENT_SCHEMA_VERSION, Graph
+from .graph import CURRENT_SCHEMA_VERSION, INITIAL_SCHEMA_VERSION, Graph
 from .migrate import MigrationError, migrate_document
 
 __all__ = [
@@ -103,9 +103,10 @@ def _reject_if_newer(found: int) -> None:
 
 
 def _coerce_version(graph_dict: dict) -> int:
-    """Read and validate a graph dict's schema_version (absent defaults to 1, matching the
-    original pre-versioning behaviour). Raises GraphDeserializationError if it is not an int."""
-    found = graph_dict.get("schema_version", 1)
+    """Read and validate a graph dict's schema_version (absent defaults to
+    INITIAL_SCHEMA_VERSION — a pre-versioning graph — matching migrate._migrate_graph_level
+    so the two cannot drift). Raises GraphDeserializationError if it is not an int."""
+    found = graph_dict.get("schema_version", INITIAL_SCHEMA_VERSION)
     if not isinstance(found, int) or isinstance(found, bool):
         raise GraphDeserializationError(f"schema_version must be an integer, got {found!r}.")
     return found
