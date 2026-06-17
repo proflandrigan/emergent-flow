@@ -26,6 +26,49 @@ during Phase 1.
   such as the TypeScript frontend.
 - **File extension convention:** `.cm.json` for persisted graph files.
 
+## Public API (`colonymind.ir.serialize`)
+
+The reference Pydantic methods above are wrapped by a small, stable public API (Story 5).
+Application code should use these rather than calling Pydantic directly — they add
+schema-version enforcement, clean error types, and file I/O over the ``.cm.json`` convention.
+
+| Function | Purpose |
+| --- | --- |
+| `serialize_graph(graph, *, indent=2) -> str` | Graph → JSON text (embeds `schema_version`; `indent=None` for compact). |
+| `deserialize_graph(data) -> Graph` | JSON text/bytes → validated `Graph`. |
+| `save_graph(graph, path, *, indent=2) -> Path` | Serialize and write UTF-8 (trailing newline). |
+| `load_graph(path) -> Graph` | Read a file and deserialize it. |
+
+All four are re-exported from `colonymind.ir`.
+
+### Validation on load
+
+`deserialize_graph` parses JSON, checks the schema version, then runs full model +
+structural validation. Structural invariants (edges referencing real nodes/ports, port
+directions, group ids) are **not** re-implemented here — they live in
+`Graph._validate_structure` and run during validation; this layer only surfaces failures
+as clean errors.
+
+### Schema-version policy
+
+A serialized graph carries `schema_version`. On load (`CURRENT` = the version this build
+supports):
+
+| Embedded version | Behaviour |
+| --- | --- |
+| `== CURRENT` | Loads. |
+| `> CURRENT` | `SchemaVersionError` — written by a newer build; upgrade to load. |
+| `< CURRENT` | `SchemaVersionError` — migration required. **This is the seam Story 9 fills:** older graphs will be routed through the migration framework here instead of rejected. |
+
+### Error types
+
+All defined in `colonymind.ir.serialize` and re-exported from `colonymind.ir`:
+
+- `GraphSerializationError` — base class.
+- `GraphDeserializationError` — malformed JSON, non-object payload, or failed validation.
+- `SchemaVersionError(GraphDeserializationError)` — version not loadable by this build;
+  carries `.found` and `.expected` for programmatic branching.
+
 ## Why JSON-first
 
 1. **Browser-native, no Python required.** The frontend must produce valid IR graphs without

@@ -83,11 +83,11 @@
 
 ## Story 5 — Graph serialization & deserialization
 
-- [ ] Implement **serialize**: IR object → portable format (with embedded schema version).
-- [ ] Implement **deserialize**: format → validated IR object.
-- [ ] Enforce **lossless round-tripping** (serialize → deserialize → serialize is identical).
-- [ ] Validate on load (reject structurally invalid graphs with clear errors).
-- [ ] Add round-trip property/golden tests across a corpus of sample graphs.
+- [x] Implement **serialize**: IR object → portable format (with embedded schema version).
+- [x] Implement **deserialize**: format → validated IR object.
+- [x] Enforce **lossless round-tripping** (serialize → deserialize → serialize is identical).
+- [x] Validate on load (reject structurally invalid graphs with clear errors).
+- [x] Add round-trip property/golden tests across a corpus of sample graphs.
 
 ---
 
