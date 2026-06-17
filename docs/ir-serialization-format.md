@@ -60,6 +60,9 @@ supports):
 | `> CURRENT` | `SchemaVersionError` — written by a newer build; upgrade to load. |
 | `< CURRENT` | `SchemaVersionError` — migration required. **This is the seam Story 9 fills:** older graphs will be routed through the migration framework here instead of rejected. |
 
+The policy applies to **every** serialized graph in the document, including the subgraphs of
+composite nodes — each carries its own `schema_version` and is checked on load.
+
 ### Error types
 
 All defined in `colonymind.ir.serialize` and re-exported from `colonymind.ir`:

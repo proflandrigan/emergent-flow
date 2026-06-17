@@ -217,3 +217,18 @@ class TestSchemaVersionPolicy:
         raw["schema_version"] = "1"
         with pytest.raises(GraphDeserializationError, match="schema_version must be an integer"):
             deserialize_graph(json.dumps(raw))
+
+    def test_nested_subgraph_version_is_enforced(self):
+        """A nested subgraph is itself a serialized graph; its schema_version is policed too.
+
+        Regression guard: the version check must reach into composite-node subgraphs, not
+        only the top-level graph, or a subgraph written by a newer build would load silently.
+        """
+        raw = json.loads(serialize_graph(build_declarative_module()))
+        module_node = raw["nodes"]["n-module"]
+        assert module_node["subgraph"] is not None, "fixture must have a nested subgraph"
+        # Top-level stays current; only the nested subgraph claims a newer version.
+        module_node["subgraph"]["schema_version"] = CURRENT_SCHEMA_VERSION + 1
+        with pytest.raises(SchemaVersionError, match="newer version") as exc:
+            deserialize_graph(json.dumps(raw))
+        assert exc.value.found == CURRENT_SCHEMA_VERSION + 1

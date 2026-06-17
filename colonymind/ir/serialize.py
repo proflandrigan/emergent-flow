@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Iterator
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -116,6 +117,19 @@ def _check_schema_version(found: int) -> None:
     )
 
 
+def _iter_subgraphs(graph: Graph) -> Iterator[Graph]:
+    """Yield every nested subgraph reachable from *graph* (depth-first, excluding the root).
+
+    A composite node's ``subgraph`` is itself a serialized :class:`Graph` carrying its own
+    ``schema_version``, so the version policy must reach it too — otherwise a nested graph
+    written by a newer/older build would load silently. See :func:`deserialize_graph`.
+    """
+    for node in graph.nodes.values():
+        if node.subgraph is not None:
+            yield node.subgraph
+            yield from _iter_subgraphs(node.subgraph)
+
+
 # ---------------------------------------------------------------------------
 # Serialize
 # ---------------------------------------------------------------------------
@@ -197,11 +211,18 @@ def deserialize_graph(data: str | bytes) -> Graph:
     # 3. Full model + structural validation. Reuse Pydantic + Graph._validate_structure;
     #    do not duplicate structural checks here.
     try:
-        return Graph.model_validate(parsed)
+        graph = Graph.model_validate(parsed)
     except ValidationError as e:
         raise GraphDeserializationError(
             f"graph failed validation: {e}"
         ) from e
+
+    # 4. Apply the version policy to nested subgraphs too — each is a serialized graph
+    #    with its own schema_version (the top-level version was already checked above).
+    for subgraph in _iter_subgraphs(graph):
+        _check_schema_version(subgraph.schema_version)
+
+    return graph
 
 
 # ---------------------------------------------------------------------------
