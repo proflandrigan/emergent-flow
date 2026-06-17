@@ -12,14 +12,14 @@ from pathlib import Path
 STUB = Path(__file__).resolve().parent.parent / "examples" / "plugin_stub"
 sys.path.insert(0, str(STUB))
 
-from cm_texttools.nodes import ReverseText, reverse_text  # noqa: E402
+from cm_texttools.nodes import ReverseText  # noqa: E402
 
 from colonymind.nodes.registry import NodeRegistry  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Helpers (mirror the _run_codegen pattern from test_reference_nodes.py)
 # ---------------------------------------------------------------------------
+
 
 def _run_codegen(definition, node, scope):
     """exec a node's emitted fragment in *scope* and return the updated scope."""
@@ -31,6 +31,7 @@ def _run_codegen(definition, node, scope):
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestStubConformsToContract:
     def test_to_spec_type(self):

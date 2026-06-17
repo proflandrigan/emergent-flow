@@ -6,8 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from colonymind.ir.common import ArtifactRef
-from colonymind.ir.params import Param, ParamValue
-
+from colonymind.ir.params import Param
 
 # ---------------------------------------------------------------------------
 # Scalar round-trip

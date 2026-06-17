@@ -14,7 +14,6 @@ from colonymind.ir.node import Node, Position
 from colonymind.ir.params import Param
 from colonymind.ir.port import Port
 
-
 # ---------------------------------------------------------------------------
 # Position model
 # ---------------------------------------------------------------------------

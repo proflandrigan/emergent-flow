@@ -148,9 +148,7 @@ class NodeDefinition(ABC):
             Output values keyed by OUT-port name.
         """
 
-    def infer_types(
-        self, node: Node, input_types: dict[str, str]
-    ) -> dict[str, str]:
+    def infer_types(self, node: Node, input_types: dict[str, str]) -> dict[str, str]:
         """Infer the data-type token produced on each OUT port.
 
         The default returns each OUT port's declared ``data_type``.  Override for
@@ -170,9 +168,7 @@ class NodeDefinition(ABC):
             Data-type token per OUT-port name.
         """
         return {
-            port.name: port.data_type
-            for port in type(self).ports
-            if port.direction.value == "out"
+            port.name: port.data_type for port in type(self).ports if port.direction.value == "out"
         }
 
     # ------------------------------------------------------------------
@@ -272,9 +268,7 @@ class NodeDefinition(ABC):
         errors: list[str] = []
 
         if node.type != cls.type:
-            errors.append(
-                f"node.type {node.type!r} does not match definition type {cls.type!r}."
-            )
+            errors.append(f"node.type {node.type!r} does not match definition type {cls.type!r}.")
 
         specs = {ps.name: ps for ps in cls.params}
         values = {p.name: p.value for p in node.params}
@@ -311,9 +305,7 @@ def _check_hints(name: str, value: Any, ps: ParamSpec) -> list[str]:
     errors: list[str] = []
 
     if hints.choices is not None and value not in hints.choices:
-        errors.append(
-            f"param {name!r} value {value!r} is not one of {hints.choices!r}."
-        )
+        errors.append(f"param {name!r} value {value!r} is not one of {hints.choices!r}.")
 
     if isinstance(value, bool):
         # bool is a subclass of int; never treat it as a numeric for min/max.
@@ -327,18 +319,15 @@ def _check_hints(name: str, value: Any, ps: ParamSpec) -> list[str]:
     if isinstance(value, (str, list)):
         length = len(value)
         if hints.min_length is not None and length < hints.min_length:
-            errors.append(
-                f"param {name!r} length {length} is below min_length {hints.min_length}."
-            )
+            errors.append(f"param {name!r} length {length} is below min_length {hints.min_length}.")
         if hints.max_length is not None and length > hints.max_length:
-            errors.append(
-                f"param {name!r} length {length} is above max_length {hints.max_length}."
-            )
+            errors.append(f"param {name!r} length {length} is above max_length {hints.max_length}.")
 
-    if hints.pattern is not None and isinstance(value, str):
-        if re.fullmatch(hints.pattern, value) is None:
-            errors.append(
-                f"param {name!r} value {value!r} does not match pattern {hints.pattern!r}."
-            )
+    if (
+        hints.pattern is not None
+        and isinstance(value, str)
+        and re.fullmatch(hints.pattern, value) is None
+    ):
+        errors.append(f"param {name!r} value {value!r} does not match pattern {hints.pattern!r}.")
 
     return errors

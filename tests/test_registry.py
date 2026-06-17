@@ -19,10 +19,10 @@ from colonymind.nodes.registry import (
 )
 from colonymind.nodes.spec import NodeSpec, ParamSpec, PortSpec
 
-
 # ---------------------------------------------------------------------------
 # Shared concrete stub helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_dummy(type_key: str, family_key: str = "x", label_text: str = "Dummy"):
     """Return a fresh concrete NodeDefinition subclass with the given type key.
@@ -52,6 +52,7 @@ def _make_dummy(type_key: str, family_key: str = "x", label_text: str = "Dummy")
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestRegisterAndContains:
     def test_register_and_contains(self):
@@ -228,6 +229,7 @@ class TestDefaultSingleton:
 # Helpers for lookup tests
 # ---------------------------------------------------------------------------
 
+
 class _Tabular(NodeDefinition):
     type = "x.tabular"
     family = "data"
@@ -257,6 +259,7 @@ class _TabularIn(NodeDefinition):
 # ---------------------------------------------------------------------------
 # TestLookups
 # ---------------------------------------------------------------------------
+
 
 class TestLookups:
     def test_get_returns_class(self):
@@ -439,6 +442,7 @@ class TestLookups:
 # TestValidate
 # ---------------------------------------------------------------------------
 
+
 class TestValidate:
     """Tests for NodeRegistry.validate() and the module-level validate()."""
 
@@ -591,6 +595,7 @@ class TestValidate:
 # Fake entry-point helpers for TestDiscover
 # ---------------------------------------------------------------------------
 
+
 class _GoodEP:
     """A fake entry point whose load() returns a valid NodeDefinition subclass."""
 
@@ -624,6 +629,7 @@ class _NotANodeEP:
 # ---------------------------------------------------------------------------
 # TestDiscover
 # ---------------------------------------------------------------------------
+
 
 class TestDiscover:
     """Tests for NodeRegistry.discover() and the module-level discover()."""

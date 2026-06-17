@@ -5,9 +5,8 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from colonymind.ir.common import Cardinality, Direction, IRId, new_id
+from colonymind.ir.common import Cardinality, Direction
 from colonymind.ir.port import Port
-
 
 # ---------------------------------------------------------------------------
 # Basic construction
@@ -204,8 +203,6 @@ class TestPortEnumUsage:
         assert port.cardinality == "one"
 
     def test_cardinality_many_port(self):
-        port = Port(
-            name="multi", direction=Direction.OUT, cardinality=Cardinality.MANY
-        )
+        port = Port(name="multi", direction=Direction.OUT, cardinality=Cardinality.MANY)
         assert port.cardinality == Cardinality.MANY
         assert port.cardinality == "many"

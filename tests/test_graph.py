@@ -30,7 +30,6 @@ from colonymind.ir import (
     PortRef,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers — build canonical two-node, one-edge functional graph
 # ---------------------------------------------------------------------------
@@ -279,7 +278,7 @@ class TestGraphStructuralRejections:
             )
 
     def test_edge_source_pointing_at_in_port_raises(self):
-        """An edge whose source endpoint references an IN port (wrong direction) must be rejected."""
+        """An edge whose source references an IN port (wrong direction) must be rejected."""
         # Give the source node an IN port and try to use it as a source.
         in_port = Port(name="input", direction=Direction.IN)
         src_with_in = Node(type="source.bad", ports=[in_port])
@@ -295,7 +294,7 @@ class TestGraphStructuralRejections:
             )
 
     def test_edge_target_pointing_at_out_port_raises(self):
-        """An edge whose target endpoint references an OUT port (wrong direction) must be rejected."""
+        """An edge whose target references an OUT port (wrong direction) must be rejected."""
         src = _make_source_node()
         out_port = Port(name="output", direction=Direction.OUT)
         tgt_with_out = Node(type="target.bad", ports=[out_port])

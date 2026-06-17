@@ -1,4 +1,5 @@
 """Tests for colonymind.ir.schema — JSON Schema export."""
+
 from __future__ import annotations
 
 import json

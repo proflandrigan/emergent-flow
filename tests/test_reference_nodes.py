@@ -124,13 +124,16 @@ class TestImputeMissing:
         assert [r["c"] for r in out["table"]] == ["x", "x", "x"]
 
     def test_helper_median(self):
-        assert impute_missing([{"a": "1"}, {"a": "3"}, {"a": ""}, {"a": "5"}],
-                              strategy="median")[2]["a"] == 3.0
+        assert (
+            impute_missing([{"a": "1"}, {"a": "3"}, {"a": ""}, {"a": "5"}], strategy="median")[2][
+                "a"
+            ]
+            == 3.0
+        )
 
     def test_columns_subset(self):
         node = ImputeMissing().instantiate(strategy="most_frequent", columns=["a"])
-        out = ImputeMissing().execute(node, inputs={"table": [{"a": "1"}, {"a": ""},
-                                                              {"b": ""}]})
+        out = ImputeMissing().execute(node, inputs={"table": [{"a": "1"}, {"a": ""}, {"b": ""}]})
         # only 'a' touched; 'b' rows untouched
         assert out["table"][1]["a"] == "1"
 

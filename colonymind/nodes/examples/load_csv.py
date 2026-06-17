@@ -12,7 +12,7 @@ carries no third-party dependency — the real pandas-backed loader is Story 8.
 from __future__ import annotations
 
 import csv
-from typing import Any
+from typing import Any, cast
 
 from colonymind.ir.common import Direction
 from colonymind.ir.node import Node
@@ -74,7 +74,7 @@ class LoadCsv(NodeDefinition):
         delimiter = values.get("delimiter", ",")
         if delimiter is None:
             delimiter = ","
-        return path, delimiter
+        return cast(str, path), cast(str, delimiter)
 
     def codegen(self, node: Node) -> CodeFragment:
         path, delimiter = self._args(node)

@@ -68,9 +68,7 @@ class NodeRegistry:
     # Registration
     # ------------------------------------------------------------------
 
-    def register(
-        self, definition: type[NodeDefinition]
-    ) -> type[NodeDefinition]:
+    def register(self, definition: type[NodeDefinition]) -> type[NodeDefinition]:
         """Register *definition* and return it unchanged.
 
         The return value means this method doubles as a class decorator::
@@ -112,9 +110,7 @@ class NodeRegistry:
             For any of the fail-fast checks described above.
         """
         # --- check 1: must be a proper subclass of NodeDefinition ----------
-        if not isinstance(definition, type) or not issubclass(
-            definition, NodeDefinition
-        ):
+        if not isinstance(definition, type) or not issubclass(definition, NodeDefinition):
             raise ValueError(
                 f"{definition!r} is not a subclass of NodeDefinition; "
                 "only NodeDefinition subclasses may be registered."
@@ -133,7 +129,7 @@ class NodeRegistry:
                 raise ValueError(
                     f"{definition.__name__!r} has no {attr!r} class attribute set; "
                     f"every NodeDefinition subclass must declare {attr!r}."
-                )
+                ) from None
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(
                     f"{definition.__name__!r} has an empty or non-string {attr!r} "
@@ -141,7 +137,7 @@ class NodeRegistry:
                 )
 
         # After check 2 we know definition.type is a valid, non-empty string.
-        type_key: str = definition.type  # type: ignore[attr-defined]
+        type_key: str = definition.type
 
         # --- check 3: definition().to_spec() must succeed -------------------
         try:
@@ -192,9 +188,7 @@ class NodeRegistry:
         try:
             return self._defs[type_key]
         except KeyError:
-            raise KeyError(
-                f"{type_key!r} is not registered in this NodeRegistry."
-            ) from None
+            raise KeyError(f"{type_key!r} is not registered in this NodeRegistry.") from None
 
     def try_get(self, type_key: str) -> type[NodeDefinition] | None:
         """Return the definition registered under *type_key*, or ``None``.
@@ -256,10 +250,9 @@ class NodeRegistry:
         results = []
         for d in self._defs.values():
             for ps in d.ports:
-                if ps.data_type == data_type:
-                    if direction is None or ps.direction == direction:
-                        results.append(d)
-                        break
+                if ps.data_type == data_type and (direction is None or ps.direction == direction):
+                    results.append(d)
+                    break
         return sorted(results, key=lambda d: d.type)
 
     def all(self) -> list[type[NodeDefinition]]:
@@ -325,11 +318,9 @@ class NodeRegistry:
         for stored_key, definition in self._defs.items():
             # ---- check 1: stored key must match definition.type ----
             try:
-                declared_type = definition.type  # type: ignore[attr-defined]
+                declared_type = definition.type
             except AttributeError:
-                errors.append(
-                    f"Definition stored under {stored_key!r} has no 'type' attribute."
-                )
+                errors.append(f"Definition stored under {stored_key!r} has no 'type' attribute.")
                 continue
 
             if stored_key != declared_type:
@@ -342,14 +333,11 @@ class NodeRegistry:
             try:
                 definition().to_spec()
             except Exception as exc:
-                errors.append(
-                    f"{declared_type!r}: to_spec() raised "
-                    f"{type(exc).__name__}: {exc}"
-                )
+                errors.append(f"{declared_type!r}: to_spec() raised {type(exc).__name__}: {exc}")
 
             # ---- check 3: port name uniqueness per direction ----
             try:
-                ports = definition.ports  # type: ignore[attr-defined]
+                ports = definition.ports
             except AttributeError:
                 ports = []
 
@@ -367,42 +355,36 @@ class NodeRegistry:
 
             # ---- check 4: param name uniqueness ----
             try:
-                params = definition.params  # type: ignore[attr-defined]
+                params = definition.params
             except AttributeError:
                 params = []
 
             seen_params: dict[str, int] = {}
-            for ps in params:
-                seen_params[ps.name] = seen_params.get(ps.name, 0) + 1
+            for param in params:
+                seen_params[param.name] = seen_params.get(param.name, 0) + 1
 
             for name, count in seen_params.items():
                 if count > 1:
                     errors.append(
-                        f"{declared_type!r}: duplicate param name {name!r} "
-                        f"({count} occurrences)."
+                        f"{declared_type!r}: duplicate param name {name!r} ({count} occurrences)."
                     )
 
             # ---- check 5: version is an int >= 1 ----
             try:
-                version = definition.version  # type: ignore[attr-defined]
+                version = definition.version
             except AttributeError:
                 errors.append(f"{declared_type!r}: missing 'version' attribute.")
             else:
                 if not isinstance(version, int) or isinstance(version, bool):
                     errors.append(
-                        f"{declared_type!r}: version must be an int >= 1; "
-                        f"got {version!r}."
+                        f"{declared_type!r}: version must be an int >= 1; got {version!r}."
                     )
                 elif version < 1:
-                    errors.append(
-                        f"{declared_type!r}: version must be >= 1; got {version!r}."
-                    )
+                    errors.append(f"{declared_type!r}: version must be >= 1; got {version!r}.")
 
         return sorted(errors)
 
-    def discover(
-        self, *, group: str = ENTRY_POINT_GROUP
-    ) -> list[str]:
+    def discover(self, *, group: str = ENTRY_POINT_GROUP) -> list[str]:
         """Load and register every entry point published under *group*.
 
         Third-party packages contribute node definitions by declaring an entry
@@ -445,8 +427,7 @@ class NodeRegistry:
                 self.register(loaded)
             except Exception as exc:
                 problems.append(
-                    f"Entry point {ep.name!r} ({ep.value!r}) failed: "
-                    f"{type(exc).__name__}: {exc}"
+                    f"Entry point {ep.name!r} ({ep.value!r}) failed: {type(exc).__name__}: {exc}"
                 )
         return problems
 

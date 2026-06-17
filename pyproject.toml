@@ -4,20 +4,71 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "colonymind"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Colony Mind — core SDK and graph intermediate representation (IR)."
+readme = "README.md"
 requires-python = ">=3.11"
+authors = [
+    { name = "Colony Mind" },
+]
+keywords = ["data-science", "machine-learning", "visual-programming", "graph", "ir"]
+# NOTE: license intentionally omitted — the open-core SDK/platform license boundary is
+# decided in Epic 1 Story 10. Do not assert a license or add License classifiers here.
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
+]
 dependencies = [
-    "pydantic>=2,<3",
+    "pydantic>=2.5,<3",
 ]
 
-[project.optional-dependencies]
+[project.urls]
+Homepage = "https://github.com/proflandrigan/colony-mind"
+Repository = "https://github.com/proflandrigan/colony-mind"
+Issues = "https://github.com/proflandrigan/colony-mind/issues"
+
+[dependency-groups]
 dev = [
     "pytest>=7",
+    "ruff>=0.6",
+    "mypy>=1.11",
 ]
+
+[tool.setuptools.dynamic]
+version = { attr = "colonymind.__version__" }
 
 [tool.setuptools.packages.find]
 include = ["colonymind*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# UP042: the IR enums deliberately subclass (str, Enum) for stable JSON serialization
+# semantics; migrating them to enum.StrEnum changes str()/value behavior and is out of
+# scope here (see colonymind/ir/common.py).
+ignore = ["UP042"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["colonymind"]
+plugins = ["pydantic.mypy"]
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+check_untyped_defs = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
