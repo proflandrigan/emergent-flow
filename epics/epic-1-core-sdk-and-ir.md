@@ -134,10 +134,10 @@
 > Saved graphs from v1 must open in v2. This is unglamorous and essential; without it,
 > every node/SDK change risks bricking saved work. (Full maturity lands in Epic 14.)
 
-- [ ] Define a **migration framework** (versioned IR + explicit, ordered migration steps).
-- [ ] Implement a "load old version → migrate → current" path with at least one example migration.
-- [ ] Add tests that load fixtures from prior schema versions and assert successful migration.
-- [ ] Document the policy: no breaking schema change ships without a migration step.
+- [x] Define a **migration framework** (versioned IR + explicit, ordered migration steps).
+- [x] Implement a "load old version → migrate → current" path with at least one example migration.
+- [x] Add tests that load fixtures from prior schema versions and assert successful migration.
+- [x] Document the policy: no breaking schema change ships without a migration step.
 
 ---
 

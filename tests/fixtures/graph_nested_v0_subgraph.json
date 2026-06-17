@@ -1,0 +1,167 @@
+{
+  "edges": {},
+  "name": "v1 graph with a nested v0 subgraph",
+  "nodes": {
+    "n-module": {
+      "group_id": null,
+      "id": "n-module",
+      "label": "SimpleClassifier",
+      "paradigm": "declarative",
+      "params": [],
+      "ports": [],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "subgraph": {
+        "edges": {
+          "e-linear1-relu": {
+            "id": "e-linear1-relu",
+            "source": {
+              "node_id": "n-linear1",
+              "port_id": "p-linear1-out"
+            },
+            "target": {
+              "node_id": "n-relu",
+              "port_id": "p-relu-in"
+            },
+            "type_compatible": null
+          },
+          "e-relu-linear2": {
+            "id": "e-relu-linear2",
+            "source": {
+              "node_id": "n-relu",
+              "port_id": "p-relu-out"
+            },
+            "target": {
+              "node_id": "n-linear2",
+              "port_id": "p-linear2-in"
+            },
+            "type_compatible": null
+          }
+        },
+        "mode": "declarative",
+        "name": "SimpleClassifier body",
+        "nodes": {
+          "n-linear1": {
+            "group_id": null,
+            "id": "n-linear1",
+            "label": "Linear 128\u219264",
+            "paradigm": "declarative",
+            "params": [
+              {
+                "default": null,
+                "name": "in_features",
+                "type_token": "int",
+                "value": 128
+              },
+              {
+                "default": null,
+                "name": "out_features",
+                "type_token": "int",
+                "value": 64
+              }
+            ],
+            "ports": [
+              {
+                "cardinality": "one",
+                "data_type": "Tensor",
+                "direction": "in",
+                "id": "p-linear1-in",
+                "name": "x"
+              },
+              {
+                "cardinality": "one",
+                "data_type": "Tensor",
+                "direction": "out",
+                "id": "p-linear1-out",
+                "name": "out"
+              }
+            ],
+            "position": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "subgraph": null,
+            "type": "nn.linear"
+          },
+          "n-linear2": {
+            "group_id": null,
+            "id": "n-linear2",
+            "label": "Linear 64\u219210",
+            "paradigm": "declarative",
+            "params": [
+              {
+                "default": null,
+                "name": "in_features",
+                "type_token": "int",
+                "value": 64
+              },
+              {
+                "default": null,
+                "name": "out_features",
+                "type_token": "int",
+                "value": 10
+              }
+            ],
+            "ports": [
+              {
+                "cardinality": "one",
+                "data_type": "Tensor",
+                "direction": "in",
+                "id": "p-linear2-in",
+                "name": "x"
+              },
+              {
+                "cardinality": "one",
+                "data_type": "Tensor",
+                "direction": "out",
+                "id": "p-linear2-out",
+                "name": "out"
+              }
+            ],
+            "position": {
+              "x": 400.0,
+              "y": 0.0
+            },
+            "subgraph": null,
+            "type": "nn.linear"
+          },
+          "n-relu": {
+            "group_id": null,
+            "id": "n-relu",
+            "label": "ReLU",
+            "paradigm": "declarative",
+            "params": [],
+            "ports": [
+              {
+                "cardinality": "one",
+                "data_type": "Tensor",
+                "direction": "in",
+                "id": "p-relu-in",
+                "name": "x"
+              },
+              {
+                "cardinality": "one",
+                "data_type": "Tensor",
+                "direction": "out",
+                "id": "p-relu-out",
+                "name": "out"
+              }
+            ],
+            "position": {
+              "x": 200.0,
+              "y": 0.0
+            },
+            "subgraph": null,
+            "type": "nn.relu"
+          }
+        },
+        "schema_version": 0
+      },
+      "type": "nn.module"
+    }
+  },
+  "paradigm": "declarative",
+  "schema_version": 1
+}
