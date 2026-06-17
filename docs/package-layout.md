@@ -53,7 +53,7 @@ library (see [SDK Design Philosophy](sdk-design-philosophy.md)).
 |-----------|---------|----------------------|-----------|
 | `cm.data` | Data ingestion and source loading | `cm.data.load_csv(path)` | pandas |
 | `cm.clean` | Cleaning, transformation, and imputation | `cm.clean.impute_missing(df)` | scikit-learn |
-| `cm.stats` | Statistical analytics and aggregation | `cm.stats.anova(df, group_col=..., value_col=...)` | Pingouin |
+| `cm.stats` | Statistical analytics and aggregation | `cm.stats.anova(df, group_col=..., value_col=...)` | statsmodels |
 | `cm.ml` | Classical machine learning workflows | `cm.ml.train_classifier(df, target=...)` | scikit-learn |
 | `cm.reports` | Automated reporting and visualization | `cm.reports.generate_html_summary(df)` | ydata-profiling |
 

@@ -219,6 +219,14 @@ Python 3.11 and 3.12.
 
 ## License
 
-To be determined. Colony Mind follows an open-core model: the Python SDK is intended to be
-open-source, with the platform as the product. The exact SDK/platform boundary is being
-decided alongside the core SDK packaging work (see Epic 1 in the roadmap).
+The Colony Mind SDK in this repository is licensed under the
+[Apache License 2.0](./LICENSE). Colony Mind follows an **open-core** model: the
+Python SDK is open source, while the collaborative platform (visual canvas,
+real-time multiplayer, hosting, and enterprise features) is a separate
+proprietary product. See [Open-Core Boundary](./docs/open-core-boundary.md) for
+what is SDK vs. platform-only, and
+[Dependency Licensing & Compatibility](./docs/licensing-and-dependencies.md) for
+the dependency-license policy.
+
+Contributions are accepted under a license-grant CLA — see
+[CONTRIBUTING.md](./CONTRIBUTING.md).

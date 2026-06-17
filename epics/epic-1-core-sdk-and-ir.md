@@ -143,9 +143,9 @@
 
 ## Story 10 — Open-core licensing boundary
 
-- [ ] Decide which nodes/features are **open-source SDK** vs. **platform-only**.
-- [ ] Document the boundary and its rationale (affects packaging from the start).
-- [ ] Apply the chosen license(s) to the SDK repo and confirm packaging respects the split.
+- [x] Decide which nodes/features are **open-source SDK** vs. **platform-only**.
+- [x] Document the boundary and its rationale (affects packaging from the start).
+- [x] Apply the chosen license(s) to the SDK repo and confirm packaging respects the split.
 
 ---
 

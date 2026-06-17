@@ -49,9 +49,9 @@ the wrapped library's internals.
 "Returns inspectable structured data" is a **selection criterion for every wrapped
 library**, not an afterthought. When two libraries cover the same capability, prefer the
 one whose outputs are already structured and serializable. This is precisely why
-[Pingouin](https://pingouin-stats.org/) is the chosen statistics backend: its tests return
-clean, tidy `DataFrame`s rather than opaque result objects, so a thin wrapper satisfies
-rule 4 with no translation layer. A library that only emits opaque handles forces the
+[statsmodels](https://www.statsmodels.org/) is the chosen statistics backend: its
+`anova_lm` and related routines return clean, tidy `DataFrame`s rather than opaque result
+objects, so a thin wrapper satisfies rule 4 with no translation layer. A library that only emits opaque handles forces the
 wrapper to do reverse-engineering work — a violation of rule 1 (thin) as well.
 
 ## How the rules are enforced
