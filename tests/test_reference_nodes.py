@@ -12,7 +12,13 @@ import pytest
 
 from colonymind.ir.common import Direction, Paradigm
 from colonymind.ir.graph import Graph
-from colonymind.nodes.examples import ImputeMissing, LoadCsv
+from colonymind.nodes.examples import (
+    Anova,
+    GenerateHtmlSummary,
+    ImputeMissing,
+    LoadCsv,
+    TrainClassifier,
+)
 
 
 @pytest.fixture
@@ -123,3 +129,85 @@ class TestImputeMissing:
         scope = {"frame": df.copy()}
         _run_codegen(defn, node, scope)
         assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
+# stats.anova
+# ---------------------------------------------------------------------------
+
+
+class TestAnova:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Anova()
+        df = pd.DataFrame(
+            {
+                "grp": ["a", "a", "a", "b", "b", "b", "c", "c", "c"],
+                "score": [1.0, 1.1, 0.9, 5.0, 5.1, 4.9, 9.0, 9.1, 8.9],
+            }
+        )
+        node = defn.instantiate(group_col="grp", value_col="score")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+
+        assert generated.f_statistic == executed.f_statistic
+        assert generated.p_value == executed.p_value
+        assert generated.effect_size == executed.effect_size
+        assert generated.summary.equals(executed.summary)
+
+
+# ---------------------------------------------------------------------------
+# ml.train_classifier
+# ---------------------------------------------------------------------------
+
+
+class TestTrainClassifier:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code.
+
+        The classifier is deterministic given ``random_state``, so the two paths
+        must yield an identical :class:`ClassifierResult` (all fields compare by
+        value).
+        """
+        defn = TrainClassifier()
+        df = pd.DataFrame(
+            {
+                "x1": [float(i) for i in range(20)] + [float(i) for i in range(20)],
+                "x2": [float(i % 5) for i in range(40)],
+                "label": ["low" if i % 2 == 0 else "high" for i in range(40)],
+            }
+        )
+        node = defn.instantiate(target="label", random_state=0)
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+
+        assert generated == executed
+
+
+# ---------------------------------------------------------------------------
+# reports.generate_html_summary
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateHtmlSummary:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code.
+
+        ydata-profiling embeds a generation timestamp, so the HTML is not
+        byte-reproducible between calls (see ``colonymind.reports``). We assert
+        the structural equivalence the reports module prescribes instead: both
+        paths return a non-empty HTML string carrying the requested title.
+        """
+        defn = GenerateHtmlSummary()
+        df = pd.DataFrame({"a": [1, 2, 3, 4, 5], "b": ["x", "y", "z", "x", "y"]})
+        node = defn.instantiate(title="Equivalence Check")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["html"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["html"]
+
+        for html in (executed, generated):
+            assert isinstance(html, str)
+            assert "<html" in html.lower()
+            assert "Equivalence Check" in html
