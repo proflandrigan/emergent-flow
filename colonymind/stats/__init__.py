@@ -32,7 +32,7 @@ class AnovaResult:
     Attributes
     ----------
     f_statistic: the ANOVA F value.
-    p_value: the uncorrected p-value (``p-unc``).
+    p_value: the uncorrected p-value (``p_unc``).
     effect_size: partial eta-squared (``np2``).
     summary: Pingouin's full tidy result table.
     """
