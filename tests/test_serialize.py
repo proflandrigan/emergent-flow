@@ -7,15 +7,17 @@ Covers the public API in ``colonymind.ir.serialize``:
   - lossless, string-stable round-tripping across a corpus of sample graphs;
   - file I/O via save_graph / load_graph (.cm.json convention);
   - validate-on-load (malformed JSON and structurally invalid graphs);
-  - schema-version policy (reject newer; reject older as "migration required").
+  - schema-version policy (reject newer; migrate older up to current — Story 9).
 
 The sample-graph corpus reuses the builders in tests/test_examples.py — the single
-source of truth for example IR graphs — rather than rebuilding fixtures.
+source of truth for example IR graphs. On-disk graphs saved at prior schema versions
+live under tests/fixtures/ and back the migration tests (TestMigrationFixtures).
 """
 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -26,6 +28,7 @@ from colonymind.ir import (
     Graph,
     GraphDeserializationError,
     Node,
+    Paradigm,
     Param,
     Port,
     SchemaVersionError,
@@ -35,6 +38,9 @@ from colonymind.ir import (
     serialize_graph,
 )
 from tests.test_examples import build_declarative_module, build_functional_pipeline
+
+# On-disk corpus of graphs saved at PRIOR schema versions (Story 9 migration fixtures).
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 # ---------------------------------------------------------------------------
 # Corpus
@@ -201,13 +207,18 @@ class TestSchemaVersionPolicy:
         assert exc.value.found == CURRENT_SCHEMA_VERSION + 1
         assert exc.value.expected == CURRENT_SCHEMA_VERSION
 
-    def test_older_version_rejected_as_migration_required(self):
+    def test_older_version_is_migrated_on_load(self):
+        """An older graph with a registered migration path is migrated up on load, not rejected.
+
+        Uses the synthetic v0 shape: schema_version 0 with the legacy top-level "mode" key,
+        which the v0->v1 example migration renames to "paradigm".
+        """
         raw = json.loads(serialize_graph(build_functional_pipeline()))
-        raw["schema_version"] = CURRENT_SCHEMA_VERSION - 1
-        with pytest.raises(SchemaVersionError, match="migration is required") as exc:
-            deserialize_graph(json.dumps(raw))
-        assert exc.value.found == CURRENT_SCHEMA_VERSION - 1
-        assert exc.value.expected == CURRENT_SCHEMA_VERSION
+        raw["schema_version"] = 0
+        raw["mode"] = raw.pop("paradigm")
+        restored = deserialize_graph(json.dumps(raw))
+        assert restored.schema_version == CURRENT_SCHEMA_VERSION
+        assert restored.paradigm == build_functional_pipeline().paradigm
 
     def test_non_integer_version_rejected(self):
         raw = json.loads(serialize_graph(build_functional_pipeline()))
@@ -229,3 +240,33 @@ class TestSchemaVersionPolicy:
         with pytest.raises(SchemaVersionError, match="newer version") as exc:
             deserialize_graph(json.dumps(raw))
         assert exc.value.found == CURRENT_SCHEMA_VERSION + 1
+
+
+# ---------------------------------------------------------------------------
+# On-disk migration fixtures
+# ---------------------------------------------------------------------------
+
+
+class TestMigrationFixtures:
+    """Load graphs saved at prior schema versions from disk and assert they migrate (Story 9)."""
+
+    def test_load_flat_v0_fixture_migrates(self):
+        g = load_graph(FIXTURES_DIR / "graph_v0.json")
+        assert g.schema_version == CURRENT_SCHEMA_VERSION
+        assert g.paradigm == Paradigm.FUNCTIONAL
+        assert len(g.nodes) == 3
+
+    def test_load_nested_v0_subgraph_fixture_migrates(self):
+        g = load_graph(FIXTURES_DIR / "graph_nested_v0_subgraph.json")
+        assert g.schema_version == CURRENT_SCHEMA_VERSION
+        subs = [n.subgraph for n in g.nodes.values() if n.subgraph is not None]
+        assert subs, "fixture must contain at least one nested subgraph"
+        assert all(s.schema_version == CURRENT_SCHEMA_VERSION for s in subs)
+
+    def test_migrated_fixture_round_trips_at_current_version(self):
+        g = load_graph(FIXTURES_DIR / "graph_v0.json")
+        once = serialize_graph(g)
+        assert json.loads(once)["schema_version"] == CURRENT_SCHEMA_VERSION
+        # Re-serializing the deserialized graph is byte-identical (stable post-migration).
+        twice = serialize_graph(deserialize_graph(once))
+        assert once == twice

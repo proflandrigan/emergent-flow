@@ -8,8 +8,9 @@ into portable JSON and back. It is a thin, deterministic wrapper over Pydantic's
 ``model_dump_json`` / ``model_validate_json`` that adds three things the raw methods do not:
 
 1. **Schema-version policy on load** — a serialized graph carries ``schema_version``; this
-   module enforces it (see :func:`_check_schema_version`). Older versions raise a clear
-   "migration required" error: the deliberate seam Story 9 (migration framework) plugs into.
+   module enforces it (see :func:`_reject_if_newer`). Older versions are migrated up to
+   ``CURRENT_SCHEMA_VERSION`` via the Story 9 migration framework (``colonymind.ir.migrate``)
+   before validation; only versions newer than this build are rejected.
 2. **Clean, domain-specific errors** — Pydantic's ``ValidationError`` and ``json`` decode
    errors are re-raised as :class:`GraphDeserializationError` so callers see one error type.
 3. **File I/O helpers** — :func:`save_graph` / :func:`load_graph` using the ``.cm.json``
@@ -34,6 +35,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .graph import CURRENT_SCHEMA_VERSION, Graph
+from .migrate import MigrationError, migrate_document
 
 __all__ = [
     "serialize_graph",
@@ -88,18 +90,9 @@ class SchemaVersionError(GraphDeserializationError):
 # ---------------------------------------------------------------------------
 
 
-def _check_schema_version(found: int) -> None:
-    """Enforce the load-time schema-version policy.
-
-    - ``found == CURRENT`` → ok.
-    - ``found > CURRENT``  → written by a newer build; reject.
-    - ``found < CURRENT``  → predates this build; reject as "migration required".
-
-    The "older version" branch is the explicit hook for Story 9: once a migration
-    framework exists, older graphs should be routed through it here instead of rejected.
-    """
-    if found == CURRENT_SCHEMA_VERSION:
-        return
+def _reject_if_newer(found: int) -> None:
+    """Reject graphs written by a newer build. Older graphs are NOT rejected here — they
+    are migrated up by `migrate_document` (the Story 9 framework). Equal/older versions pass."""
     if found > CURRENT_SCHEMA_VERSION:
         raise SchemaVersionError(
             f"graph schema v{found} was written by a newer version of Colony Mind; "
@@ -107,27 +100,28 @@ def _check_schema_version(found: int) -> None:
             found=found,
             expected=CURRENT_SCHEMA_VERSION,
         )
-    # found < CURRENT_SCHEMA_VERSION
-    # TODO(Story 9): route through the migration framework instead of rejecting.
-    raise SchemaVersionError(
-        f"graph schema v{found} predates this build (v{CURRENT_SCHEMA_VERSION}); "
-        "a migration is required to load it.",
-        found=found,
-        expected=CURRENT_SCHEMA_VERSION,
-    )
 
 
-def _iter_subgraphs(graph: Graph) -> Iterator[Graph]:
-    """Yield every nested subgraph reachable from *graph* (depth-first, excluding the root).
+def _coerce_version(graph_dict: dict) -> int:
+    """Read and validate a graph dict's schema_version (absent defaults to 1, matching the
+    original pre-versioning behaviour). Raises GraphDeserializationError if it is not an int."""
+    found = graph_dict.get("schema_version", 1)
+    if not isinstance(found, int) or isinstance(found, bool):
+        raise GraphDeserializationError(f"schema_version must be an integer, got {found!r}.")
+    return found
 
-    A composite node's ``subgraph`` is itself a serialized :class:`Graph` carrying its own
-    ``schema_version``, so the version policy must reach it too — otherwise a nested graph
-    written by a newer/older build would load silently. See :func:`deserialize_graph`.
-    """
-    for node in graph.nodes.values():
-        if node.subgraph is not None:
-            yield node.subgraph
-            yield from _iter_subgraphs(node.subgraph)
+
+def _iter_subgraph_dicts(graph_dict: dict) -> Iterator[dict]:
+    """Yield every nested subgraph dict reachable from `graph_dict` (depth-first, excluding
+    the root). Each is a serialized graph with its own schema_version."""
+    nodes = graph_dict.get("nodes")
+    if isinstance(nodes, dict):
+        for node in nodes.values():
+            if isinstance(node, dict):
+                sub = node.get("subgraph")
+                if isinstance(sub, dict):
+                    yield sub
+                    yield from _iter_subgraph_dicts(sub)
 
 
 # ---------------------------------------------------------------------------
@@ -165,8 +159,10 @@ def serialize_graph(graph: Graph, *, indent: int | None = 2) -> str:
 def deserialize_graph(data: str | bytes) -> Graph:
     """Parse and validate JSON *data* into a :class:`Graph`.
 
-    Performs, in order: JSON parse → schema-version check → full model + structural
-    validation (via ``Graph._validate_structure``). Any failure is raised as a
+    Performs, in order: JSON parse → schema-version check (reject newer-than-current) →
+    migrate any older graph (top-level and nested subgraphs) up to
+    ``CURRENT_SCHEMA_VERSION`` → full model + structural validation (via
+    ``Graph._validate_structure``). Any failure is raised as a
     :class:`GraphDeserializationError` (or its :class:`SchemaVersionError` subclass),
     with the underlying cause chained.
 
@@ -178,12 +174,13 @@ def deserialize_graph(data: str | bytes) -> Graph:
     Returns
     -------
     Graph
-        A fully validated graph.
+        A fully validated graph at ``CURRENT_SCHEMA_VERSION``.
 
     Raises
     ------
     SchemaVersionError
-        If the embedded ``schema_version`` is not loadable by this build.
+        If the embedded ``schema_version`` is newer than this build supports, or if
+        migration to the current schema version fails.
     GraphDeserializationError
         If the input is not valid JSON or is not a structurally valid graph.
     """
@@ -199,24 +196,29 @@ def deserialize_graph(data: str | bytes) -> Graph:
             f"a serialized graph must be a JSON object, got {type(parsed).__name__}."
         )
 
-    # 2. Version policy. Absent version is treated as the original schema (v1); the
-    #    check then accepts/rejects it under the normal policy.
-    found = parsed.get("schema_version", 1)
-    if not isinstance(found, int) or isinstance(found, bool):
-        raise GraphDeserializationError(f"schema_version must be an integer, got {found!r}.")
-    _check_schema_version(found)
+    # 2. Version policy: reject ONLY newer-than-current versions (top-level + nested), and
+    #    validate that every embedded schema_version is an integer.
+    top_found = _coerce_version(parsed)
+    _reject_if_newer(top_found)
+    for sub in _iter_subgraph_dicts(parsed):
+        _reject_if_newer(_coerce_version(sub))
 
-    # 3. Full model + structural validation. Reuse Pydantic + Graph._validate_structure;
-    #    do not duplicate structural checks here.
+    # 3. Migrate older graphs (top-level AND nested) up to CURRENT before validation.
     try:
-        graph = Graph.model_validate(parsed)
+        migrated = migrate_document(parsed)
+    except MigrationError as e:
+        raise SchemaVersionError(
+            f"graph schema v{top_found} could not be migrated to v{CURRENT_SCHEMA_VERSION}: {e}",
+            found=top_found,
+            expected=CURRENT_SCHEMA_VERSION,
+        ) from e
+
+    # 4. Full model + structural validation on the MIGRATED dict. Reuse Pydantic +
+    #    Graph._validate_structure; do not duplicate structural checks here.
+    try:
+        graph = Graph.model_validate(migrated)
     except ValidationError as e:
         raise GraphDeserializationError(f"graph failed validation: {e}") from e
-
-    # 4. Apply the version policy to nested subgraphs too — each is a serialized graph
-    #    with its own schema_version (the top-level version was already checked above).
-    for subgraph in _iter_subgraphs(graph):
-        _check_schema_version(subgraph.schema_version)
 
     return graph
 
