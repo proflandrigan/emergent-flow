@@ -174,3 +174,19 @@ def test_registered_ops_are_all_marked() -> None:
     # mechanism a future Story-8 wrapper sweep relies on.
     for op in PUBLIC_OPS.values():
         assert getattr(op, "__cm_public_op__", False) is True
+
+
+# --- package-root re-exports ---------------------------------------------------
+
+
+def test_contract_surface_reexported_from_package_root() -> None:
+    # The design-philosophy doc promises all four contract tools (plus the error
+    # type) are reachable as cm.<name>; PUBLIC_OPS is the registry a Story-8 sweep
+    # iterates, so it must be importable from the package root.
+    import colonymind as cm
+
+    assert cm.PUBLIC_OPS is PUBLIC_OPS
+    assert cm.is_inspectable is is_inspectable
+    assert cm.assert_inspectable is assert_inspectable
+    assert cm.public_op is public_op
+    assert cm.InspectableContractError is InspectableContractError
