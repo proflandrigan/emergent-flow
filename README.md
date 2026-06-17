@@ -204,6 +204,8 @@ colony-mind/
   package structure and the planned functional-pipeline namespaces.
 - [Public API Conventions](./docs/public-api-conventions.md) — naming, signatures, and the
   serializable + inspectable return-object contract every wrapper must meet.
+- [SDK Design Philosophy](./docs/sdk-design-philosophy.md) — the thin / deterministic / pure
+  rules and the `@cm.public_op` runtime check that enforces them.
 - [Versioning & Releases](./docs/versioning-and-releases.md) — Semantic Versioning policy and
   the tag-driven release process.
 - [Architecture Decision Records](./docs/adr/) — the foundational `§A` decisions.
