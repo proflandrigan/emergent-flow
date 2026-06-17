@@ -107,10 +107,10 @@
 > These conventions are cheap to adopt now and very expensive to retrofit. Enforce them
 > as acceptance criteria for every wrapper.
 
-- [ ] Codify rules: **thin wrappers**, **deterministic**, **pure functions where possible**.
-- [ ] Require every operation to return a **serializable + inspectable** object.
-- [ ] Adopt "returns inspectable structured data" as a **selection criterion for every wrapped library** (the reason Pingouin was chosen — it returns clean DataFrames).
-- [ ] Add a lint/test check that flags wrappers returning opaque/non-serializable objects.
+- [x] Codify rules: **thin wrappers**, **deterministic**, **pure functions where possible**.
+- [x] Require every operation to return a **serializable + inspectable** object.
+- [x] Adopt "returns inspectable structured data" as a **selection criterion for every wrapped library** (the reason Pingouin was chosen — it returns clean DataFrames).
+- [x] Add a lint/test check that flags wrappers returning opaque/non-serializable objects.
 
 ---
 

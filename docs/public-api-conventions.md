@@ -68,7 +68,11 @@ Every public function must return a **serializable and inspectable object**:
 - This makes code more readable and future-proof for API extensions.
 
 **Enforcement:**
-- These conventions are enforceable via lint and test checks (Epic 1, Story 7). Compliance is a design-time requirement.
+- These conventions are enforced at runtime and in CI by `colonymind.api`: decorate every
+  wrapper with `@cm.public_op` (it validates the return via `assert_inspectable` on each
+  call and registers it in `PUBLIC_OPS`), and `tests/test_api_conventions.py` sweeps the
+  registry to flag opaque/non-serializable returns. See
+  [SDK Design Philosophy](sdk-design-philosophy.md). Compliance is a design-time requirement.
 
 ## Determinism & Purity
 
@@ -139,5 +143,6 @@ The compliant pattern ensures that:
 ## Related Documentation
 
 For more information, see:
+- [SDK Design Philosophy](sdk-design-philosophy.md) — the thin/deterministic/pure rules and their enforcement.
 - [Package Layout](package-layout.md) — structure of the SDK's namespaces and modules.
 - [Versioning and Releases](versioning-and-releases.md) — semantic versioning and release process.
