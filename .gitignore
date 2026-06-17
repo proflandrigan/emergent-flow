@@ -111,6 +111,8 @@ data/
 datasets/
 artifacts/
 models/
+# ...but the worked-example dataset is a committed SDK fixture (Epic 1, Story 8).
+!examples/vertical_slice/sample.csv
 *.sqlite
 *.sqlite3
 *.db
@@ -118,6 +120,8 @@ models/
 # Generated reports
 *.html.report
 churn_report.html
+# The vertical-slice demo writes this when run directly; it's a generated artifact.
+examples/vertical_slice/report.html
 
 # ─────────────────────────────────────────────────────────────
 # Redis / Celery

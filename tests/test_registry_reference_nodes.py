@@ -1,7 +1,7 @@
 """Tests for declarative registration of the reference nodes.
 
 Importing ``colonymind.nodes`` pulls in the reference-node package, firing the
-``@register`` decorators on ``LoadCsv`` and ``ImputeMissing`` and populating the
+``@register`` decorators on all five Story 8 reference nodes and populating the
 default ``registry``.  These tests assert that the end-to-end registration path
 works correctly and that the registry public API is re-exported from
 ``colonymind.nodes``.
@@ -12,7 +12,13 @@ import sys
 
 import colonymind.nodes.examples  # noqa: F401 — import triggers registration
 from colonymind.nodes import registry
-from colonymind.nodes.examples import ImputeMissing, LoadCsv
+from colonymind.nodes.examples import (
+    Anova,
+    GenerateHtmlSummary,
+    ImputeMissing,
+    LoadCsv,
+    TrainClassifier,
+)
 from colonymind.nodes.registry import NodeRegistry
 
 
@@ -70,3 +76,18 @@ class TestReferenceNodesRegistered:
             registry,
             validate,
         )
+
+    def test_all_five_families_registered(self):
+        """All five Story 8 reference node types are present in the default registry."""
+        expected_types = {
+            "data.load_csv",
+            "clean.impute_missing",
+            "stats.anova",
+            "ml.train_classifier",
+            "reports.generate_html_summary",
+        }
+        assert all(t in registry for t in expected_types)
+
+        assert registry.get("stats.anova") is Anova
+        assert registry.get("ml.train_classifier") is TrainClassifier
+        assert registry.get("reports.generate_html_summary") is GenerateHtmlSummary

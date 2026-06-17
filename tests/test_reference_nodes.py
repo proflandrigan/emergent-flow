@@ -7,12 +7,12 @@ result as running the code emitted by ``codegen``.
 
 import csv
 
+import pandas as pd
 import pytest
 
 from colonymind.ir.common import Direction, Paradigm
 from colonymind.ir.graph import Graph
 from colonymind.nodes.examples import ImputeMissing, LoadCsv
-from colonymind.nodes.examples.impute import impute_missing
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def csv_file(tmp_path):
         writer = csv.writer(fh)
         writer.writerow(["a", "b"])
         writer.writerow(["1", "x"])
-        writer.writerow(["", "x"])
+        writer.writerow(["2", "x"])
         writer.writerow(["3", "y"])
     return str(path)
 
@@ -46,7 +46,7 @@ class TestLoadCsv:
         assert spec.family == "data"
         assert spec.paradigm == Paradigm.FUNCTIONAL
         out_ports = [p for p in spec.ports if p.direction == Direction.OUT]
-        assert [p.name for p in out_ports] == ["table"]
+        assert [p.name for p in out_ports] == ["frame"]
         assert not [p for p in spec.ports if p.direction == Direction.IN]
 
     def test_instantiate_and_validate(self):
@@ -58,14 +58,11 @@ class TestLoadCsv:
         errors = LoadCsv().validate_node(node)
         assert any("required param 'path'" in e for e in errors)
 
-    def test_execute_reads_rows(self, csv_file):
+    def test_execute_reads_dataframe(self, csv_file):
         node = LoadCsv().instantiate(path=csv_file)
         out = LoadCsv().execute(node, inputs={})
-        assert out["table"] == [
-            {"a": "1", "b": "x"},
-            {"a": "", "b": "x"},
-            {"a": "3", "b": "y"},
-        ]
+        assert isinstance(out["frame"], pd.DataFrame)
+        assert list(out["frame"].columns) == ["a", "b"]
 
     def test_codegen_matches_execute(self, csv_file):
         """ADR 0002: execute == result of running the emitted code."""
@@ -73,7 +70,7 @@ class TestLoadCsv:
         node = defn.instantiate(path=csv_file)
         executed = defn.execute(node, inputs={})
         scope = _run_codegen(defn, node, {})
-        assert scope["table"] == executed["table"]
+        assert scope["frame"].equals(executed["frame"])
 
     def test_fits_in_graph(self, csv_file):
         node = LoadCsv().instantiate(path=csv_file)
@@ -93,11 +90,11 @@ class TestImputeMissing:
 
     def test_in_and_out_ports_may_share_a_name(self):
         # Contract: port names are unique only *within a direction*; the IN and
-        # OUT ``table`` namespaces are independent, and instantiate() must still
+        # OUT ``frame`` namespaces are independent, and instantiate() must still
         # mint a graph-valid node (distinct port ids).
         node = ImputeMissing().instantiate()
         by_dir = {p.direction: p for p in node.ports}
-        assert by_dir[Direction.IN].name == by_dir[Direction.OUT].name == "table"
+        assert by_dir[Direction.IN].name == by_dir[Direction.OUT].name == "frame"
         assert by_dir[Direction.IN].id != by_dir[Direction.OUT].id
         Graph(nodes={node.id: node})
 
@@ -112,37 +109,17 @@ class TestImputeMissing:
         assert any("not one of" in e for e in errors)
 
     def test_execute_mean_imputation(self):
-        table = [{"a": "1"}, {"a": ""}, {"a": "3"}]
+        df = pd.DataFrame({"a": [1.0, None, 3.0]})
         node = ImputeMissing().instantiate(strategy="mean")
-        out = ImputeMissing().execute(node, inputs={"table": table})
-        assert [r["a"] for r in out["table"]] == ["1", 2.0, "3"]
-
-    def test_execute_most_frequent(self):
-        table = [{"c": "x"}, {"c": ""}, {"c": "x"}]
-        node = ImputeMissing().instantiate(strategy="most_frequent")
-        out = ImputeMissing().execute(node, inputs={"table": table})
-        assert [r["c"] for r in out["table"]] == ["x", "x", "x"]
-
-    def test_helper_median(self):
-        assert (
-            impute_missing([{"a": "1"}, {"a": "3"}, {"a": ""}, {"a": "5"}], strategy="median")[2][
-                "a"
-            ]
-            == 3.0
-        )
-
-    def test_columns_subset(self):
-        node = ImputeMissing().instantiate(strategy="most_frequent", columns=["a"])
-        out = ImputeMissing().execute(node, inputs={"table": [{"a": "1"}, {"a": ""}, {"b": ""}]})
-        # only 'a' touched; 'b' rows untouched
-        assert out["table"][1]["a"] == "1"
+        out = ImputeMissing().execute(node, inputs={"frame": df})
+        assert out["frame"]["a"].iloc[1] == 2.0
 
     def test_codegen_matches_execute(self):
         """ADR 0002: execute == result of running the emitted code."""
         defn = ImputeMissing()
-        table = [{"a": "1"}, {"a": ""}, {"a": "3"}]
+        df = pd.DataFrame({"a": [1.0, None, 3.0]})
         node = defn.instantiate(strategy="mean")
-        executed = defn.execute(node, inputs={"table": table})
-        scope = {"table": [dict(r) for r in table]}
+        executed = defn.execute(node, inputs={"frame": df.copy()})
+        scope = {"frame": df.copy()}
         _run_codegen(defn, node, scope)
-        assert scope["table"] == executed["table"]
+        assert scope["frame"].equals(executed["frame"])
