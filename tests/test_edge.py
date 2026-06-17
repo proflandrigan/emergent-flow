@@ -12,7 +12,6 @@ Coverage:
   - Unknown-kwarg rejection (extra=forbid)
 """
 
-import json
 import pytest
 from pydantic import ValidationError
 
@@ -56,7 +55,9 @@ class TestPortRef:
         """PortRef rejects unknown kwargs (extra=forbid)."""
         with pytest.raises(ValidationError) as exc_info:
             PortRef(node_id="node-123", port_id="port-456", unknown_field="value")
-        assert "unknown_field" in str(exc_info.value).lower() or "extra" in str(exc_info.value).lower()
+        assert (
+            "unknown_field" in str(exc_info.value).lower() or "extra" in str(exc_info.value).lower()
+        )
 
 
 class TestEdge:
@@ -166,7 +167,9 @@ class TestEdge:
                 target=PortRef(node_id="n2", port_id="p2"),
                 unknown_field="value",
             )
-        assert "unknown_field" in str(exc_info.value).lower() or "extra" in str(exc_info.value).lower()
+        assert (
+            "unknown_field" in str(exc_info.value).lower() or "extra" in str(exc_info.value).lower()
+        )
 
     def test_edge_missing_source(self):
         """Edge requires source PortRef."""

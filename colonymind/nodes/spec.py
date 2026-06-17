@@ -245,7 +245,5 @@ class NodeSpec(IRModel):
     @classmethod
     def version_must_be_positive(cls, v: int) -> int:
         if v < 1:
-            raise ValueError(
-                f"NodeSpec.version must be a positive integer (>= 1); received {v!r}."
-            )
+            raise ValueError(f"NodeSpec.version must be a positive integer (>= 1); received {v!r}.")
         return v

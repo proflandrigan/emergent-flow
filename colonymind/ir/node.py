@@ -84,7 +84,7 @@ class Node(IRModel):
     group_id: IRId | None = None
     # Forward reference — Graph does not exist yet (Task 07).
     # Do NOT call Node.model_rebuild() here; graph.py resolves this ref.
-    subgraph: "Graph | None" = None
+    subgraph: Graph | None = None
 
     @field_validator("type")
     @classmethod

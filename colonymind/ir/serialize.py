@@ -203,9 +203,7 @@ def deserialize_graph(data: str | bytes) -> Graph:
     #    check then accepts/rejects it under the normal policy.
     found = parsed.get("schema_version", 1)
     if not isinstance(found, int) or isinstance(found, bool):
-        raise GraphDeserializationError(
-            f"schema_version must be an integer, got {found!r}."
-        )
+        raise GraphDeserializationError(f"schema_version must be an integer, got {found!r}.")
     _check_schema_version(found)
 
     # 3. Full model + structural validation. Reuse Pydantic + Graph._validate_structure;
@@ -213,9 +211,7 @@ def deserialize_graph(data: str | bytes) -> Graph:
     try:
         graph = Graph.model_validate(parsed)
     except ValidationError as e:
-        raise GraphDeserializationError(
-            f"graph failed validation: {e}"
-        ) from e
+        raise GraphDeserializationError(f"graph failed validation: {e}") from e
 
     # 4. Apply the version policy to nested subgraphs too — each is a serialized graph
     #    with its own schema_version (the top-level version was already checked above).

@@ -65,7 +65,7 @@ class Graph(IRModel):
     # ------------------------------------------------------------------
 
     @model_validator(mode="after")
-    def _validate_structure(self) -> "Graph":
+    def _validate_structure(self) -> Graph:
         """Enforce graph-level structural invariants.
 
         Checks (all O(nodes + edges)):

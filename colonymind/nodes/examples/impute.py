@@ -12,7 +12,7 @@ pandas-backed cleaner is Story 8.
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any
+from typing import Any, cast
 
 from colonymind.ir.common import Direction
 from colonymind.ir.node import Node
@@ -116,16 +116,13 @@ class ImputeMissing(NodeDefinition):
         values = {p.name: p.value for p in node.params}
         strategy = values.get("strategy", "mean") or "mean"
         columns = values.get("columns")
-        return strategy, columns
+        return cast(str, strategy), cast("list[str] | None", columns)
 
     def codegen(self, node: Node) -> CodeFragment:
         strategy, columns = self._args(node)
         return CodeFragment(
             imports=["from colonymind.nodes.examples.impute import impute_missing"],
-            body=(
-                f"table = impute_missing(table, strategy={strategy!r}, "
-                f"columns={columns!r})"
-            ),
+            body=(f"table = impute_missing(table, strategy={strategy!r}, columns={columns!r})"),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:

@@ -20,12 +20,20 @@ class _Demo(NodeDefinition):
         PortSpec(name="out1", direction=Direction.OUT, data_type="Frame"),
     ]
     params = [
-        ParamSpec(name="mode", type_token="str", default="a", required=True,
-                  hints=ValidationHints(choices=["a", "b"])),
-        ParamSpec(name="k", type_token="int", default=1,
-                  hints=ValidationHints(min=0, max=10)),
-        ParamSpec(name="name", type_token="str", default=None,
-                  hints=ValidationHints(min_length=2, pattern=r"[a-z]+")),
+        ParamSpec(
+            name="mode",
+            type_token="str",
+            default="a",
+            required=True,
+            hints=ValidationHints(choices=["a", "b"]),
+        ),
+        ParamSpec(name="k", type_token="int", default=1, hints=ValidationHints(min=0, max=10)),
+        ParamSpec(
+            name="name",
+            type_token="str",
+            default=None,
+            hints=ValidationHints(min_length=2, pattern=r"[a-z]+"),
+        ),
     ]
 
     def codegen(self, node):

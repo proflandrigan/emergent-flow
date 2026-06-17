@@ -370,9 +370,7 @@ class TestDeclarativeModule:
         raw = (EXAMPLES_DIR / "declarative_module.json").read_text(encoding="utf-8")
         graph = Graph.model_validate_json(raw)
         subgraph = graph.nodes["n-module"].subgraph
-        assert len(subgraph.edges) == 2, (
-            f"Expected 2 edges in subgraph, got {len(subgraph.edges)}"
-        )
+        assert len(subgraph.edges) == 2, f"Expected 2 edges in subgraph, got {len(subgraph.edges)}"
 
     def test_round_trip(self):
         raw = (EXAMPLES_DIR / "declarative_module.json").read_text(encoding="utf-8")

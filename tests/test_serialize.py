@@ -20,16 +20,14 @@ import json
 import pytest
 
 from colonymind.ir import (
-    ArtifactRef,
     CURRENT_SCHEMA_VERSION,
+    ArtifactRef,
     Direction,
-    Edge,
     Graph,
     GraphDeserializationError,
     Node,
     Param,
     Port,
-    PortRef,
     SchemaVersionError,
     deserialize_graph,
     load_graph,
@@ -37,7 +35,6 @@ from colonymind.ir import (
     serialize_graph,
 )
 from tests.test_examples import build_declarative_module, build_functional_pipeline
-
 
 # ---------------------------------------------------------------------------
 # Corpus

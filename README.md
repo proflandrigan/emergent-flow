@@ -2,6 +2,9 @@
 
 ### The Visual Architecture Platform for Data Science, Analytics & Machine Learning
 
+[![CI](https://github.com/proflandrigan/colony-mind/actions/workflows/ci.yml/badge.svg)](https://github.com/proflandrigan/colony-mind/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
+
 Colony Mind is an **infinite-canvas** visual development platform that unifies the
 fragmented data ecosystem. It bridges the divide between low-code/no-code visual tools
 (which lack flexibility and lock users into proprietary environments) and code-first
@@ -170,12 +173,16 @@ with the IR designed CRDT-ready from the start.
 ```
 colony-mind/
 ├── colonymind/               # Python SDK source
+│   ├── ir/                   # Graph intermediate representation (schema, serialization)
 │   └── nodes/                # Node contract, registry, and reference examples
 ├── docs/
 │   ├── adr/                  # Architecture Decision Records (foundational decisions)
 │   ├── node-contract-spec.md # Node-definition contract reference
 │   ├── node-registry.md      # Registry and plugin discovery guide
-│   └── authoring-a-node.md   # Step-by-step guide to writing a node
+│   ├── authoring-a-node.md   # Step-by-step guide to writing a node
+│   ├── package-layout.md     # Package layout & namespace conventions
+│   ├── versioning-and-releases.md  # Semantic versioning & release process
+│   └── public-api-conventions.md   # Public API naming, signatures, return objects
 ├── epics/
 │   └── epic-1-core-sdk-and-ir.md  # Epic 1 — Core SDK & graph IR
 ├── examples/
@@ -183,8 +190,28 @@ colony-mind/
 ├── planning_docs/
 │   ├── proposal.md           # Product vision & market mapping
 │   └── technical_roadmap.md  # Engineering decomposition (epics, phases, decisions)
+├── .github/workflows/        # CI (lint, type-check, test) and release pipelines
+├── pyproject.toml            # Packaging, dependencies, tool config (ruff, mypy, pytest)
+├── uv.lock                   # Pinned, reproducible dependency lockfile
 └── README.md
 ```
+
+---
+
+## Documentation
+
+- [Package Layout & Namespace Conventions](./docs/package-layout.md) — the `colonymind` / `cm`
+  package structure and the planned functional-pipeline namespaces.
+- [Public API Conventions](./docs/public-api-conventions.md) — naming, signatures, and the
+  serializable + inspectable return-object contract every wrapper must meet.
+- [Versioning & Releases](./docs/versioning-and-releases.md) — Semantic Versioning policy and
+  the tag-driven release process.
+- [Architecture Decision Records](./docs/adr/) — the foundational `§A` decisions.
+- [How to Author a Node](./docs/authoring-a-node.md) — the node-definition contract in practice.
+
+The SDK uses [`uv`](https://docs.astral.sh/uv/) for reproducible installs (`uv sync`), `ruff`
+for lint + format, and `mypy` for type-checking; CI runs all three plus the test suite on
+Python 3.11 and 3.12.
 
 ---
 

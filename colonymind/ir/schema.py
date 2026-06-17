@@ -1,4 +1,5 @@
 """JSON Schema export for the Colony Mind IR (source of truth: the Pydantic models)."""
+
 from __future__ import annotations
 
 import json

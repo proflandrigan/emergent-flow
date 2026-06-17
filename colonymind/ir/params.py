@@ -22,7 +22,7 @@ from .common import ARTIFACT_REF_KIND, ArtifactRef, IRModel
 # Value type alias
 # ---------------------------------------------------------------------------
 
-JsonScalar = Union[str, int, float, bool, None]
+JsonScalar = str | int | float | bool | None
 
 
 def _param_value_discriminator(v: Any) -> str:

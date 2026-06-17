@@ -29,8 +29,13 @@ class TestPortSpec:
 
     def test_round_trip(self):
         ps = PortSpec(
-            name="table", direction=Direction.IN, data_type="Table",
-            cardinality=Cardinality.MANY, required=False, label="In", help="h",
+            name="table",
+            direction=Direction.IN,
+            data_type="Table",
+            cardinality=Cardinality.MANY,
+            required=False,
+            label="In",
+            help="h",
         )
         assert PortSpec.model_validate_json(ps.model_dump_json()) == ps
 
@@ -52,8 +57,12 @@ class TestParamSpec:
 
     def test_round_trip_with_hints(self):
         ps = ParamSpec(
-            name="strategy", type_token="str", default="mean", required=True,
-            label="Strategy", help="how",
+            name="strategy",
+            type_token="str",
+            default="mean",
+            required=True,
+            label="Strategy",
+            help="how",
             hints=ValidationHints(choices=["mean", "median"], widget="select"),
         )
         assert ParamSpec.model_validate_json(ps.model_dump_json()) == ps
@@ -64,8 +73,16 @@ class TestValidationHints:
         assert ValidationHints().min is None
 
     def test_round_trip(self):
-        h = ValidationHints(min=0, max=10, step=1, choices=[1, 2], min_length=1,
-                            max_length=5, pattern=r"\d+", widget="slider")
+        h = ValidationHints(
+            min=0,
+            max=10,
+            step=1,
+            choices=[1, 2],
+            min_length=1,
+            max_length=5,
+            pattern=r"\d+",
+            widget="slider",
+        )
         assert ValidationHints.model_validate_json(h.model_dump_json()) == h
 
 
@@ -87,10 +104,19 @@ class TestNodeSpec:
 
     def test_round_trip(self):
         spec = NodeSpec(
-            type="clean.impute_missing", version=2, family="clean",
-            label="Impute", paradigm=Paradigm.FUNCTIONAL,
+            type="clean.impute_missing",
+            version=2,
+            family="clean",
+            label="Impute",
+            paradigm=Paradigm.FUNCTIONAL,
             ports=[PortSpec(name="table", direction=Direction.OUT, data_type="Table")],
-            params=[ParamSpec(name="strategy", type_token="str", default="mean",
-                              hints=ValidationHints(choices=["mean"]))],
+            params=[
+                ParamSpec(
+                    name="strategy",
+                    type_token="str",
+                    default="mean",
+                    hints=ValidationHints(choices=["mean"]),
+                )
+            ],
         )
         assert NodeSpec.model_validate_json(spec.model_dump_json()) == spec

@@ -93,12 +93,12 @@
 
 ## Story 6 — SDK packaging, versioning & public API conventions
 
-- [ ] Establish the package layout and namespace (e.g. `import colonymind as cm`, `cm.data`, `cm.clean`, `cm.stats`, `cm.ml`, `cm.reports`).
-- [ ] **Pin all dependency versions** (deterministic, reproducible installs).
-- [ ] Adopt a versioning scheme (semantic versioning) and document the release process.
-- [ ] Set up build + publish pipeline to a package index.
-- [ ] Document **public API conventions** (naming, signatures, return-object expectations).
-- [ ] Stand up CI (lint with `ruff`/`black`, type-check, run tests on each commit).
+- [x] Establish the package layout and namespace (e.g. `import colonymind as cm`, `cm.data`, `cm.clean`, `cm.stats`, `cm.ml`, `cm.reports`).
+- [x] **Pin all dependency versions** (deterministic, reproducible installs).
+- [x] Adopt a versioning scheme (semantic versioning) and document the release process.
+- [x] Set up build + publish pipeline to a package index.
+- [x] Document **public API conventions** (naming, signatures, return-object expectations).
+- [x] Stand up CI (lint with `ruff`/`black`, type-check, run tests on each commit).
 
 ---
 

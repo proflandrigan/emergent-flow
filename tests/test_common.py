@@ -7,12 +7,11 @@ from colonymind.ir.common import (
     ArtifactRef,
     Cardinality,
     Direction,
-    IRModel,
     IRId,
+    IRModel,
     Paradigm,
     new_id,
 )
-
 
 # ---------------------------------------------------------------------------
 # Enum member values
