@@ -107,10 +107,13 @@ credentials.json
 *.ckpt
 *.safetensors
 *.onnx
-data/
-datasets/
-artifacts/
-models/
+# Anchored to the repo root so these ignore top-level data/output dirs only and
+# never swallow same-named source packages (e.g. colonymind/data/, the cm.data
+# loader family — Epic 1, Story 8 — or a future colonymind/models/).
+/data/
+/datasets/
+/artifacts/
+/models/
 # ...but the worked-example dataset is a committed SDK fixture (Epic 1, Story 8).
 !examples/vertical_slice/sample.csv
 *.sqlite
