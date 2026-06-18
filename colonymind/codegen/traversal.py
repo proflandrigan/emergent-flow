@@ -87,8 +87,8 @@ def topological_sort(graph: Graph) -> list[IRId]:
         names = ", ".join(_describe(graph.nodes[nid]) for nid in sorted(remaining))
         raise CycleError(
             "Functional-pipeline graph contains a cycle; no topological order "
-            f"exists. Nodes involved in the cycle: {names}. Functional pipelines "
-            "must be acyclic."
+            f"exists. Nodes on or downstream of the cycle: {names}. Functional "
+            "pipelines must be acyclic."
         )
 
     return order

@@ -97,7 +97,9 @@ class WiringMap(BaseModel):
         key = (node_id, port_id)
         if key not in self._by_target:
             raise KeyError(f"No IN port {port_id!r} on node {node_id!r} in this wiring map.")
-        return self._by_target[key].sources
+        # Return a copy so callers cannot mutate the map's internal binding state
+        # (kept consistent with consumers(), which also returns a fresh list).
+        return list(self._by_target[key].sources)
 
     def is_bound(self, node_id: str, port_id: str) -> bool:
         """True if the given IN port has at least one upstream source."""
@@ -120,6 +122,10 @@ def build_wiring_map(graph: Graph) -> WiringMap:
     ONE fed by more than one edge raises `CardinalityError`.
     """
     # Gather incoming OUT endpoints per (target node id, target port id).
+    # Sources are kept per edge and NOT de-duplicated: two parallel edges from the
+    # same OUT port to the same IN port yield two identical PortRefs, mirroring the
+    # per-edge counting in topological_sort. A consumer that needs distinct sources
+    # de-dupes itself (Story 5/6).
     incoming: dict[tuple[str, str], list[PortRef]] = {}
     for edge in graph.edges.values():
         key = (edge.target.node_id, edge.target.port_id)

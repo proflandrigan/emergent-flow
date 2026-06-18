@@ -126,6 +126,21 @@ def test_self_loop_raises_cycle_error() -> None:
         topological_sort(_graph([a], [_edge(a, a)]))
 
 
+def test_cycle_error_names_downstream_nodes_with_accurate_wording() -> None:
+    # A<->B is the cycle; C hangs off B (downstream of, but not on, the cycle).
+    # The message names every unschedulable node, so its wording must not claim
+    # they are all strictly "on" the cycle.
+    a = _node("A")
+    b = _node("B")
+    c = _node("C", n_out=0)
+    g = _graph([a, b, c], [_edge(a, b), _edge(b, a), _edge(b, c)])
+    with pytest.raises(CycleError) as exc:
+        topological_sort(g)
+    msg = str(exc.value)
+    assert "on or downstream of the cycle" in msg
+    assert c.id in msg
+
+
 def test_tie_break_is_ascending_node_id() -> None:
     a = _node("A", n_in=0, n_out=0)
     b = _node("B", n_in=0, n_out=0)

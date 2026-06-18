@@ -132,6 +132,18 @@ def test_upstream_unknown_port_raises_keyerror() -> None:
         wm.upstream(a.id, "no-such-port")
 
 
+def test_upstream_returns_a_copy_not_internal_state() -> None:
+    # Mutating the list returned by upstream() must not corrupt the map's state.
+    a = _node("A", n_out=1)
+    b = _node("B", ins=[("in0", Cardinality.ONE)], n_out=0)
+    wm = build_wiring_map(_graph([a, b], [_edge(a, b)]))
+
+    up = wm.upstream(b.id, _in(b).id)
+    up.append(PortRef(node_id="HACK", port_id="HACK"))
+
+    assert _src_keys(wm.upstream(b.id, _in(b).id)) == {(a.id, _out(a).id)}
+
+
 def test_map_is_inspectable_and_round_trips() -> None:
     a = _node("A", n_out=1)
     b = _node("B", ins=[("in0", Cardinality.MANY)], n_out=0)
