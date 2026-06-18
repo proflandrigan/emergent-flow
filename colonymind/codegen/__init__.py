@@ -1,0 +1,28 @@
+"""
+colonymind.codegen
+~~~~~~~~~~~~~~~~~~~
+The code-generation engine (Epic 2). Houses the whole-graph compiler and the
+reference executor (Stories 5-6) and the shared graph-analysis plumbing both
+rely on (Story 2): deterministic topological ordering, cycle detection, and the
+input-wiring map.
+
+Exposed publicly as the lazy ``cm.codegen`` namespace (see
+``colonymind/__init__.py``). Top-level ``cm.compile_to_code`` / ``cm.execute``
+entry points are reserved per ADR 0010 and land in Stories 5-6.
+"""
+
+from __future__ import annotations
+
+from colonymind.codegen.errors import CardinalityError, CodegenError, CycleError
+from colonymind.codegen.traversal import topological_sort
+from colonymind.codegen.wiring import InputBinding, WiringMap, build_wiring_map
+
+__all__ = [
+    "CodegenError",
+    "CycleError",
+    "CardinalityError",
+    "topological_sort",
+    "build_wiring_map",
+    "WiringMap",
+    "InputBinding",
+]
