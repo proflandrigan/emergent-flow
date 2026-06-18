@@ -16,6 +16,15 @@ and Story 1 of [Epic 1](../../epics/epic-1-core-sdk-and-ir.md).
 | [0004](./0004-storage-tiering.md) | Storage tiering: metadata in Redis, artifacts on disk/object store | Accepted |
 | [0005](./0005-node-definition-contract.md) | Node-definition contract: a serializable spec plus Python behaviour | Accepted |
 
+The following decisions lock the codegen engine's architecture; they correspond to Story 1 of
+[Epic 2](../../epics/epic-2-code-generation-engine.md).
+
+| ADR | Decision | Status |
+| :-- | :------- | :----- |
+| [0008](./0008-codegen-templating-vs-ast.md) | Codegen: string templates for functional pipelines, AST construction for the declarative paradigm | Accepted |
+| [0009](./0009-codegen-binding-context.md) | The whole-graph compiler supplies variable names to nodes via a `CodegenContext` | Accepted |
+| [0010](./0010-codegen-package-placement.md) | The codegen engine lives in `colonymind/codegen` with `cm.compile_to_code` / `cm.execute` entry points | Accepted |
+
 ## Conventions
 
 - Filenames: `NNNN-kebab-case-title.md`, numbered sequentially from `0001`.
