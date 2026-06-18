@@ -11,7 +11,7 @@ by construction (ADR 0002).
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from colonymind.data import load_csv
 from colonymind.ir.common import Direction
@@ -21,13 +21,16 @@ from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
 from ..spec import ParamSpec, PortSpec, ValidationHints
 
+if TYPE_CHECKING:
+    from colonymind.codegen.context import CodegenContext
+
 
 @register
 class LoadCsv(NodeDefinition):
     """Load a CSV file into a pandas DataFrame."""
 
     type = "data.load_csv"
-    version = 1
+    version = 2
     family = "data"
     label = "Load CSV"
 
@@ -66,11 +69,11 @@ class LoadCsv(NodeDefinition):
             encoding = "utf-8"
         return cast(str, path), cast(str, encoding)
 
-    def codegen(self, node: Node) -> CodeFragment:
+    def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         path, encoding = self._args(node)
         return CodeFragment(
             imports=["import colonymind as cm"],
-            body=f"frame = cm.data.load_csv({path!r}, encoding={encoding!r})",
+            body=f"{ctx.out_var('frame')} = cm.data.load_csv({path!r}, encoding={encoding!r})",
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:

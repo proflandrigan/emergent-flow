@@ -16,12 +16,15 @@ construction.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from colonymind.ir.common import Direction
 from colonymind.ir.node import Node
 from colonymind.nodes.contract import CodeFragment, NodeDefinition
 from colonymind.nodes.spec import PortSpec
+
+if TYPE_CHECKING:
+    from colonymind.codegen.context import CodegenContext
 
 
 def reverse_text(value: str) -> str:
@@ -38,7 +41,7 @@ class ReverseText(NodeDefinition):
     """Reverse a text string (IN ``text`` → OUT ``text``)."""
 
     type = "text.reverse"
-    version = 1
+    version = 2
     family = "text"
     label = "Reverse Text"
 
@@ -48,10 +51,10 @@ class ReverseText(NodeDefinition):
     ]
     params = []
 
-    def codegen(self, node: Node) -> CodeFragment:
+    def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         return CodeFragment(
             imports=["from cm_texttools.nodes import reverse_text"],
-            body="text = reverse_text(text)",
+            body=f"{ctx.out_var('text')} = reverse_text({ctx.in_var('text')})",
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:

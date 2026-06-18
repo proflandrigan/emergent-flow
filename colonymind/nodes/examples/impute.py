@@ -11,7 +11,7 @@ equivalent by construction (ADR 0002).
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from colonymind.clean import STRATEGIES, impute_missing
 from colonymind.ir.common import Direction
@@ -21,13 +21,16 @@ from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
 from ..spec import ParamSpec, PortSpec, ValidationHints
 
+if TYPE_CHECKING:
+    from colonymind.codegen.context import CodegenContext
+
 
 @register
 class ImputeMissing(NodeDefinition):
     """Impute missing values in a DataFrame column-wise."""
 
     type = "clean.impute_missing"
-    version = 1
+    version = 2
     family = "clean"
     label = "Impute Missing"
 
@@ -70,13 +73,13 @@ class ImputeMissing(NodeDefinition):
         columns = values.get("columns")
         return cast(str, strategy), cast("list[str] | None", columns)
 
-    def codegen(self, node: Node) -> CodeFragment:
+    def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         strategy, columns = self._args(node)
         return CodeFragment(
             imports=["import colonymind as cm"],
             body=(
-                f"frame = cm.clean.impute_missing(frame, strategy={strategy!r}, "
-                f"columns={columns!r})"
+                f"{ctx.out_var('frame')} = cm.clean.impute_missing("
+                f"{ctx.in_var('frame')}, strategy={strategy!r}, columns={columns!r})"
             ),
         )
 

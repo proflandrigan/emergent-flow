@@ -22,8 +22,8 @@ from colonymind.nodes.registry import NodeRegistry  # noqa: E402
 
 
 def _run_codegen(definition, node, scope):
-    """exec a node's emitted fragment in *scope* and return the updated scope."""
-    frag = definition.codegen(node)
+    """exec a node's preview fragment in *scope* and return the updated scope."""
+    frag = definition.preview(node)
     exec(frag.render(), scope)  # noqa: S102 — test-only, on our own emitted code
     return scope
 

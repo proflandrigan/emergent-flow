@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import re
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import Field
 
@@ -34,6 +34,9 @@ from colonymind.ir.params import Param, ParamValue
 from colonymind.ir.port import Port
 
 from .spec import NodeSpec, ParamSpec, PortSpec
+
+if TYPE_CHECKING:
+    from colonymind.codegen.context import CodegenContext
 
 # ---------------------------------------------------------------------------
 # CodeFragment — the unit a node's codegen emits
@@ -123,13 +126,32 @@ class NodeDefinition(ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    def codegen(self, node: Node) -> CodeFragment:
+    def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         """Emit the Python source implementing *node* (the codegen template).
+
+        *ctx* (ADR 0009) supplies the variable name bound to each IN port
+        (``ctx.in_var(port_name)``) and allocated to each OUT port
+        (``ctx.out_var(port_name)``); a node asks the context for names instead
+        of hardcoding them, so the whole-graph compiler can wire real graphs and
+        names never collide.
 
         Must be the human-readable equivalent of ``execute`` for the same node
         (ADR 0002).  The output is for display, export and Git publishing; it is
         never ``exec``-ed in production.
         """
+
+    def preview(self, node: Node) -> CodeFragment:
+        """Emit a single-node code preview, with each port's variable == its name.
+
+        Builds a trivial port-name-identity :class:`CodegenContext` and calls
+        ``codegen``.  This is the canvas "show code" path (Epic 3): a node
+        previewed on its own renders exactly as it did before the Story 4 binding
+        contract (e.g. ``data.load_csv`` -> ``frame = cm.data.load_csv(...)``).
+        The whole-graph compiler instead passes a graph-resolved context.
+        """
+        from colonymind.codegen.context import CodegenContext
+
+        return self.codegen(node, CodegenContext.preview(node))
 
     @abstractmethod
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:

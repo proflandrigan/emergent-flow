@@ -88,22 +88,30 @@ Keep the real work in a small, importable helper (`impute_missing`) — see the 
 
 ## Step 5 — Implement `codegen`, and keep it equivalent to `execute`
 
-`codegen` returns a `CodeFragment` (`imports` + `body`). The body must bind the node's outputs
-(here, the variable `table`). **ADR 0002 requires codegen and execute to be equivalent.** The
-cheapest way to guarantee that — and the Story 7 "thin wrapper" pattern — is to have both call
-the *same* runtime helper:
+`codegen` takes the node *and* a `CodegenContext` (`ctx`), and returns a `CodeFragment`
+(`imports` + `body`). The body must bind the node's outputs via `ctx.out_var(<out port
+name>)` and read its inputs via `ctx.in_var(<in port name>)` rather than hardcoding `table`.
+The whole-graph compiler supplies `ctx` (ADR 0009), resolving each IN port to the variable its
+upstream node was allocated and each OUT port to the variable this node is allocated; for a
+standalone preview, `ctx` maps each port to its own name. **ADR 0002 requires codegen and
+execute to be equivalent.** The cheapest way to guarantee that — and the Story 7 "thin wrapper"
+pattern — is to have both call the *same* runtime helper:
 
 ```python
-    def codegen(self, node):
+    def codegen(self, node, ctx):
         strategy, columns = self._args(node)
         return CodeFragment(
             imports=["from colonymind.nodes.examples.impute import impute_missing"],
-            body=f"table = impute_missing(table, strategy={strategy!r}, columns={columns!r})",
+            body=(
+                f"{ctx.out_var('table')} = impute_missing("
+                f"{ctx.in_var('table')}, strategy={strategy!r}, columns={columns!r})"
+            ),
         )
 ```
 
 `execute` calls `impute_missing(...)`; the emitted code calls the same function. They cannot
-drift. Add a test that runs both and asserts equal results (see
+drift. Add a test that runs both and asserts equal results — for `codegen`, that means running
+`preview().render()` (see
 `tests/test_reference_nodes.py::TestImputeMissing::test_codegen_matches_execute`).
 
 ## Step 6 — (Optional) override `infer_types`
@@ -129,7 +137,7 @@ A conformance checklist for your test file:
 - `instantiate()` produces a node that fits in a `Graph`;
 - `validate_node()` catches a missing required param, a bad `choices` value, and any
   numeric/length/pattern violation;
-- `execute` equals running `codegen().render()` for a representative node (ADR 0002).
+- `execute` equals running `preview().render()` for a representative node (ADR 0002).
 
 ## Registration
 
