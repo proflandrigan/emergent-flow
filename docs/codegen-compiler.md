@@ -24,11 +24,11 @@ Any required input (IN) port on a node that remains unconnected at compile-time 
 
 ## Import collection
 
-All `import` statements gathered from individual node code fragments are consolidated into a `set` to ensure uniqueness, then `sorted()` alphabetically, and finally joined to form the import block of the generated module. Currently, the reference-node catalog primarily emits `"import colonymind as cm"`. This simple alphabetical deduplication is sufficient for present needs but can be enhanced with more sophisticated tools like `isort` or `ruff check --select I` if the import diversity of the node catalog expands.
+All `import` statements gathered from individual node code fragments are consolidated into a `set` to ensure uniqueness, then `sorted()` alphabetically, and finally joined to form the import block of the generated module. Currently, the reference-node catalog primarily emits `"import colonymind as cm"`. The alphabetical join is only a stable pre-order: the formatting pass (below) runs `ruff check --select I` over the assembled module, so the final import block is grouped isort-clean (stdlib before third-party) even once the node catalog emits a more diverse mix of imports.
 
-## The `ruff format` pass
+## The ruff normalization passes
 
-As specified in [ADR 0008](adr/0008-codegen-templating-vs-ast.md), a `ruff format` pass is the final step before `compile_to_code` returns the generated source code. This is invoked via `colonymind.codegen.formatting.format_source`, which shells out to `python -m ruff format -`. Consequently, `ruff` is now a runtime dependency (listed in `[project.dependencies]` in `pyproject.toml`), not solely a development tool, due to its integral role in maintaining code style and consistency.
+As specified in [ADR 0008](adr/0008-codegen-templating-vs-ast.md), a ruff normalization step is the final stage before `compile_to_code` returns the generated source code. This is invoked via `colonymind.codegen.formatting.format_source`, which shells out to `python -m ruff` twice over stdin: first `ruff check --select I --fix` to organize imports (since `ruff format` never reorders them, a stdlib + third-party mix would otherwise emit `I001`-dirty output), then `ruff format` to normalize whitespace, quotes and line length. The `--select I` flag forces the import-order rule regardless of config discovery, and every `I` violation is auto-fixable, so the pass only fails if the assembled source does not parse. Consequently, `ruff` is now a runtime dependency (listed in `[project.dependencies]` in `pyproject.toml`), not solely a development tool, due to its integral role in maintaining code style and consistency.
 
 ## Paradigm scope
 
