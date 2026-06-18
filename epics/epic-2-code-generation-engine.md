@@ -47,12 +47,12 @@
 > (`colonymind/ir/graph.py`) stores nodes/edges as id→object maps with structural
 > validation but offers no traversal helpers.
 
-- [ ] Implement a **deterministic topological sort** over `Graph.nodes`/`Graph.edges`, with a stable tie-break (e.g. by node id) so the same graph always orders identically.
-- [ ] Implement **cycle detection**: functional-pipeline graphs must be acyclic; reject cycles with a clear, node-naming error message.
-- [ ] Build the **input-wiring map**: for each node's IN port, resolve the upstream `(node_id, OUT port_id)` from `Graph.edges` (`Edge.source` → `Edge.target`).
-- [ ] Handle **fan-out** (one OUT port feeding many targets) and **fan-in / cardinality** (an IN port's `cardinality`, see `colonymind/ir/port.py`).
-- [ ] Define behaviour for **dangling IN ports** (no upstream edge) — error vs. leave unbound — and document it.
-- [ ] Add unit tests over crafted graphs (linear chain, diamond/fan-out, disconnected, cyclic).
+- [x] Implement a **deterministic topological sort** over `Graph.nodes`/`Graph.edges`, with a stable tie-break (e.g. by node id) so the same graph always orders identically.
+- [x] Implement **cycle detection**: functional-pipeline graphs must be acyclic; reject cycles with a clear, node-naming error message.
+- [x] Build the **input-wiring map**: for each node's IN port, resolve the upstream `(node_id, OUT port_id)` from `Graph.edges` (`Edge.source` → `Edge.target`).
+- [x] Handle **fan-out** (one OUT port feeding many targets) and **fan-in / cardinality** (an IN port's `cardinality`, see `colonymind/ir/port.py`).
+- [x] Define behaviour for **dangling IN ports** (no upstream edge) — error vs. leave unbound — and document it.
+- [x] Add unit tests over crafted graphs (linear chain, diamond/fan-out, disconnected, cyclic).
 
 ---
 
@@ -61,16 +61,15 @@
 > Directly defuses the proposal's Challenge 2 ("df_step_3_v2_final"). Names must be
 > derived from intent, not execution order, and never collide.
 
-- [ ] Derive a candidate identifier from each node's `label` (e.g. "Load CSV" → `load_csv`), slugified to a valid Python identifier.
-- [ ] **Collision handling** that is deterministic and readable (stable suffixing), not order-encoded. Note the live bug this fixes: `stats.anova` and `ml.train_classifier` both hardcode `result =` today and would clobber each other.
-- [ ] Avoid Python **keywords/builtins** and ensure uniqueness across the whole graph.
-- [ ] Map every **OUT port** to a bound variable name (supporting multi-output nodes), feeding the binding context from Story 1.
-- [ ] Guarantee **stability**: the same IR always yields the same names (required for golden tests and CRDT-friendly diffs).
-- [ ] Unit-test naming over labels with spaces, duplicates, unicode, keyword collisions, and empty/None labels.
+- [x] Derive a candidate identifier from each node's `label` (e.g. "Load CSV" → `load_csv`), slugified to a valid Python identifier.
+- [x] **Collision handling** that is deterministic and readable (stable suffixing), not order-encoded. Note the live bug this fixes: `stats.anova` and `ml.train_classifier` both hardcode `result =` today and would clobber each other.
+- [x] Avoid Python **keywords/builtins** and ensure uniqueness across the whole graph.
+- [x] Map every **OUT port** to a bound variable name (supporting multi-output nodes), feeding the binding context from Story 1.
+- [x] Guarantee **stability**: the same IR always yields the same names (required for golden tests and CRDT-friendly diffs).
+- [x] Unit-test naming over labels with spaces, duplicates, unicode, keyword collisions, and empty/None labels.
 
 ---
-
-## Story 4 — Evolve the node codegen contract for whole-graph compilation
+ — Evolve the node codegen contract for whole-graph compilation
 
 > The existing `NodeDefinition.codegen(node) -> CodeFragment` cannot participate in a real
 > compiler because it hardcodes variable names. This story closes that gap while preserving
