@@ -130,9 +130,7 @@ def test_var_for_unknown_port_raises_key_error() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _node(
-    label: str | None, *, type_: str = "test.node", outs: tuple[str, ...] = ("out",)
-) -> Node:
+def _node(label: str | None, *, type_: str = "test.node", outs: tuple[str, ...] = ("out",)) -> Node:
     ports = [Port(name=n, direction=Direction.OUT) for n in outs]
     return Node(type=type_, label=label, ports=ports)
 
