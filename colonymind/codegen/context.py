@@ -81,11 +81,9 @@ def build_codegen_context(node: Node, name_map: NameMap, wiring_map: WiringMap) 
       * exactly one source  -> that source's variable name;
       * no source (dangling) -> fall back to the IN port's own name (mirrors the
         preview fallback; whole-graph dangling policy is Story 5);
-      * more than one source (fan-in, Cardinality.MANY) -> raise ValueError. None
-        of the reference nodes use MANY inputs; supporting multi-source fan-in is
-        deferred. The message must name the port, e.g.
-        f"IN port {port.name!r} on node {node.id!r} has {len(sources)} sources; "
-        "multi-source fan-in is not yet supported by codegen context."
+      * more than one source (fan-in, Cardinality.MANY) -> raise ValueError
+        naming the port. None of the reference nodes use MANY inputs;
+        supporting multi-source fan-in is deferred.
     """
     in_vars: dict[str, str] = {}
     out_vars: dict[str, str] = {}
