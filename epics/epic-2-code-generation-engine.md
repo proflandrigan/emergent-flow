@@ -33,11 +33,11 @@
 > These choices shape every later story and are expensive to retrofit. Decide and write
 > them down before building the compiler, mirroring how Epic 1 Story 1 fixed §A.
 
-- [ ] **Templating vs. AST construction.** Decide the hybrid: string/template emission for flat functional pipelines (already how `CodeFragment.body` works in `contract.py`), AST/`libcst` for the declarative paradigm where nested structure matters (per roadmap Epic 2 key decisions). Record an ADR.
-- [ ] **Variable-binding model.** Decide how the whole-graph compiler supplies each node with the *input* variable names (per IN port, from upstream bindings) and *output* variable names (per OUT port). This is the central contract change — today nodes hardcode `frame`/`result`/`html` in their `body` (see `colonymind/nodes/examples/*.py`), which cannot wire a real graph. Record an ADR (a `CodegenContext` passed into `codegen`).
-- [ ] **Package placement.** Decide the home for the engine (e.g. `colonymind/codegen/`) and the public entry points `cm.compile_to_code` / `cm.execute`, consistent with `docs/public-api-conventions.md`.
-- [ ] **Formatting toolchain.** Choose the post-generation formatter; the repo already standardizes on `ruff` (`[tool.ruff]` in `pyproject.toml`), so prefer `ruff format` over adding `black`.
-- [ ] **Restate the equivalence invariant** (ADR 0002): `execute(ir)` and running `compile_to_code(ir)` must produce equivalent artifacts; link the new ADRs back to `docs/adr/0002-execute-the-ir-not-the-string.md`.
+- [x] **Templating vs. AST construction.** Decide the hybrid: string/template emission for flat functional pipelines (already how `CodeFragment.body` works in `contract.py`), AST/`libcst` for the declarative paradigm where nested structure matters (per roadmap Epic 2 key decisions). Record an ADR. → [ADR 0008](../docs/adr/0008-codegen-templating-vs-ast.md)
+- [x] **Variable-binding model.** Decide how the whole-graph compiler supplies each node with the *input* variable names (per IN port, from upstream bindings) and *output* variable names (per OUT port). This is the central contract change — today nodes hardcode `frame`/`result`/`html` in their `body` (see `colonymind/nodes/examples/*.py`), which cannot wire a real graph. Record an ADR (a `CodegenContext` passed into `codegen`). → [ADR 0009](../docs/adr/0009-codegen-binding-context.md)
+- [x] **Package placement.** Decide the home for the engine (e.g. `colonymind/codegen/`) and the public entry points `cm.compile_to_code` / `cm.execute`, consistent with `docs/public-api-conventions.md`. → [ADR 0010](../docs/adr/0010-codegen-package-placement.md)
+- [x] **Formatting toolchain.** Choose the post-generation formatter; the repo already standardizes on `ruff` (`[tool.ruff]` in `pyproject.toml`), so prefer `ruff format` over adding `black`. → folded into [ADR 0008](../docs/adr/0008-codegen-templating-vs-ast.md)
+- [x] **Restate the equivalence invariant** (ADR 0002): `execute(ir)` and running `compile_to_code(ir)` must produce equivalent artifacts; link the new ADRs back to `docs/adr/0002-execute-the-ir-not-the-string.md`. → folded into [ADR 0010](../docs/adr/0010-codegen-package-placement.md)
 
 ---
 
