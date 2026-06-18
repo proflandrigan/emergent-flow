@@ -88,13 +88,13 @@
 
 > The headline deliverable: IR → one runnable Python module.
 
-- [ ] Implement `compile_to_code(graph) -> str` composing Stories 2–4: topo order, naming, per-node fragments.
-- [ ] **Collect, de-duplicate, and sort imports** across all fragments (the job `CodeFragment.render()` explicitly defers to "the real whole-graph compiler" in `contract.py`).
-- [ ] Emit body statements in topological order with correct upstream→downstream variable wiring.
-- [ ] Assemble a complete module: header/docstring, import block, then body; decide flat-script vs. `def main()` wrapping and document it.
-- [ ] Run the **formatting pass** (`ruff format`) so output is PEP8-clean.
-- [ ] Expose the public entry point (`cm.compile_to_code`) and register it under the public-API conventions; ensure it returns an inspectable `str`.
-- [ ] Handle edge cases: empty graph, single source node, fan-out, fan-in.
+- [x] Implement `compile_to_code(graph) -> str` composing Stories 2–4: topo order, naming, per-node fragments.
+- [x] **Collect, de-duplicate, and sort imports** across all fragments (the job `CodeFragment.render()` explicitly defers to "the real whole-graph compiler" in `contract.py`).
+- [x] Emit body statements in topological order with correct upstream→downstream variable wiring.
+- [x] Assemble a complete module: header/docstring, import block, then body; decide flat-script vs. `def main()` wrapping and document it.
+- [x] Run the **formatting pass** (`ruff format`) so output is PEP8-clean.
+- [x] Expose the public entry point (`cm.compile_to_code`) and register it under the public-API conventions; ensure it returns an inspectable `str`.
+- [x] Handle edge cases: empty graph, single source node, fan-out, fan-in.
 
 ---
 

@@ -14,7 +14,7 @@ entry points are reserved per ADR 0010 and land in Stories 5-6.
 from __future__ import annotations
 
 from colonymind.codegen.context import CodegenContext, build_codegen_context
-from colonymind.codegen.errors import CardinalityError, CodegenError, CycleError
+from colonymind.codegen.errors import CardinalityError, CodegenError, CycleError, UnboundInputError
 from colonymind.codegen.naming import NameMap, OutBinding, build_name_map
 from colonymind.codegen.traversal import topological_sort
 from colonymind.codegen.wiring import InputBinding, WiringMap, build_wiring_map
@@ -23,6 +23,7 @@ __all__ = [
     "CodegenError",
     "CycleError",
     "CardinalityError",
+    "UnboundInputError",
     "topological_sort",
     "build_wiring_map",
     "WiringMap",

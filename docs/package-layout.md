@@ -29,7 +29,7 @@ colonymind/
 │   ├── [contract, registry, spec modules]
 │   └── examples/        (reference node implementations)
 └── codegen/             (code-generation engine: graph traversal, wiring, compiler/executor)
-    └── [traversal, wiring, errors modules]
+    └── [traversal, wiring, naming, context, errors, formatting, compiler modules]
 ```
 
 **`colonymind.ir`** — the intermediate representation layer. Defines the graph schema: node
@@ -44,13 +44,14 @@ All node types (in-tree and third-party) register here. The module exposes a sha
 self-register at import time and serve as examples for authoring custom nodes.
 
 **`colonymind.codegen`** — the code-generation engine (Epic 2). Houses the shared
-graph-analysis plumbing that both the whole-graph compiler (`cm.compile_to_code`, Story 5)
-and the reference executor (`cm.execute`, Story 6) build on: deterministic topological
-ordering, cycle detection, and the input-wiring map (Story 2). It is exposed as the
-lazily-imported `cm.codegen` namespace, so `import colonymind as cm` stays lightweight and
+graph-analysis plumbing that the whole-graph compiler (`cm.compile_to_code`, Story 5) and
+the reference executor (`cm.execute`, Story 6) build on. The `cm.compile_to_code(graph) -> str`
+entry point is implemented, building on deterministic topological ordering, cycle detection,
+and the input-wiring map (Story 2). `cm.execute` remains reserved. The module is exposed as
+the lazily-imported `cm.codegen` namespace, so `import colonymind as cm` stays lightweight and
 the package is only pulled in on first access to `cm.codegen`. See
-[How codegen traversal works](codegen-traversal.md). The top-level `cm.compile_to_code` /
-`cm.execute` entry points are reserved per
+[How codegen traversal works](codegen-traversal.md) and [How codegen compilation works](codegen-compiler.md).
+The top-level `cm.compile_to_code` / `cm.execute` entry points are placed per
 [ADR 0010](adr/0010-codegen-package-placement.md).
 
 ---
