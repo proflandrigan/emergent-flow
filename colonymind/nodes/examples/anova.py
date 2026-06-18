@@ -11,7 +11,7 @@ construction (ADR 0002).
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from colonymind.ir.common import Direction
 from colonymind.ir.node import Node
@@ -21,13 +21,16 @@ from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
 from ..spec import ParamSpec, PortSpec, ValidationHints
 
+if TYPE_CHECKING:
+    from colonymind.codegen.context import CodegenContext
+
 
 @register
 class Anova(NodeDefinition):
     """Perform a one-way ANOVA of a value column across groups."""
 
     type = "stats.anova"
-    version = 1
+    version = 2
     family = "stats"
     label = "ANOVA"
 
@@ -79,13 +82,13 @@ class Anova(NodeDefinition):
             alpha = 0.05
         return cast(str, group_col), cast(str, value_col), cast(float, alpha)
 
-    def codegen(self, node: Node) -> CodeFragment:
+    def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         group_col, value_col, alpha = self._args(node)
         return CodeFragment(
             imports=["import colonymind as cm"],
             body=(
-                f"result = cm.stats.anova(frame, group_col={group_col!r}, "
-                f"value_col={value_col!r}, alpha={alpha!r})"
+                f"{ctx.out_var('result')} = cm.stats.anova({ctx.in_var('frame')}, "
+                f"group_col={group_col!r}, value_col={value_col!r}, alpha={alpha!r})"
             ),
         )
 

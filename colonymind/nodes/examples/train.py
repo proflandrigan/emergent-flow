@@ -11,7 +11,7 @@ two paths are equivalent by construction (ADR 0002).
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from colonymind.ir.common import Direction
 from colonymind.ir.node import Node
@@ -21,13 +21,16 @@ from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
 from ..spec import ParamSpec, PortSpec, ValidationHints
 
+if TYPE_CHECKING:
+    from colonymind.codegen.context import CodegenContext
+
 
 @register
 class TrainClassifier(NodeDefinition):
     """Train a logistic-regression classifier and report inspectable metrics."""
 
     type = "ml.train_classifier"
-    version = 1
+    version = 2
     family = "ml"
     label = "Train Classifier"
 
@@ -95,13 +98,13 @@ class TrainClassifier(NodeDefinition):
             cast(int, random_state),
         )
 
-    def codegen(self, node: Node) -> CodeFragment:
+    def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         target, features, test_size, random_state = self._args(node)
         return CodeFragment(
             imports=["import colonymind as cm"],
             body=(
-                f"result = cm.ml.train_classifier(frame, target={target!r}, "
-                f"features={features!r}, test_size={test_size!r}, "
+                f"{ctx.out_var('result')} = cm.ml.train_classifier({ctx.in_var('frame')}, "
+                f"target={target!r}, features={features!r}, test_size={test_size!r}, "
                 f"random_state={random_state!r})"
             ),
         )

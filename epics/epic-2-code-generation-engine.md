@@ -69,18 +69,18 @@
 - [x] Unit-test naming over labels with spaces, duplicates, unicode, keyword collisions, and empty/None labels.
 
 ---
- — Evolve the node codegen contract for whole-graph compilation
+ ## Story 4 Evolve the node codegen contract for whole-graph compilation
 
 > The existing `NodeDefinition.codegen(node) -> CodeFragment` cannot participate in a real
 > compiler because it hardcodes variable names. This story closes that gap while preserving
 > single-node preview (`CodeFragment.render()`).
 
-- [ ] Extend the contract so `codegen` receives a **binding context** (input var name per IN port, output var name per OUT port) — e.g. `codegen(node, ctx) -> CodeFragment` — per the Story 1 ADR.
-- [ ] Keep `CodeFragment` (`imports` + `body`) as the unit; confirm `render()` still works for single-node previews and the canvas "show code" panel (Epic 3).
-- [ ] Migrate all five reference nodes to consume the context instead of literals: `data.load_csv`, `clean.impute_missing`, `stats.anova`, `ml.train_classifier`, `reports.generate_html_summary` (`colonymind/nodes/examples/*.py`).
-- [ ] Bump each migrated node's `version` (per-node catalog version) since codegen semantics change (see the `version` ClassVar in `contract.py`).
-- [ ] Update `tests/test_reference_nodes.py` and the node-contract tests to assert codegen wiring against the context.
-- [ ] Update `docs/node-contract-spec.md` and `docs/authoring-a-node.md` so "how to author a node" reflects the new `codegen` signature.
+- [x] Extend the contract so `codegen` receives a **binding context** (input var name per IN port, output var name per OUT port) — e.g. `codegen(node, ctx) -> CodeFragment` — per the Story 1 ADR.
+- [x] Keep `CodeFragment` (`imports` + `body`) as the unit; confirm `render()` still works for single-node previews and the canvas "show code" panel (Epic 3).
+- [x] Migrate all five reference nodes to consume the context instead of literals: `data.load_csv`, `clean.impute_missing`, `stats.anova`, `ml.train_classifier`, `reports.generate_html_summary` (`colonymind/nodes/examples/*.py`).
+- [x] Bump each migrated node's `version` (per-node catalog version) since codegen semantics change (see the `version` ClassVar in `contract.py`).
+- [x] Update `tests/test_reference_nodes.py` and the node-contract tests to assert codegen wiring against the context.
+- [x] Update `docs/node-contract-spec.md` and `docs/authoring-a-node.md` so "how to author a node" reflects the new `codegen` signature.
 
 ---
 

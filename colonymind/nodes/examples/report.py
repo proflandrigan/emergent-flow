@@ -12,7 +12,7 @@ two paths are equivalent by construction (ADR 0002).
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from colonymind.ir.common import Direction
 from colonymind.ir.node import Node
@@ -22,13 +22,16 @@ from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
 from ..spec import ParamSpec, PortSpec, ValidationHints
 
+if TYPE_CHECKING:
+    from colonymind.codegen.context import CodegenContext
+
 
 @register
 class GenerateHtmlSummary(NodeDefinition):
     """Generate a self-contained HTML profiling report for a DataFrame."""
 
     type = "reports.generate_html_summary"
-    version = 1
+    version = 2
     family = "reports"
     label = "HTML Summary"
 
@@ -64,11 +67,14 @@ class GenerateHtmlSummary(NodeDefinition):
             title = "Colony Mind Data Summary"
         return cast(str, title)
 
-    def codegen(self, node: Node) -> CodeFragment:
+    def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         title = self._args(node)
         return CodeFragment(
             imports=["import colonymind as cm"],
-            body=f"html = cm.reports.generate_html_summary(frame, title={title!r})",
+            body=(
+                f"{ctx.out_var('html')} = cm.reports.generate_html_summary("
+                f"{ctx.in_var('frame')}, title={title!r})"
+            ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:

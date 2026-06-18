@@ -10,7 +10,11 @@ import csv
 import pandas as pd
 import pytest
 
+from colonymind.codegen.context import build_codegen_context
+from colonymind.codegen.naming import build_name_map
+from colonymind.codegen.wiring import build_wiring_map
 from colonymind.ir.common import Direction, Paradigm
+from colonymind.ir.edge import Edge, PortRef
 from colonymind.ir.graph import Graph
 from colonymind.nodes.examples import (
     Anova,
@@ -34,8 +38,8 @@ def csv_file(tmp_path):
 
 
 def _run_codegen(definition, node, scope):
-    """exec a node's emitted fragment in *scope* and return the updated scope."""
-    frag = definition.codegen(node)
+    """exec a node's preview fragment in *scope* and return the updated scope."""
+    frag = definition.preview(node)
     exec(frag.render(), scope)  # noqa: S102 — test-only, on our own emitted code
     return scope
 
@@ -211,3 +215,52 @@ class TestGenerateHtmlSummary:
             assert isinstance(html, str)
             assert "<html" in html.lower()
             assert "Equivalence Check" in html
+
+
+# ---------------------------------------------------------------------------
+# whole-graph wiring (Epic 2, Story 4)
+# ---------------------------------------------------------------------------
+
+
+def _out_port(node, name):
+    return next(p for p in node.ports if p.direction == Direction.OUT and p.name == name)
+
+
+def _in_port(node, name):
+    return next(p for p in node.ports if p.direction == Direction.IN and p.name == name)
+
+
+class TestWholeGraphWiring:
+    def test_downstream_input_uses_upstream_output_name(self):
+        load = LoadCsv().instantiate(path="x.csv", label="Load CSV")
+        an = Anova().instantiate(group_col="g", value_col="v", label="ANOVA")
+        edge = Edge(
+            source=PortRef(node_id=load.id, port_id=_out_port(load, "frame").id),
+            target=PortRef(node_id=an.id, port_id=_in_port(an, "frame").id),
+        )
+        graph = Graph(nodes={load.id: load, an.id: an}, edges={edge.id: edge})
+
+        nm = build_name_map(graph)
+        wm = build_wiring_map(graph)
+        load_var = nm.var_for(load.id, _out_port(load, "frame").id)
+
+        ctx = build_codegen_context(an, nm, wm)
+        frag = Anova().codegen(an, ctx)
+        # the anova call reads the exact variable load_csv bound its output to
+        assert f"cm.stats.anova({load_var}" in frag.body
+        assert frag.body.startswith(nm.var_for(an.id, _out_port(an, "result").id))
+
+    def test_colliding_outputs_get_distinct_names(self):
+        # anova and train both historically emitted `result = ...`; with the
+        # binding context their OUT vars must differ (the ADR 0009 clobber bug).
+        an = Anova().instantiate(group_col="g", value_col="v", label="ANOVA")
+        tr = TrainClassifier().instantiate(target="y", label="Train Classifier")
+        graph = Graph(nodes={an.id: an, tr.id: tr})
+        nm = build_name_map(graph)
+        wm = build_wiring_map(graph)
+
+        an_frag = Anova().codegen(an, build_codegen_context(an, nm, wm))
+        tr_frag = TrainClassifier().codegen(tr, build_codegen_context(tr, nm, wm))
+        an_lhs = an_frag.body.split("=", 1)[0].strip()
+        tr_lhs = tr_frag.body.split("=", 1)[0].strip()
+        assert an_lhs != tr_lhs

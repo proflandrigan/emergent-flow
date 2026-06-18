@@ -36,8 +36,11 @@ class _Demo(NodeDefinition):
         ),
     ]
 
-    def codegen(self, node):
-        return CodeFragment(imports=["import os"], body="out1 = in1")
+    def codegen(self, node, ctx):
+        return CodeFragment(
+            imports=["import os"],
+            body=f"{ctx.out_var('out1')} = {ctx.in_var('in1')}",
+        )
 
     def execute(self, node, inputs):
         return {"out1": inputs["in1"]}
@@ -165,6 +168,18 @@ class TestInferTypes:
     def test_default_returns_out_port_types(self):
         out = _Demo().infer_types(_Demo().instantiate(), {"in1": "Table"})
         assert out == {"out1": "Frame"}
+
+
+class TestPreview:
+    def test_preview_uses_port_names_as_variables(self):
+        node = _Demo().instantiate()
+        frag = _Demo().preview(node)
+        assert frag.body == "out1 = in1"
+        assert frag.imports == ["import os"]
+
+    def test_preview_render_round_trips(self):
+        node = _Demo().instantiate()
+        assert _Demo().preview(node).render() == "import os\n\nout1 = in1"
 
 
 class TestAbstractEnforcement:

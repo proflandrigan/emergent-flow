@@ -1,8 +1,8 @@
 # Colony Mind Node-Definition Contract
 
-- **Version:** 1
+- **Version:** 2
 - **Status:** Accepted
-- **Date:** 2026-06-16
+- **Date:** 2026-06-18
 
 ---
 
@@ -102,8 +102,11 @@ sets the class-level metadata attributes (`type`, `version`, `family`, `label`, 
 
 ### Required (abstract)
 
-- **`codegen(self, node) -> CodeFragment`** — the codegen template. Emits the Python source
-  the node contributes. Must be the human-readable equivalent of `execute` for the same node
+- **`codegen(self, node, ctx) -> CodeFragment`** — the codegen template. Emits the Python
+  source the node contributes. `ctx` is a `CodegenContext`: the node obtains its input/output
+  variable names from it (`ctx.in_var(port_name)` / `ctx.out_var(port_name)`) rather than
+  hardcoding them, so the whole-graph compiler can wire real graphs and names never collide
+  (ADR 0009). Must be the human-readable equivalent of `execute` for the same node
   (ADR 0002). The output is for display, export, and Git publishing; it is never `exec`-ed in
   production.
 - **`execute(self, node, inputs) -> dict`** — the executor. Runs the node directly over its
@@ -126,6 +129,10 @@ sets the class-level metadata attributes (`type`, `version`, `family`, `label`, 
 - **`validate_node(self, node) -> list[str]`** — return human-readable errors (empty = valid):
   type match, required params present, no undeclared params, and each value against its
   `ValidationHints`. Port/edge wiring is validated at the graph level, not here.
+- **`preview(self, node) -> CodeFragment`** — single-node code preview: builds a trivial
+  `CodegenContext` whose every port maps to its own name and calls `codegen`. The canvas
+  "show code" path (Epic 3); a node previewed alone renders as it did before the binding
+  contract.
 
 ### CodeFragment
 
@@ -138,6 +145,19 @@ sets the class-level metadata attributes (`type`, `version`, `family`, `label`, 
 
 `render()` returns a self-contained snippet (imports, blank line, body) for previews and
 tests; the real compiler renders imports once per graph.
+
+### CodegenContext
+
+`colonymind.codegen.context.CodegenContext` — the per-node binding context the whole-graph
+compiler passes into `codegen` (see
+[ADR 0009](adr/0009-codegen-binding-context.md)). The compiler builds it from the graph's
+wiring and naming maps via `build_codegen_context`; `preview()` instead builds the identity
+form, where every port's variable is its own name.
+
+| Method | Returns |
+|---|---|
+| `in_var(port_name)` | The variable name bound to the named IN port. |
+| `out_var(port_name)` | The variable name allocated to the named OUT port. |
 
 ---
 
