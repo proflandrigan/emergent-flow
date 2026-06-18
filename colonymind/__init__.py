@@ -21,8 +21,13 @@ __version__ = "0.2.0"
 # scikit-learn, ydata-profiling) is only pulled in when a family is first used.
 _LAZY_FAMILIES = frozenset({"data", "clean", "stats", "ml", "reports"})
 
-if TYPE_CHECKING:  # let type-checkers resolve cm.data, cm.stats, ... statically
-    from colonymind import clean, data, ml, reports, stats
+# Whole-graph code-generation engine namespace (Epic 2). Imported lazily like the
+# functional families so a bare ``import colonymind`` stays light — the codegen
+# package is only pulled in on first access to ``cm.codegen``.
+_LAZY_NAMESPACES = _LAZY_FAMILIES | frozenset({"codegen"})
+
+if TYPE_CHECKING:  # let type-checkers resolve cm.data, cm.codegen, ... statically
+    from colonymind import clean, codegen, data, ml, reports, stats
 
 __all__ = [
     "__version__",
@@ -36,12 +41,13 @@ __all__ = [
     "stats",
     "ml",
     "reports",
+    "codegen",
 ]
 
 
 def __getattr__(name: str) -> ModuleType:
-    """Lazily import a functional-pipeline family on first attribute access."""
-    if name in _LAZY_FAMILIES:
+    """Lazily import a public family or engine namespace on first access."""
+    if name in _LAZY_NAMESPACES:
         module = importlib.import_module(f"colonymind.{name}")
         globals()[name] = module
         return module
