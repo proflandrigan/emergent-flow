@@ -31,3 +31,12 @@ class CardinalityError(CodegenError):
     For example, an IN port declared ``Cardinality.ONE`` that has more than one
     incoming edge feeding it.
     """
+
+
+class UnboundInputError(CodegenError):
+    """Raised when the whole-graph compiler finds a node's IN port with no upstream edge.
+
+    The generated code would otherwise reference an undefined variable. The
+    message should name the node and port so the author can find and fix the
+    missing connection.
+    """

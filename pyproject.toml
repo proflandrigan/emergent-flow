@@ -40,6 +40,9 @@ dependencies = [
     # setuptools as a dependency. Pin it explicitly, and below 81 where
     # pkg_resources was removed, so the report family imports cleanly.
     "setuptools>=68,<81",
+    # ADR 0008: compile_to_code runs a `ruff format` pass on every emitted
+    # module, so ruff is a runtime dependency, not just a dev tool.
+    "ruff>=0.6",
 ]
 
 [project.urls]
@@ -50,7 +53,6 @@ Issues = "https://github.com/proflandrigan/colony-mind/issues"
 [dependency-groups]
 dev = [
     "pytest>=7",
-    "ruff>=0.6",
     "mypy>=1.11",
 ]
 
