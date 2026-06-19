@@ -19,8 +19,8 @@
 - [ ] Imports are collected, de-duplicated, and ordered once for the whole graph (not per node).
 - [ ] Variable names are deterministic, readable (derived from node labels), and collision-free — no `df_step_3_v2_final` and no silent variable clobbering.
 - [ ] Statements are emitted in a deterministic topological order; cyclic functional graphs are rejected with a clear error.
-- [ ] A pure, in-process `execute(graph) -> results` reference interpreter walks the IR and calls each node's `execute` (the productionized, sandboxed runtime is Epic 6).
-- [ ] The A2 equivalence invariant holds: across a fixture corpus, artifacts from `execute(ir)` equal artifacts from running `compile_to_code(ir)`, enforced as a CI golden/property gate.
+- [x] A pure, in-process `execute(graph) -> results` reference interpreter walks the IR and calls each node's `execute` (the productionized, sandboxed runtime is Epic 6).
+- [x] The A2 equivalence invariant holds: across a fixture corpus, artifacts from `execute(ir)` equal artifacts from running `compile_to_code(ir)`, enforced as a CI golden/property gate.
 - [ ] Generated code passes `ruff` lint and is importable/runnable; a golden-file corpus covers every reference node type and common compositions (fan-in, fan-out, subgraphs).
 - [ ] The two-paradigm seam exists: the compiler dispatches on `paradigm`, with a working proof for the declarative `nn.Module` example; full DL/agent codegen is deferred to Epic 10/11.
 - [ ] The vertical-slice graph (`examples/vertical_slice/pipeline.json`) compiles to code that reads like the hand-written `examples/vertical_slice/demo.py` and runs to the same artifacts.
@@ -105,11 +105,11 @@
 > runtime is Epic 6 — this story builds only the pure, in-process reference executor needed to
 > prove equivalence.
 
-- [ ] Implement `execute(graph) -> results`: topo-walk the IR, call each node's `execute(node, inputs)`, and thread OUT-port outputs to downstream IN ports via the Story 2 wiring map.
-- [ ] Return inspectable results keyed by node/port, consistent with `colonymind/api.py` (`is_inspectable`).
-- [ ] Build the **equivalence harness**: for a corpus of graphs, assert artifacts from `execute(ir)` equal artifacts from running `compile_to_code(ir)`.
-- [ ] Cover the vertical slice end to end (`examples/vertical_slice/pipeline.json`) plus `examples/functional_pipeline.json`.
-- [ ] Document the boundary: this executor is the equivalence reference; Epic 6 wraps it with sandboxing, resource limits, and streaming.
+- [x] Implement `execute(graph) -> results`: topo-walk the IR, call each node's `execute(node, inputs)`, and thread OUT-port outputs to downstream IN ports via the Story 2 wiring map.
+- [x] Return inspectable results keyed by node/port, consistent with `colonymind/api.py` (`is_inspectable`).
+- [x] Build the **equivalence harness**: for a corpus of graphs, assert artifacts from `execute(ir)` equal artifacts from running `compile_to_code(ir)`.
+- [x] Cover the vertical slice end to end (`examples/vertical_slice/pipeline.json`) plus `examples/functional_pipeline.json`.
+- [x] Document the boundary: this executor is the equivalence reference; Epic 6 wraps it with sandboxing, resource limits, and streaming.
 
 ---
 

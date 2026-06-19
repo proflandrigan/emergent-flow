@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from colonymind.codegen.context import CodegenContext, build_codegen_context
 from colonymind.codegen.errors import CardinalityError, CodegenError, CycleError, UnboundInputError
+from colonymind.codegen.executor import execute
 from colonymind.codegen.naming import NameMap, OutBinding, build_name_map
 from colonymind.codegen.traversal import topological_sort
 from colonymind.codegen.wiring import InputBinding, WiringMap, build_wiring_map
@@ -33,4 +34,5 @@ __all__ = [
     "OutBinding",
     "CodegenContext",
     "build_codegen_context",
+    "execute",
 ]

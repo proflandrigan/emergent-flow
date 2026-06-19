@@ -23,7 +23,7 @@ order = cm.codegen.topological_sort(graph)   # list[node_id]
 wiring = cm.codegen.build_wiring_map(graph)   # WiringMap
 ```
 
-The whole-graph verbs `cm.compile_to_code` and `cm.execute` remain reserved at the top level
+The whole-graph verbs `cm.compile_to_code` (Story 5) and `cm.execute` (Story 6) are implemented at the top level
 per [ADR 0010](adr/0010-codegen-package-placement.md); the traversal helpers sit under
 `cm.codegen` because they are internal plumbing those verbs compose.
 
