@@ -30,7 +30,7 @@ class SimpleClassifier(nn.Module):
 
 ## Supported surface (the seam, not the catalog)
 
-Only three node types are wired: `nn.module`, `nn.linear`, and `nn.relu`. Any other declarative layer type raises `CodegenError` pointing at **Epic 10**, which owns the full PyTorch layer catalog and tensor-shape-aware codegen. The `forward` generator assumes a single linear chain — general DAG/branching forward bodies are also Epic 10.
+Only three node types are wired: `nn.module`, `nn.linear`, and `nn.relu`. Any other declarative layer type raises `CodegenError` pointing at **Epic 10**, which owns the full PyTorch layer catalog and tensor-shape-aware codegen. The `forward` generator only supports a single linear chain: a subgraph that is not a simple path (fan-out, fan-in, or disconnected layers) is rejected with a `CodegenError` rather than silently miscompiled — general DAG/branching forward bodies are Epic 10. The compiler and executor share one validation gate (`_prepare_declarative`), so both paradigm paths accept and reject exactly the same graphs.
 
 ## Agent/LangGraph seam
 

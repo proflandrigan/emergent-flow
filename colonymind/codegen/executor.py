@@ -31,11 +31,7 @@ from __future__ import annotations
 from typing import Any
 
 from colonymind.api import public_op
-from colonymind.codegen.declarative import (
-    _AGENT_NODE_PREFIXES,
-    _MODULE_TYPE,
-    _SUPPORTED_LAYER_TYPES,
-)
+from colonymind.codegen.declarative import _prepare_declarative
 from colonymind.codegen.errors import CodegenError, UnboundInputError
 from colonymind.codegen.traversal import topological_sort
 from colonymind.codegen.wiring import build_wiring_map
@@ -166,44 +162,16 @@ def _execute_declarative(graph: Graph) -> dict[str, dict[str, Any]]:
         a live torch module is not a serializable/inspectable artifact.
 
     Raises:
-        CodegenError: If the graph (or the module's subgraph) contains an
-                      agent/LangGraph node (Epic 11), if the graph does not
-                      have exactly one `nn.module` node, if that node has no
-                      subgraph, or if the subgraph contains a layer type
-                      outside `_SUPPORTED_LAYER_TYPES` (the full PyTorch layer
-                      catalog is Epic 10).
+        CodegenError: Whatever `_prepare_declarative` (the shared compiler/
+                      executor validation gate) rejects — an agent/LangGraph
+                      node (Epic 11); not exactly one `nn.module` node owning a
+                      non-empty subgraph; an unsupported, non-DECLARATIVE, or
+                      invalid-param layer; or a subgraph that is not a single
+                      linear chain (the full catalog/branching is Epic 10).
     """
-    # Agent/LangGraph seam, top level.
-    for node in graph.nodes.values():
-        if node.type.startswith(_AGENT_NODE_PREFIXES):
-            raise CodegenError("Agent/LangGraph execution is deferred to Epic 11.")
-
-    # Locate the single nn.module node.
-    module_nodes = [n for n in graph.nodes.values() if n.type == _MODULE_TYPE]
-    if len(module_nodes) == 0:
-        raise CodegenError(
-            "Declarative execution requires exactly one 'nn.module' node; the full "
-            "declarative catalog is Epic 10."
-        )
-    if len(module_nodes) > 1:
-        raise CodegenError(
-            "Declarative execution supports a single 'nn.module' node; multi-module "
-            "is Epic 10."
-        )
-    module_node = module_nodes[0]
-    subgraph = module_node.subgraph
-    if subgraph is None:
-        raise CodegenError(f"nn.module node {module_node.id!r} has no subgraph to execute.")
-
-    # Validate the subgraph's layer types (agent seam again, then catalog).
-    for node in subgraph.nodes.values():
-        if node.type.startswith(_AGENT_NODE_PREFIXES):
-            raise CodegenError("Agent/LangGraph execution is deferred to Epic 11.")
-        if node.type != _MODULE_TYPE and node.type not in _SUPPORTED_LAYER_TYPES:
-            raise CodegenError(
-                f"Declarative layer type {node.type!r} not supported by the Story 8 "
-                "seam; full catalog is Epic 10."
-            )
+    # Validate and resolve via the SAME gate the compiler uses, so execute and
+    # compile_to_code accept/reject exactly the same declarative graphs.
+    module_node, subgraph, order, _wiring = _prepare_declarative(graph)
 
     # Build the structural twin of the compiled nn.Module: same layer
     # types/params/order as `compile_declarative` would emit, as an
@@ -213,7 +181,7 @@ def _execute_declarative(graph: Graph) -> dict[str, dict[str, Any]]:
     import torch.nn as nn  # noqa: PLC0415  (lazy: torch is not a hard dependency)
 
     layers = []
-    for node_id in topological_sort(subgraph):
+    for node_id in order:
         node = subgraph.nodes[node_id]
         definition = get_node_definition(node.type)()
         out = definition.execute(node, {})  # layer node returns {"out": <layer obj>}

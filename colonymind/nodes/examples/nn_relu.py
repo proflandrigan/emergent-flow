@@ -6,7 +6,7 @@ Reference node: ``nn.relu`` — a *declarative* layer node (1 in, 1 out).
 Unlike the functional reference nodes, this is a DECLARATIVE layer (ADR 0003):
 it does not emit a full statement. ``codegen`` returns the bare constructor
 EXPRESSION (``nn.ReLU()``); the whole-graph declarative generator (Epic 2,
-Story 9) binds that expression to ``self.<attr> = <expr>`` in ``__init__`` and
+Story 8) binds that expression to ``self.<attr> = <expr>`` in ``__init__`` and
 calls it in ``forward``. ``execute`` likewise builds and returns the layer
 object itself rather than running a forward pass — the whole-graph
 declarative executor composes the layers.

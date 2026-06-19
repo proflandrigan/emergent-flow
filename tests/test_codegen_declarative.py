@@ -12,7 +12,7 @@ import pytest
 from colonymind.codegen.compiler import compile_to_code
 from colonymind.codegen.errors import CodegenError
 from colonymind.codegen.executor import execute
-from colonymind.ir import Direction, Graph, Node, Paradigm, Port, load_graph
+from colonymind.ir import Direction, Edge, Graph, Node, Paradigm, Param, Port, PortRef, load_graph
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent
 EXAMPLE = REPO_ROOT / "examples" / "declarative_module.json"
@@ -116,3 +116,123 @@ def _unsupported_layer_graph() -> Graph:
 def test_unsupported_layer_deferred_to_epic_10():
     with pytest.raises(CodegenError, match="Epic 10"):
         compile_to_code(_unsupported_layer_graph())
+
+
+# ---------------------------------------------------------------------------
+# Structural-validation regression tests (PR review findings)
+# ---------------------------------------------------------------------------
+
+
+def _linear(node_id: str, in_f: int | None, out_f: int | None, *, label: str = "Linear") -> Node:
+    params = []
+    if in_f is not None:
+        params.append(Param(name="in_features", type_token="int", value=in_f))
+    if out_f is not None:
+        params.append(Param(name="out_features", type_token="int", value=out_f))
+    return Node(
+        id=node_id,
+        type="nn.linear",
+        label=label,
+        paradigm=Paradigm.DECLARATIVE,
+        params=params,
+        ports=[
+            Port(id=f"{node_id}-in", name="x", direction=Direction.IN, data_type="Tensor"),
+            Port(id=f"{node_id}-out", name="out", direction=Direction.OUT, data_type="Tensor"),
+        ],
+    )
+
+
+def _relu(node_id: str) -> Node:
+    return Node(
+        id=node_id,
+        type="nn.relu",
+        label="ReLU",
+        paradigm=Paradigm.DECLARATIVE,
+        ports=[
+            Port(id=f"{node_id}-in", name="x", direction=Direction.IN, data_type="Tensor"),
+            Port(id=f"{node_id}-out", name="out", direction=Direction.OUT, data_type="Tensor"),
+        ],
+    )
+
+
+def _edge(edge_id: str, src: Node, tgt: Node) -> Edge:
+    return Edge(
+        id=edge_id,
+        source=PortRef(node_id=src.id, port_id=f"{src.id}-out"),
+        target=PortRef(node_id=tgt.id, port_id=f"{tgt.id}-in"),
+    )
+
+
+def _module_graph(sub_nodes: list[Node], sub_edges: list[Edge], *, label: str = "Net") -> Graph:
+    subgraph = Graph(
+        paradigm=Paradigm.DECLARATIVE,
+        name="body",
+        nodes={n.id: n for n in sub_nodes},
+        edges={e.id: e for e in sub_edges},
+    )
+    module = Node(
+        id="n-module",
+        type="nn.module",
+        label=label,
+        paradigm=Paradigm.DECLARATIVE,
+        subgraph=subgraph,
+    )
+    return Graph(paradigm=Paradigm.DECLARATIVE, name="m", nodes={module.id: module}, edges={})
+
+
+def test_single_node_chain_is_valid():
+    # A one-layer subgraph is a valid (degenerate) linear chain.
+    graph = _module_graph([_linear("n-l1", 4, 2)], [])
+    code = compile_to_code(graph)
+    ast.parse(code)
+    assert "nn.Linear(4, 2)" in code
+
+
+def test_fan_out_subgraph_rejected_and_paths_agree():
+    # One linear feeding two relus is fan-out, not a linear chain.
+    l1 = _linear("n-l1", 4, 4)
+    r1, r2 = _relu("n-r1"), _relu("n-r2")
+    graph = _module_graph([l1, r1, r2], [_edge("e1", l1, r1), _edge("e2", l1, r2)])
+    # Compiler and executor must reject identically (no silent miscompile).
+    with pytest.raises(CodegenError, match="Epic 10"):
+        compile_to_code(graph)
+    with pytest.raises(CodegenError, match="Epic 10"):
+        execute(graph)
+
+
+def test_disconnected_subgraph_rejected():
+    graph = _module_graph([_linear("n-l1", 4, 2), _linear("n-l2", 2, 1)], [])
+    with pytest.raises(CodegenError, match="Epic 10"):
+        compile_to_code(graph)
+
+
+def test_empty_subgraph_rejected_in_both_paths():
+    graph = _module_graph([], [])
+    with pytest.raises(CodegenError, match="empty subgraph"):
+        compile_to_code(graph)
+    with pytest.raises(CodegenError, match="empty subgraph"):
+        execute(graph)
+
+
+def test_missing_required_params_rejected():
+    # nn.Linear(None, None) must never be emitted — validate_node catches it.
+    graph = _module_graph([_linear("n-l1", None, None)], [])
+    with pytest.raises(CodegenError, match="invalid params"):
+        compile_to_code(graph)
+
+
+def test_non_declarative_layer_rejected():
+    node = _linear("n-l1", 4, 2)
+    node.paradigm = Paradigm.FUNCTIONAL
+    graph = _module_graph([node], [])
+    with pytest.raises(CodegenError, match="DECLARATIVE"):
+        compile_to_code(graph)
+
+
+def test_digit_leading_class_label_does_not_crash():
+    # "123Net" slugifies to a leading-digit identifier; class name falls back
+    # to "Module" rather than crashing cst.Name with an invalid identifier.
+    graph = _module_graph([_linear("n-l1", 4, 2)], [], label="123Net")
+    code = compile_to_code(graph)
+    ast.parse(code)
+    assert "class Module(nn.Module):" in code

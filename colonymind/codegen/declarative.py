@@ -40,10 +40,10 @@ import libcst as cst
 
 from colonymind.codegen.context import CodegenContext
 from colonymind.codegen.errors import CodegenError
-from colonymind.codegen.naming import _base_name
+from colonymind.codegen.naming import _base_name, _sanitize_identifier, _slugify
 from colonymind.codegen.traversal import topological_sort
 from colonymind.codegen.wiring import WiringMap, build_wiring_map
-from colonymind.ir import Direction, Graph, Node
+from colonymind.ir import Direction, Graph, Node, Paradigm
 from colonymind.ir.common import IRId
 from colonymind.nodes import get as get_node_definition
 
@@ -87,7 +87,12 @@ def _class_name(label: str | None) -> str:
     pseudo_node = Node(type=_MODULE_TYPE, label=slug)
     base = _base_name(pseudo_node)
     pascal = "".join(part.capitalize() for part in base.split("_") if part)
-    return pascal or "Module"
+    # PascalCasing can still yield an invalid identifier (e.g. a label like
+    # "123Net" slugs to "_123net", which reconstructs to "123net" — a leading
+    # digit). Fall back rather than feed cst.Name an invalid identifier.
+    if not pascal or not pascal.isidentifier() or keyword.iskeyword(pascal):
+        return "Module"
+    return pascal
 
 
 def _layer_constructor(node: Node) -> tuple[str, list[str]]:
@@ -129,9 +134,12 @@ def _forward_input_name(order: list[IRId], subgraph: Graph, wiring: WiringMap) -
     """Return the module's forward-input name: the first dangling IN port name.
 
     Scans *order* for the first layer with a dangling IN port (no upstream
-    edge inside the subgraph) and returns that port's name. Falls back to
-    ``"x"`` if every layer's IN ports are bound (should not happen for a
-    well-formed single-chain subgraph, but keeps this function total).
+    edge inside the subgraph) and returns that port's name, sanitized to a
+    valid, non-keyword Python identifier (a port named ``"class"`` would
+    otherwise emit ``def forward(self, class):``). Falls back to ``"x"`` if
+    every layer's IN ports are bound or the name sanitizes to empty (should
+    not happen for a well-formed single-chain subgraph, but keeps this
+    function total).
     """
     for node_id in order:
         node = subgraph.nodes[node_id]
@@ -139,8 +147,116 @@ def _forward_input_name(order: list[IRId], subgraph: Graph, wiring: WiringMap) -
             if port.direction != Direction.IN:
                 continue
             if not wiring.upstream(node.id, port.id):
-                return port.name
+                return _sanitize_identifier(_slugify(port.name)) or "x"
     return "x"
+
+
+def _require_linear_chain(subgraph: Graph, wiring: WiringMap) -> None:
+    """Reject subgraphs that are not a single linear chain of layers.
+
+    The Story 8 forward generator threads ONE rolling variable through the
+    layers in topological order, so it is only correct when the subgraph is a
+    simple path: exactly one head (a dangling IN port), exactly one tail (an
+    unconsumed OUT port), no fan-in or fan-out, and ``len(edges) == len(nodes)
+    - 1``. Branching / fan-out / disconnected subgraphs would silently compile
+    to a false sequential chain, so they are rejected here (general DAG forward
+    codegen is Epic 10).
+    """
+    nodes = list(subgraph.nodes.values())
+    n = len(nodes)
+    if len(subgraph.edges) != n - 1:
+        raise CodegenError(
+            "Declarative subgraph must be a single linear chain of layers; got "
+            f"{n} node(s) and {len(subgraph.edges)} edge(s) (a chain needs "
+            f"{n - 1}). Branching/fan-out/disconnected subgraphs are Epic 10."
+        )
+    heads = 0
+    tails = 0
+    for node in nodes:
+        in_count = sum(
+            len(wiring.upstream(node.id, p.id)) for p in node.ports if p.direction == Direction.IN
+        )
+        out_count = sum(
+            len(wiring.consumers(node.id, p.id)) for p in node.ports if p.direction == Direction.OUT
+        )
+        if in_count > 1 or out_count > 1:
+            raise CodegenError(
+                f"Declarative layer {node.type!r} (id={node.id!r}) has fan-in/fan-out "
+                "(more than one wired input or output); the Story 8 seam only supports "
+                "a single linear chain. Branching is Epic 10."
+            )
+        if in_count == 0:
+            heads += 1
+        if out_count == 0:
+            tails += 1
+    if heads != 1 or tails != 1:
+        raise CodegenError(
+            "Declarative subgraph must be a single connected linear chain with one "
+            f"input and one output layer; found {heads} head(s) and {tails} tail(s). "
+            "Disconnected/branching subgraphs are Epic 10."
+        )
+
+
+def _prepare_declarative(graph: Graph) -> tuple[Node, Graph, list[IRId], WiringMap]:
+    """Validate a declarative graph and return what both codegen paths need.
+
+    Single source of truth shared by `compile_declarative` and the executor's
+    `_execute_declarative`, so the two paradigm paths accept and reject exactly
+    the same graphs with the same errors. Validates: the agent/LangGraph seam
+    (Epic 11), exactly one ``nn.module`` node owning a non-empty subgraph, every
+    subgraph node being a supported `Paradigm.DECLARATIVE` layer with valid
+    params, and the subgraph being a single linear chain. Returns
+    ``(module_node, subgraph, topo_order, wiring)``.
+    """
+    # Agent/LangGraph seam, top level.
+    _check_for_agent_nodes(graph)
+
+    # Exactly one nn.module node, owning a non-empty subgraph.
+    module_nodes = [n for n in graph.nodes.values() if n.type == _MODULE_TYPE]
+    if len(module_nodes) == 0:
+        raise CodegenError(
+            "Declarative codegen requires exactly one 'nn.module' node; the full "
+            "declarative catalog is Epic 10."
+        )
+    if len(module_nodes) > 1:
+        raise CodegenError(
+            "Declarative codegen supports a single 'nn.module' node; multi-module "
+            "graphs are Epic 10."
+        )
+    module_node = module_nodes[0]
+    if module_node.subgraph is None:
+        raise CodegenError(f"nn.module node {module_node.id!r} has no subgraph to compile.")
+    subgraph = module_node.subgraph
+    if not subgraph.nodes:
+        raise CodegenError(
+            f"nn.module node {module_node.id!r} has an empty subgraph; nothing to compile."
+        )
+
+    # Agent seam (subgraph), supported layer types, paradigm parity, valid params.
+    _check_for_agent_nodes(subgraph)
+    for node in subgraph.nodes.values():
+        if node.type not in _SUPPORTED_LAYER_TYPES:
+            raise CodegenError(
+                f"Declarative layer type {node.type!r} is not supported by the "
+                "Story 8 seam; the full PyTorch layer catalog is Epic 10."
+            )
+        if node.paradigm is not Paradigm.DECLARATIVE:
+            raise CodegenError(
+                f"Node {node.id!r} in a declarative subgraph has paradigm "
+                f"{node.paradigm!r}; declarative layers must be Paradigm.DECLARATIVE."
+            )
+        param_errors = get_node_definition(node.type)().validate_node(node)
+        if param_errors:
+            raise CodegenError(
+                f"Declarative layer {node.type!r} (id={node.id!r}) has invalid params: "
+                f"{'; '.join(param_errors)}"
+            )
+
+    # Deterministic traversal + wiring, then the linear-chain shape gate.
+    order = topological_sort(subgraph)
+    wiring = build_wiring_map(subgraph)
+    _require_linear_chain(subgraph, wiring)
+    return module_node, subgraph, order, wiring
 
 
 def compile_declarative(graph: Graph) -> str:
@@ -161,51 +277,22 @@ def compile_declarative(graph: Graph) -> str:
     ------
     CodegenError
         If the graph (or the module's subgraph) contains an agent/LangGraph
-        node (Epic 11), if the graph does not have exactly one ``nn.module``
-        node, if that node has no subgraph, or if the subgraph contains a
-        layer type outside `_SUPPORTED_LAYER_TYPES` (the full PyTorch layer
-        catalog is Epic 10).
+        node (Epic 11); if the graph does not have exactly one ``nn.module``
+        node owning a non-empty subgraph; if the subgraph contains a layer type
+        outside `_SUPPORTED_LAYER_TYPES`, a non-DECLARATIVE node, or a layer
+        with invalid params; or if the subgraph is not a single linear chain
+        (the full PyTorch layer catalog and branching forward are Epic 10).
     """
-    # Step 1: Agent/LangGraph seam, top level.
-    _check_for_agent_nodes(graph)
+    # Validate and resolve the shared pieces (same gate the executor uses).
+    module_node, subgraph, order, wiring = _prepare_declarative(graph)
 
-    # Step 2: Locate the single nn.module node.
-    module_nodes = [n for n in graph.nodes.values() if n.type == _MODULE_TYPE]
-    if len(module_nodes) == 0:
-        raise CodegenError(
-            "Declarative codegen requires exactly one 'nn.module' node; the full "
-            "declarative catalog is Epic 10."
-        )
-    if len(module_nodes) > 1:
-        raise CodegenError(
-            "Declarative codegen supports a single 'nn.module' node; multi-module "
-            "graphs are Epic 10."
-        )
-    module_node = module_nodes[0]
-    if module_node.subgraph is None:
-        raise CodegenError(f"nn.module node {module_node.id!r} has no subgraph to compile.")
-
-    # Step 3: Validate the subgraph's layer types.
-    subgraph = module_node.subgraph
-    _check_for_agent_nodes(subgraph)
-    for node in subgraph.nodes.values():
-        if node.type != _MODULE_TYPE and node.type not in _SUPPORTED_LAYER_TYPES:
-            raise CodegenError(
-                f"Declarative layer type {node.type!r} is not supported by the "
-                "Story 8 seam; the full PyTorch layer catalog is Epic 10."
-            )
-
-    # Step 4: Deterministic traversal + wiring.
-    order = topological_sort(subgraph)
-    wiring = build_wiring_map(subgraph)
-
-    # Step 5: Collision-safe attribute names, in topo order.
+    # Collision-safe attribute names, in topo order.
     attr_for = _assign_attr_names(order, subgraph)
 
-    # Step 6: Forward input name (the first dangling IN port in topo order).
+    # Forward input name (the first dangling IN port in topo order).
     forward_input_name = _forward_input_name(order, subgraph, wiring)
 
-    # Step 7: Collect imports + per-layer constructor expressions.
+    # Collect imports + per-layer constructor expressions.
     imports: set[str] = set()
     ctor_for: dict[IRId, str] = {}
     for node_id in order:
@@ -258,10 +345,10 @@ def compile_declarative(graph: Graph) -> str:
     header_docstring_line = cst.parse_statement(
         '"""Generated by Colony Mind. Do not edit by hand."""'
     )
-    # The Story 8 seam's only supported layers (nn.linear, nn.relu) both import
-    # `torch.nn as nn`; the single collected import line is emitted verbatim.
-    import_line = cst.parse_statement(next(iter(sorted(imports))))
+    # Emit every de-duplicated import (sorted), mirroring the functional path's
+    # whole-graph import collection. The shared `ruff format` pass groups them.
+    import_lines = [cst.parse_statement(imp) for imp in sorted(imports)]
 
-    module = cst.Module(body=[header_docstring_line, import_line, class_def])
+    module = cst.Module(body=[header_docstring_line, *import_lines, class_def])
 
     return module.code
