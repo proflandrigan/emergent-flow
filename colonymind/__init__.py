@@ -33,12 +33,14 @@ _LAZY_NAMESPACES = _LAZY_FAMILIES | frozenset({"codegen"})
 _LAZY_ENTRY_POINTS = {
     "compile_to_code": ("colonymind.codegen.compiler", "compile_to_code"),
     "execute": ("colonymind.codegen.executor", "execute"),
+    "export_script": ("colonymind.codegen.export", "export_script"),
 }
 
 if TYPE_CHECKING:  # let type-checkers resolve cm.data, cm.codegen, ... statically
     from colonymind import clean, codegen, data, ml, reports, stats
     from colonymind.codegen.compiler import compile_to_code
     from colonymind.codegen.executor import execute
+    from colonymind.codegen.export import export_script
 
 __all__ = [
     "__version__",
@@ -55,6 +57,7 @@ __all__ = [
     "codegen",
     "compile_to_code",
     "execute",
+    "export_script",
 ]
 
 

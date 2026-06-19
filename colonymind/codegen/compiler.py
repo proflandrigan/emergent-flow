@@ -110,12 +110,11 @@ def _assemble(graph: Graph) -> _AssembledModule:
     # Step 6: Body assembly
     body_statements = [fragment.body for fragment in code_fragments if fragment.body]
 
-    # Every per-node fragment binds a variable to each of its OUT ports, but an
-    # OUT port with no downstream consumer (a leaf/terminal result, e.g. the
-    # final ANOVA result in a fan-out) would otherwise be "assigned but never
-    # used" and fail the project's ruff lint gate. Explicitly `del` those leaf
-    # bindings rather than changing main()'s `-> None` shape to return them;
-    # exposing leaf results from an exported script is Story 7's concern.
+    # Every per-node fragment binds a variable to each of its OUT ports. An OUT
+    # port with no downstream consumer (a leaf/terminal result, e.g. the final
+    # ANOVA result in a fan-out) is the pipeline's actual output: compile_to_code
+    # collects these `leaf_vars` and `main()` returns them keyed by variable name
+    # (Story 7), which also keeps them "used" under the project's ruff lint gate.
     leaf_vars: list[str] = []
     out_ports: list[tuple[str, str, str]] = []
     for node_id in topo_order_ids:
@@ -160,10 +159,12 @@ def compile_to_code(graph: Graph) -> str:
     import_block = "\n".join(assembled.imports)
 
     body_lines = [textwrap.indent(stmt, "    ") for stmt in assembled.body_statements]
-    if assembled.leaf_vars:
-        body_lines.append(textwrap.indent(f"del {', '.join(assembled.leaf_vars)}", "    "))
 
-    main_body = "\n".join(body_lines) if body_lines else "    pass"
+    return_items = ", ".join(f'"{var}": {var}' for var in assembled.leaf_vars)
+    return_line = textwrap.indent(f"return {{{return_items}}}", "    ")
+    body_lines.append(return_line)
+
+    main_body = "\n".join(body_lines)
 
     # Step 7: Module assembly
     module_source = f'''
@@ -171,11 +172,13 @@ def compile_to_code(graph: Graph) -> str:
 
 {import_block}
 
-def main() -> None:
+def main() -> dict[str, object]:
 {main_body}
 
 if __name__ == "__main__":
-    main()
+    _results = main()
+    for _name, _value in _results.items():
+        print(f"{{_name}} = {{_value!r}}")
 '''
 
     # Step 8: Format pass
