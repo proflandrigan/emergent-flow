@@ -53,7 +53,11 @@ def build_functional_pipeline() -> Graph:
         label="Load CSV",
         paradigm=Paradigm.FUNCTIONAL,
         params=[
-            Param(name="path", type_token="str", value="data/experiment.csv"),
+            Param(
+                name="path",
+                type_token="str",
+                value="examples/vertical_slice/sample.csv",
+            ),
         ],
         ports=[
             Port(
@@ -99,8 +103,8 @@ def build_functional_pipeline() -> Graph:
         label="ANOVA",
         paradigm=Paradigm.FUNCTIONAL,
         params=[
-            Param(name="dv", type_token="str"),
-            Param(name="between", type_token="str"),
+            Param(name="group_col", type_token="str", value="cohort"),
+            Param(name="value_col", type_token="str", value="score"),
         ],
         ports=[
             Port(
@@ -108,6 +112,12 @@ def build_functional_pipeline() -> Graph:
                 name="frame",
                 direction=Direction.IN,
                 data_type="DataFrame",
+            ),
+            Port(
+                id="p-anova-out",
+                name="result",
+                direction=Direction.OUT,
+                data_type="AnovaResult",
             ),
         ],
         position=Position(x=400.0, y=0.0),

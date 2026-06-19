@@ -47,7 +47,7 @@ self-register at import time and serve as examples for authoring custom nodes.
 graph-analysis plumbing that the whole-graph compiler (`cm.compile_to_code`, Story 5) and
 the reference executor (`cm.execute`, Story 6) build on. The `cm.compile_to_code(graph) -> str`
 entry point is implemented, building on deterministic topological ordering, cycle detection,
-and the input-wiring map (Story 2). `cm.execute` remains reserved. The module is exposed as
+and the input-wiring map (Story 2). The `cm.execute(graph) -> results` reference executor is also implemented (Story 6); see [How the codegen executor & equivalence work](codegen-executor.md). The module is exposed as
 the lazily-imported `cm.codegen` namespace, so `import colonymind as cm` stays lightweight and
 the package is only pulled in on first access to `cm.codegen`. See
 [How codegen traversal works](codegen-traversal.md) and [How codegen compilation works](codegen-compiler.md).

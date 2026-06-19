@@ -18,12 +18,13 @@ Currently, only `Paradigm.FUNCTIONAL` graphs are handled by this compiler. The
 from __future__ import annotations
 
 import textwrap
+from dataclasses import dataclass
 
 from colonymind.api import public_op
 from colonymind.codegen.context import build_codegen_context
 from colonymind.codegen.errors import CodegenError, UnboundInputError
 from colonymind.codegen.formatting import format_source
-from colonymind.codegen.naming import build_name_map
+from colonymind.codegen.naming import NameMap, build_name_map
 from colonymind.codegen.traversal import topological_sort
 from colonymind.codegen.wiring import build_wiring_map
 from colonymind.ir import Direction, Graph, Node, Paradigm
@@ -39,23 +40,23 @@ def _describe(node: Node) -> str:
     return f"{node.type!r} (id={node.id})"
 
 
-@public_op(name="cm.compile_to_code")
-def compile_to_code(graph: Graph) -> str:
-    """Compiles a Colony Mind IR graph into runnable Python source code.
+@dataclass(frozen=True)
+class _AssembledModule:
+    """Structured intermediate shared by compile_to_code and the equivalence harness."""
 
-    Args:
-        graph: The IR graph to compile.
+    imports: list[str]  # sorted, de-duplicated import lines
+    body_statements: list[str]  # per-node fragment bodies, topo order, UNINDENTED
+    name_map: NameMap
+    out_ports: list[tuple[str, str, str]]  # (node_id, out_port_name, var_name), topo order
+    leaf_vars: list[str]  # OUT-port vars with no downstream consumer
 
-    Returns:
-        A string containing the generated Python source code.
 
-    Raises:
-        CodegenError: If the graph contains declarative paradigm nodes, or if
-                      `format_source` encounters an error.
-        UnboundInputError: If any input port in the graph is not connected to
-                           an upstream output port.
-        CycleError: If the graph contains a cycle (propagated from
-                    `topological_sort`).
+def _assemble(graph: Graph) -> _AssembledModule:
+    """Runs the per-node compilation pipeline and returns its structured result.
+
+    Shared seam between `compile_to_code` and the equivalence harness so both
+    can build on the same graph traversal, naming, and codegen without
+    duplicating the per-node assembly logic.
     """
     # Step 1: Paradigm guard
     if graph.paradigm is not Paradigm.FUNCTIONAL:
@@ -104,13 +105,10 @@ def compile_to_code(graph: Graph) -> str:
     all_imports: set[str] = set()
     for fragment in code_fragments:
         all_imports.update(fragment.imports)
-    import_block = "\n".join(sorted(all_imports))
+    imports = sorted(all_imports)
 
     # Step 6: Body assembly
-    body_lines: list[str] = []
-    for fragment in code_fragments:
-        if fragment.body:
-            body_lines.append(textwrap.indent(fragment.body, "    "))
+    body_statements = [fragment.body for fragment in code_fragments if fragment.body]
 
     # Every per-node fragment binds a variable to each of its OUT ports, but an
     # OUT port with no downstream consumer (a leaf/terminal result, e.g. the
@@ -119,13 +117,51 @@ def compile_to_code(graph: Graph) -> str:
     # bindings rather than changing main()'s `-> None` shape to return them;
     # exposing leaf results from an exported script is Story 7's concern.
     leaf_vars: list[str] = []
+    out_ports: list[tuple[str, str, str]] = []
     for node_id in topo_order_ids:
         node = graph.nodes[node_id]
         for port in node.ports:
-            if port.direction == Direction.OUT and not wiring_map.consumers(node.id, port.id):
-                leaf_vars.append(name_map.var_for(node.id, port.id))
-    if leaf_vars:
-        body_lines.append(textwrap.indent(f"del {', '.join(leaf_vars)}", "    "))
+            if port.direction != Direction.OUT:
+                continue
+            var_name = name_map.var_for(node.id, port.id)
+            out_ports.append((node.id, port.name, var_name))
+            if not wiring_map.consumers(node.id, port.id):
+                leaf_vars.append(var_name)
+
+    return _AssembledModule(
+        imports=imports,
+        body_statements=body_statements,
+        name_map=name_map,
+        out_ports=out_ports,
+        leaf_vars=leaf_vars,
+    )
+
+
+@public_op(name="cm.compile_to_code")
+def compile_to_code(graph: Graph) -> str:
+    """Compiles a Colony Mind IR graph into runnable Python source code.
+
+    Args:
+        graph: The IR graph to compile.
+
+    Returns:
+        A string containing the generated Python source code.
+
+    Raises:
+        CodegenError: If the graph contains declarative paradigm nodes, or if
+                      `format_source` encounters an error.
+        UnboundInputError: If any input port in the graph is not connected to
+                           an upstream output port.
+        CycleError: If the graph contains a cycle (propagated from
+                    `topological_sort`).
+    """
+    assembled = _assemble(graph)
+
+    import_block = "\n".join(assembled.imports)
+
+    body_lines = [textwrap.indent(stmt, "    ") for stmt in assembled.body_statements]
+    if assembled.leaf_vars:
+        body_lines.append(textwrap.indent(f"del {', '.join(assembled.leaf_vars)}", "    "))
 
     main_body = "\n".join(body_lines) if body_lines else "    pass"
 

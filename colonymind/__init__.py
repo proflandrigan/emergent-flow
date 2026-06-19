@@ -32,11 +32,13 @@ _LAZY_NAMESPACES = _LAZY_FAMILIES | frozenset({"codegen"})
 # on first access so a bare ``import colonymind`` stays light.
 _LAZY_ENTRY_POINTS = {
     "compile_to_code": ("colonymind.codegen.compiler", "compile_to_code"),
+    "execute": ("colonymind.codegen.executor", "execute"),
 }
 
 if TYPE_CHECKING:  # let type-checkers resolve cm.data, cm.codegen, ... statically
     from colonymind import clean, codegen, data, ml, reports, stats
     from colonymind.codegen.compiler import compile_to_code
+    from colonymind.codegen.executor import execute
 
 __all__ = [
     "__version__",
@@ -52,6 +54,7 @@ __all__ = [
     "reports",
     "codegen",
     "compile_to_code",
+    "execute",
 ]
 
 

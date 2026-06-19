@@ -12,7 +12,7 @@
         {
           "name": "path",
           "type_token": "str",
-          "value": "data/experiment.csv",
+          "value": "examples/vertical_slice/sample.csv",
           "default": null
         }
       ],
@@ -75,15 +75,15 @@
       "paradigm": "functional",
       "params": [
         {
-          "name": "dv",
+          "name": "group_col",
           "type_token": "str",
-          "value": null,
+          "value": "cohort",
           "default": null
         },
         {
-          "name": "between",
+          "name": "value_col",
           "type_token": "str",
-          "value": null,
+          "value": "score",
           "default": null
         }
       ],
@@ -93,6 +93,13 @@
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-anova-out",
+          "name": "result",
+          "direction": "out",
+          "data_type": "AnovaResult",
           "cardinality": "one"
         }
       ],
