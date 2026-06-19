@@ -17,6 +17,7 @@ is Epic 14.
 
 from __future__ import annotations
 
+import keyword
 import pathlib
 import re
 from dataclasses import dataclass
@@ -36,9 +37,21 @@ class ExportResult:
 
 
 def _slug_filename(name: str | None) -> str:
-    """Derive a safe snake_case .py stem from a graph name; fall back to 'pipeline'."""
+    """Derive a safe snake_case .py stem from a graph name; fall back to 'pipeline'.
+
+    The stem is a valid Python identifier so the exported file is importable by
+    its bare module name (e.g. a graph named "2024 Report" -> ``_2024_report``,
+    not ``2024_report`` which is not a legal module name), mirroring the
+    identifier discipline in :mod:`colonymind.codegen.naming`.
+    """
     slug = re.sub(r"[^0-9a-zA-Z]+", "_", (name or "").strip().lower()).strip("_")
-    return slug or "pipeline"
+    if not slug:
+        return "pipeline"
+    if slug[0].isdigit():
+        slug = f"_{slug}"
+    if keyword.iskeyword(slug) or keyword.issoftkeyword(slug):
+        slug = f"{slug}_"
+    return slug
 
 
 @public_op(name="cm.export_script")
@@ -56,6 +69,12 @@ def export_script(
         dest: Destination directory (created, with parents, if missing).
         name: Optional base filename stem (no extension). Defaults to a slug of
             ``graph.name``, or ``"pipeline"`` if the graph is unnamed.
+
+    Note:
+        Export is idempotent and overwrites: ``<stem>.py`` and the fixed
+        ``requirements.txt`` in *dest* are replaced if they already exist. Pass a
+        distinct ``dest`` (or ``name``) per graph to avoid clobbering, since two
+        different graphs can slug to the same stem.
 
     Returns:
         An :class:`ExportResult` with the written ``script_path`` and

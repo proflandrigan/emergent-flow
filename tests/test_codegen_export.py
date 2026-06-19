@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import keyword
 import pathlib
 import subprocess
 import sys
@@ -19,7 +20,7 @@ import pytest
 import colonymind as cm
 from colonymind.codegen.compiler import _assemble
 from colonymind.codegen.executor import execute
-from colonymind.ir import load_graph
+from colonymind.ir import Graph, load_graph
 from tests.test_codegen_equivalence import _assert_equiv, _canon, _volatile_ports
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent
@@ -140,3 +141,28 @@ def test_roundtrip_main_artifacts_equal_execute(
             assert isinstance(ev, str) and isinstance(cv, str) and ev and cv
         else:
             _assert_equiv(_canon(exec_value), _canon(value), f"{node_id}.{port_name}")
+
+
+@pytest.mark.parametrize(
+    ("graph_name", "expected_stem"),
+    [
+        ("Vertical Slice Example", "vertical_slice_example"),
+        ("2024 Report", "_2024_report"),  # leading digit -> not a legal module name
+        ("class", "class_"),  # keyword -> would shadow / be a SyntaxError to import
+        ("match", "match_"),  # soft keyword
+        ("café", "caf"),  # non-ASCII transliterated away
+        ("日本語", "pipeline"),  # all-non-ASCII -> fallback
+        ("", "pipeline"),  # empty -> fallback
+        (None, "pipeline"),  # unnamed graph -> fallback
+    ],
+)
+def test_export_filename_stem_is_a_valid_identifier(
+    tmp_path: pathlib.Path, graph_name: str | None, expected_stem: str
+) -> None:
+    """The exported .py stem is always a valid, importable Python identifier."""
+    graph = Graph(name=graph_name)
+    result = cm.export_script(graph, tmp_path)
+    assert result.script_path.name == f"{expected_stem}.py"
+    # The stem must be a legal module name so the script is importable by name,
+    # not just runnable by path (parity with colonymind.codegen.naming).
+    assert expected_stem.isidentifier() and not keyword.iskeyword(expected_stem)
