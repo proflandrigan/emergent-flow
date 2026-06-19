@@ -11,6 +11,14 @@ Story 2/3 plumbing the compiler does (`topological_sort`, `build_wiring_map`) an
 applies the same guards with the same error messages, so a graph that compiles
 also executes, and vice versa.
 
+`Paradigm.DECLARATIVE` graphs are run via a separate declarative seam (Epic 2,
+Story 8): instead of topo-walking the whole graph, it locates the graph's single
+``nn.module`` node and builds the structural twin of the `nn.Module` subclass
+`compile_declarative` (`colonymind/codegen/declarative.py`) would emit for the
+same subgraph — same layer types, params, and order, as an `nn.Sequential`. This
+requires `torch` at call time (imported lazily) and raises `CodegenError` for
+unsupported layer types or agent/LangGraph targets (deferred to Epic 11).
+
 This is a pure, in-process reference implementation: no sandboxing, no resource
 limits, no subprocess isolation. It exists to let the rest of the system (tests,
 previews, the ADR-0002 equivalence harness) run a graph without going through
@@ -23,6 +31,11 @@ from __future__ import annotations
 from typing import Any
 
 from colonymind.api import public_op
+from colonymind.codegen.declarative import (
+    _AGENT_NODE_PREFIXES,
+    _MODULE_TYPE,
+    _SUPPORTED_LAYER_TYPES,
+)
 from colonymind.codegen.errors import CodegenError, UnboundInputError
 from colonymind.codegen.traversal import topological_sort
 from colonymind.codegen.wiring import build_wiring_map
@@ -50,12 +63,20 @@ def execute(graph: Graph) -> dict[str, dict[str, Any]]:
         OUT-port name: ``{node_id: {out_port_name: value}}``.
 
     Raises:
-        CodegenError: If the graph contains declarative paradigm nodes.
+        CodegenError: If the graph is `Paradigm.DECLARATIVE` and the
+                      declarative seam rejects it (unsupported layer type,
+                      not exactly one `nn.module` node, or an agent/LangGraph
+                      target — see `_execute_declarative`). For
+                      `Paradigm.FUNCTIONAL` graphs, if the graph or any node
+                      has a non-FUNCTIONAL paradigm.
         UnboundInputError: If any input port in the graph is not connected to
                            an upstream output port.
         CycleError: If the graph contains a cycle (propagated from
                     `topological_sort`).
     """
+    if graph.paradigm is Paradigm.DECLARATIVE:
+        return _execute_declarative(graph)
+
     # Step 1: Paradigm guard
     if graph.paradigm is not Paradigm.FUNCTIONAL:
         raise CodegenError(
@@ -116,3 +137,90 @@ def execute(graph: Graph) -> dict[str, dict[str, Any]]:
 
     # Step 5: Return collected results
     return results
+
+
+def _execute_declarative(graph: Graph) -> dict[str, dict[str, Any]]:
+    """Run a `Paradigm.DECLARATIVE` graph's single `nn.module` node.
+
+    This is the execution-side sibling of `compile_declarative`
+    (`colonymind/codegen/declarative.py`, Story 8): it builds the structural
+    twin of the `nn.Module` that `compile_declarative` would emit for the same
+    subgraph — same layer types, params, and order, assembled as an
+    `nn.Sequential` — rather than emitting and exec'ing Python source. Because
+    the layers are constructed fresh (not loaded from a trained checkpoint),
+    their weights are randomly initialized, so equivalence to the compiled
+    class is STRUCTURAL only (same architecture), not numerical. Real forward
+    execution against input tensors and sandboxed running of arbitrary
+    declarative graphs are Epic 6/10.
+
+    Args:
+        graph: The IR graph to execute. Must own exactly one `nn.module` node
+               whose `subgraph` holds a single linear chain of supported layer
+               nodes (currently `nn.linear` and `nn.relu`).
+
+    Returns:
+        ``{module_node.id: {"layers": [<layer repr str>, ...]}}`` — the ordered
+        architecture of the structural-twin module. The summary is a list of
+        strings (not the live `nn.Sequential`) so the result satisfies the
+        `cm.execute` inspectable-return contract (`colonymind.api.is_inspectable`);
+        a live torch module is not a serializable/inspectable artifact.
+
+    Raises:
+        CodegenError: If the graph (or the module's subgraph) contains an
+                      agent/LangGraph node (Epic 11), if the graph does not
+                      have exactly one `nn.module` node, if that node has no
+                      subgraph, or if the subgraph contains a layer type
+                      outside `_SUPPORTED_LAYER_TYPES` (the full PyTorch layer
+                      catalog is Epic 10).
+    """
+    # Agent/LangGraph seam, top level.
+    for node in graph.nodes.values():
+        if node.type.startswith(_AGENT_NODE_PREFIXES):
+            raise CodegenError("Agent/LangGraph execution is deferred to Epic 11.")
+
+    # Locate the single nn.module node.
+    module_nodes = [n for n in graph.nodes.values() if n.type == _MODULE_TYPE]
+    if len(module_nodes) == 0:
+        raise CodegenError(
+            "Declarative execution requires exactly one 'nn.module' node; the full "
+            "declarative catalog is Epic 10."
+        )
+    if len(module_nodes) > 1:
+        raise CodegenError(
+            "Declarative execution supports a single 'nn.module' node; multi-module "
+            "is Epic 10."
+        )
+    module_node = module_nodes[0]
+    subgraph = module_node.subgraph
+    if subgraph is None:
+        raise CodegenError(f"nn.module node {module_node.id!r} has no subgraph to execute.")
+
+    # Validate the subgraph's layer types (agent seam again, then catalog).
+    for node in subgraph.nodes.values():
+        if node.type.startswith(_AGENT_NODE_PREFIXES):
+            raise CodegenError("Agent/LangGraph execution is deferred to Epic 11.")
+        if node.type != _MODULE_TYPE and node.type not in _SUPPORTED_LAYER_TYPES:
+            raise CodegenError(
+                f"Declarative layer type {node.type!r} not supported by the Story 8 "
+                "seam; full catalog is Epic 10."
+            )
+
+    # Build the structural twin of the compiled nn.Module: same layer
+    # types/params/order as `compile_declarative` would emit, as an
+    # nn.Sequential. Weights are randomly initialized (no checkpoint is
+    # loaded), so equivalence to the compiled class is STRUCTURAL only; real
+    # forward execution and sandboxing are Epic 6/10.
+    import torch.nn as nn  # noqa: PLC0415  (lazy: torch is not a hard dependency)
+
+    layers = []
+    for node_id in topological_sort(subgraph):
+        node = subgraph.nodes[node_id]
+        definition = get_node_definition(node.type)()
+        out = definition.execute(node, {})  # layer node returns {"out": <layer obj>}
+        layers.append(out["out"])
+    module = nn.Sequential(*layers)
+    # Return an inspectable architecture summary (ordered layer reprs), not the
+    # live module: `cm.execute` is a public op and must return a serializable +
+    # inspectable result (colonymind.api.is_inspectable).
+    layer_reprs = [repr(layer) for layer in module.children()]
+    return {module_node.id: {"layers": layer_reprs}}

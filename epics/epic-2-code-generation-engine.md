@@ -22,7 +22,7 @@
 - [x] A pure, in-process `execute(graph) -> results` reference interpreter walks the IR and calls each node's `execute` (the productionized, sandboxed runtime is Epic 6).
 - [x] The A2 equivalence invariant holds: across a fixture corpus, artifacts from `execute(ir)` equal artifacts from running `compile_to_code(ir)`, enforced as a CI golden/property gate.
 - [ ] Generated code passes `ruff` lint and is importable/runnable; a golden-file corpus covers every reference node type and common compositions (fan-in, fan-out, subgraphs).
-- [ ] The two-paradigm seam exists: the compiler dispatches on `paradigm`, with a working proof for the declarative `nn.Module` example; full DL/agent codegen is deferred to Epic 10/11.
+- [x] The two-paradigm seam exists: the compiler dispatches on `paradigm`, with a working proof for the declarative `nn.Module` example; full DL/agent codegen is deferred to Epic 10/11.
 - [ ] The vertical-slice graph (`examples/vertical_slice/pipeline.json`) compiles to code that reads like the hand-written `examples/vertical_slice/demo.py` and runs to the same artifacts.
 - [ ] Bidirectional (code → graph) parsing is explicitly **not** built (deferred per A1/ADR 0001).
 
@@ -130,10 +130,10 @@
 > `examples/declarative_module.json`). Establish the architecture now so DL/agents bolt on
 > cleanly later, without building the full catalog.
 
-- [ ] Add **paradigm dispatch** in the compiler: branch on `Graph.paradigm` / `Node.paradigm` (`FUNCTIONAL` vs `DECLARATIVE`).
-- [ ] Implement an **AST/`libcst`-based** generator that compiles a `Node.subgraph` into an `nn.Module` class, proven against `examples/declarative_module.json` (the `nn.module` → `nn.linear`/`nn.relu` example).
-- [ ] Leave a documented seam for the **LangGraph** (agent) target; defer its implementation to Epic 11.
-- [ ] State explicitly that the full PyTorch layer catalog and tensor-shape codegen land in Epic 10; this story only proves the seam holds.
+- [x] Add **paradigm dispatch** in the compiler: branch on `Graph.paradigm` / `Node.paradigm` (`FUNCTIONAL` vs `DECLARATIVE`).
+- [x] Implement an **AST/`libcst`-based** generator that compiles a `Node.subgraph` into an `nn.Module` class, proven against `examples/declarative_module.json` (the `nn.module` → `nn.linear`/`nn.relu` example).
+- [x] Leave a documented seam for the **LangGraph** (agent) target; defer its implementation to Epic 11.
+- [x] State explicitly that the full PyTorch layer catalog and tensor-shape codegen land in Epic 10; this story only proves the seam holds.
 
 ---
 

@@ -43,6 +43,10 @@ dependencies = [
     # ADR 0008: compile_to_code runs a `ruff format` pass on every emitted
     # module, so ruff is a runtime dependency, not just a dev tool.
     "ruff>=0.6",
+    # ADR 0008: the declarative (nn.Module) codegen branch assembles a real
+    # concrete syntax tree with libcst rather than splicing strings, so libcst
+    # is a runtime dependency of compile_to_code for DECLARATIVE graphs.
+    "libcst>=1.1",
 ]
 
 [project.urls]

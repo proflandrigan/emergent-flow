@@ -32,4 +32,4 @@ As specified in [ADR 0008](adr/0008-codegen-templating-vs-ast.md), a ruff normal
 
 ## Paradigm scope
 
-The `compile_to_code` function is designed to exclusively handle graphs and nodes adhering to `Paradigm.FUNCTIONAL`. Any attempt to compile a `Paradigm.DECLARATIVE` graph or node will raise a `CodegenError`. Support for the declarative paradigm, involving `libcst`-based transformations, is slated for Epic 2 Story 8.
+The string-template assembly described in this document handles `Paradigm.FUNCTIONAL` graphs. `compile_to_code` dispatches on `graph.paradigm`: `Paradigm.DECLARATIVE` graphs are compiled by the sibling declarative path (`compile_declarative`, `colonymind/codegen/declarative.py`), the `libcst`-based `nn.Module` generator added in Epic 2 Story 8 — see [`docs/codegen-declarative.md`](codegen-declarative.md). Both paths share the final `ruff format` pass. A `Paradigm.FUNCTIONAL` graph that contains a stray declarative node is still rejected with a `CodegenError` by the functional assembly.
