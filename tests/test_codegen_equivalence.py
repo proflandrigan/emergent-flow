@@ -67,7 +67,7 @@ _VOLATILE_DATA_TYPES = frozenset({"HTML"})
 #   * dict/list/tuple -> recurse
 #   * scalars        -> as-is; anything else -> repr() (stable last resort)
 # ---------------------------------------------------------------------------
-_CANON_SRC = '''
+_CANON_SRC = """
 import dataclasses as _dc
 
 
@@ -100,7 +100,7 @@ def _canon(obj):
     if isinstance(obj, (list, tuple)):
         return [_canon(v) for v in obj]
     return repr(obj)
-'''
+"""
 
 _canon_ns: dict[str, Any] = {}
 exec(_CANON_SRC, _canon_ns)

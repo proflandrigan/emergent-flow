@@ -92,12 +92,8 @@ def _edge(
     source_node: Node, source_port_name: str, target_node: Node, target_port_name: str
 ) -> Edge:
     return Edge(
-        source=PortRef(
-            node_id=source_node.id, port_id=_out_port(source_node, source_port_name).id
-        ),
-        target=PortRef(
-            node_id=target_node.id, port_id=_in_port(target_node, target_port_name).id
-        ),
+        source=PortRef(node_id=source_node.id, port_id=_out_port(source_node, source_port_name).id),
+        target=PortRef(node_id=target_node.id, port_id=_in_port(target_node, target_port_name).id),
     )
 
 
