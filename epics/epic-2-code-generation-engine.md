@@ -117,10 +117,10 @@
 
 > The "glass-box" payoff: a user can download the exact code that runs.
 
-- [ ] Export `compile_to_code(graph)` output as a standalone `.py` that runs outside the canvas.
-- [ ] Emit a reproducibility reference (pinned SDK version / `requirements`) alongside the script; keep it light here and hand the full project-export format to Epic 14.
-- [ ] Verify the vertical-slice graph exports to code that reads like the hand-written `examples/vertical_slice/demo.py`.
-- [ ] Round-trip test: run the exported script and assert it produces the same artifacts as `execute(ir)`.
+- [x] Export `compile_to_code(graph)` output as a standalone `.py` that runs outside the canvas.
+- [x] Emit a reproducibility reference (pinned SDK version / `requirements`) alongside the script; keep it light here and hand the full project-export format to Epic 14.
+- [x] Verify the vertical-slice graph exports to code that reads like the hand-written `examples/vertical_slice/demo.py`.
+- [x] Round-trip test: run the exported script and assert it produces the same artifacts as `execute(ir)`.
 
 ---
 
