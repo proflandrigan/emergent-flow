@@ -13,6 +13,7 @@ from colonymind.api import is_inspectable
 from colonymind.codegen.errors import CodegenError, UnboundInputError
 from colonymind.codegen.executor import execute
 from colonymind.ir import Direction, Edge, Graph, Node, Paradigm, Port, PortRef
+from colonymind.ir.common import Cardinality
 from colonymind.nodes.contract import CodeFragment, NodeDefinition
 from colonymind.nodes.registry import register
 from colonymind.nodes.spec import PortSpec
@@ -193,3 +194,134 @@ assert 'colonymind.codegen' in sys.modules
     )
     assert result.returncode == 0, f"Subprocess failed:\n{result.stderr}\n{result.stdout}"
     assert "execute" in cm.__all__
+
+
+@register
+class _ExecSplit(NodeDefinition):
+    """Test fixture: 1 in, 2 distinctly-named outs. lo = in_, hi = in_ * 10."""
+
+    type = "test.exec_split"
+    family = "test"
+    label = "Split"
+    ports = [
+        PortSpec(name="in_", direction=Direction.IN, data_type="int"),
+        PortSpec(name="lo", direction=Direction.OUT, data_type="int"),
+        PortSpec(name="hi", direction=Direction.OUT, data_type="int"),
+    ]
+
+    def codegen(self, node: Node, ctx: Any) -> CodeFragment:
+        return CodeFragment(
+            body=(
+                f"{ctx.out_var('lo')} = {ctx.in_var('in_')}\n"
+                f"{ctx.out_var('hi')} = {ctx.in_var('in_')} * 10"
+            )
+        )
+
+    def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
+        return {"lo": inputs["in_"], "hi": inputs["in_"] * 10}
+
+
+@register
+class _ExecFanIn(NodeDefinition):
+    """Test fixture: one MANY-cardinality IN port (allows >1 upstream source)."""
+
+    type = "test.exec_fan_in"
+    family = "test"
+    label = "FanIn"
+    ports = [
+        PortSpec(
+            name="in_",
+            direction=Direction.IN,
+            data_type="int",
+            cardinality=Cardinality.MANY,
+        ),
+        PortSpec(name="out", direction=Direction.OUT, data_type="int"),
+    ]
+
+    def codegen(self, node: Node, ctx: Any) -> CodeFragment:
+        return CodeFragment(body=f"{ctx.out_var('out')} = {ctx.in_var('in_')}")
+
+    def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
+        return {"out": inputs["in_"]}
+
+
+def test_multi_output_threads_each_out_port_by_name() -> None:
+    """A 2-output node's ports are resolved by name (not position) downstream."""
+    src = _source_node()
+    split = Node(
+        id="split",
+        type=_ExecSplit.type,
+        label=_ExecSplit.label,
+        ports=[
+            Port(id="split-in", name="in_", direction=Direction.IN, data_type="int"),
+            Port(id="split-lo", name="lo", direction=Direction.OUT, data_type="int"),
+            Port(id="split-hi", name="hi", direction=Direction.OUT, data_type="int"),
+        ],
+    )
+    # Two doublers consume the two DISTINCT out ports: one off `hi`, one off `lo`.
+    dbl_hi = _double_node("dbl_hi")
+    dbl_lo = _double_node("dbl_lo")
+    edges = [
+        _edge(src, "out", split, "in_"),
+        Edge(
+            source=PortRef(node_id="split", port_id="split-hi"),
+            target=PortRef(node_id="dbl_hi", port_id="dbl_hi-in"),
+        ),
+        Edge(
+            source=PortRef(node_id="split", port_id="split-lo"),
+            target=PortRef(node_id="dbl_lo", port_id="dbl_lo-in"),
+        ),
+    ]
+    graph = _graph([src, split, dbl_hi, dbl_lo], edges)
+
+    results = execute(graph)
+    assert results["split"] == {"lo": 1, "hi": 10}
+    # dbl_hi must double `hi` (10 -> 20); dbl_lo must double `lo` (1 -> 2). If the
+    # executor resolved OUT ports positionally these would be swapped.
+    assert results["dbl_hi"] == {"out": 20}
+    assert results["dbl_lo"] == {"out": 2}
+
+
+def test_multi_source_fan_in_is_error() -> None:
+    """A MANY IN port fed by 2 sources raises ValueError (parity with codegen)."""
+    src_a = Node(
+        id="src_a",
+        type=_ExecSource.type,
+        label=_ExecSource.label,
+        ports=[Port(id="src_a-out", name="out", direction=Direction.OUT, data_type="int")],
+    )
+    src_b = Node(
+        id="src_b",
+        type=_ExecSource.type,
+        label=_ExecSource.label,
+        ports=[Port(id="src_b-out", name="out", direction=Direction.OUT, data_type="int")],
+    )
+    fan = Node(
+        id="fan",
+        type=_ExecFanIn.type,
+        label=_ExecFanIn.label,
+        ports=[
+            Port(
+                id="fan-in",
+                name="in_",
+                direction=Direction.IN,
+                data_type="int",
+                cardinality=Cardinality.MANY,
+            ),
+            Port(id="fan-out", name="out", direction=Direction.OUT, data_type="int"),
+        ],
+    )
+    edges = [
+        Edge(
+            source=PortRef(node_id="src_a", port_id="src_a-out"),
+            target=PortRef(node_id="fan", port_id="fan-in"),
+        ),
+        Edge(
+            source=PortRef(node_id="src_b", port_id="src_b-out"),
+            target=PortRef(node_id="fan", port_id="fan-in"),
+        ),
+    ]
+    graph = _graph([src_a, src_b, fan], edges)
+
+    with pytest.raises(ValueError, match="multi-source fan-in"):
+        execute(graph)

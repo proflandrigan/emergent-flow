@@ -87,6 +87,10 @@ def _canon(obj):
     # DataFrame-like (duck-typed, matches pandas/polars): columns -> value lists.
     if hasattr(obj, "to_dict") and hasattr(obj, "shape") and hasattr(obj, "columns"):
         return {"__df__": {str(k): _canon(list(v)) for k, v in obj.to_dict(orient="list").items()}}
+    # numpy ndarray / array-like (has tolist + shape but is not a DataFrame, handled
+    # above): compare real values, not a repr() that is sensitive to print options.
+    if hasattr(obj, "tolist") and hasattr(obj, "shape"):
+        return _canon(obj.tolist())
     if _dc.is_dataclass(obj) and not isinstance(obj, type):
         return {f.name: _canon(getattr(obj, f.name)) for f in _dc.fields(obj)}
     if hasattr(obj, "model_dump"):  # pydantic BaseModel
@@ -169,6 +173,9 @@ def _code_side(graph: Graph, *, cwd: pathlib.Path) -> dict[str, dict[str, Any]]:
             capture_output=True,
             text=True,
             check=False,
+            # Bound the wait so a hung library call (e.g. ydata-profiling) surfaces
+            # as a clear TimeoutExpired test failure rather than hanging CI forever.
+            timeout=180,
         )
         assert proc.returncode == 0, (
             "compiled module failed to run:\n"
@@ -193,13 +200,18 @@ def _assert_equiv(exec_v: Any, code_v: Any, path: str = "") -> None:
         assert len(exec_v) == len(code_v), f"list-length mismatch at {path}"
         for i, (a, b) in enumerate(zip(exec_v, code_v, strict=False)):
             _assert_equiv(a, b, f"{path}[{i}]")
-    elif isinstance(exec_v, float) or isinstance(code_v, float):
-        if (
-            isinstance(exec_v, float)
-            and isinstance(code_v, float)
-            and math.isnan(exec_v)
-            and math.isnan(code_v)
-        ):
+    elif isinstance(exec_v, bool) or isinstance(code_v, bool):
+        # bool is an int subclass; compare strictly so True is not equal to 1.
+        assert type(exec_v) is type(code_v) and exec_v == code_v, (
+            f"bool mismatch at {path}: {exec_v!r} != {code_v!r}"
+        )
+    elif isinstance(exec_v, (int, float)) or isinstance(code_v, (int, float)):
+        # Both must be numeric; a number-vs-non-number pair is a clear mismatch
+        # (not a TypeError out of math.isclose).
+        assert isinstance(exec_v, (int, float)) and isinstance(code_v, (int, float)), (
+            f"numeric/type mismatch at {path}: {exec_v!r} != {code_v!r}"
+        )
+        if math.isnan(exec_v) and math.isnan(code_v):
             return
         assert math.isclose(exec_v, code_v, rel_tol=1e-9, abs_tol=1e-12), (
             f"float mismatch at {path}: {exec_v!r} != {code_v!r}"
