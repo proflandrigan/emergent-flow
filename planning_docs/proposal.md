@@ -76,6 +76,8 @@ A hyper-responsive, fluid frontend optimized for rendering hundreds of data comp
 * **Canvas Engine:** Built using *React Flow* or *Rete.js* to power node creation, infinite pan/zoom, interactive edge connection, and sub-graph nesting.
 * **State Rendering:** Rich embedded charts, distribution graphs, and matrix tables rendered directly inside node expansion windows using lightweight SVG libraries.
 
+> **Engineering note — the canvas is a separate codebase, not a layer of the SDK.** Although drawn here as one stack, the TypeScript/React canvas ships as its own repository (`colony-mind-canvas`) distinct from the Python SDK and the execution backend. The three couple *only* through published, versioned artifacts — the graph IR schema, the generated-code string, and the connection-validation rules as data — so the frontend never imports Python and the open-source SDK boundary stays clean. See §A5 / §B Epic 3 of the technical roadmap for the repo topology and contract.
+
 #### Layer 3: The Backend Execution & State Server (The Bridge)
 A high-throughput API gateway built with *FastAPI* that coordinates interaction between the browser canvas and the Python SDK runtime.
 * **Execution Mapping:** Translates UI node configurations into structural, human-readable Python strings using *Jinja2* templating engines.
@@ -141,6 +143,6 @@ Embed an LLM agent directly into the canvas space. Instead of hand-building grap
 ### 6. Phased Implementation Roadmap
 To mitigate execution risk and optimize time-to-market, development is structured into three iterative phases:
 
-* **Phase 1: The Foundation (Core SDK & Static Canvas):** Focus entirely on engineering the wrapper Python SDK. Simultaneously build a pure frontend React Flow whiteboard canvas capable of mapping visual node arrangements to flawless, downloadable text scripts. Zero backend execution at this stage—focus entirely on layout and structural code generation.
+* **Phase 1: The Foundation (Core SDK & Static Canvas):** Focus entirely on engineering the wrapper Python SDK. Simultaneously build a pure frontend React Flow whiteboard canvas capable of mapping visual node arrangements to flawless, downloadable text scripts. Zero backend execution at this stage—focus entirely on layout and structural code generation. *(The SDK and the canvas are two separate repos even in Phase 1, coupled only by the published IR schema, codegen output, and connection-validation rules — see §A5 of the technical roadmap.)*
 * **Phase 2: The Living Bridge (Reactive Backend Integration):** Connect the canvas to a live FastAPI runtime server. Implement the Redis caching layer so clicking "Execute Node" runs real-time python processes and pipes rich data visualizations, descriptive tables, and charts back into the visual whiteboard interface.
 * **Phase 3: The Frontier (Deep Learning, GenAI, and Agent Automation):** Introduce the real-time tensor tensor shape engine, deploy visual LangGraph agent configuration modules, and integrate the natural-language canvas agent to allow conversational platform construct
