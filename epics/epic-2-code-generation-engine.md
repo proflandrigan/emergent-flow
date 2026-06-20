@@ -1,5 +1,13 @@
 # Epic 2 — Code Generation Engine
 
+> **Repo ↔ roadmap numbering.** Epic files are numbered by **delivery order in this repo**;
+> the [technical roadmap](../planning_docs/technical_roadmap.md) numbers epics **globally
+> across all three repos**. This file is repo **Epic 2** = roadmap **Epic 2** (they match
+> here, but diverge for later epics). Cross-references in the prose below (e.g. "Blocks: Epic
+> 3 (canvas), Epic 10/11") use **roadmap** numbers. See [`epics/README.md`](./README.md) for
+> the full mapping — notably, the roadmap's Epics 3 & 4 (the React/TS frontend canvas &
+> node-config UX) ship in the separate `colony-mind-canvas` repo, not here.
+
 > Deterministic IR → idiomatic, PEP8-clean, runnable Python. The "glass-box"
 > promise made real. Epic 1 gave every node a per-node `codegen(node) -> CodeFragment`
 > (`colonymind/nodes/contract.py`) and a per-node `execute(node, inputs)`, but there is

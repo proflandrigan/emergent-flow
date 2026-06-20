@@ -1,5 +1,13 @@
 # Epic 1 — Core SDK & Graph Intermediate Representation (IR)
 
+> **Repo ↔ roadmap numbering.** Epic files are numbered by **delivery order in this repo**;
+> the [technical roadmap](../planning_docs/technical_roadmap.md) numbers epics **globally
+> across all three repos**. This file is repo **Epic 1** = roadmap **Epic 1** (they match
+> here, but diverge for later epics). Cross-references in the prose below (e.g. "Blocks:
+> Epics 3, 5") use **roadmap** numbers. See [`epics/README.md`](./README.md) for the full
+> mapping — notably, the roadmap's Epics 3 & 4 (the React/TS frontend canvas & node-config
+> UX) ship in the separate `colony-mind-canvas` repo, not here.
+
 > The spine of Colony Mind. A versioned, open-source Python SDK plus a
 > canonical graph schema (the IR) that every other layer reads and writes. Nothing else
 > can be built reliably until this is right — and the IR schema is the single hardest
