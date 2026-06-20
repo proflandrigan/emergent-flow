@@ -15,7 +15,7 @@ Each epic carries:
 - **Key design decisions & options** — the real forks in the road, with a recommendation.
 - **Dependencies** — what must exist first.
 - **Notes / risks** — traps, sequencing hazards, and things the proposal under-specifies.
-- **Phase** — alignment to the proposal's three-phase plan (with adjustments noted in §C).
+- **Phase** — alignment to the proposal's three-phase plan (with adjustments noted in §D).
 
 Before the epics, §A fixes the cross-cutting architectural decisions that shape almost everything else. Read it first — several "challenges" in the proposal dissolve once these are settled.
 
@@ -23,7 +23,7 @@ Before the epics, §A fixes the cross-cutting architectural decisions that shape
 
 ## A. Foundational architectural decisions (read first)
 
-These four decisions are upstream of nearly every epic. Getting them right early is cheaper than retrofitting.
+These five decisions are upstream of nearly every epic. Getting them right early is cheaper than retrofitting.
 
 ### A1. The graph is the single source of truth; code is a compiled artifact
 
@@ -56,11 +56,83 @@ The proposal repeatedly names Redis as the cache. Redis is an in-memory store �
 
 **Recommendation:** Tier the artifact store. Redis (or equivalent) holds **cache metadata, execution hashes, small scalar/JSON results, and the DAG state index**. Large artifacts (DataFrames, tensors, models, HTML reports) serialize to a **disk- or object-backed store** using columnar/zero-copy formats (Arrow IPC / Parquet for frames; `torch.save` / safetensors for models). The cache key points at the artifact location, not the bytes.
 
+### A5. The frontend canvas is a separate repo that consumes the IR — not a co-equal codebase
+
+The proposal draws the canvas (React Flow / Tailwind / Vite) and the SDK (Pandas / Pingouin / PyTorch …) as two layers of one system, which invites treating them as one codebase. The trap is co-locating a TypeScript frontend and a Python SDK in a single repo: two unrelated toolchains (`npm`/Vite/Vitest vs. `uv`/`ruff`/`mypy`/`pytest`), two CI matrices, and two dependency trees fighting in one tree — and, worse, a temptation for the frontend to reach into Python internals instead of through the published contract.
+
+**Recommendation:** Split by toolchain into separate repos that couple **only through serialized artifacts**, never a shared source import:
+
+- `colony-mind` — this repo: the open-source Python SDK + graph IR + codegen (Epics 1, 2, 5/typing, 14).
+- `colony-mind-canvas` — the React frontend canvas (roadmap Epic 3) + node config UX (Epic 4 surface) + result rendering (Epic 8).
+- `colony-mind-server` — the FastAPI/Celery execution backend (Epics 6, 7, 9, 15) that wraps the SDK's reference executor.
+
+The boundary the canvas consumes from the SDK is exactly three published, versioned artifacts:
+
+1. the **IR JSON Schema** (Epic 1) — so the canvas produces and reads valid graphs with no Python present;
+2. the **generated-code string** from `compile_to_code(ir)` (Epic 2) — for the in-node "show code" panel;
+3. the **type catalog + connection-compatibility rules as data** (Epic 5) — so the canvas gives instant red-edge feedback without a Python round-trip.
+
+**Consequences to communicate.** The frontend never `import`s `colonymind`; it talks to the IR contract (Phase 1, no backend) and later to `colony-mind-server` over REST/WebSocket (Phase 2+). This keeps the one-way, IR-is-source-of-truth model (A1), the execute-the-IR equivalence model (A2), and the open-core boundary (which is partly *a repo boundary*: SDK open, canvas/server are the product) all clean. The cost the SDK must pay back: it must **publish stable, serializable schemas and rule artifacts** (versioned alongside the IR schema) as first-class outputs, because a separate frontend can only be as good as the contract it's handed.
+
 ---
 
-## B. The Epics
+## B. Repo map: which epic lives where, and when frontend work unblocks
 
-Epics are numbered for reference, not strictly for execution order. §D gives the critical path.
+Per §A5, this product is **three repos**, not one, coupled only through published, versioned
+artifacts. Before diving into individual epics, this section gives the at-a-glance map: which
+track (repo) owns each epic, and — for everything that touches the frontend — exactly what
+SDK contract has to exist before that frontend work can begin.
+
+### B1. Epic → Track → Repo
+
+| Epic | Title | Track | Repo |
+| :-- | :-- | :-- | :-- |
+| 1 | Core SDK & Graph IR | **Python SDK** | `colony-mind` |
+| 2 | Code Generation Engine | **Python SDK** | `colony-mind` |
+| 3 | Frontend Canvas Engine | **Frontend** | `colony-mind-canvas` |
+| 4 | Node Library & Configuration UX | **Frontend** (config-panel UI) + **Python SDK** (node catalog/defaults) — *split* | `colony-mind-canvas` + `colony-mind` |
+| 5 | Type-Safe Graph & Connection Validation | **Cross-cutting** — SDK owns the type system + rules; canvas consumes the rules-as-data for live feedback — *split* | `colony-mind` (owns) / `colony-mind-canvas` (consumes) |
+| 6 | Backend Execution Runtime & Sandboxing | **Backend/Server** | `colony-mind-server` |
+| 7 | DAG Caching & Incremental State Management | **Backend/Server** | `colony-mind-server` |
+| 8 | Result Rendering & In-Node Visualization | **Frontend** (rendering) + **Backend/Server** (heavy-artifact rendering, payload shaping) — *split* | `colony-mind-canvas` + `colony-mind-server` |
+| 9 | Data Connectors & Credential Management | **Backend/Server** | `colony-mind-server` |
+| 10 | Deep Learning Module & Tensor Shape Resolution | **Python SDK** (layer nodes, declarative codegen, shape inference) + **Frontend** (real-time shape-mismatch UI) — *split* | `colony-mind` + `colony-mind-canvas` |
+| 11 | GenAI & Multi-Agent Orchestration | **Python SDK** (nodes, codegen) + **Backend/Server** (execution, cost tracking) + **Frontend** (live message/token viz) — *split* | all three |
+| 12 | Canvas-Aware Coding Agent (NL → graph) | **Cross-cutting** — agent logic likely SDK/server-side, propose/apply UX is frontend | `colony-mind` / `colony-mind-server` + `colony-mind-canvas` |
+| 13 | Real-Time Multiplayer Collaboration | **Frontend** (presence/cursors/CRDT client) + **Backend/Server** (sync transport) — *split* | `colony-mind-canvas` + `colony-mind-server` |
+| 14 | Project Persistence, Versioning & Git Sync | **Python SDK** (schema migrations, IR/export format) + **Backend/Server** (project storage) — *split* | `colony-mind` + `colony-mind-server` |
+| 15 | Platform Infrastructure, Security & Observability | **Cross-cutting** (underpins 6–13; mostly server/infra) | `colony-mind-server` (+ deployment infra) |
+
+This repo (`colony-mind`) ships Epics 1, 2, and 5 (rules-owning half) outright, plus the SDK-side
+slices of 4, 10, 11, and 14. Everything else lives downstream in `colony-mind-canvas` or
+`colony-mind-server` and only ever touches this repo through the three published artifacts
+named in §A5.
+
+### B2. Frontend readiness: what's the gate, and is it met?
+
+This is the practical question for anyone staffing the canvas repo: **what SDK artifact has to
+exist before this slice of frontend work can start?** Three gates, in order of when they open:
+
+| Frontend slice | Gating SDK artifact (this repo) | Gate met today? | Can frontend start? |
+| :-- | :-- | :-- | :-- |
+| Phase-1 static canvas: node placement, edge drawing → produces valid IR → "show code" panel → downloadable script (Epic 3 core, Epic 4 surface) | **IR JSON Schema** (Epic 1) + **`compile_to_code(ir)` output** (Epic 2) | **Yes** — both have landed in this repo. | **Yes — can start now.** This is the whole Phase-1 demo and needs zero backend. |
+| Live connection/type validation: red-edge feedback, "why is this invalid" tooltips (Epic 5's frontend-facing half, wired into Epic 3) | **Type catalog + connection-compatibility rules-as-data artifact** (Epic 5, this repo's in-progress `plan/epic-3-type-safe-graph` work) | **Not yet** — Epic 5 (repo-numbering: "Epic 3" in this codebase, see `epics/epic-3-type-safe-graph-and-validation.md`) is in progress and has not published the rules artifact. | **Blocked** until the rules-as-data artifact is published and versioned. The canvas can build its UI scaffolding against a mocked rules shape in the meantime, but cannot wire real validation. |
+| Real-time tensor shape-mismatch UI (Epic 10's frontend half) | Epic 5's general framework **plus** Epic 10's dimension-level shape inference (meta-tensor tracing), exported the same way as the structural rules | **No** — depends on Epic 5 (above) and on Epic 10, which hasn't started. | **Blocked**, transitively on Epic 5. |
+| Result rendering inside nodes (Epic 8) | A defined **result-payload contract** from the execution runtime (Epic 6) — sized/paginated/typed renderable payloads | **No** — Epic 6 (backend execution) hasn't started; there is no live executor to shape payloads from yet. | **Blocked** until Epic 6 publishes its result-payload shape (even a draft contract would unblock UI prototyping). |
+| Live message/token visualization for GenAI/agent flows (Epic 11's frontend half) | Epic 6 (execution/streaming) + Epic 11's agent-graph execution semantics | **No** — both upstream. | **Blocked.** |
+| Multiplayer presence/cursors (Epic 13) | No SDK gate per se, but the **IR must be CRDT-friendly** (a property of Epic 1's schema design, not a separate artifact) — open question whether Epic 1 as landed satisfies this (open question, see §F item 4). | Partially — Epic 1 has landed, but CRDT-friendliness was a *design intent*, not a verified property. | **Nominally startable**, but verify the open question above before investing heavily. |
+
+**Bottom line:** the only frontend work unblocked *today* is the Phase-1 static canvas (Epic 3
+core + Epic 4 surface) — exactly because Epics 1 and 2 have landed in this repo. Everything else
+in the canvas repo is gated on artifacts this repo has not yet published, with Epic 5's
+rules-as-data artifact (the subject of the current `plan/epic-3-type-safe-graph` work) being the
+very next gate to clear.
+
+---
+
+## C. The Epics
+
+Epics are numbered for reference, not strictly for execution order. §E gives the critical path.
 
 ---
 
@@ -115,6 +187,8 @@ Epics are numbered for reference, not strictly for execution order. §D gives th
 
 **Goal:** A fluid infinite canvas: node creation, pan/zoom, edge drawing, selection, grouping/sub-graph nesting, and an extensible node-rendering framework — performant at hundreds-to-thousands of nodes.
 
+**Repo / boundary (per A5):** This epic lives in its own frontend repo (`colony-mind-canvas`), *not* in the Python SDK repo. It consumes the SDK's published contract — the IR JSON Schema, the `compile_to_code` output, and the Epic-5 rules-as-data — and never imports `colonymind`. Plan the SDK side to *publish* those artifacts; plan this epic against them.
+
 **Scope**
 - In: canvas runtime; node/edge rendering; interaction (drag, connect, multi-select, group); sub-graph nesting/collapse; the per-node config-panel framework; in-node "show code" view (consumes Epic 2 output).
 - Out: collaborative editing (Epic 13); result visualizations inside nodes (Epic 8); backend wiring (Epic 6).
@@ -123,11 +197,12 @@ Epics are numbered for reference, not strictly for execution order. §D gives th
 - **React Flow (@xyflow) vs. Rete.js.** Given the proposed React + Tailwind + Vite stack, **React Flow** is the natural fit: React-native, large ecosystem, strong node-editor primitives. Rete.js is more rendering-agnostic and plugin-driven but smaller and less React-idiomatic. Recommend React Flow, with an explicit **performance budget** and a virtualization/level-of-detail plan (render simplified nodes when zoomed out; virtualize off-screen nodes) — the "hundreds of components smoothly" claim is not free.
 - **Node UI as schema-driven.** Generate config panels from the node's declared param schema (Epic 1) rather than hand-coding a form per node. Keeps the catalog scalable and the UI consistent.
 
-**Dependencies:** Epic 1 (IR), Epic 2 (for the code-view panel).
+**Dependencies:** Epic 1 (IR schema), Epic 2 (generated code for the code-view panel), Epic 5 (type catalog + connection-compatibility rules-as-data for live edge validation). All consumed as published artifacts, not as a code import (A5).
 
 **Notes / risks**
 - Phase-1 milestone is achievable here with **zero backend**: canvas → valid IR → downloadable script. This de-risks the whole product early and is a strong demo.
 - Canvas performance is the most likely place to discover the architecture doesn't hold; prototype with a synthetic 1,000-node graph early.
+- **Separate repo, contract-only coupling (A5).** The canvas's quality ceiling is the quality of the published SDK contract — get the IR schema, codegen output, and rules artifact stable and versioned before building deeply against them, or the frontend churns every time the SDK shifts. Treat a schema/rules version mismatch as a first-class, surfaced error (ties to Epic 14 migrations).
 
 **Phase:** 1.
 
@@ -164,9 +239,11 @@ Epics are numbered for reference, not strictly for execution order. §D gives th
 
 **Key design decisions & options**
 - **Strictness.** Strict static typing catches errors early but can feel rigid for exploratory work. Recommend strict on structural type (you cannot wire a Model into a DataFrame input) with softer, warn-don't-block handling for things only knowable at runtime.
-- **Where validation runs.** The frontend needs enough of the type system to give instant feedback without a round-trip; the backend re-validates authoritatively. Plan for the rules to be expressible in/shippable to the client.
+- **Where validation runs.** The frontend (separate repo, A5) needs enough of the type system to give instant feedback without a round-trip; the backend re-validates authoritatively. Plan for the rules to be expressible as **data shippable to the client** — a versioned type-catalog + compatibility-table artifact — not as Python the canvas would have to call. This artifact is the third leg of the SDK→canvas contract (A5), alongside the IR schema and the codegen output.
 
-**Dependencies:** Epic 1 (port types in the IR), Epic 3 (UI feedback).
+**Repo / boundary (per A5):** This epic lives in the Python SDK repo and *owns* the type system and rules. The "live UI feedback" it enables is rendered by the separate `colony-mind-canvas` repo, which consumes the exported rules artifact and the `Diagnostics` schema — it does not import this code. The SDK is the authoritative re-validator (server-side, Epic 6).
+
+**Dependencies:** Epic 1 (port types in the IR), Epic 2 (the codegen/execute gate the validation hooks into). The canvas (Epic 3, separate repo) is a *consumer* of this epic's rules artifact, not a dependency.
 
 **Notes / risks**
 - The proposal frames tensor validation (Challenge 3) as a DL-only problem; it's actually a special case of general edge typing. Building the general framework first means DL gets validation "for free" at the structural level and only needs dimension inference layered on.
@@ -388,12 +465,12 @@ Epics are numbered for reference, not strictly for execution order. §D gives th
 
 ---
 
-## C. Mapping to the proposal's three phases (with adjustments)
+## D. Mapping to the proposal's three phases (with adjustments)
 
 The proposal's phasing is sound; two adjustments are recommended.
 
 **Phase 1 — Foundation (SDK + static canvas, no backend execution).**
-Epics 1, 2, 3, 4 (initial vertical slice), 5 (structural typing), 14 (basic save/load + export). Deliverable: a frontend-only canvas that maps a node graph to flawless, downloadable Python. Strongest early de-risking milestone — the whole "glass-box codegen" thesis is provable here without infrastructure.
+Epics 1, 2, 3, 4 (initial vertical slice), 5 (structural typing), 14 (basic save/load + export). Deliverable: a frontend-only canvas that maps a node graph to flawless, downloadable Python. Strongest early de-risking milestone — the whole "glass-box codegen" thesis is provable here without infrastructure. Note that even in Phase 1 this is **two repos** (A5): the Python SDK (Epics 1, 2, 5, 14) and the `colony-mind-canvas` frontend (Epics 3, 4 surface), coupled only by the published IR schema, codegen output, and rules artifact.
 
 **Phase 2 — Living Bridge (reactive backend).**
 Epics 6, 7, 8, 9, plus 15 spinning up (auth/infra/security/observability), and 14 maturing (migrations). Deliverable: "Execute" runs real Python, with incremental caching and rich results rendered back into the canvas.
@@ -405,9 +482,11 @@ Epics 10, 11, 12, and 5's tensor-dimension layer. Deliverable: visual deep learn
 
 **Adjustment 2 — Security/sandboxing (Epics 6 + 15) is treated as a Phase-2 implementation detail in the proposal but is a first-class, high-severity deliverable.** Promote it to an explicit Phase-2 workstream with a named owner.
 
+**Adjustment 3 — The frontend is a separate repo, not a layer of one codebase (A5).** The proposal's three-layer stack diagram reads as one system; in practice the canvas (`colony-mind-canvas`) and the execution backend (`colony-mind-server`) are distinct repos from this Python SDK, coupled only through the published IR schema, codegen output, and rules-as-data. Decide the repo split at the start of Phase 1 — retrofitting a TypeScript frontend out of a shared Python repo, or untangling frontend reach-ins into SDK internals, is exactly the kind of avoidable rework A1/A2 already warned about for sync.
+
 ---
 
-## D. Critical path & sequencing summary
+## E. Critical path & sequencing summary
 
 The hard dependency spine:
 
@@ -419,7 +498,7 @@ The two decisions that most constrain everything downstream and should be locked
 
 ---
 
-## E. Open questions / decision register
+## F. Open questions / decision register
 
 | # | Question | Why it matters | Suggested default |
 | :-- | :-- | :-- | :-- |
@@ -433,3 +512,4 @@ The two decisions that most constrain everything downstream and should be locked
 | 8 | Caching semantics for non-deterministic LLM/agent nodes? | Breaks the deterministic hash-cache assumption. | Separate execution path; cache-with-care + cost tracking. |
 | 9 | Open-core boundary: what's SDK vs. platform-only? | Affects packaging, licensing, and community story. | Decide alongside Epic 1 packaging. |
 | 10 | Where does heavy compute run at scale (10 GB+)? | Single FastAPI process won't hold it; the proposal assumes it does. | Isolated scalable workers; plan for remote/distributed. |
+| 11 | One repo or split SDK / canvas / server? | Toolchain, CI, and the open-core boundary; frontend reach-ins are hard to undo. | Separate repos (A5), coupled only by published IR schema + codegen output + rules-as-data. |
