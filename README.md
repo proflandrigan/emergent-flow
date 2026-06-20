@@ -17,10 +17,13 @@ Crucially, the visual canvas maps **1:1** with an underlying, optimized open-sou
 SDK: every drag-and-drop connection compiles to beautiful, production-grade, human-readable
 Python — eliminating vendor lock-in and preserving true developer freedom.
 
-> **Status:** Early-stage. This repository currently contains the planning and design
-> material in [`planning_docs/`](./planning_docs/). See the
-> [Technical Roadmap](./planning_docs/technical_roadmap.md) for the engineering
-> decomposition and the [Product Proposal](./planning_docs/proposal.md) for the vision.
+> **Status:** Phase 1 (Foundation), in active development. The open-source Python SDK is
+> taking shape: the graph IR with its node contract and registry (Epic 1) and the
+> code-generation engine — the pure `cm.compile_to_code` / `cm.execute` pair over one IR,
+> including the declarative `nn.Module` codegen seam (Epic 2) — are implemented and
+> CI-tested. See the [Technical Roadmap](./planning_docs/technical_roadmap.md) for the
+> engineering decomposition and the [Product Proposal](./planning_docs/proposal.md) for
+> the vision.
 
 ---
 
@@ -97,7 +100,11 @@ consequences of each: [ADR 0001](./docs/adr/0001-graph-is-single-source-of-truth
 [ADR 0003](./docs/adr/0003-sdk-supports-two-paradigms.md),
 [ADR 0004](./docs/adr/0004-storage-tiering.md),
 [ADR 0005](./docs/adr/0005-node-definition-contract.md),
-[ADR 0006](./docs/adr/0006-node-registry-and-plugin-discovery.md).
+[ADR 0006](./docs/adr/0006-node-registry-and-plugin-discovery.md),
+[ADR 0007](./docs/adr/0007-open-core-licensing-boundary.md),
+[ADR 0008](./docs/adr/0008-codegen-templating-vs-ast.md),
+[ADR 0009](./docs/adr/0009-codegen-binding-context.md),
+[ADR 0010](./docs/adr/0010-codegen-package-placement.md).
 
 ### Example of generated code
 
@@ -125,6 +132,11 @@ model, metrics = cm.ml.train_classifier(
 # 4. Export artifacts
 cm.reports.generate_html_summary(model, metrics, output_path="churn_report.html")
 ```
+
+The same `cm.compile_to_code` entry point dispatches on paradigm: **declarative**
+`nn.Module` graphs compile through a `libcst`-based generator to idiomatic PyTorch class
+definitions (an `__init__` of layers plus a `forward` chain) rather than a flat script.
+See the [Declarative Codegen Seam](./docs/codegen-declarative.md) for the worked example.
 
 ---
 
@@ -174,17 +186,22 @@ with the IR designed CRDT-ready from the start.
 colony-mind/
 ├── colonymind/               # Python SDK source
 │   ├── ir/                   # Graph intermediate representation (schema, serialization)
-│   └── nodes/                # Node contract, registry, and reference examples
+│   ├── nodes/                # Node contract, registry, and reference examples
+│   ├── codegen/              # Whole-graph compiler + reference executor (compile_to_code / execute)
+│   ├── data, clean, stats, ml, reports/   # Reference node-family SDK wrappers
+│   └── api.py                # @public_op decorator + inspectable-return contract
 ├── docs/
 │   ├── adr/                  # Architecture Decision Records (foundational decisions)
 │   ├── node-contract-spec.md # Node-definition contract reference
 │   ├── node-registry.md      # Registry and plugin discovery guide
 │   ├── authoring-a-node.md   # Step-by-step guide to writing a node
+│   ├── codegen-compiler.md   # Codegen engine: compiler, executor, declarative seam
 │   ├── package-layout.md     # Package layout & namespace conventions
 │   ├── versioning-and-releases.md  # Semantic versioning & release process
 │   └── public-api-conventions.md   # Public API naming, signatures, return objects
 ├── epics/
-│   └── epic-1-core-sdk-and-ir.md  # Epic 1 — Core SDK & graph IR
+│   ├── epic-1-core-sdk-and-ir.md          # Epic 1 — Core SDK & graph IR
+│   └── epic-2-code-generation-engine.md   # Epic 2 — Code generation engine
 ├── examples/
 │   └── plugin_stub/          # Out-of-core node plugin example (cm-texttools, text.reverse)
 ├── planning_docs/
@@ -206,6 +223,9 @@ colony-mind/
   serializable + inspectable return-object contract every wrapper must meet.
 - [SDK Design Philosophy](./docs/sdk-design-philosophy.md) — the thin / deterministic / pure
   rules and the `@cm.public_op` runtime check that enforces them.
+- [Codegen Engine](./docs/codegen-compiler.md) — the whole-graph `compile_to_code` compiler
+  and reference `execute` interpreter, plus the
+  [declarative `nn.Module` seam](./docs/codegen-declarative.md).
 - [Versioning & Releases](./docs/versioning-and-releases.md) — Semantic Versioning policy and
   the tag-driven release process.
 - [Architecture Decision Records](./docs/adr/) — the foundational `§A` decisions.

@@ -11,8 +11,11 @@ It leverages ADR 0008 for templating in the functional paradigm and uses `ruff f
 for a final formatting pass. ADR 0009 defines the binding context, and ADR 0010
 specifies the entry point and package placement.
 
-Currently, only `Paradigm.FUNCTIONAL` graphs are handled by this compiler. The
-`Paradigm.DECLARATIVE` branch is a separate compiler path, slated for Epic 2 Story 8.
+`compile_to_code` dispatches on `graph.paradigm`: `Paradigm.FUNCTIONAL` graphs are
+assembled via the string-template pipeline in this module, while
+`Paradigm.DECLARATIVE` graphs are delegated to `compile_declarative`
+(`colonymind.codegen.declarative`), the libcst-based `nn.Module` generator (ADR
+0008, Epic 2 Story 8). Both paths share the same final `format_source` pass.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ from dataclasses import dataclass
 
 from colonymind.api import public_op
 from colonymind.codegen.context import build_codegen_context
+from colonymind.codegen.declarative import compile_declarative
 from colonymind.codegen.errors import CodegenError, UnboundInputError
 from colonymind.codegen.formatting import format_source
 from colonymind.codegen.naming import NameMap, build_name_map
@@ -147,13 +151,20 @@ def compile_to_code(graph: Graph) -> str:
         A string containing the generated Python source code.
 
     Raises:
-        CodegenError: If the graph contains declarative paradigm nodes, or if
-                      `format_source` encounters an error.
+        CodegenError: If `format_source` encounters an error. DECLARATIVE
+                      graphs are compiled via `compile_declarative`, which
+                      raises `CodegenError` for declarative node types
+                      outside the supported catalog (full catalog is Epic
+                      10) and for agent/LangGraph targets (deferred to Epic
+                      11).
         UnboundInputError: If any input port in the graph is not connected to
                            an upstream output port.
         CycleError: If the graph contains a cycle (propagated from
                     `topological_sort`).
     """
+    if graph.paradigm is Paradigm.DECLARATIVE:
+        return format_source(compile_declarative(graph))
+
     assembled = _assemble(graph)
 
     import_block = "\n".join(assembled.imports)

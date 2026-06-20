@@ -14,6 +14,7 @@ entry points are reserved per ADR 0010 and land in Stories 5-6.
 from __future__ import annotations
 
 from colonymind.codegen.context import CodegenContext, build_codegen_context
+from colonymind.codegen.declarative import compile_declarative
 from colonymind.codegen.errors import CardinalityError, CodegenError, CycleError, UnboundInputError
 from colonymind.codegen.executor import execute
 from colonymind.codegen.export import ExportResult, export_script
@@ -38,4 +39,5 @@ __all__ = [
     "execute",
     "export_script",
     "ExportResult",
+    "compile_declarative",
 ]

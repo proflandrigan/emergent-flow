@@ -17,6 +17,9 @@ re-implementing them inline.
 from .anova import Anova
 from .impute import ImputeMissing
 from .load_csv import LoadCsv
+from .nn_linear import NnLinear
+from .nn_module import NnModule
+from .nn_relu import NnReLU
 from .report import GenerateHtmlSummary
 from .train import TrainClassifier
 
@@ -26,4 +29,7 @@ __all__ = [
     "Anova",
     "TrainClassifier",
     "GenerateHtmlSummary",
+    "NnLinear",
+    "NnReLU",
+    "NnModule",
 ]
