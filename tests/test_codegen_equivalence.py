@@ -41,7 +41,9 @@ import sys
 import tempfile
 from typing import Any
 
-from colonymind.codegen.compiler import _assemble
+import pytest
+
+from colonymind.codegen.compiler import _assemble, compile_to_code
 from colonymind.codegen.executor import execute
 from colonymind.ir import Direction, Edge, Graph, Node, Port, PortRef, load_graph
 from colonymind.nodes.contract import CodeFragment, NodeDefinition
@@ -293,6 +295,27 @@ class _EquivDouble(NodeDefinition):
         return {"out": inputs["in_"] * 2}
 
 
+@register
+class _EquivJoin2(NodeDefinition):
+    """Test fixture: 2 in (a, b), 1 out. out = a + b — exercises fan-in wiring."""
+
+    type = "test.equiv_join2"
+    family = "test"
+    label = "Equiv Join2"
+    ports = [
+        PortSpec(name="a", direction=Direction.IN, data_type="int"),
+        PortSpec(name="b", direction=Direction.IN, data_type="int"),
+        PortSpec(name="out", direction=Direction.OUT, data_type="int"),
+    ]
+
+    def codegen(self, node: Node, ctx: Any) -> CodeFragment:
+        return CodeFragment(body=f"{ctx.out_var('out')} = {ctx.in_var('a')} + {ctx.in_var('b')}")
+
+    def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
+        return {"out": inputs["a"] + inputs["b"]}
+
+
+@pytest.mark.equivalence
 def test_trivial_chain_equivalence() -> None:
     """A pure-Python source->double chain proves the harness end to end."""
     src = Node(
@@ -319,6 +342,7 @@ def test_trivial_chain_equivalence() -> None:
     assert_equivalent(graph)
 
 
+@pytest.mark.equivalence
 def test_empty_graph_equivalence() -> None:
     """The empty graph is trivially equivalent (no artifacts on either side)."""
     assert_equivalent(Graph())
@@ -329,6 +353,7 @@ def test_empty_graph_equivalence() -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.equivalence
 def test_vertical_slice_equivalence() -> None:
     """The vertical slice (fan-out) is equivalent end to end over its sample CSV."""
     slice_dir = REPO_ROOT / "examples" / "vertical_slice"
@@ -337,8 +362,85 @@ def test_vertical_slice_equivalence() -> None:
     assert_equivalent(graph, cwd=slice_dir)
 
 
+@pytest.mark.equivalence
 def test_functional_pipeline_equivalence() -> None:
     """The functional pipeline (linear chain) is equivalent over the sample CSV."""
     graph = load_graph(REPO_ROOT / "examples" / "functional_pipeline.json")
     # Its load_csv path is repo-root-relative, so run from the repo root.
     assert_equivalent(graph, cwd=REPO_ROOT)
+
+
+def _diamond_graph() -> Graph:
+    """A reconverging diamond: src -> {dbl_a, dbl_b} -> join.
+
+    Exercises fan-out (src.out feeds two targets) AND fan-in (join has two IN
+    ports fed by two distinct upstreams) — neither expressible with the
+    single-input reference catalog, so built from the pure-Python int fakes.
+    """
+    src = Node(
+        id="src",
+        type=_EquivSource.type,
+        label=_EquivSource.label,
+        ports=[Port(id="src-out", name="out", direction=Direction.OUT, data_type="int")],
+    )
+    dbl_a = Node(
+        id="dbl_a",
+        type=_EquivDouble.type,
+        label=_EquivDouble.label,
+        ports=[
+            Port(id="dbl_a-in", name="in_", direction=Direction.IN, data_type="int"),
+            Port(id="dbl_a-out", name="out", direction=Direction.OUT, data_type="int"),
+        ],
+    )
+    dbl_b = Node(
+        id="dbl_b",
+        type=_EquivDouble.type,
+        label=_EquivDouble.label,
+        ports=[
+            Port(id="dbl_b-in", name="in_", direction=Direction.IN, data_type="int"),
+            Port(id="dbl_b-out", name="out", direction=Direction.OUT, data_type="int"),
+        ],
+    )
+    join = Node(
+        id="join",
+        type=_EquivJoin2.type,
+        label=_EquivJoin2.label,
+        ports=[
+            Port(id="join-a", name="a", direction=Direction.IN, data_type="int"),
+            Port(id="join-b", name="b", direction=Direction.IN, data_type="int"),
+            Port(id="join-out", name="out", direction=Direction.OUT, data_type="int"),
+        ],
+    )
+    edges = [
+        Edge(
+            source=PortRef(node_id="src", port_id="src-out"),
+            target=PortRef(node_id="dbl_a", port_id="dbl_a-in"),
+        ),
+        Edge(
+            source=PortRef(node_id="src", port_id="src-out"),
+            target=PortRef(node_id="dbl_b", port_id="dbl_b-in"),
+        ),
+        Edge(
+            source=PortRef(node_id="dbl_a", port_id="dbl_a-out"),
+            target=PortRef(node_id="join", port_id="join-a"),
+        ),
+        Edge(
+            source=PortRef(node_id="dbl_b", port_id="dbl_b-out"),
+            target=PortRef(node_id="join", port_id="join-b"),
+        ),
+    ]
+    return Graph(
+        nodes={n.id: n for n in (src, dbl_a, dbl_b, join)},
+        edges={e.id: e for e in edges},
+    )
+
+
+@pytest.mark.equivalence
+def test_diamond_equivalence() -> None:
+    """The reconverging diamond is execute/compile equivalent (join out == 28)."""
+    assert_equivalent(_diamond_graph())
+
+
+def test_diamond_golden(snapshot) -> None:
+    """The diamond compiles to stable golden code (fan-in/fan-out wiring)."""
+    assert compile_to_code(_diamond_graph()) == snapshot

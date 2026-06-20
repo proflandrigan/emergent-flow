@@ -21,7 +21,7 @@
 - [ ] Statements are emitted in a deterministic topological order; cyclic functional graphs are rejected with a clear error.
 - [x] A pure, in-process `execute(graph) -> results` reference interpreter walks the IR and calls each node's `execute` (the productionized, sandboxed runtime is Epic 6).
 - [x] The A2 equivalence invariant holds: across a fixture corpus, artifacts from `execute(ir)` equal artifacts from running `compile_to_code(ir)`, enforced as a CI golden/property gate.
-- [ ] Generated code passes `ruff` lint and is importable/runnable; a golden-file corpus covers every reference node type and common compositions (fan-in, fan-out, subgraphs).
+- [x] Generated code passes `ruff` lint and is importable/runnable; a golden-file corpus covers every reference node type and common compositions (fan-in, fan-out, subgraphs).
 - [x] The two-paradigm seam exists: the compiler dispatches on `paradigm`, with a working proof for the declarative `nn.Module` example; full DL/agent codegen is deferred to Epic 10/11.
 - [ ] The vertical-slice graph (`examples/vertical_slice/pipeline.json`) compiles to code that reads like the hand-written `examples/vertical_slice/demo.py` and runs to the same artifacts.
 - [ ] Bidirectional (code → graph) parsing is explicitly **not** built (deferred per A1/ADR 0001).
@@ -142,11 +142,11 @@
 > "Codegen quality *is* the marketing claim" (roadmap). A messy edge case is a credibility hit,
 > so the fixture suite and gate are first-class, not an afterthought.
 
-- [ ] Assemble a **fixture corpus** covering every reference node type and common compositions: linear chain, fan-out, fan-in/diamond, and a subgraph/grouped graph.
-- [ ] Add **golden-file (snapshot) tests** of generated code so regressions in formatting/naming/imports are caught.
-- [ ] Assert generated code **passes `ruff` lint** and is importable (and runnable where data fixtures allow).
-- [ ] Wire the **equivalence gate** (Story 6) and golden tests into CI to run on every commit, alongside the existing `tests/` suite.
-- [ ] Add a "how codegen works" doc (`docs/`) and link it from the README, mirroring Epic 1's docs discipline.
+- [x] Assemble a **fixture corpus** covering every reference node type and common compositions: linear chain, fan-out, fan-in/diamond, and a subgraph/grouped graph.
+- [x] Add **golden-file (snapshot) tests** of generated code so regressions in formatting/naming/imports are caught.
+- [x] Assert generated code **passes `ruff` lint** and is importable (and runnable where data fixtures allow).
+- [x] Wire the **equivalence gate** (Story 6) and golden tests into CI to run on every commit, alongside the existing `tests/` suite.
+- [x] Add a "how codegen works" doc (`docs/`) and link it from the README, mirroring Epic 1's docs discipline.
 
 ---
 
