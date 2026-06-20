@@ -76,11 +76,11 @@
 
 > The pure core both the validation pass and the (separate) frontend rely on.
 
-- [ ] Implement a **pure** `is_compatible(source_type, target_type) -> Compatibility` returning `COMPATIBLE | INCOMPATIBLE | UNKNOWN` plus a human-readable reason (no I/O, no global state — so Epic 6 sandboxing and client-side shipping both stay trivial).
-- [ ] Implement the **cardinality rule**: a `Cardinality.ONE` IN port rejects a second inbound edge; `MANY` permits fan-in. (This is a real gap today — `Graph._validate_structure` checks direction and existence but never cardinality, and no reference node uses `MANY` yet.)
-- [ ] Keep results **deterministic and reason-bearing** (expected-vs-actual token in the message), required for golden tests and for the canvas's "explain why this edge is red" affordance.
-- [ ] Guarantee the rules are **expressible as data** (Story 1 ADR 0012): a serialized compatibility table the frontend can evaluate without calling Python.
-- [ ] Unit-test the matrix: exact match, subtype, `"any"` either side, unregistered token (→ UNKNOWN/warn), and ONE-vs-MANY cardinality.
+- [x] Implement a **pure** `is_compatible(source_type, target_type) -> Compatibility` returning `COMPATIBLE | INCOMPATIBLE | UNKNOWN` plus a human-readable reason (no I/O, no global state — so Epic 6 sandboxing and client-side shipping both stay trivial).
+- [x] Implement the **cardinality rule**: a `Cardinality.ONE` IN port rejects a second inbound edge; `MANY` permits fan-in. (This is a real gap today — `Graph._validate_structure` checks direction and existence but never cardinality, and no reference node uses `MANY` yet.)
+- [x] Keep results **deterministic and reason-bearing** (expected-vs-actual token in the message), required for golden tests and for the canvas's "explain why this edge is red" affordance.
+- [x] Guarantee the rules are **expressible as data** (Story 1 ADR 0012): a serialized compatibility table the frontend can evaluate without calling Python.
+- [x] Unit-test the matrix: exact match, subtype, `"any"` either side, unregistered token (→ UNKNOWN/warn), and ONE-vs-MANY cardinality.
 
 ---
 
