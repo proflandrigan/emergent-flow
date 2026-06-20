@@ -16,7 +16,7 @@ For details on how the compiler traverses the graph, refer to [How codegen trave
 
 ## Module shape
 
-The generated Python module is structured with a `def main() -> None:` function wrapping a flat sequence of per-node statements, guarded by an `if __name__ == "__main__": main()` block. This design ensures that importing the generated module does not inadvertently execute the pipeline as a side effect, mirroring the `run()`/`main()`/guard pattern found in `examples/vertical_slice/demo.py`.
+The generated Python module is structured with a `def main() -> dict[str, object]:` function wrapping a flat sequence of per-node statements, guarded by an `if __name__ == "__main__": main()` block. This design ensures that importing the generated module does not inadvertently execute the pipeline as a side effect, mirroring the `run()`/`main()`/guard pattern found in `examples/vertical_slice/demo.py`.
 
 ## Dangling required IN ports are a hard compile-time error
 

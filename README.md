@@ -226,6 +226,9 @@ colony-mind/
 - [Codegen Engine](./docs/codegen-compiler.md) — the whole-graph `compile_to_code` compiler
   and reference `execute` interpreter, plus the
   [declarative `nn.Module` seam](./docs/codegen-declarative.md).
+- [How Codegen Works](./docs/how-codegen-works.md) — an overview of the codegen pipeline,
+  the two paradigms, and the golden / equivalence quality gates that back the
+  "what you see runs" promise.
 - [Versioning & Releases](./docs/versioning-and-releases.md) — Semantic Versioning policy and
   the tag-driven release process.
 - [Architecture Decision Records](./docs/adr/) — the foundational `§A` decisions.

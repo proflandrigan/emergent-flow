@@ -58,6 +58,7 @@ Issues = "https://github.com/proflandrigan/colony-mind/issues"
 dev = [
     "pytest>=7",
     "mypy>=1.11",
+    "syrupy>=4",
 ]
 
 [tool.setuptools.dynamic]
@@ -68,6 +69,9 @@ include = ["colonymind*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "equivalence: ADR-0002 (A2) execute(ir) == run(compile_to_code(ir)) gate",
+]
 
 [tool.ruff]
 line-length = 100
