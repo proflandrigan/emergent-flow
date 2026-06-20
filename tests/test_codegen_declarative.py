@@ -236,3 +236,15 @@ def test_digit_leading_class_label_does_not_crash():
     code = compile_to_code(graph)
     ast.parse(code)
     assert "class Module(nn.Module):" in code
+
+
+def test_forward_input_name_sanitized_for_keyword_port():
+    # A dangling IN port named "class" (a keyword) must not emit
+    # `def forward(self, class):` — the name is sanitized to a valid identifier.
+    node = _linear("n-l1", 4, 2)
+    node.ports[0].name = "class"
+    graph = _module_graph([node], [])
+    code = compile_to_code(graph)
+    ast.parse(code)  # would raise SyntaxError if the param were the bare keyword
+    assert "def forward(self, class)" not in code
+    assert "def forward(self, class_)" in code
