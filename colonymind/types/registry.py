@@ -40,7 +40,10 @@ class TypeDef(IRModel):
         token: The type-token identifier (e.g. ``"DataFrame"``).
         description: Optional human-readable description.
         supertypes: Declared direct supertype tokens. May reference tokens not
-            (yet) registered; forward references are allowed.
+            (yet) registered; forward references are allowed. Note that tuple
+            order is part of model identity (``__eq__``), so idempotent
+            re-registration requires the same order — declare supertypes
+            consistently across plugin versions.
     """
 
     token: str
@@ -192,6 +195,11 @@ class TypeRegistry:
 
         For ``TOP_TYPE`` this is every other registered token. The token itself
         is never included.
+
+        This is O(n) registered tokens per call (each delegating to
+        :meth:`supertypes_of`), which is fine at the catalog's intended scale (a
+        handful to low hundreds of tokens). It is an in-memory convenience query,
+        not the exported artifact ADR 0012 keeps non-quadratic.
         """
         if token == TOP_TYPE:
             return set(self._defs.keys()) - {TOP_TYPE}
@@ -209,6 +217,11 @@ class TypeRegistry:
 
         ``is_subtype(x, x)`` is ``False``; ``sup == TOP_TYPE`` is ``True`` for any
         ``sub != TOP_TYPE``.
+
+        This is a pure subtype-graph membership query, not the three-valued
+        ``is_compatible`` of ADR 0011 (Epic 3 Story 3): an unregistered *sub* is
+        still reported a subtype of ``"any"`` here, whereas compatibility against
+        an unregistered token is the future UNKNOWN/warn case.
         """
         if sub == sup:
             return False

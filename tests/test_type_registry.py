@@ -72,6 +72,42 @@ class TestTypeRegistry:
         with pytest.raises(ValueError):
             reg.register(TypeDef(token="B", supertypes=("A",)))
 
+    def test_forward_reference_cycle_rejected(self):
+        """A cycle closed via a forward reference is rejected.
+
+        ``A`` is registered pointing at the not-yet-registered ``B`` (a forward
+        reference, which is allowed); registering ``B`` pointing back at ``A``
+        closes the cycle and must raise.
+        """
+        reg = TypeRegistry()
+        reg.register(TypeDef(token="A", supertypes=("B",)))  # forward ref to unregistered B
+        with pytest.raises(ValueError):
+            reg.register(TypeDef(token="B", supertypes=("A",)))
+
+    def test_multi_hop_cycle_rejected(self):
+        """A 3-node cycle (A -> B -> C -> A) is rejected at closing registration."""
+        reg = TypeRegistry()
+        reg.register(TypeDef(token="A", supertypes=("B",)))
+        reg.register(TypeDef(token="B", supertypes=("C",)))
+        with pytest.raises(ValueError):
+            reg.register(TypeDef(token="C", supertypes=("A",)))
+
+    def test_diamond_is_not_a_cycle(self):
+        """A diamond (D <: B, C; B, C <: A) is a valid DAG, not a cycle.
+
+        Registration must succeed and the transitive supertypes of ``D`` must
+        include both intermediate parents plus the shared ancestor and ``"any"``.
+        """
+        reg = TypeRegistry()
+        reg.register(TypeDef(token="A"))
+        reg.register(TypeDef(token="B", supertypes=("A",)))
+        reg.register(TypeDef(token="C", supertypes=("A",)))
+        reg.register(TypeDef(token="D", supertypes=("B", "C")))
+
+        assert reg.supertypes_of("D") == {"B", "C", "A", "any"}
+        assert reg.is_subtype("D", "A") is True
+        assert reg.subtypes_of("A") == {"B", "C", "D"}
+
     def test_any_semantics(self):
         """Test semantics of the top type "any"."""
         reg = TypeRegistry()
