@@ -95,7 +95,10 @@ init_typed = true
 
 # Story 8 wrapped libraries that ship no type stubs / py.typed marker. Treat
 # their imports as untyped so mypy stays green without vendoring stubs; the
-# wrappers themselves remain fully annotated at their public boundary.
+# wrappers themselves remain fully annotated at their public boundary. `torch`
+# is here for a different reason: it is intentionally NOT a dependency (the
+# declarative codegen seam imports it lazily, only when actually running an
+# nn.Module), so it is absent in CI — ignore its missing import.
 [[tool.mypy.overrides]]
-module = ["pandas.*", "statsmodels.*", "ydata_profiling.*", "sklearn.*"]
+module = ["pandas.*", "statsmodels.*", "ydata_profiling.*", "sklearn.*", "torch.*"]
 ignore_missing_imports = true
