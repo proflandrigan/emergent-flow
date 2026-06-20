@@ -42,11 +42,11 @@
 > These choices shape every later story and are expensive to retrofit. Decide and write
 > them down before building, mirroring Epic 1 Story 1 (§A) and Epic 2 Story 1.
 
-- [ ] **Type model: nominal vs. structural.** Decide whether compatibility is nominal (token equality + a declared subtype graph) or structural. Recommend **nominal with an explicit, optional subtype relation** and `"any"` as the top type — it is simple, serializable, and matches the existing free-string tokens. Record an ADR. → ADR 0011
-- [ ] **Compatibility semantics.** Define exactly when OUT type `S` may connect to IN type `T`: `T == "any"` or `S == "any"` (wildcard), `S == T` (exact), or `S` is a registered subtype of `T`. Define the third outcome — *unknown* — for tokens not in the registry (warn, don't block). Record in the same ADR.
-- [ ] **Strictness policy.** Hard-block structural mismatches and cardinality violations; **warn-don't-block** for anything only knowable at runtime (e.g. unregistered tokens, dynamic frames). Mirror how the declarative seam already raises `CodegenError` early. → folded into ADR 0011
-- [ ] **Where validation runs / portability.** The rules must be expressible as **plain data** (a serialized type catalog + subtype table) shippable to the frontend for instant feedback, with this SDK as the authoritative re-validator. Decide the export shape. Record an ADR. → ADR 0012
-- [ ] **Relationship to Epic 10.** State that this epic builds the *general* structural framework and that tensor **dimension** inference (roadmap Epic 10) layers on top, only for `Tensor`-typed ports — so DL gets structural validation "for free" and only adds dimension inference later. → folded into ADR 0011
+- [x] **Type model: nominal vs. structural.** Decide whether compatibility is nominal (token equality + a declared subtype graph) or structural. Recommend **nominal with an explicit, optional subtype relation** and `"any"` as the top type — it is simple, serializable, and matches the existing free-string tokens. Record an ADR. → ADR 0011
+- [x] **Compatibility semantics.** Define exactly when OUT type `S` may connect to IN type `T`: `T == "any"` or `S == "any"` (wildcard), `S == T` (exact), or `S` is a registered subtype of `T`. Define the third outcome — *unknown* — for tokens not in the registry (warn, don't block). Record in the same ADR.
+- [x] **Strictness policy.** Hard-block structural mismatches and cardinality violations; **warn-don't-block** for anything only knowable at runtime (e.g. unregistered tokens, dynamic frames). Mirror how the declarative seam already raises `CodegenError` early. → folded into ADR 0011
+- [x] **Where validation runs / portability.** The rules must be expressible as **plain data** (a serialized type catalog + subtype table) shippable to the frontend for instant feedback, with this SDK as the authoritative re-validator. Decide the export shape. Record an ADR. → ADR 0012
+- [x] **Relationship to Epic 10.** State that this epic builds the *general* structural framework and that tensor **dimension** inference (roadmap Epic 10) layers on top, only for `Tensor`-typed ports — so DL gets structural validation "for free" and only adds dimension inference later. → folded into ADR 0011
 
 ---
 
