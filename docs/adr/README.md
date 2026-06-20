@@ -25,6 +25,14 @@ The following decisions lock the codegen engine's architecture; they correspond 
 | [0009](./0009-codegen-binding-context.md) | The whole-graph compiler supplies variable names to nodes via a `CodegenContext` | Accepted |
 | [0010](./0010-codegen-package-placement.md) | The codegen engine lives in `colonymind/codegen` with `cm.compile_to_code` / `cm.execute` entry points | Accepted |
 
+The following decisions lock the type system's architecture; they correspond to Story 1 of
+[Epic 3](../../epics/epic-3-type-safe-graph-and-validation.md).
+
+| ADR | Decision | Status |
+| :-- | :------- | :----- |
+| [0011](./0011-type-model-and-compatibility.md) | Nominal type model with an optional subtype relation and three-valued compatibility | Accepted |
+| [0012](./0012-rules-as-portable-data.md) | Ship the type rules as versioned data, with the SDK as authoritative re-validator | Accepted |
+
 ## Conventions
 
 - Filenames: `NNNN-kebab-case-title.md`, numbered sequentially from `0001`.
