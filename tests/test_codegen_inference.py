@@ -269,3 +269,107 @@ def test_conflicting_inbound_types_reduce_to_any() -> None:
     result = infer_graph_types(g, node_registry=_echo_registry())
 
     assert result.type_of("n-echo", "p-echo-out") == "any"
+
+
+def test_unregistered_node_type_falls_back_to_declared_out_type() -> None:
+    # The node's type is absent from the registry passed in, AND it is fed a
+    # "DataFrame" input. The fallback must use the *declared* OUT type ("HTML"),
+    # ignoring the input — distinct from any input-dependent infer_types override.
+    src = _src("n-src", "p-src-out", "DataFrame")
+    unreg = Node(
+        id="n-unreg",
+        type="test.unregistered",
+        label="Unregistered",
+        ports=[
+            Port(id="p-u-in", name="in0", direction=Direction.IN, data_type="any"),
+            Port(id="p-u-out", name="out0", direction=Direction.OUT, data_type="HTML"),
+        ],
+    )
+    edge = Edge(
+        id="e-su",
+        source=PortRef(node_id="n-src", port_id="p-src-out"),
+        target=PortRef(node_id="n-unreg", port_id="p-u-in"),
+    )
+    g = _graph([src, unreg], [edge])
+
+    # A registry that knows the echo node but NOT "test.unregistered".
+    result = infer_graph_types(g, node_registry=_echo_registry())
+
+    assert result.type_of("n-unreg", "p-u-out") == "HTML"
+
+
+def _diamond_nodes() -> list[Node]:
+    a = _src("n-a", "p-a-out", "DataFrame")
+    b = Node(
+        id="n-b",
+        type="test.mid",
+        label="B",
+        ports=[
+            Port(id="p-b-in", name="in0", direction=Direction.IN, data_type="DataFrame"),
+            Port(id="p-b-out", name="out0", direction=Direction.OUT, data_type="DataFrame"),
+        ],
+    )
+    c = Node(
+        id="n-c",
+        type="test.mid",
+        label="C",
+        ports=[
+            Port(id="p-c-in", name="in0", direction=Direction.IN, data_type="DataFrame"),
+            Port(id="p-c-out", name="out0", direction=Direction.OUT, data_type="DataFrame"),
+        ],
+    )
+    d = Node(
+        id="n-d",
+        type="test.sink",
+        label="D",
+        ports=[
+            Port(
+                id="p-d-in",
+                name="in0",
+                direction=Direction.IN,
+                data_type="DataFrame",
+                cardinality=Cardinality.MANY,
+            ),
+            Port(id="p-d-out", name="out0", direction=Direction.OUT, data_type="DataFrame"),
+        ],
+    )
+    return [a, b, c, d]
+
+
+def _diamond_edges() -> list[Edge]:
+    return [
+        Edge(
+            id="e-ab",
+            source=PortRef(node_id="n-a", port_id="p-a-out"),
+            target=PortRef(node_id="n-b", port_id="p-b-in"),
+        ),
+        Edge(
+            id="e-ac",
+            source=PortRef(node_id="n-a", port_id="p-a-out"),
+            target=PortRef(node_id="n-c", port_id="p-c-in"),
+        ),
+        Edge(
+            id="e-bd",
+            source=PortRef(node_id="n-b", port_id="p-b-out"),
+            target=PortRef(node_id="n-d", port_id="p-d-in"),
+        ),
+        Edge(
+            id="e-cd",
+            source=PortRef(node_id="n-c", port_id="p-c-out"),
+            target=PortRef(node_id="n-d", port_id="p-d-in"),
+        ),
+    ]
+
+
+def test_inference_is_deterministic_across_insertion_order() -> None:
+    # Same diamond, built with nodes and edges inserted in two different orders.
+    # The pass must produce an identical InferenceResult (list order included),
+    # since `resolved`/`unbound` ordering is part of the golden-test contract.
+    nodes = _diamond_nodes()
+    edges = _diamond_edges()
+
+    forward = infer_graph_types(_graph(nodes, edges))
+    reordered = infer_graph_types(_graph(list(reversed(nodes)), list(reversed(edges))))
+
+    assert forward.resolved == reordered.resolved
+    assert forward.unbound == reordered.unbound

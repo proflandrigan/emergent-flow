@@ -20,7 +20,9 @@ the frontend as data — the same purity constraint the rest of Epic 3 keeps.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from colonymind.api import public_op
 from colonymind.codegen.traversal import topological_sort
@@ -28,6 +30,7 @@ from colonymind.codegen.wiring import build_wiring_map
 from colonymind.ir import Direction, Graph
 from colonymind.nodes import NodeRegistry
 from colonymind.nodes import registry as default_node_registry
+from colonymind.types.registry import TOP_TYPE
 
 
 class ResolvedPortType(BaseModel):
@@ -80,17 +83,19 @@ class InferenceResult(BaseModel):
     resolved: list[ResolvedPortType] = Field(default_factory=list)
     unbound: list[UnboundInput] = Field(default_factory=list)
 
+    # `resolved` stays the serializable wire surface; a private (node_id, port_id)
+    # index is rebuilt after construction/deserialization so `type_of` is O(1),
+    # mirroring how `WiringMap` indexes its `bindings` list (wiring.py). The Story
+    # 5 validation pass calls `type_of` once per edge, so the index matters.
+    _by_port: dict[tuple[str, str], str] = PrivateAttr(default_factory=dict)
+
+    def model_post_init(self, __context: Any) -> None:
+        """Build the (node_id, port_id) -> resolved-token index from `resolved`."""
+        self._by_port = {(r.node_id, r.port_id): r.type for r in self.resolved}
+
     def type_of(self, node_id: str, port_id: str) -> str | None:
         """Return the resolved token for an OUT port, or None if not resolved."""
-        for r in self.resolved:
-            if r.node_id == node_id and r.port_id == port_id:
-                return r.type
-        return None
-
-
-# The wildcard / top type token (ADR 0011). A fan-in IN port whose inbound
-# sources disagree on type collapses to this, rather than guessing or failing.
-TOP_TYPE = "any"
+        return self._by_port.get((node_id, port_id))
 
 
 def _reduce_inbound_types(tokens: list[str]) -> str:
@@ -179,6 +184,9 @@ def infer_graph_types(
             out_types = {p.name: p.data_type for p in out_ports}
 
         for port in out_ports:
+            # `.get(..., declared)` covers two cases: a registered node whose
+            # `infer_types` omits an OUT-port name, and (redundantly but harmlessly)
+            # the unregistered branch above, which already declared every name.
             token = out_types.get(port.name, port.data_type)
             resolved_map[(node_id, port.id)] = token
             resolved.append(
