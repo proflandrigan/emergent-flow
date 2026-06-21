@@ -103,12 +103,12 @@
 > The headline deliverable: one call that tells you everything wrong with a graph's wiring,
 > structured for both humans and the canvas.
 
-- [ ] Implement `cm.validate(graph) -> Diagnostics` (a `@public_op`, serializable + inspectable) that runs inference (Story 4) then checks every edge with the rules engine (Story 3).
-- [ ] Emit structured **diagnostics**: each carries `severity` (error/warning), the offending edge/port ids, a human-readable message, and expected-vs-actual type. Make `Diagnostics` JSON-native so the frontend renders it directly.
-- [ ] **Do not block construction.** Unlike `Graph._validate_structure` (which hard-rejects malformed structure at build time), type/cardinality validation is a *separate* call so exploratory, half-wired graphs can exist on the canvas and still be inspected. Document this split explicitly.
-- [ ] **Populate `Edge.type_compatible`** (currently always `None`) as a side-output of validation, fulfilling the field Epic 1 reserved.
-- [ ] Cover structural connection checks here too: **required IN port with no edge** → error; **cardinality violation** → error; **unregistered token** → warning.
-- [ ] Unit-test diagnostics shape and severities across crafted invalid graphs.
+- [x] Implement `cm.validate(graph) -> Diagnostics` (a `@public_op`, serializable + inspectable) that runs inference (Story 4) then checks every edge with the rules engine (Story 3).
+- [x] Emit structured **diagnostics**: each carries `severity` (error/warning), the offending edge/port ids, a human-readable message, and expected-vs-actual type. Make `Diagnostics` JSON-native so the frontend renders it directly.
+- [x] **Do not block construction.** Unlike `Graph._validate_structure` (which hard-rejects malformed structure at build time), type/cardinality validation is a *separate* call so exploratory, half-wired graphs can exist on the canvas and still be inspected. Document this split explicitly.
+- [x] **Populate `Edge.type_compatible`** (currently always `None`) as a side-output of validation, fulfilling the field Epic 1 reserved.
+- [x] Cover structural connection checks here too: **required IN port with no edge** → error; **cardinality violation** → error; **unregistered token** → warning.
+- [x] Unit-test diagnostics shape and severities across crafted invalid graphs.
 
 ---
 
