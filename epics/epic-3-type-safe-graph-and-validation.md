@@ -1,5 +1,12 @@
 # Epic 3 — Type-Safe Graph & Connection Validation
 
+> **Repo ↔ roadmap numbering.** This file is repo **Epic 3** (third epic delivered here) =
+> roadmap **Epic 5**. The roadmap's literal **Epic 3** is the *Frontend Canvas Engine*
+> (React/TS) and is **not** delivered in this repo — it ships in the separate
+> `colony-mind-canvas` repo and consumes this epic's rules-as-data. Cross-references in the
+> prose below use **roadmap** numbers. See [`epics/README.md`](./README.md) for the full
+> mapping; the per-epic "Numbering note" just below expands the rationale.
+
 > Prevent invalid graphs before execution. Edges carry types (`DataFrame`,
 > `ClassifierResult`, `Tensor`, `HTML`, …); incompatible connections are caught with a
 > clear, machine-readable reason. Epic 1 gave every port a `data_type` token and every edge
@@ -56,12 +63,12 @@
 > `ClassifierResult`, `AnovaResult`, `HTML`, `Tensor` used ad hoc across the reference nodes.
 > Give them a registry so compatibility can be reasoned about and shipped as data.
 
-- [ ] Implement a **type registry** (e.g. `colonymind/types/` or `colonymind/ir/types.py`) cataloguing known data types and an optional **subtype relation** between them.
-- [ ] Make `"any"` the explicit **top/wildcard** type with documented semantics (connects to/from anything, warns nowhere).
-- [ ] **Inventory and register** every token currently in use (`DataFrame`, `ClassifierResult`, `AnovaResult`, `HTML`, `Tensor`, `any`) from `colonymind/nodes/examples/*.py`; keep `data_type` a `str` on the wire (no IR schema break) but validate it against the registry during the validation pass, not at construction.
-- [ ] Make the registry **declaratively extensible** (an out-of-core node can register a new type token), consistent with the node registry/plugin pattern (ADR 0006) — and add a stub demonstrating it, like `examples/plugin_stub`.
-- [ ] Ensure the registry + subtype table **serialize to JSON** (the frontend consumes them with no Python present, same constraint that drove the IR).
-- [ ] Unit-test: registration, duplicate/conflict detection, subtype transitivity, `"any"` semantics.
+- [x] Implement a **type registry** (e.g. `colonymind/types/` or `colonymind/ir/types.py`) cataloguing known data types and an optional **subtype relation** between them.
+- [x] Make `"any"` the explicit **top/wildcard** type with documented semantics (connects to/from anything, warns nowhere).
+- [x] **Inventory and register** every token currently in use (`DataFrame`, `ClassifierResult`, `AnovaResult`, `HTML`, `Tensor`, `any`) from `colonymind/nodes/examples/*.py`; keep `data_type` a `str` on the wire (no IR schema break) but validate it against the registry during the validation pass, not at construction.
+- [x] Make the registry **declaratively extensible** (an out-of-core node can register a new type token), consistent with the node registry/plugin pattern (ADR 0006) — and add a stub demonstrating it, like `examples/plugin_stub`.
+- [x] Ensure the registry + subtype table **serialize to JSON** (the frontend consumes them with no Python present, same constraint that drove the IR).
+- [x] Unit-test: registration, duplicate/conflict detection, subtype transitivity, `"any"` semantics.
 
 ---
 
@@ -69,11 +76,11 @@
 
 > The pure core both the validation pass and the (separate) frontend rely on.
 
-- [ ] Implement a **pure** `is_compatible(source_type, target_type) -> Compatibility` returning `COMPATIBLE | INCOMPATIBLE | UNKNOWN` plus a human-readable reason (no I/O, no global state — so Epic 6 sandboxing and client-side shipping both stay trivial).
-- [ ] Implement the **cardinality rule**: a `Cardinality.ONE` IN port rejects a second inbound edge; `MANY` permits fan-in. (This is a real gap today — `Graph._validate_structure` checks direction and existence but never cardinality, and no reference node uses `MANY` yet.)
-- [ ] Keep results **deterministic and reason-bearing** (expected-vs-actual token in the message), required for golden tests and for the canvas's "explain why this edge is red" affordance.
-- [ ] Guarantee the rules are **expressible as data** (Story 1 ADR 0012): a serialized compatibility table the frontend can evaluate without calling Python.
-- [ ] Unit-test the matrix: exact match, subtype, `"any"` either side, unregistered token (→ UNKNOWN/warn), and ONE-vs-MANY cardinality.
+- [x] Implement a **pure** `is_compatible(source_type, target_type) -> Compatibility` returning `COMPATIBLE | INCOMPATIBLE | UNKNOWN` plus a human-readable reason (no I/O, no global state — so Epic 6 sandboxing and client-side shipping both stay trivial).
+- [x] Implement the **cardinality rule**: a `Cardinality.ONE` IN port rejects a second inbound edge; `MANY` permits fan-in. (This is a real gap today — `Graph._validate_structure` checks direction and existence but never cardinality, and no reference node uses `MANY` yet.)
+- [x] Keep results **deterministic and reason-bearing** (expected-vs-actual token in the message), required for golden tests and for the canvas's "explain why this edge is red" affordance.
+- [x] Guarantee the rules are **expressible as data** (Story 1 ADR 0012): a serialized compatibility table the frontend can evaluate without calling Python.
+- [x] Unit-test the matrix: exact match, subtype, `"any"` either side, unregistered token (→ UNKNOWN/warn), and ONE-vs-MANY cardinality.
 
 ---
 
