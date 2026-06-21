@@ -26,6 +26,13 @@ from colonymind.codegen.inference import (
 )
 from colonymind.codegen.naming import NameMap, OutBinding, build_name_map
 from colonymind.codegen.traversal import topological_sort
+from colonymind.codegen.validation import (
+    Diagnostic,
+    Diagnostics,
+    Severity,
+    apply_type_compatibility,
+    validate,
+)
 from colonymind.codegen.wiring import InputBinding, WiringMap, build_wiring_map
 
 __all__ = [
@@ -50,4 +57,9 @@ __all__ = [
     "InferenceResult",
     "ResolvedPortType",
     "UnboundInput",
+    "validate",
+    "apply_type_compatibility",
+    "Diagnostics",
+    "Diagnostic",
+    "Severity",
 ]
