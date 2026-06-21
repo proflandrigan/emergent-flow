@@ -18,6 +18,12 @@ from colonymind.codegen.declarative import compile_declarative
 from colonymind.codegen.errors import CardinalityError, CodegenError, CycleError, UnboundInputError
 from colonymind.codegen.executor import execute
 from colonymind.codegen.export import ExportResult, export_script
+from colonymind.codegen.inference import (
+    InferenceResult,
+    ResolvedPortType,
+    UnboundInput,
+    infer_graph_types,
+)
 from colonymind.codegen.naming import NameMap, OutBinding, build_name_map
 from colonymind.codegen.traversal import topological_sort
 from colonymind.codegen.wiring import InputBinding, WiringMap, build_wiring_map
@@ -40,4 +46,8 @@ __all__ = [
     "export_script",
     "ExportResult",
     "compile_declarative",
+    "infer_graph_types",
+    "InferenceResult",
+    "ResolvedPortType",
+    "UnboundInput",
 ]

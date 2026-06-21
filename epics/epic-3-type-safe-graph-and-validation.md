@@ -90,11 +90,11 @@
 > `data_type`, and nothing calls it across a graph. Resolve types end-to-end so compatibility
 > checks see real, propagated types.
 
-- [ ] Implement a **graph inference pass** that walks the IR in topological order (reuse Epic 2's `traversal.py`), threading each node's resolved OUT types into downstream IN ports and calling each node's `infer_types(node, input_types)`.
-- [ ] Define behaviour when an upstream type is **unknown/unbound** (dangling IN port) — surface as a diagnostic, don't crash; reuse Epic 2's documented dangling-IN-port behaviour.
-- [ ] Return a **resolved-type map** keyed by `(node_id, port_id)` that the validation pass (Story 5) consumes.
-- [ ] Keep the pass **pure** and deterministic so it can run client-side-equivalently and feed golden tests.
-- [ ] Unit-test inference over linear chains, fan-out/fan-in (diamond), and a node whose OUT type depends on inputs (add or use a fixture node that overrides `infer_types`).
+- [x] Implement a **graph inference pass** that walks the IR in topological order (reuse Epic 2's `traversal.py`), threading each node's resolved OUT types into downstream IN ports and calling each node's `infer_types(node, input_types)`.
+- [x] Define behaviour when an upstream type is **unknown/unbound** (dangling IN port) — surface as a diagnostic, don't crash; reuse Epic 2's documented dangling-IN-port behaviour.
+- [x] Return a **resolved-type map** keyed by `(node_id, port_id)` that the validation pass (Story 5) consumes.
+- [x] Keep the pass **pure** and deterministic so it can run client-side-equivalently and feed golden tests.
+- [x] Unit-test inference over linear chains, fan-out/fan-in (diamond), and a node whose OUT type depends on inputs (add or use a fixture node that overrides `infer_types`).
 
 ---
 
