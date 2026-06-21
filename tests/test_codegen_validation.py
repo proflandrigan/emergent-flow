@@ -175,6 +175,24 @@ def test_cardinality_violation_is_error_and_does_not_crash() -> None:
     assert any(d.code == "cardinality_violation" for d in diags.errors)
 
 
+def test_diagnostics_order_is_deterministic_regardless_of_dict_insertion_order() -> None:
+    # Two incompatible edges feeding a MANY sink so cardinality never fires;
+    # only the type_incompatible ordering is under test here.
+    src_z = _out("n-z", "p-z", "HTML")
+    src_a = _out("n-a", "p-a", "HTML")
+    sink = _in("n-m", "p-m", "DataFrame", cardinality=Cardinality.MANY)
+    edge_z = _edge("e-z", src_z, sink)
+    edge_a = _edge("e-a", src_a, sink)
+
+    g1 = _graph([src_z, src_a, sink], [edge_z, edge_a])
+    g2 = _graph([src_a, src_z, sink], [edge_a, edge_z])  # same graph, different insertion order
+
+    order1 = [d.edge_id for d in validate(g1).diagnostics]
+    order2 = [d.edge_id for d in validate(g2).diagnostics]
+
+    assert order1 == order2 == ["e-a", "e-z"]  # ascending edge id, independent of insertion order
+
+
 def test_apply_type_compatibility_populates_without_mutating_input() -> None:
     src = _out("n-src", "p-out", "DataFrame")
     sink = _in("n-sink", "p-in", "DataFrame")

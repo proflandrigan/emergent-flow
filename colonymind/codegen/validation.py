@@ -110,6 +110,11 @@ def _collect_structural_diagnostics(
     definition's `PortSpec.required` from the registry. A node whose type is not
     registered contributes no required-input check (its required-ness is
     unknown).
+
+    Deterministic: nodes are visited in ascending node-id order (ports are
+    already in declared list order), mirroring `wiring.py`'s tie-break, so the
+    same graph always yields the same diagnostics order regardless of dict
+    insertion order.
     """
     diagnostics: list[Diagnostic] = []
 
@@ -119,7 +124,7 @@ def _collect_structural_diagnostics(
         key = (edge.target.node_id, edge.target.port_id)
         inbound_count[key] = inbound_count.get(key, 0) + 1
 
-    for node in graph.nodes.values():
+    for node in sorted(graph.nodes.values(), key=lambda n: n.id):
         # Names of this node type's required IN ports, when the type is registered.
         definition_cls = node_registry.try_get(node.type)
         required_in_names: set[str] = set()
@@ -182,6 +187,10 @@ def _collect_type_diagnostics(
     `CardinalityError` when a `Cardinality.ONE` IN port has >1 inbound edges.
     That is already reported by `_collect_structural_diagnostics`, so here we
     catch it and return no type diagnostics rather than crash.
+
+    Deterministic: edges are visited in ascending edge-id order so the same
+    graph always yields the same diagnostics order regardless of dict
+    insertion order (mirroring `wiring.py`'s tie-break).
     """
     diagnostics: list[Diagnostic] = []
     edge_compatibility: dict[str, bool | None] = {}
@@ -197,7 +206,7 @@ def _collect_type_diagnostics(
     except CardinalityError:
         return diagnostics, edge_compatibility
 
-    for edge_id, edge in graph.edges.items():
+    for edge_id, edge in sorted(graph.edges.items()):
         source_port = ports.get((edge.source.node_id, edge.source.port_id))
         target_port = ports.get((edge.target.node_id, edge.target.port_id))
         if source_port is None or target_port is None:
