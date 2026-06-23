@@ -118,11 +118,11 @@
 > reasons. Wire validation in as a shared gate, exactly as `_prepare_declarative` is the single
 > validation seam shared by both the compiler and executor today.
 
-- [ ] Add a **single shared validation gate** that `compile_to_code` and `execute` both call before doing any work, so the two paradigms and the two pure functions accept/reject identically.
-- [ ] On a hard structural mismatch (error-severity diagnostic), raise a **clear, node/edge-naming error** before any code is emitted or any node runs — consistent with the existing `CodegenError` pattern for the declarative seam.
-- [ ] Let warnings **pass through** (warn-don't-block) so exploratory runs still execute; surface them on the result/diagnostics object.
-- [ ] Extend the **equivalence corpus** so a known-invalid graph is rejected by *both* `compile_to_code` and `execute` with equivalent errors (negative equivalence).
-- [ ] Confirm purity is preserved — the gate adds no I/O or global state (Epic 6 still wraps the executor cleanly).
+- [x] Add a **single shared validation gate** that `compile_to_code` and `execute` both call before doing any work, so the two paradigms and the two pure functions accept/reject identically.
+- [x] On a hard structural mismatch (error-severity diagnostic), raise a **clear, node/edge-naming error** before any code is emitted or any node runs — consistent with the existing `CodegenError` pattern for the declarative seam.
+- [x] Let warnings **pass through** (warn-don't-block) so exploratory runs still execute; surface them on the result/diagnostics object. (Return types are unchanged; warnings are non-blocking and surfaced via `cm.validate(graph)` — wrapping the artifacts in a result object would break the ADR-0002 equivalence harness and the `@public_op` inspectable contract.)
+- [x] Extend the **equivalence corpus** so a known-invalid graph is rejected by *both* `compile_to_code` and `execute` with equivalent errors (negative equivalence).
+- [x] Confirm purity is preserved — the gate adds no I/O or global state (Epic 6 still wraps the executor cleanly).
 
 ---
 

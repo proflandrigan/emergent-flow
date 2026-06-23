@@ -10,7 +10,7 @@ import pytest
 
 import colonymind as cm
 from colonymind.api import is_inspectable
-from colonymind.codegen.errors import CodegenError, UnboundInputError
+from colonymind.codegen.errors import CodegenError, GraphValidationError
 from colonymind.codegen.executor import execute
 from colonymind.ir import Direction, Edge, Graph, Node, Paradigm, Port, PortRef
 from colonymind.ir.common import Cardinality
@@ -138,14 +138,20 @@ def test_fan_out() -> None:
 
 
 def test_dangling_required_in_port_is_error() -> None:
-    """A Double node with no incoming edge raises UnboundInputError."""
+    """A Double node with no incoming edge is rejected by the Story 6 gate.
+
+    The shared `enforce_validation_gate` runs first and reports the unconnected
+    required IN port as a `required_input_unconnected` error before the
+    lower-level `UnboundInputError` guard in `execute` is reached — matching how
+    `compile_to_code` rejects the same graph (ADR 0002 equivalence).
+    """
     dbl = _double_node("dbl")
     graph = _graph([dbl])
 
-    with pytest.raises(UnboundInputError) as exc_info:
+    with pytest.raises(GraphValidationError) as exc_info:
         execute(graph)
 
-    assert "Double" in str(exc_info.value)
+    assert "required_input_unconnected" in str(exc_info.value)
     assert "in_" in str(exc_info.value)
 
 

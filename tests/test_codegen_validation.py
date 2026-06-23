@@ -5,8 +5,8 @@ Tests for colonymind.codegen.validation — the graph validation pass &
 diagnostics (Epic 3, Story 5). Covers a compatible chain (no diagnostics), an
 incompatible edge (error), an unregistered token (warning), the "any" wildcard,
 a dangling required IN port (error), a cardinality violation (error, no crash),
-the apply_type_compatibility side-output, and the inspectable/JSON-native
-contract.
+the apply_type_compatibility side-output, the inspectable/JSON-native
+contract, and the `enforce_validation_gate` shared gate (Epic 3, Story 6).
 """
 
 from __future__ import annotations
@@ -14,11 +14,15 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import pytest
+
 from colonymind.api import is_inspectable
+from colonymind.codegen.errors import GraphValidationError
 from colonymind.codegen.validation import (
     Diagnostics,
     Severity,
     apply_type_compatibility,
+    enforce_validation_gate,
     validate,
 )
 from colonymind.ir import Cardinality, Direction, Edge, Graph, Node, Port, PortRef
@@ -219,3 +223,38 @@ def test_diagnostics_is_inspectable_and_json_native() -> None:
     restored = json.loads(json.dumps(payload))
     assert restored["diagnostics"][0]["code"] == "type_incompatible"
     assert restored["edge_compatibility"]["e1"] is False
+
+
+def test_gate_passes_on_clean_graph() -> None:
+    src = _out("n-src", "p-out", "DataFrame")
+    sink = _in("n-sink", "p-in", "DataFrame")
+    g = _graph([src, sink], [_edge("e1", src, sink)])
+
+    diags = enforce_validation_gate(g)
+
+    assert isinstance(diags, Diagnostics)
+    assert diags.ok
+
+
+def test_gate_raises_on_type_incompatible() -> None:
+    src = _out("n-src", "p-out", "HTML")
+    sink = _in("n-sink", "p-in", "DataFrame")
+    g = _graph([src, sink], [_edge("e1", src, sink)])
+
+    with pytest.raises(GraphValidationError) as excinfo:
+        enforce_validation_gate(g)
+
+    message = str(excinfo.value)
+    assert "type_incompatible" in message
+    assert "e1" in message
+
+
+def test_gate_does_not_raise_on_warning_only() -> None:
+    src = _out("n-src", "p-out", "Mystery")
+    sink = _in("n-sink", "p-in", "DataFrame")
+    g = _graph([src, sink], [_edge("e1", src, sink)])
+
+    diags = enforce_validation_gate(g)
+
+    assert isinstance(diags, Diagnostics)
+    assert diags.warnings

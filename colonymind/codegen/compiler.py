@@ -30,6 +30,7 @@ from colonymind.codegen.errors import CodegenError, UnboundInputError
 from colonymind.codegen.formatting import format_source
 from colonymind.codegen.naming import NameMap, build_name_map
 from colonymind.codegen.traversal import topological_sort
+from colonymind.codegen.validation import enforce_validation_gate
 from colonymind.codegen.wiring import build_wiring_map
 from colonymind.ir import Direction, Graph, Node, Paradigm
 from colonymind.nodes import get as get_node_definition
@@ -161,9 +162,18 @@ def compile_to_code(graph: Graph) -> str:
                            an upstream output port.
         CycleError: If the graph contains a cycle (propagated from
                     `topological_sort`).
+        GraphValidationError: If the graph has an error-severity validation
+                              diagnostic (type incompatibility, cardinality
+                              violation, or unconnected required IN port). Raised
+                              before any code is emitted. Warnings do not block.
     """
     if graph.paradigm is Paradigm.DECLARATIVE:
         return format_source(compile_declarative(graph))
+
+    # Story 6: gate the FUNCTIONAL path on validation before emitting any code,
+    # so compile_to_code and execute reject identical graphs for identical
+    # reasons (ADR 0002 equivalence extends to rejection). Warnings pass through.
+    enforce_validation_gate(graph)
 
     assembled = _assemble(graph)
 
