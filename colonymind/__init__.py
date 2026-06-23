@@ -34,6 +34,8 @@ _LAZY_ENTRY_POINTS = {
     "compile_to_code": ("colonymind.codegen.compiler", "compile_to_code"),
     "execute": ("colonymind.codegen.executor", "execute"),
     "export_script": ("colonymind.codegen.export", "export_script"),
+    "validate": ("colonymind.codegen.validation", "validate"),
+    "apply_type_compatibility": ("colonymind.codegen.validation", "apply_type_compatibility"),
 }
 
 if TYPE_CHECKING:  # let type-checkers resolve cm.data, cm.codegen, ... statically
@@ -41,6 +43,7 @@ if TYPE_CHECKING:  # let type-checkers resolve cm.data, cm.codegen, ... statical
     from colonymind.codegen.compiler import compile_to_code
     from colonymind.codegen.executor import execute
     from colonymind.codegen.export import export_script
+    from colonymind.codegen.validation import apply_type_compatibility, validate
 
 __all__ = [
     "__version__",
@@ -58,6 +61,8 @@ __all__ = [
     "compile_to_code",
     "execute",
     "export_script",
+    "validate",
+    "apply_type_compatibility",
 ]
 
 
