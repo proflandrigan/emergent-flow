@@ -22,7 +22,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
 
 from colonymind.api import public_op
-from colonymind.codegen.errors import CardinalityError
+from colonymind.codegen.errors import CardinalityError, GraphValidationError
 from colonymind.codegen.inference import infer_graph_types
 from colonymind.ir import Direction, Graph, Port
 from colonymind.nodes import NodeRegistry
@@ -311,3 +311,70 @@ def apply_type_compatibility(graph: Graph, diagnostics: Diagnostics) -> Graph:
         if edge_id in diagnostics.edge_compatibility:
             edge.type_compatible = diagnostics.edge_compatibility[edge_id]
     return updated
+
+
+def _format_error_location(diag: Diagnostic) -> str:
+    """One-line, location-naming description of a single error diagnostic.
+
+    Names the edge and/or node/port the diagnostic is about so the raised
+    `GraphValidationError` points the author straight at the broken wiring.
+    """
+    where_parts: list[str] = []
+    if diag.edge_id is not None:
+        where_parts.append(f"edge {diag.edge_id!r}")
+    if diag.node_id is not None:
+        port = f".{diag.port_name}" if diag.port_name else ""
+        where_parts.append(f"node {diag.node_id!r}{port}")
+    where = " ".join(where_parts) if where_parts else "graph"
+    return f"[{diag.code}] {where}: {diag.message}"
+
+
+@public_op(name="cm.enforce_validation_gate")
+def enforce_validation_gate(
+    graph: Graph,
+    *,
+    node_registry: NodeRegistry = default_node_registry,
+    type_registry: TypeRegistry = default_type_registry,
+) -> Diagnostics:
+    """Validate *graph* and raise on any error-severity diagnostic (Story 6).
+
+    The single shared gate both `compile_to_code` and `execute` call before doing
+    any work, so the two pure functions accept/reject identical graphs for
+    identical reasons (ADR 0002 equivalence extends to rejection), mirroring how
+    `_prepare_declarative` is the shared declarative gate.
+
+    Runs `validate` (Story 5) and, if it produced any error-severity diagnostic
+    (type incompatibility, cardinality violation, or unconnected required IN
+    port), raises `GraphValidationError` naming every offending node/edge/port.
+    Warnings (e.g. unregistered tokens) **pass through** — they never block, so
+    exploratory runs still execute; callers inspect them on the returned
+    `Diagnostics` (or via `cm.validate`).
+
+    Pure and deterministic: both registries are passed straight through to
+    `validate` (defaulting to the package singletons) and there is no I/O or
+    mutation, so the gate keeps Epic 6 sandboxing and client-side shipping
+    trivial.
+
+    Args:
+        graph: The graph to gate.
+        node_registry: Node registry, forwarded to `validate`. Defaults to the
+            package singleton.
+        type_registry: Type registry, forwarded to `validate`. Defaults to the
+            package singleton.
+
+    Returns:
+        The `Diagnostics` from `validate` when there are no errors (it may still
+        carry warnings).
+
+    Raises:
+        GraphValidationError: If `validate` produced any error-severity
+            diagnostic.
+    """
+    diagnostics = validate(graph, node_registry=node_registry, type_registry=type_registry)
+    if diagnostics.errors:
+        detail = "\n".join(_format_error_location(d) for d in diagnostics.errors)
+        raise GraphValidationError(
+            f"Graph {graph.name!r} failed validation with "
+            f"{len(diagnostics.errors)} error(s):\n{detail}"
+        )
+    return diagnostics

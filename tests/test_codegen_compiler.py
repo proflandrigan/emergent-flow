@@ -13,7 +13,7 @@ import pytest
 
 import colonymind as cm
 from colonymind.codegen.compiler import compile_to_code
-from colonymind.codegen.errors import CardinalityError, CodegenError, UnboundInputError
+from colonymind.codegen.errors import CodegenError, GraphValidationError
 from colonymind.codegen.naming import build_name_map
 from colonymind.ir import Direction, Edge, Graph, Node, Paradigm, Port, PortRef, load_graph
 from colonymind.nodes.examples import (
@@ -153,14 +153,19 @@ def test_fan_out_one_upstream_var_three_consumers() -> None:
 
 
 def test_dangling_required_in_port_is_error() -> None:
-    """Dangling required IN port is a hard error."""
+    """Dangling required IN port is a hard error (Story 6 validation gate).
+
+    The shared `enforce_validation_gate` runs first and reports the unconnected
+    required IN port as a `required_input_unconnected` error before the lower-level
+    `UnboundInputError` guard in `_assemble` is reached.
+    """
     impute_missing_node = ImputeMissing().instantiate()
     graph = _graph([impute_missing_node])
 
-    with pytest.raises(UnboundInputError) as exc_info:
+    with pytest.raises(GraphValidationError) as exc_info:
         compile_to_code(graph)
 
-    assert "Impute Missing" in str(exc_info.value)
+    assert "required_input_unconnected" in str(exc_info.value)
     assert "frame" in str(exc_info.value)
 
 
@@ -186,9 +191,12 @@ def test_fan_in_cardinality_one_port_is_error() -> None:
     graph = _graph([load_csv_node_a, load_csv_node_b, impute_missing_node], [edge_a, edge_b])
 
     # Graph construction succeeds (cardinality isn't checked until wiring is
-    # resolved); compile_to_code is what raises CardinalityError.
-    with pytest.raises(CardinalityError):
+    # resolved); the Story 6 validation gate is what raises, reporting the
+    # Cardinality.ONE fan-in as a `cardinality_violation` error.
+    with pytest.raises(GraphValidationError) as exc_info:
         compile_to_code(graph)
+
+    assert "cardinality_violation" in str(exc_info.value)
 
 
 def test_non_functional_graph_rejected() -> None:

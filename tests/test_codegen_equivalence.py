@@ -44,6 +44,7 @@ from typing import Any
 import pytest
 
 from colonymind.codegen.compiler import _assemble, compile_to_code
+from colonymind.codegen.errors import GraphValidationError
 from colonymind.codegen.executor import execute
 from colonymind.ir import Direction, Edge, Graph, Node, Port, PortRef, load_graph
 from colonymind.nodes.contract import CodeFragment, NodeDefinition
@@ -253,6 +254,26 @@ def assert_equivalent(graph: Graph, *, cwd: pathlib.Path = REPO_ROOT) -> None:
                 _assert_equiv(e_val, c_val, f"{node_id}.{port_name}")
 
 
+def assert_rejected_equivalently(
+    graph: Graph, *, expected_error: type[Exception] = GraphValidationError
+) -> None:
+    """Assert ``execute`` and ``compile_to_code`` reject *graph* identically.
+
+    The negative twin of `assert_equivalent`: both pure functions must raise the
+    same error type with the same message (ADR 0002 equivalence extends to
+    rejection — both route through the single shared validation gate, Story 6).
+    """
+    with pytest.raises(expected_error) as exec_exc:
+        execute(graph)
+    with pytest.raises(expected_error) as compile_exc:
+        compile_to_code(graph)
+    assert str(exec_exc.value) == str(compile_exc.value), (
+        "execute and compile_to_code rejected the graph with different messages:\n"
+        f"execute:        {exec_exc.value}\n"
+        f"compile_to_code:{compile_exc.value}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Trivial hermetic proof — pure-Python integer nodes, no data files.
 # Unique type keys (test.equiv_*) avoid colliding with the fakes registered in
@@ -313,6 +334,41 @@ class _EquivJoin2(NodeDefinition):
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
         return {"out": inputs["a"] + inputs["b"]}
+
+
+@register
+class _EquivDFSource(NodeDefinition):
+    """Test fixture: 0 in, 1 out, declares a registered ``DataFrame`` OUT token."""
+
+    type = "test.equiv_df_source"
+    family = "test"
+    label = "Equiv DF Src"
+    ports = [PortSpec(name="out", direction=Direction.OUT, data_type="DataFrame")]
+
+    def codegen(self, node: Node, ctx: Any) -> CodeFragment:
+        return CodeFragment(body=f"{ctx.out_var('out')} = None")
+
+    def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
+        return {"out": None}
+
+
+@register
+class _EquivHTMLSink(NodeDefinition):
+    """Test fixture: 1 in (registered ``HTML`` token), 1 out — type-incompatible IN."""
+
+    type = "test.equiv_html_sink"
+    family = "test"
+    label = "Equiv HTML Sink"
+    ports = [
+        PortSpec(name="in_", direction=Direction.IN, data_type="HTML"),
+        PortSpec(name="out", direction=Direction.OUT, data_type="HTML"),
+    ]
+
+    def codegen(self, node: Node, ctx: Any) -> CodeFragment:
+        return CodeFragment(body=f"{ctx.out_var('out')} = {ctx.in_var('in_')}")
+
+    def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
+        return {"out": inputs["in_"]}
 
 
 @pytest.mark.equivalence
@@ -444,3 +500,75 @@ def test_diamond_equivalence() -> None:
 def test_diamond_golden(snapshot) -> None:
     """The diamond compiles to stable golden code (fan-in/fan-out wiring)."""
     assert compile_to_code(_diamond_graph()) == snapshot
+
+
+# ---------------------------------------------------------------------------
+# Negative equivalence — both pure functions must reject identically.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.equivalence
+def test_type_incompatible_rejected_equivalently() -> None:
+    """A DataFrame->HTML edge is rejected identically by execute and compile."""
+    src = Node(
+        id="df_src",
+        type=_EquivDFSource.type,
+        label=_EquivDFSource.label,
+        ports=[Port(id="df_src-out", name="out", direction=Direction.OUT, data_type="DataFrame")],
+    )
+    sink = Node(
+        id="html_sink",
+        type=_EquivHTMLSink.type,
+        label=_EquivHTMLSink.label,
+        ports=[
+            Port(id="html_sink-in", name="in_", direction=Direction.IN, data_type="HTML"),
+            Port(id="html_sink-out", name="out", direction=Direction.OUT, data_type="HTML"),
+        ],
+    )
+    edge = Edge(
+        source=PortRef(node_id="df_src", port_id="df_src-out"),
+        target=PortRef(node_id="html_sink", port_id="html_sink-in"),
+    )
+    graph = Graph(nodes={src.id: src, sink.id: sink}, edges={edge.id: edge})
+    assert_rejected_equivalently(graph)
+
+
+@pytest.mark.equivalence
+def test_cardinality_violation_rejected_equivalently() -> None:
+    """Two edges into one Cardinality.ONE IN port: rejected identically."""
+    src_a = Node(
+        id="src_a",
+        type=_EquivSource.type,
+        label=_EquivSource.label,
+        ports=[Port(id="src_a-out", name="out", direction=Direction.OUT, data_type="int")],
+    )
+    src_b = Node(
+        id="src_b",
+        type=_EquivSource.type,
+        label=_EquivSource.label,
+        ports=[Port(id="src_b-out", name="out", direction=Direction.OUT, data_type="int")],
+    )
+    dbl = Node(
+        id="dbl",
+        type=_EquivDouble.type,
+        label=_EquivDouble.label,
+        ports=[
+            Port(id="dbl-in", name="in_", direction=Direction.IN, data_type="int"),
+            Port(id="dbl-out", name="out", direction=Direction.OUT, data_type="int"),
+        ],
+    )
+    edges = [
+        Edge(
+            source=PortRef(node_id="src_a", port_id="src_a-out"),
+            target=PortRef(node_id="dbl", port_id="dbl-in"),
+        ),
+        Edge(
+            source=PortRef(node_id="src_b", port_id="src_b-out"),
+            target=PortRef(node_id="dbl", port_id="dbl-in"),
+        ),
+    ]
+    graph = Graph(
+        nodes={n.id: n for n in (src_a, src_b, dbl)},
+        edges={e.id: e for e in edges},
+    )
+    assert_rejected_equivalently(graph)

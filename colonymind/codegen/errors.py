@@ -40,3 +40,17 @@ class UnboundInputError(CodegenError):
     message should name the node and port so the author can find and fix the
     missing connection.
     """
+
+
+class GraphValidationError(CodegenError):
+    """Raised when the shared validation gate rejects a graph before codegen/execution.
+
+    Epic 3, Story 6: `compile_to_code` and `execute` both call the single
+    `enforce_validation_gate` (`colonymind.codegen.validation`) before doing any
+    work, so the two pure functions reject the same graphs for the same reasons
+    (ADR 0002 equivalence extends to rejection). The exception is raised only for
+    *error*-severity diagnostics (type incompatibility, cardinality violation,
+    unconnected required IN port); warnings pass through (warn-don't-block). The
+    message names every offending node/edge/port so the author can find and fix
+    the wiring.
+    """
