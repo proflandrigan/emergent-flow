@@ -116,17 +116,18 @@ exist before this slice of frontend work can start?** Three gates, in order of w
 | Frontend slice | Gating SDK artifact (this repo) | Gate met today? | Can frontend start? |
 | :-- | :-- | :-- | :-- |
 | Phase-1 static canvas: node placement, edge drawing → produces valid IR → "show code" panel → downloadable script (Epic 3 core, Epic 4 surface) | **IR JSON Schema** (Epic 1) + **`compile_to_code(ir)` output** (Epic 2) | **Yes** — both have landed in this repo. | **Yes — can start now.** This is the whole Phase-1 demo and needs zero backend. |
-| Live connection/type validation: red-edge feedback, "why is this invalid" tooltips (Epic 5's frontend-facing half, wired into Epic 3) | **Type catalog + connection-compatibility rules-as-data artifact** (Epic 5, this repo's in-progress `plan/epic-3-type-safe-graph` work) | **Not yet** — Epic 5 (repo-numbering: "Epic 3" in this codebase, see `epics/epic-3-type-safe-graph-and-validation.md`) is in progress and has not published the rules artifact. | **Blocked** until the rules-as-data artifact is published and versioned. The canvas can build its UI scaffolding against a mocked rules shape in the meantime, but cannot wire real validation. |
-| Real-time tensor shape-mismatch UI (Epic 10's frontend half) | Epic 5's general framework **plus** Epic 10's dimension-level shape inference (meta-tensor tracing), exported the same way as the structural rules | **No** — depends on Epic 5 (above) and on Epic 10, which hasn't started. | **Blocked**, transitively on Epic 5. |
+| Live connection/type validation: red-edge feedback, "why is this invalid" tooltips (Epic 5's frontend-facing half, wired into Epic 3) | **Type catalog + connection-compatibility rules-as-data artifact** (Epic 5, repo Epic 3, `epics/epic-3-type-safe-graph-and-validation.md`) | **Yes** — Epic 5 is complete (Stories 1–8 merged to `main`); the rules-as-data artifact is published and versioned. | **Yes — can start now.** The canvas can wire real live validation against the published artifact, not just a mocked shape. |
+| Real-time tensor shape-mismatch UI (Epic 10's frontend half) | Epic 5's general framework **plus** Epic 10's dimension-level shape inference (meta-tensor tracing), exported the same way as the structural rules | **No** — Epic 5 has landed, but Epic 10 (dimension-level shape inference) hasn't started. | **Blocked** on Epic 10. |
 | Result rendering inside nodes (Epic 8) | A defined **result-payload contract** from the execution runtime (Epic 6) — sized/paginated/typed renderable payloads | **No** — Epic 6 (backend execution) hasn't started; there is no live executor to shape payloads from yet. | **Blocked** until Epic 6 publishes its result-payload shape (even a draft contract would unblock UI prototyping). |
 | Live message/token visualization for GenAI/agent flows (Epic 11's frontend half) | Epic 6 (execution/streaming) + Epic 11's agent-graph execution semantics | **No** — both upstream. | **Blocked.** |
 | Multiplayer presence/cursors (Epic 13) | No SDK gate per se, but the **IR must be CRDT-friendly** (a property of Epic 1's schema design, not a separate artifact) — open question whether Epic 1 as landed satisfies this (open question, see §F item 4). | Partially — Epic 1 has landed, but CRDT-friendliness was a *design intent*, not a verified property. | **Nominally startable**, but verify the open question above before investing heavily. |
 
-**Bottom line:** the only frontend work unblocked *today* is the Phase-1 static canvas (Epic 3
-core + Epic 4 surface) — exactly because Epics 1 and 2 have landed in this repo. Everything else
-in the canvas repo is gated on artifacts this repo has not yet published, with Epic 5's
-rules-as-data artifact (the subject of the current `plan/epic-3-type-safe-graph` work) being the
-very next gate to clear.
+**Bottom line:** the full Phase-1 canvas is unblocked *today* — the static canvas (Epic 3 core +
+Epic 4 surface) on Epics 1–2, **and** live connection/type validation on Epic 5's now-published
+rules-as-data artifact (Stories 1–8 merged). All three SDK→canvas contracts have landed, so the
+frontend can start in earnest. What remains gated lives downstream behind the backend: result
+rendering (Epic 8) waits on the execution runtime (Epic 6), and the GenAI/agent and tensor-shape
+UIs wait on Epics 11 / 10 respectively.
 
 ---
 
