@@ -28,10 +28,10 @@
 - [x] `colonymind serve` (alias `cm lab`) boots a local server that calls `cm.compile_to_code` / `cm.execute` / `cm.validate` in-process and returns JSON.
 - [x] The server is **zero-new-dependency** (stdlib `http.server`) and never crashes on a bad graph — failures come back as JSON.
 - [x] The execution path stays **pure** (ADR 0002): the server only wraps the reference executor, so the hosted tier can later swap in sandboxing without re-architecting.
-- [ ] Execution granularity: "run this node", "run to here", and "run all" over the IR (Story 2).
+- [ ] Execution granularity: "run all" + per-node status over the IR (Story 2); finer-grained "run this node" / "run to here" is deferred to land with the cache (Story 6 / roadmap Epic 7).
 - [ ] A **result-payload contract** — JSON-safe, sized/truncated renderable payloads — that roadmap Epic 8 (in-node rendering) consumes (Story 3).
 - [ ] `colonymind serve` serves the bundled canvas from `colonymind/_static/` once the `ui/` build hook exists (Story 4).
-- [ ] A CI **boundary check** asserts `ui/` never imports `colonymind` and only the three contract artifacts cross the line ([ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) Decision 4) (Story 5).
+- [ ] A CI **boundary check** asserts `ui/` never imports `colonymind`; the "only the three contract artifacts cross the line" rule is documented as a convention rather than a brittle CI assertion ([ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) Decision 4) (Story 5).
 - [ ] Celery / container sandboxing / distributed & streaming execution are explicitly **not** built here — deferred to the hosted product (§A6).
 
 ---
@@ -49,28 +49,31 @@
 
 ---
 
-## Story 2 — Execution granularity (run node / to-here / all)
+## Story 2 — Execute the graph (run all + per-node status)
 
-> Makes the canvas feel like a canvas, not a batch script — and sets up the cache (roadmap Epic 7).
+> The minimum that makes the canvas runnable: execute the whole graph and report per-node
+> status so the UI can colour nodes. Finer-grained granularity is deferred (Story 6).
 
-- [ ] Add a request shape that selects a target node (or set) and executes only the subgraph up to and including it ("run to here"), reusing the Story 2/Epic 2 traversal + wiring.
-- [ ] Support "run this node" (single node given already-available upstream inputs) and "run all".
-- [ ] Return per-node status (ok / error / skipped) so the canvas can colour nodes.
+- [ ] A "run all" request that executes the whole IR and returns results per OUT port.
+- [ ] Return per-node status (ok / error / skipped) so the canvas can colour nodes (consumed by repo Epic 5 Story 8).
 - [ ] Keep it pure and in-process; no caching yet (that's roadmap Epic 7 — note the seam).
-- [ ] Tests over a fan-out graph asserting only the requested subgraph executes.
+- [ ] Tests over a multi-node graph asserting results + per-node status come back.
 
 ---
 
 ## Story 3 — Result-payload contract (the Epic 8 boundary)
 
-> The frontend can only render what the server hands it. Define the renderable payload now so
-> in-node visualization (roadmap Epic 8) builds against a stable contract.
+> The frontend can only render what the server hands it. Define the *minimal* renderable
+> payload now — scalars and tables — so in-node visualization (roadmap Epic 8) builds against a
+> stable contract. Rich/large result types (HTML reports, big blobs) are defined when Epic 8
+> needs them, not pre-built here.
 
-- [ ] Define a JSON-safe, **sized** payload per OUT port: small scalars/JSON inline; tabular results as `{columns, dtypes, shape, head: [...]}` with a truncation flag ("showing N of M"); HTML reports as a reference/blob the client fetches lazily.
+- [ ] Define a JSON-safe, **sized** payload per OUT port: small scalars/JSON inline; tabular results as `{columns, dtypes, shape, head: [...]}` with a truncation flag ("showing N of M").
 - [ ] Replace the v0 `repr`/`to_dict` best-effort coercion (Story 1) with this typed contract.
-- [ ] Never serialize a full large DataFrame into the response — paginate/sample at the server.
+- [ ] Never serialize a full large DataFrame into the response — sample/truncate to `head` at the server.
 - [ ] Version the payload shape alongside the IR schema; document it in `docs/`.
-- [ ] Tests: a wide/long DataFrame truncates; an HTML report returns a reference, not megabytes.
+- [ ] Tests: a wide/long DataFrame truncates to the declared `head`.
+- [ ] **Deferred to roadmap Epic 8:** rich/large result types (e.g. HTML reports as a lazily-fetched reference/blob) — extend this contract only when a node actually emits them and Epic 8 renders them, to avoid building a blob-fetch path with no consumer.
 
 ---
 
@@ -90,9 +93,22 @@
 > [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) Decision 4: the monorepo loses
 > the physical repo wall, so a CI check must enforce the coupling invariant instead.
 
-- [ ] A check that fails CI if anything under `ui/` imports/bundles `colonymind` or reaches into Python internals.
-- [ ] Assert that only the three contract artifacts (IR JSON Schema, `compile_to_code` output, rules-as-data) cross the `ui/ ↔ colonymind/` boundary.
-- [ ] Wire it into `.github/workflows/ci.yml` alongside the existing Python gates (pairs with ADR 0007's still-deferred one-way-dependency linter).
+- [ ] A check that fails CI if anything under `ui/` imports/bundles `colonymind` or reaches into Python internals. **This import ban is the mechanically-enforced invariant.**
+- [ ] Document the contract-artifact boundary (only the IR JSON Schema, `compile_to_code` output, and rules-as-data cross `ui/ ↔ colonymind/`) as a stated convention in [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) Decision 4 / `docs/` — rather than a brittle "exactly these three artifacts" CI assertion. Tighten into an enforced check only if it later proves trivially mechanizable.
+- [ ] Wire the import ban into `.github/workflows/ci.yml` alongside the existing Python gates (pairs with ADR 0007's still-deferred one-way-dependency linter).
+
+---
+
+## Story 6 — Incremental execution granularity (deferred — lands with the cache)
+
+> Deferred out of Story 2 on purpose. "Run to here" / "run this node" only earns its keep once
+> re-running everything feels slow, which is exactly when the cache (roadmap Epic 7) arrives.
+> Building it earlier is speculative scaffolding for a deferred epic (§A6).
+
+- [ ] "Run to here": a request shape selecting a target node (or set) that executes only the subgraph up to and including it, reusing the Epic 2 traversal + wiring.
+- [ ] "Run this node": execute a single node given already-available upstream inputs.
+- [ ] Tests over a fan-out graph asserting only the requested subgraph executes.
+- [ ] Sequence alongside the on-disk happy-path cache (roadmap Epic 7), not before it.
 
 ---
 
@@ -100,7 +116,7 @@
 
 - **Keep the executor pure.** The whole point of the in-process v0 is that ADR 0002's purity lets the hosted tier wrap it in sandboxing later. Do not let server convenience leak I/O or global state into `cm.execute`.
 - **Resist scope creep into the hosted tier.** Celery, containers, WebSocket streaming, auth, multi-tenancy are §A6 **(hosted)** — every one of them added here is over-architecting the local app. Ship granularity + result payloads + serving the UI first.
-- **The cache (roadmap Epic 7) is separate but adjacent.** The v0 re-runs everything; that's fine until edits feel slow. Story 2 leaves the seam; the on-disk happy-path cache lands as its own epic.
+- **The cache (roadmap Epic 7) is separate but adjacent.** The v0 re-runs everything; that's fine until edits feel slow. Story 2 ships run-all and leaves the seam; finer-grained granularity (Story 6) and the on-disk happy-path cache land together as their own epic.
 - **Story 3 is the load-bearing contract** for the frontend's most uncertain work (Epic 8). Stabilize it before the canvas renders results, or the UI churns.
 
 ---

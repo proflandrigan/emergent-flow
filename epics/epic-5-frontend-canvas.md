@@ -25,7 +25,7 @@
 
 ## Definition of Done (epic-level)
 
-- [ ] An infinite canvas renders nodes/edges with pan/zoom, multi-select, drag-to-connect, and grouping/subgraph nesting — smooth at the dozens-to-hundreds of nodes a real pipeline needs.
+- [ ] An infinite canvas renders nodes/edges with pan/zoom, multi-select, and drag-to-connect — smooth at the dozens-to-hundreds of nodes a real pipeline needs. (Grouping / subgraph nesting is deferred — see the Story 3 deferred item.)
 - [ ] Config panels are **generated from each node's declared param schema** (Epic 1), not hand-coded per node.
 - [ ] The canvas produces and reads **valid IR** (validated against the published JSON Schema) with no Python present in the client.
 - [ ] An in-node **"show code"** panel renders the Python from the server's `/compile` for the current graph.
@@ -65,8 +65,10 @@
 - [ ] Node and edge rendering with an extensible node component framework.
 - [ ] Pan/zoom, multi-select, drag-to-create-edge, delete, and an undo/redo stack.
 - [ ] A node palette / search to add nodes from the catalog (param schema drives the rest).
-- [ ] Grouping / subgraph nesting + collapse (the IR already models subgraphs).
-- [ ] Vitest coverage of the IR-producing interactions (add node, connect, group).
+- [ ] Vitest coverage of the IR-producing interactions (add node, connect).
+- [ ] **Deferred (after the loop):** grouping / subgraph nesting + collapse. The IR already
+  models subgraphs, so this is a UI affordance, not an IR change — and it is **not** on the
+  canvas→IR→code→execute critical path (Story 8). Pick it up once the loop is demoable.
 
 ---
 
@@ -131,7 +133,7 @@
 
 - **The canvas's quality ceiling is the published SDK contract.** The IR schema, codegen output, and rules-as-data are all landed and versioned, and the local server (repo Epic 4) serves them — build against those, and surface version mismatches as first-class errors.
 - **Don't re-implement Python in TypeScript.** ADR 0013 Decision 5: call the local server for codegen/validation. The client-side rules validator is a *later* optimization, not a Phase-1 gate.
-- **Sequence the loop before the polish.** Stories 1–8 deliver the demoable canvas→IR→code→execute loop; Story 9 (perf) and rich result rendering (Epic 8) come after — pragmatism over edge cases (§A6).
+- **Sequence the loop before the polish.** Stories 1–8 deliver the demoable canvas→IR→code→execute loop; grouping/subgraph nesting (Story 3 deferred item), Story 9 (perf), and rich result rendering (Epic 8) come after — pragmatism over edge cases (§A6).
 - **Keep the coupling invariant honest.** The CI boundary check (repo Epic 4 Story 5) is the discipline that replaces the old repo wall — land it with the `ui/` scaffold, not after.
 - **Multiplayer is hosted (Epic 13).** Keep the IR/canvas model CRDT-friendly as a design intent, but do not build collaboration here.
 

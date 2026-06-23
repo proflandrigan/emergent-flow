@@ -218,7 +218,7 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 
 ### Epic 3 — Frontend Canvas Engine
 
-**Goal:** A fluid infinite canvas: node creation, pan/zoom, edge drawing, selection, grouping/sub-graph nesting, and an extensible node-rendering framework — performant at hundreds-to-thousands of nodes.
+**Goal:** A fluid infinite canvas: node creation, pan/zoom, edge drawing, selection, grouping/sub-graph nesting, and an extensible node-rendering framework — performant at hundreds-to-thousands of nodes. *(Happy-path decomposition: repo Epic 5 ships flat node/edge interaction for the canvas→IR→code→execute loop first; grouping/sub-graph nesting is deferred to after the loop — repo Epic 5 Story 3 deferred item — since the IR already models subgraphs and nesting is a UI affordance, not on the critical path.)*
 
 **Tree / boundary (per A5, as amended by [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)):** This epic lives in the `ui/` tree of the one repo, *not* in the `colonymind/` SDK tree. It consumes the SDK's published contract — the IR JSON Schema, the `compile_to_code` output, and the Epic-5 rules-as-data — and never imports `colonymind`; the contract-only coupling is now enforced by a CI boundary check rather than a repo wall. Plan the SDK side to *publish* those artifacts; plan this epic against them.
 
@@ -292,14 +292,14 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 **Happy path vs. hosted (per A6):** the bundled app's first deliverable is a thin **local** FastAPI server (`cm lab` / `colonymind serve`) that calls `cm.execute(ir)` **in-process** on localhost — no Celery, no broker, **no sandbox** (you run your own code on your own machine, Jupyter-style). The Celery workers, container-per-session sandboxing, resource caps, and distributed/remote compute in the scope below are **(hosted product)** concerns: keep the executor pure (A2) so the hosted tier can wrap it later, but do not build them into the bundled package.
 
 **Scope**
-- In (bundled / happy path): a thin **local** server (`colonymind serve` / `cm lab`) that executes the IR (per A2) **in-process** via `cm.execute`; streaming logs/progress to the canvas; "run this node / run to here / run all" granularity.
+- In (bundled / happy path): a thin **local** server (`colonymind serve` / `cm lab`) that executes the IR (per A2) **in-process** via `cm.execute`; streaming logs/progress to the canvas; "run this node / run to here / run all" granularity. *(Happy-path decomposition: repo Epic 4 ships **run-all + per-node status** first [Story 2]; finer-grained "run this node / run to here" is deferred to repo Epic 4 Story 6, sequenced with the Epic 7 cache.)*
 - In (hosted, deferred): FastAPI gateway at scale; Celery (or equivalent) task workers; container-per-session sandboxing/isolation; resource limits (CPU/mem/time); controlled network egress. These activate only for the gated hosted product (A6).
 - Out: caching logic (Epic 7); result rendering (Epic 8); connectors (Epic 9).
 
 **Key design decisions & options**
 - **Isolation model.** Options: process-per-execution, container-per-session, or persistent kernels (Jupyter-style). Recommend **container-per-session** (or per-execution for untrusted code) with strict CPU/memory/timeout caps and controlled network egress — non-negotiable once raw-code nodes (Epic 4) or LLM-generated code (Epic 12) exist.
 - **Where compute runs.** A single FastAPI process cannot handle the proposal's own 10 GB-CSV example. Plan from the start for workers as separate, scalable units, with a path toward remote/distributed execution. State the scaling assumptions explicitly.
-- **Execution granularity.** Support "run this node" / "run to here" / "run all," which the caching layer (Epic 7) makes efficient.
+- **Execution granularity.** Support "run this node" / "run to here" / "run all," which the caching layer (Epic 7) makes efficient. *(Repo Epic 4 delivers "run all" up front [Story 2]; "run this node / run to here" is deferred to repo Epic 4 Story 6 to land with the cache rather than ahead of it.)*
 
 **Dependencies:** Epics 1–2; pairs tightly with Epic 7.
 
@@ -340,7 +340,7 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 **Goal:** Execution results (tables, distributions, charts, profiling reports) render richly *inside* nodes on the canvas, not just in a separate console.
 
 **Scope**
-- In: serialization of results to renderable payloads; in-node tables, charts, distribution plots (lightweight SVG/canvas); embedding of generated HTML reports (YData-Profiling/Sweetviz); handling large results (paginate/sample, never dump 10M rows into the DOM).
+- In: serialization of results to renderable payloads; in-node tables, charts, distribution plots (lightweight SVG/canvas); embedding of generated HTML reports (YData-Profiling/Sweetviz); handling large results (paginate/sample, never dump 10M rows into the DOM). *(Repo Epic 4 Story 3 defines the minimal scalar+table result-payload contract up front; the rich/large result types here — HTML reports as lazily-fetched references/blobs — are deferred to this epic, extended onto that contract only when a node actually emits them.)*
 - Out: collaborative cursors/comments (Epic 13).
 
 **Key design decisions & options**
