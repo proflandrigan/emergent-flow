@@ -56,12 +56,15 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
   - **Unblocks Step 4:** the rules-as-data artifact (Story 7) is published, so the canvas can
     now wire real live validation.
 
-- [ ] **Step 4 — Roadmap Epic 3: Frontend Canvas Engine** · `ui/` tree
+- [ ] **Step 4 — Roadmap Epic 3: Frontend Canvas Engine** · `ui/` tree · *story-level decomposition: [repo Epic 5](../epics/epic-5-frontend-canvas.md)*
   - Deps: Steps 1, 2, **3** (consumes IR schema + `compile_to_code` output + rules-as-data;
-    never `import colonymind`). React Flow canvas, pan/zoom, edge drawing, grouping,
-    schema-driven config panels, in-node "show code" view, live red-edge validation.
+    never `import colonymind`), and now **Phase 1.5** (calls the local server's `/compile`,
+    `/validate`, `/execute` instead of re-implementing codegen/validation in TS — [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)
+    Decision 5). React Flow canvas, pan/zoom, edge drawing, grouping, schema-driven config
+    panels, in-node "show code" view, live red-edge validation.
   - **Toolchain switch:** first work in the `npm`/Vite/Vitest `ui/` tree. All three SDK contracts it
-    consumes have now landed — this is unblocked and is the fastest path to a usable UI.
+    consumes have landed *and* the local server already serves them — this is unblocked and is
+    the fastest path to a usable UI. Stories are broken out in [`epics/epic-5-frontend-canvas.md`](../epics/epic-5-frontend-canvas.md).
 
 - [ ] **Step 5 — Roadmap Epic 4: Node Library & Configuration UX** · `ui/` + `colonymind/` *(split)*
   - Deps: Steps 1–3, 4. The end-to-end vertical slice (load → clean → one stats test → one
@@ -71,6 +74,29 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
 
 > **End of Phase 1 milestone:** canvas → valid IR → downloadable, runnable Python, zero
 > backend. The strongest early de-risking demo.
+
+---
+
+## Phase 1.5 — Local server v0 (front-loaded, shipped early)
+
+> A small slice of Step 7 (roadmap Epic 6) pulled forward **ahead of the canvas**, because the
+> SDK is proven and tested while the canvas is unbuilt — a thin in-process server over already-
+> tested functions is the shortest path to a runnable app (roadmap §A6 / §E, the Sonnet plan
+> review). Story-level decomposition: [repo Epic 4](../epics/epic-4-local-server.md).
+
+- [x] **Step 3.5 — Local Execution Server v0** · `colonymind/server/` · *[repo Epic 4](../epics/epic-4-local-server.md) Story 1*
+  - Deps: Steps 1–3. `colonymind serve` (alias `cm lab`) boots a **stdlib** `http.server` that
+    calls `cm.compile_to_code` / `cm.execute` / `cm.validate` **in-process** and returns JSON
+    (`/compile`, `/execute`, `/validate`, `/healthz`, plus a paste-IR demo page). Zero new
+    dependencies; bad graphs come back as JSON errors, never a crash.
+  - Status: **done** — `colonymind/server/`, `colonymind/cli.py`, `[project.scripts]`, and
+    `tests/test_server.py` (service + HTTP round-trip incl. a real in-process execute) landed and
+    green under the four CI gates.
+  - **Why before Step 4:** it gives the canvas (Step 4) real `/compile` and `/validate`
+    endpoints to call (ADR 0013 Decision 5), and makes "ship" a literal
+    `pip install colonymind && colonymind serve`. Remaining server stories (execution
+    granularity, the result-payload contract, serving the bundled UI, the CI boundary check) are
+    in [repo Epic 4](../epics/epic-4-local-server.md) and continue inside Phase 2.
 
 ---
 
@@ -99,11 +125,15 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
     (local in-process execution); this step's hosted half spins up only when the hosted offering
     starts, then runs continuously through Phase 3.
 
-- [ ] **Step 7 — Roadmap Epic 6: Backend Execution Runtime & Sandboxing** · `colonymind/server/`
-  - Deps: Steps 1–2 (wraps the reference executor). **Happy path:** a thin local FastAPI server
-    (`cm lab` / `colonymind serve`) that calls `cm.execute(ir)` **in-process**, streaming
-    logs/progress over WebSocket. No Celery, no broker, **no sandbox** — you run your own code on
-    your own machine, the Jupyter trust model. This is the whole "Execute runs real Python" demo.
+- [~] **Step 7 — Roadmap Epic 6: Backend Execution Runtime & Sandboxing** · `colonymind/server/` · *[repo Epic 4](../epics/epic-4-local-server.md)*
+  - Deps: Steps 1–2 (wraps the reference executor). **Happy path:** a thin local server
+    (`cm lab` / `colonymind serve`) that calls `cm.execute(ir)` **in-process**. No Celery, no
+    broker, **no sandbox** — you run your own code on your own machine, the Jupyter trust model.
+    This is the whole "Execute runs real Python" demo.
+  - Status: **v0 done in Phase 1.5** (Step 3.5 above / [repo Epic 4](../epics/epic-4-local-server.md)
+    Story 1): the stdlib in-process server + CLI + tests have landed. Remaining here:
+    execution granularity (run-node / run-to-here), the result-payload contract for Step 11, and
+    the FastAPI/WebSocket streaming upgrade (the v0 is synchronous stdlib).
   - **(Hosted)** Celery/distributed workers, container-per-session sandboxing, resource caps,
     and controlled egress become first-class **and high-severity** the moment code runs on
     shared/hosted infrastructure — deferred to the hosted product. Keep the executor pure
@@ -194,8 +224,10 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
   not between repos; steps are ordered to cluster same-toolchain work and minimize ping-pong.
 - **The canvas (Step 4) is the current frontier.** Step 3 (the type system) is done and was the
   gate for almost everything visual — its rules-as-data is published, so the canvas can wire
-  real live validation now. Step 4 is the fastest path to a usable UI on top of the
-  already-usable Python package.
+  real live validation now. The local server v0 (Phase 1.5 / [repo Epic 4](../epics/epic-4-local-server.md))
+  already serves `/compile` and `/validate`, so the canvas calls real Python over localhost
+  rather than porting it to TS. Step 4 is the fastest path to a usable UI on top of the
+  already-usable package + server.
 - **Epics that span phases:** Epic 14 (persistence) now lands at Step 9 (basic save/load +
   export, once the server exists) and its migrations mature through Step 11 as the schema
   evolves; Epic 15 (infra) is mostly **(hosted)** — only basic local logging is needed for the
@@ -211,12 +243,15 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
 
 | Done | In progress | Not started |
 | :-- | :-- | :-- |
-| Roadmap Epics **1, 2, 5** (repo Epics 1–3) | — | Roadmap Epics **3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15** |
+| Roadmap Epics **1, 2, 5** (repo Epics 1–3) | Roadmap Epic **6** (repo Epic 4 — local server **v0 done**, Story 1) | Roadmap Epics **3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15** |
 
-**3 of 15 epics complete.** The Python package is usable today (`cm.compile_to_code`,
-`cm.execute`, `cm.validate`, `cm.export_script`). Next concrete milestone: **Step 4 — the
-frontend canvas** (roadmap Epic 3, the `ui/` tree), now fully unblocked by the published
-IR schema, codegen output, and rules-as-data artifact — the fastest path to a usable UI.
+**3 of 15 epics complete, + a running v0 local server.** The Python package is usable today
+(`cm.compile_to_code`, `cm.execute`, `cm.validate`, `cm.export_script`), and there is now a
+literal `pip install colonymind && colonymind serve` that executes graphs in-process over REST
+([repo Epic 4](../epics/epic-4-local-server.md)). Next concrete milestone: **Step 4 — the
+frontend canvas** (roadmap Epic 3, the `ui/` tree; story-level plan in
+[repo Epic 5](../epics/epic-5-frontend-canvas.md)) — fully unblocked by the published IR schema,
+codegen output, and rules-as-data artifact, *and* by the local server that already serves them.
 
 ---
 
