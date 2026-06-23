@@ -119,6 +119,8 @@ We will implement the following:
 - **Richer duplicate-key conflict resolution.** The current policy is first-registered wins,
   second-different-class rejected. A priority or version-aware conflict-resolution policy is
   deferred.
-- **Type-aware `by_port_type` matching.** Today `by_port_type` compares `data_type` tokens
-  as opaque strings. Structural subtyping (e.g. `"DataFrame"` satisfies a `"Table"` port) is
-  deferred to the Epic 5 type system.
+- **Type-aware `by_port_type` matching.** `by_port_type` compares `data_type` tokens as
+  plain strings for registry lookup. Type-system-aware compatibility — the `"any"` wildcard
+  and the declared subtype relation (e.g. `"DataFrame"` satisfies a `"Table"` port) — lives
+  in the connection type system (repo Epic 3 / roadmap Epic 5); see
+  [ADR 0011](./0011-type-model-and-compatibility.md) and `cm.validate`.

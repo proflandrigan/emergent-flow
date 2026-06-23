@@ -59,9 +59,10 @@ class Edge(IRModel):
         id: Stable unique identifier for this edge.
         source: PortRef identifying the OUT-side endpoint.
         target: PortRef identifying the IN-side endpoint.
-        type_compatible: Optional type-compatibility metadata. None means "not yet checked"
-            (full type-checking is Epic 5). When set, records whether source/target
-            data-type tokens were found compatible.
+        type_compatible: Optional type-compatibility metadata. None means "not yet
+            checked" (or unknown/unregistered token). Populated by
+            ``cm.apply_type_compatibility`` from a ``cm.validate`` result, recording
+            whether source/target data-type tokens were found compatible.
 
     Note: Structural validation of whether referenced nodes/ports exist is handled
     by the Graph model (Task 07), which has full node/port context.
@@ -73,5 +74,5 @@ class Edge(IRModel):
     type_compatible: bool | None = Field(
         default=None,
         description='Type-compatibility metadata. None="not yet checked". '
-        "Set to bool when type-checking is complete (Epic 5).",
+        "Set to bool by cm.apply_type_compatibility from a cm.validate result.",
     )

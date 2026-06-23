@@ -80,7 +80,7 @@ is `IN`; `group_id` references an existing node.
 | `id` | `IRId` | `new_id()` | Stable unique identifier (auto-generated). |
 | `name` | `str` | required | Port name, unique within its node. Non-empty. |
 | `direction` | `Direction` | required | `"in"` (incoming edge) or `"out"` (outgoing edge). |
-| `data_type` | `str` | `"any"` | Opaque data-type token. Full type system arrives in Epic 5. |
+| `data_type` | `str` | `"any"` | Data-type token; stays a string on the wire but is validated against the type registry and resolved by inference during `cm.validate`. See [type-system-spec.md](./type-system-spec.md). |
 | `cardinality` | `Cardinality` | `"one"` | `"one"` = single connection; `"many"` = fan-in/out allowed. |
 
 ### Edge and PortRef
@@ -93,7 +93,7 @@ target node.
 | `id` | `IRId` | `new_id()` | Stable unique identifier (auto-generated). |
 | `source` | `PortRef` | required | The OUT-side endpoint (`node_id` + `port_id`). |
 | `target` | `PortRef` | required | The IN-side endpoint (`node_id` + `port_id`). |
-| `type_compatible` | `bool \| None` | `None` | Type-compatibility metadata. `None` = not yet checked (Epic 5). |
+| `type_compatible` | `bool \| None` | `None` | Type-compatibility metadata. `None` = not yet checked / unknown; populated by `cm.apply_type_compatibility` from a `cm.validate` result. |
 
 `colonymind.ir.edge.PortRef` — an endpoint reference.
 
@@ -119,7 +119,8 @@ is enforced by `Graph`'s model validator.
 
 `ParamValue` is a recursive alias:
 `str | int | float | bool | None | ArtifactRef | list[ParamValue] | dict[str, ParamValue]`.
-The full type system (Epic 5) will narrow this; `type_token` is a placeholder label now.
+`type_token` is a descriptive label for the param value, distinct from the port `data_type`
+tokens the [connection type system](./type-system-spec.md) validates.
 
 It is a *discriminated* union: an `ArtifactRef` is recognized only by its `kind`
 discriminator tag (see below). A plain mapping that happens to share `ArtifactRef`'s

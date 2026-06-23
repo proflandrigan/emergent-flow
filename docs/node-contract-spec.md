@@ -57,7 +57,7 @@ All spec models are Pydantic v2 subclasses of `IRModel` (`extra="forbid"`,
 |---|---|---|---|
 | `name` | `str` | — | Port name, unique among the node's ports of the same direction (non-empty). IN and OUT may share a name — `execute` keys inputs/outputs in separate namespaces. |
 | `direction` | `Direction` | — | `"in"` or `"out"`. |
-| `data_type` | `str` | `"any"` | Opaque data-type token (full type system is Epic 5). |
+| `data_type` | `str` | `"any"` | Data-type token; validated against the type registry and resolved by inference during `cm.validate` (see [type-system-spec.md](./type-system-spec.md)). |
 | `cardinality` | `Cardinality` | `"one"` | How many edges may attach (`"one"`/`"many"`). |
 | `required` | `bool` | `True` | For IN ports, whether an edge must connect. Ignored for OUT. |
 | `label` | `str \| None` | `None` | Optional display label. |
@@ -114,9 +114,11 @@ sets the class-level metadata attributes (`type`, `version`, `family`, `label`, 
 
 ### Optional (overridable)
 
-- **`infer_types(self, node, input_types) -> dict`** — shape/type-inference. The default
+- **`infer_types(self, node, input_types) -> dict`** — type-inference. The default
   returns each OUT port's declared `data_type`; override when output type depends on inputs or
-  params. Full inference is Epic 5.
+  params. The whole-graph inference pass threads resolved upstream types in via `input_types`
+  and feeds the result to `cm.validate` (see [type-system-spec.md](./type-system-spec.md)).
+  Per-dimension tensor shape inference is deferred to roadmap Epic 10.
 
 ### Derived (provided; do not override)
 

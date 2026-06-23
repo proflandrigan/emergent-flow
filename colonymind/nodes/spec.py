@@ -56,7 +56,8 @@ class PortSpec(IRModel):
     direction:
         IN or OUT (required).
     data_type:
-        Opaque data-type token (default ``"any"``; full type system is Epic 5).
+        Data-type token (default ``"any"``); validated against the type registry
+        and resolved by inference during ``cm.validate``.
     cardinality:
         How many edges may attach (ONE or MANY; default ONE).
     required:
@@ -147,8 +148,9 @@ class ParamSpec(IRModel):
     name:
         Non-empty parameter name (unique within the node).
     type_token:
-        Opaque declared-type label (e.g. ``"str"``, ``"int"``, ``"DataFrame"``).
-        The real type system is Epic 5; this is a placeholder label only.
+        Declared-type label for the param value (e.g. ``"str"``, ``"int"``,
+        ``"DataFrame"``). Distinct from the port ``data_type`` tokens the
+        connection type system validates.
     default:
         Default serializable value used when the instance leaves it unset.
     required:

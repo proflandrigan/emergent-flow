@@ -229,6 +229,9 @@ colony-mind/
 - [How Codegen Works](./docs/how-codegen-works.md) — an overview of the codegen pipeline,
   the two paradigms, and the golden / equivalence quality gates that back the
   "what you see runs" promise.
+- [The Type System & Connection Validation](./docs/type-system-spec.md) — the nominal type
+  model, compatibility + cardinality rules, whole-graph inference, `cm.validate`/`Diagnostics`,
+  the strictness policy, and the shared codegen/execute gate.
 - [Connection Validation: Rules as a Portable Artifact](./docs/connection-validation.md) — the
   type rules + `Diagnostics` schema shipped to the frontend canvas as data, and the
   frontend-vs-SDK authority model.

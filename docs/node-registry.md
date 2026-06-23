@@ -152,8 +152,9 @@ producers = by_port_type("Table", direction=Direction.OUT)
 either    = by_port_type("Table")
 ```
 
-Note: `data_type` matching is an opaque token comparison today. Real type-system-aware
-matching (structural subtyping) is deferred to Epic 5.
+Note: `by_port_type` is a plain token comparison for registry lookup. Type-system-aware
+compatibility (the `"any"` wildcard and the subtype relation) lives in the connection
+type system — see [type-system-spec.md](./type-system-spec.md) and `cm.validate`.
 
 ### `all() -> list[type[NodeDefinition]]`
 

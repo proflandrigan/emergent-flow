@@ -49,7 +49,9 @@ from colonymind.nodes.spec import PortSpec
     ]
 ```
 
-`data_type` is an opaque token for now (the real type system is Epic 5).
+`data_type` is a token from the type registry; it drives connection-compatibility checks
+during `cm.validate`. See Step 6 and [type-system-spec.md](type-system-spec.md) for how to
+choose, register, and infer types.
 
 ## Step 3 — Declare typed params, with defaults and validation hints
 
@@ -116,9 +118,41 @@ drift. Add a test that runs both and asserts equal results — for `codegen`, th
 
 ## Step 6 — (Optional) override `infer_types`
 
-The default returns each OUT port's declared `data_type`. Override only when the output type
-depends on inputs or params. `impute_missing` preserves the table type, so the default is
-correct and we override nothing.
+A node's output ports declare their `data_type`, which is a token from the nominal type
+registry (`colonymind/types/`). Built-in tokens include `DataFrame`, `ClassifierResult`,
+`AnovaResult`, `HTML`, `Tensor`, and `any` (the wildcard top type). Prefer reusing an existing
+token so connections type-check against other nodes. Use `"any"` only when the port genuinely
+accepts anything.
+
+If you need a new token, register it by declaring a `TypeDef` in the registry, optionally
+specifying supertypes for subtype compatibility:
+
+```python
+from colonymind.types.registry import TypeDef, registry
+registry.register(TypeDef(token="TimeSeries", supertypes=("DataFrame",)))
+```
+
+An out-of-core package can ship its own tokens; see `examples/type_plugin_stub/`. An
+unregistered token is not an error — `cm.validate` reports it as a non-blocking warning
+(`type_unknown`).
+
+Override `infer_types` only when the output type depends on inputs or params. The default
+returns each OUT port's declared `data_type`. The signature is:
+
+```python
+infer_types(self, node, input_types) -> dict[str, str]
+```
+
+Where `input_types` maps IN-port name to its resolved upstream token, and the return maps
+OUT-port name to the produced token.
+
+For example, `impute_missing` preserves the table type, so the default is correct and we
+override nothing.
+
+> **Note**: Per-dimension tensor shape inference is out of scope here and is roadmap Epic 10;
+> structural typing (`Tensor` -> `Tensor`) is all that is resolved.
+
+See [type-system-spec.md](type-system-spec.md) for the full reference.
 
 ## Step 7 — Use the derived helpers and test
 
