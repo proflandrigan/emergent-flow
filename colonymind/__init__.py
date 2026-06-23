@@ -36,14 +36,18 @@ _LAZY_ENTRY_POINTS = {
     "export_script": ("colonymind.codegen.export", "export_script"),
     "validate": ("colonymind.codegen.validation", "validate"),
     "apply_type_compatibility": ("colonymind.codegen.validation", "apply_type_compatibility"),
+    "build_rules_artifact": ("colonymind.types.rules_artifact", "build_rules_artifact"),
+    "diagnostics_json_schema": ("colonymind.codegen.diagnostics_schema", "diagnostics_json_schema"),
 }
 
 if TYPE_CHECKING:  # let type-checkers resolve cm.data, cm.codegen, ... statically
     from colonymind import clean, codegen, data, ml, reports, stats
     from colonymind.codegen.compiler import compile_to_code
+    from colonymind.codegen.diagnostics_schema import diagnostics_json_schema
     from colonymind.codegen.executor import execute
     from colonymind.codegen.export import export_script
     from colonymind.codegen.validation import apply_type_compatibility, validate
+    from colonymind.types.rules_artifact import build_rules_artifact
 
 __all__ = [
     "__version__",
@@ -63,6 +67,8 @@ __all__ = [
     "export_script",
     "validate",
     "apply_type_compatibility",
+    "build_rules_artifact",
+    "diagnostics_json_schema",
 ]
 
 

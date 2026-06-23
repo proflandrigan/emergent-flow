@@ -1,0 +1,136 @@
+{
+  "$defs": {
+    "Diagnostic": {
+      "additionalProperties": false,
+      "description": "A single structured validation finding.\n\nAttributes:\n    severity: error (hard problem) or warning (runtime-only-knowable).\n    code: machine-readable code, e.g. \"type_incompatible\".\n    message: human-readable explanation (the canvas's \"why\" tooltip text).\n    edge_id: the offending edge id, when the finding is about an edge.\n    node_id: the node id, when the finding is about a port.\n    port_id: the port id, when the finding is about a port.\n    port_name: the port name, when the finding is about a port.\n    expected_type: the type the target IN port expected, for type findings.\n    actual_type: the type the source OUT port produced, for type findings.",
+      "properties": {
+        "actual_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actual Type"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "edge_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Edge Id"
+        },
+        "expected_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Type"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "node_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Node Id"
+        },
+        "port_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Port Id"
+        },
+        "port_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Port Name"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        }
+      },
+      "required": [
+        "severity",
+        "code",
+        "message"
+      ],
+      "title": "Diagnostic",
+      "type": "object"
+    },
+    "Severity": {
+      "description": "Severity of a single validation diagnostic (Story 5).",
+      "enum": [
+        "error",
+        "warning"
+      ],
+      "title": "Severity",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The result of `validate`: every finding plus the per-edge verdict map.\n\nAttributes:\n    diagnostics: every `Diagnostic` produced for the graph.\n    edge_compatibility: per-edge-id verdict \u2014 True (compatible),\n        False (incompatible), or None (unknown / not type-checked). This is\n        the source for `Edge.type_compatible` (see `apply_type_compatibility`).",
+  "properties": {
+    "diagnostics": {
+      "items": {
+        "$ref": "#/$defs/Diagnostic"
+      },
+      "title": "Diagnostics",
+      "type": "array"
+    },
+    "edge_compatibility": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "title": "Edge Compatibility",
+      "type": "object"
+    }
+  },
+  "title": "Diagnostics",
+  "type": "object"
+}
