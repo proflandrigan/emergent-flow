@@ -28,7 +28,7 @@
 - [x] `colonymind serve` (alias `cm lab`) boots a local server that calls `cm.compile_to_code` / `cm.execute` / `cm.validate` in-process and returns JSON.
 - [x] The server is **zero-new-dependency** (stdlib `http.server`) and never crashes on a bad graph — failures come back as JSON.
 - [x] The execution path stays **pure** (ADR 0002): the server only wraps the reference executor, so the hosted tier can later swap in sandboxing without re-architecting.
-- [ ] Execution granularity: "run all" + per-node status over the IR (Story 2); finer-grained "run this node" / "run to here" is deferred to land with the cache (Story 6 / roadmap Epic 7).
+- [x] Execution granularity: "run all" + per-node status over the IR (Story 2); finer-grained "run this node" / "run to here" is deferred to land with the cache (Story 6 / roadmap Epic 7).
 - [ ] A **result-payload contract** — JSON-safe, sized/truncated renderable payloads — that roadmap Epic 8 (in-node rendering) consumes (Story 3).
 - [ ] `colonymind serve` serves the bundled canvas from `colonymind/_static/` once the `ui/` build hook exists (Story 4).
 - [ ] A CI **boundary check** asserts `ui/` never imports `colonymind`; the "only the three contract artifacts cross the line" rule is documented as a convention rather than a brittle CI assertion ([ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) Decision 4) (Story 5).
@@ -49,15 +49,15 @@
 
 ---
 
-## Story 2 — Execute the graph (run all + per-node status)
+## Story 2 — Execute the graph (run all + per-node status) ✅ (done)
 
 > The minimum that makes the canvas runnable: execute the whole graph and report per-node
 > status so the UI can colour nodes. Finer-grained granularity is deferred (Story 6).
 
-- [ ] A "run all" request that executes the whole IR and returns results per OUT port.
-- [ ] Return per-node status (ok / error / skipped) so the canvas can colour nodes (consumed by repo Epic 5 Story 8).
-- [ ] Keep it pure and in-process; no caching yet (that's roadmap Epic 7 — note the seam).
-- [ ] Tests over a multi-node graph asserting results + per-node status come back.
+- [x] A "run all" request that executes the whole IR and returns results per OUT port.
+- [x] Return per-node status (ok / error / skipped) so the canvas can colour nodes (consumed by repo Epic 5 Story 8).
+- [x] Keep it pure and in-process; no caching yet (that's roadmap Epic 7 — note the seam).
+- [x] Tests over a multi-node graph asserting results + per-node status come back.
 
 ---
 
