@@ -10,7 +10,7 @@ Routes:
 - ``GET  /``          -- a minimal paste-IR demo page (proves the loop end to end)
 - ``GET  /healthz``   -- ``{"status": "ok"}``
 - ``POST /compile``   -- IR JSON -> ``{"code": ...}``
-- ``POST /execute``   -- IR JSON -> ``{"results": ...}``
+- ``POST /execute``   -- IR JSON -> ``{"results": ..., "statuses": ...}``
 - ``POST /validate``  -- IR JSON -> ``{"diagnostics": ...}``
 """
 

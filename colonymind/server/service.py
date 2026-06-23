@@ -111,7 +111,14 @@ def _execute_functional_with_status(
         for port in node.ports:
             if port.direction != Direction.IN:
                 continue
-            src = wiring_map.upstream(node.id, port.id)[0]
+            sources = wiring_map.upstream(node.id, port.id)
+            if len(sources) > 1:
+                raise ValueError(
+                    f"IN port {port.name!r} on node {node.id!r} has {len(sources)} "
+                    "sources; multi-source fan-in is not yet supported by codegen "
+                    "context."
+                )
+            src = sources[0]
             if statuses[src.node_id]["status"] != _STATUS_OK:
                 skipped = True
                 break
