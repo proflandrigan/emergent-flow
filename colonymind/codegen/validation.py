@@ -329,7 +329,7 @@ def _format_error_location(diag: Diagnostic) -> str:
     return f"[{diag.code}] {where}: {diag.message}"
 
 
-@public_op(name="cm.enforce_validation_gate")
+@public_op(name="cm.codegen.enforce_validation_gate")
 def enforce_validation_gate(
     graph: Graph,
     *,
@@ -339,9 +339,12 @@ def enforce_validation_gate(
     """Validate *graph* and raise on any error-severity diagnostic (Story 6).
 
     The single shared gate both `compile_to_code` and `execute` call before doing
-    any work, so the two pure functions accept/reject identical graphs for
-    identical reasons (ADR 0002 equivalence extends to rejection), mirroring how
-    `_prepare_declarative` is the shared declarative gate.
+    any work on the **FUNCTIONAL** path, so the two pure functions accept/reject
+    identical graphs for identical reasons (ADR 0002 equivalence extends to
+    rejection). DECLARATIVE graphs are out of scope here: they are gated
+    separately by `_prepare_declarative` (the shared compiler/executor declarative
+    seam), which both pure functions reach before this gate. This is a
+    codegen-internal seam (like `infer_graph_types`); users call `cm.validate`.
 
     Runs `validate` (Story 5) and, if it produced any error-severity diagnostic
     (type incompatibility, cardinality violation, or unconnected required IN

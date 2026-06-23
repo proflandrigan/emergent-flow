@@ -44,8 +44,9 @@ from typing import Any
 import pytest
 
 from colonymind.codegen.compiler import _assemble, compile_to_code
-from colonymind.codegen.errors import GraphValidationError
+from colonymind.codegen.errors import CycleError, GraphValidationError
 from colonymind.codegen.executor import execute
+from colonymind.codegen.validation import validate
 from colonymind.ir import Direction, Edge, Graph, Node, Port, PortRef, load_graph
 from colonymind.nodes.contract import CodeFragment, NodeDefinition
 from colonymind.nodes.registry import register
@@ -572,3 +573,87 @@ def test_cardinality_violation_rejected_equivalently() -> None:
         edges={e.id: e for e in edges},
     )
     assert_rejected_equivalently(graph)
+
+
+@pytest.mark.equivalence
+def test_cycle_rejected_equivalently() -> None:
+    """A 2-node cycle is rejected identically (CycleError) by execute and compile.
+
+    Cycle rejection is not a `GraphValidationError`: the gate runs `validate`,
+    whose inference pass calls `topological_sort`, which raises `CycleError`
+    (a `CodegenError`). Because BOTH pure functions route through the gate first,
+    they raise the identical error — this test pins that equivalence so a future
+    refactor of the inference pass can't silently break it.
+    """
+    a = Node(
+        id="a",
+        type=_EquivDouble.type,
+        label=_EquivDouble.label,
+        ports=[
+            Port(id="a-in", name="in_", direction=Direction.IN, data_type="int"),
+            Port(id="a-out", name="out", direction=Direction.OUT, data_type="int"),
+        ],
+    )
+    b = Node(
+        id="b",
+        type=_EquivDouble.type,
+        label=_EquivDouble.label,
+        ports=[
+            Port(id="b-in", name="in_", direction=Direction.IN, data_type="int"),
+            Port(id="b-out", name="out", direction=Direction.OUT, data_type="int"),
+        ],
+    )
+    edges = [
+        Edge(
+            source=PortRef(node_id="a", port_id="a-out"),
+            target=PortRef(node_id="b", port_id="b-in"),
+        ),
+        Edge(
+            source=PortRef(node_id="b", port_id="b-out"),
+            target=PortRef(node_id="a", port_id="a-in"),
+        ),
+    ]
+    graph = Graph(nodes={a.id: a, b.id: b}, edges={e.id: e for e in edges})
+    assert_rejected_equivalently(graph, expected_error=CycleError)
+
+
+@pytest.mark.equivalence
+def test_warning_only_graph_runs_through_both(tmp_path: pathlib.Path) -> None:
+    """Warn-don't-block, proven end to end: a graph whose only finding is a
+    warning (unregistered `int` tokens) is NOT blocked — it validates with
+    warnings, yet `compile_to_code` emits source and `execute` returns results,
+    and the two stay equivalent.
+    """
+    src = Node(
+        id="src",
+        type=_EquivSource.type,
+        label=_EquivSource.label,
+        ports=[Port(id="src-out", name="out", direction=Direction.OUT, data_type="int")],
+    )
+    dbl = Node(
+        id="dbl",
+        type=_EquivDouble.type,
+        label=_EquivDouble.label,
+        ports=[
+            Port(id="dbl-in", name="in_", direction=Direction.IN, data_type="int"),
+            Port(id="dbl-out", name="out", direction=Direction.OUT, data_type="int"),
+        ],
+    )
+    edge = Edge(
+        source=PortRef(node_id="src", port_id="src-out"),
+        target=PortRef(node_id="dbl", port_id="dbl-in"),
+    )
+    graph = Graph(nodes={src.id: src, dbl.id: dbl}, edges={edge.id: edge})
+
+    # The graph is "warn-don't-block": warnings present, no errors.
+    diagnostics = validate(graph)
+    assert diagnostics.ok  # no error-severity diagnostics
+    assert diagnostics.warnings  # but the unregistered `int` tokens warn
+
+    # Neither pure function is blocked by the warnings.
+    source = compile_to_code(graph)
+    assert "def main()" in source
+    assert execute(graph)["dbl"] == {"out": 14}
+
+    # ...and they remain equivalent.
+    assert_equivalent(graph, cwd=tmp_path)
