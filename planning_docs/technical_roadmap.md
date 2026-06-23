@@ -292,7 +292,8 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 **Happy path vs. hosted (per A6):** the bundled app's first deliverable is a thin **local** FastAPI server (`cm lab` / `colonymind serve`) that calls `cm.execute(ir)` **in-process** on localhost — no Celery, no broker, **no sandbox** (you run your own code on your own machine, Jupyter-style). The Celery workers, container-per-session sandboxing, resource caps, and distributed/remote compute in the scope below are **(hosted product)** concerns: keep the executor pure (A2) so the hosted tier can wrap it later, but do not build them into the bundled package.
 
 **Scope**
-- In: FastAPI gateway; Celery (or equivalent) task workers; execution of the IR (per A2); sandboxing/isolation; resource limits (CPU/mem/time); streaming logs and progress to the frontend over WebSockets.
+- In (bundled / happy path): a thin **local** server (`colonymind serve` / `cm lab`) that executes the IR (per A2) **in-process** via `cm.execute`; streaming logs/progress to the canvas; "run this node / run to here / run all" granularity.
+- In (hosted, deferred): FastAPI gateway at scale; Celery (or equivalent) task workers; container-per-session sandboxing/isolation; resource limits (CPU/mem/time); controlled network egress. These activate only for the gated hosted product (A6).
 - Out: caching logic (Epic 7); result rendering (Epic 8); connectors (Epic 9).
 
 **Key design decisions & options**
@@ -316,7 +317,8 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 **Happy path vs. hosted (per A6):** the bundled app uses a simple in-memory + on-disk cache keyed by the execution hash (Parquet/safetensors under a project cache dir). The Redis-metadata + object-store tiering (A4) and cross-user/shared caching below are **(hosted product)** optimizations — the local app needs neither.
 
 **Scope**
-- In: per-node **execution hash** (node config + ordered upstream output hashes + SDK/dependency version); backward dependency tracing; cache lookup/store; invalidation on change; the tiered artifact store from A4.
+- In (bundled / happy path): per-node **execution hash** (node config + ordered upstream output hashes + SDK/dependency version); backward dependency tracing; cache lookup/store; invalidation on change; a simple in-memory + **on-disk** artifact store under a project cache dir.
+- In (hosted, deferred): the tiered artifact store from A4 (Redis metadata + object store for large artifacts). A scale-out optimization for the hosted product (A6), not the local app.
 - Out: cross-user/shared caching (later optimization).
 
 **Key design decisions & options**
@@ -359,7 +361,8 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 **Goal:** Pull from real sources — SQL/warehouses, cloud object storage, file uploads — with secure credential handling.
 
 **Scope**
-- In: a connector framework; first connectors (Postgres/SQL, CSV/Parquet upload, an object store); secrets storage and per-user/per-workspace credential scoping.
+- In (bundled / happy path): a connector framework; a few basic/local connectors (CSV/Parquet upload, local files, one SQL source); secrets kept out of the IR and stored locally (a local secrets file / OS keyring).
+- In (hosted, deferred): managed per-user/per-workspace credential scoping and a secret store; premium/managed connectors. Hosted-product concerns (A6).
 - Out: a long tail of niche connectors (incremental).
 
 **Key design decisions & options**
@@ -490,8 +493,9 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 **Happy path vs. hosted (per A6):** the bundled local app needs almost none of this — localhost, single user, no tenant model, no deploy pipeline. Auth/authz, the workspace/tenant model, managed deployment & CI/CD, and cross-service tracing are **(hosted product)** concerns. The only Phase-2 infra the bundled app needs is basic local logging and surfacing errors back into nodes.
 
 **Scope**
-- In: authn/authz; workspace/tenant model; deployment & CI/CD; secrets management (pairs with Epic 9); logging/metrics/tracing across canvas → backend → workers; execution observability (streaming logs, progress, error surfacing back to nodes).
-- Out: nothing structurally — but it activates with the backend (Phase 2), since Phase 1 is frontend-only.
+- In (bundled / happy path): basic local logging and execution observability — streaming logs, progress, and surfacing errors back into nodes. That is *all* the bundled local app needs.
+- In (hosted, deferred): authn/authz; workspace/tenant model; deployment & CI/CD; managed secrets (pairs with Epic 9); cross-service tracing across canvas → backend → workers. Hosted-product concerns (A6) — do not stand them up to make local Execute work.
+- Out: nothing structurally — but the hosted half activates only when the hosted offering does; the bundled app (Phases 1–2) needs only the local-logging sliver above.
 
 **Key design decisions & options**
 - **Deployment target.** Cloud-hosted SaaS vs. self-hostable (enterprise data-residency is a stated competitor weakness to exploit). Recommend designing for both — containerized, config-driven — even if SaaS ships first.
@@ -533,6 +537,8 @@ The hard dependency spine:
 
 > **Epic 1 (IR + SDK)** → **Epic 2 (codegen)** → **Epic 3 (canvas)** → *Phase 1 demo* → **Epic 6 (execution) + Epic 7 (caching)** → **Epic 8 (results)** → *Phase 2 product* → **Epics 10 / 11** → **Epic 12 (agent)** → *Phase 3 frontier*.
 
+Here "Epic 6 / Epic 7" means the **local in-process / on-disk happy-path slice only** (per A6) — *not* the hosted sandbox/Celery/Redis build-out, which is off this critical path. And in practice a sliver of Epic 6 (the thin local server calling the already-tested `cm.execute`) is cheap enough to stand up *before* the full Epic 3 canvas, since the SDK is proven and the canvas is the larger, more uncertain build — see the bundled-app shipping note below.
+
 Run in parallel where possible: Epic 4 (node library, continuous), Epic 5 (typing, alongside 1/3), Epic 9 (connectors, alongside 6), Epic 14 (persistence, alongside 1/2), Epic 15 (infra, alongside 6). Epic 13 (multiplayer) is independent enough to schedule flexibly *if and only if* the IR was designed for it in Epic 1.
 
 The two decisions that most constrain everything downstream and should be locked first: **the IR schema (Epic 1)** and **the execute-the-IR-not-the-string equivalence model (A2)**.
@@ -545,7 +551,7 @@ The two decisions that most constrain everything downstream and should be locked
 | :-- | :-- | :-- | :-- |
 | 1 | One-way codegen, or eventual bidirectional Git sync? | Determines whether a Python→graph parser is ever needed (huge). | One-way; revisit later as opt-in. |
 | 2 | Execute generated strings, or execute the IR? | Security, reliability, and the "what runs = what you see" guarantee. | Execute IR; enforce equivalence in CI. |
-| 3 | Ship a raw-code / raw-SQL escape-hatch node in v1? | Raises the ceiling but reintroduces sandboxing + codegen concerns. | Yes, sandboxed and marked un-validated. |
+| 3 | Ship a raw-code / raw-SQL escape-hatch node in v1? | Raises the ceiling; sandboxing is a *hosted* concern (A6), so for the local app it's only a codegen concern. | Yes — **unsandboxed on the local happy path** (Jupyter trust model: you run your own code), explicitly marked un-validated. Gate it behind the sandbox only in the hosted tier; don't block the local node on hosted sandboxing. |
 | 4 | Is multiplayer an MVP differentiator or a fast-follow? | Single→multi retrofit is expensive; affects IR design now. | Single-user MVP; IR built CRDT-ready. |
 | 5 | SaaS-only or self-hostable? | Enterprise data-residency is a stated competitive wedge. | Design for both; ship SaaS first. |
 | 6 | React Flow vs. Rete.js for the canvas? | Ecosystem fit vs. rendering flexibility; perf ceiling. | React Flow, with a perf budget + virtualization. |

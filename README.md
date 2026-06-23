@@ -52,28 +52,39 @@ stack:
 
 ## Architecture
 
-Colony Mind is built around a modular, three-layered stack that separates presentation,
-execution, and orchestration.
+Colony Mind ships as **one repository and one bundled `pip install colonymind`** — the
+JupyterLab model: the Python data-science engine *and* a local web canvas in a single install,
+launched with `colonymind serve` (alias `cm lab`). The canvas and the SDK are separate
+toolchains that couple **only** through three published artifacts (the IR JSON Schema, the
+`compile_to_code` output string, and the connection-validation rules-as-data) — the UI never
+imports Python. See [ADR 0013](./docs/adr/0013-single-repo-bundled-ui-topology.md).
 
 ```
+            pip install colonymind  →  colonymind serve  (alias: cm lab)
 ┌──────────────────────────────────────────────────────────┐
-│                   FRONTEND CANVAS LAYER                   │
-│        React Flow / Rete.js  |  Tailwind CSS  |  Vite     │
+│   ui/  —  CANVAS (React Flow, Tailwind, Vite)            │  bundled into the wheel
+│         talks only via IR schema · codegen · rules-data  │  (never imports colonymind)
 └────────────────────────────┬─────────────────────────────┘
-                             │ (Bi-directional WebSockets / REST)
+                             │ localhost REST  (no shared import)
                              ▼
 ┌──────────────────────────────────────────────────────────┐
-│                   BACKEND ENGINE LAYER                    │
-│           FastAPI  |  Celery Task Queue  |  Redis         │
+│   colonymind/server/  —  thin LOCAL server                │  calls cm.* in-process
+│         in-process cm.compile_to_code / cm.execute        │  (no Celery / Redis / sandbox)
 └────────────────────────────┬─────────────────────────────┘
-                             │ (Dynamic 1:1 Code Mapping)
+                             │ (pure functions over one IR)
                              ▼
 ┌──────────────────────────────────────────────────────────┐
-│               CORE PYTHON SDK & EXECUTION                 │
+│   colonymind/  —  CORE PYTHON SDK & EXECUTION             │
 │    Pandas / Polars  |  Statsmodels  |  Scikit-Learn       │
 │          PyTorch  |  LangGraph  |  YData-Profiling        │
 └──────────────────────────────────────────────────────────┘
 ```
+
+> **The happy path is local and in-process** ([§A6 of the roadmap](./planning_docs/technical_roadmap.md)).
+> The bundled package is a single-user, local-first app — no Celery, no Redis, no sandbox, no
+> multi-tenancy. The enterprise scale-out (distributed/sandboxed execution, Redis +
+> object-store caching, auth, multiplayer) is **deferred to a future gated hosted product**
+> (the dbt-Cloud to this dbt-core), not the bundled install.
 
 ### Core design principles
 
@@ -90,9 +101,11 @@ formal Architecture Decision Record in [`docs/adr/`](./docs/adr/) and derives fr
 3. **The SDK supports two paradigms.** A *functional pipeline* (DE / stats / classical ML /
    reporting) and a *declarative module/graph definition* (PyTorch architectures, LangGraph
    agent graphs) are first-class from day one.
-4. **Storage is tiered.** Redis holds cache metadata, execution hashes, and small results;
-   large artifacts (DataFrames, tensors, models, reports) serialize to a disk/object store
-   via Arrow / Parquet / safetensors.
+4. **Storage is tiered (hosted tier).** On the bundled happy path the cache is a simple
+   in-memory + on-disk store. The tiered design — Redis for cache metadata/hashes/small
+   results, a disk/object store for large artifacts via Arrow / Parquet / safetensors — is a
+   *hosted-product* concern (see [ADR 0013](./docs/adr/0013-single-repo-bundled-ui-topology.md)
+   and §A6 of the roadmap), not something the local install needs.
 
 See the [Architecture Decision Records](./docs/adr/) for the full context, decision, and
 consequences of each: [ADR 0001](./docs/adr/0001-graph-is-single-source-of-truth.md),
@@ -104,7 +117,10 @@ consequences of each: [ADR 0001](./docs/adr/0001-graph-is-single-source-of-truth
 [ADR 0007](./docs/adr/0007-open-core-licensing-boundary.md),
 [ADR 0008](./docs/adr/0008-codegen-templating-vs-ast.md),
 [ADR 0009](./docs/adr/0009-codegen-binding-context.md),
-[ADR 0010](./docs/adr/0010-codegen-package-placement.md).
+[ADR 0010](./docs/adr/0010-codegen-package-placement.md),
+[ADR 0011](./docs/adr/0011-type-model-and-compatibility.md),
+[ADR 0012](./docs/adr/0012-rules-as-portable-data.md),
+[ADR 0013](./docs/adr/0013-single-repo-bundled-ui-topology.md).
 
 ### Example of generated code
 
@@ -144,8 +160,9 @@ See the [Declarative Codegen Seam](./docs/codegen-declarative.md) for the worked
 
 | Layer | Technologies |
 | :--- | :--- |
-| **Frontend canvas** | React Flow / Rete.js, Tailwind CSS, Vite |
-| **Backend engine** | FastAPI, Celery, Redis, Jinja2 |
+| **Canvas (`ui/` tree, bundled)** | React Flow / Rete.js, Tailwind CSS, Vite |
+| **Local server (`colonymind/server/`)** | thin local HTTP server, in-process `cm.*` |
+| **Backend engine (hosted tier)** | FastAPI, Celery, Redis — *deferred to the hosted product (ADR 0013 / §A6)* |
 | **Data wrangling** | Pandas, Polars |
 | **Statistics** | Statsmodels |
 | **Machine learning** | Scikit-Learn |
@@ -166,11 +183,13 @@ an initial vertical slice of the node library, structural type validation, and b
 save/load + export. **Deliverable:** a frontend-only canvas that maps a node graph to
 flawless, downloadable Python — no backend execution required.
 
-### Phase 2 — Living Bridge (reactive backend)
-A live FastAPI runtime with Celery workers and sandboxed execution, DAG-based incremental
-caching, rich in-node result rendering, data connectors with secure credential handling, and
-the platform infrastructure/security/observability layer. **Deliverable:** "Execute" runs
-real Python, with incremental caching and results rendered back into the canvas.
+### Phase 2 — Living Bridge (local reactive backend, bundled)
+A thin **local** server bundled in the package (`colonymind serve`) that runs `cm.execute(ir)`
+**in-process**, a simple on-disk incremental cache, and rich in-node result rendering. The
+enterprise build-out — Celery/sandboxed/distributed execution, Redis + object-store caching,
+auth/multi-tenancy/deploy — is **deferred to the gated hosted product** (ADR 0013 / §A6), not
+the bundled install. **Deliverable:** "Execute" runs real Python locally, with incremental
+caching and results rendered back into the canvas.
 
 ### Phase 3 — Frontier (Deep Learning, GenAI & agents)
 Visual PyTorch composition with real-time tensor-shape resolution, visual LangGraph
@@ -188,8 +207,12 @@ colony-mind/
 │   ├── ir/                   # Graph intermediate representation (schema, serialization)
 │   ├── nodes/                # Node contract, registry, and reference examples
 │   ├── codegen/              # Whole-graph compiler + reference executor (compile_to_code / execute)
+│   ├── types/                # Type catalog, compatibility rules, rules-as-data artifact
 │   ├── data, clean, stats, ml, reports/   # Reference node-family SDK wrappers
+│   ├── server/               # Thin local HTTP server (cm.* in-process) — `colonymind serve`
+│   ├── cli.py                # `colonymind` console entry point (serve / lab)
 │   └── api.py                # @public_op decorator + inspectable-return contract
+├── ui/                       # TypeScript/React canvas (Vite) — bundled into the wheel (planned)
 ├── docs/
 │   ├── adr/                  # Architecture Decision Records (foundational decisions)
 │   ├── node-contract-spec.md # Node-definition contract reference

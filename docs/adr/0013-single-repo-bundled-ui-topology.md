@@ -142,8 +142,12 @@ pattern — while preserving the §A5 coupling invariant in full.**
 
 **Deferred:**
 - The concrete build-hook implementation and wheel-bundling test.
-- The `colonymind serve` / `cm lab` entry point and the thin FastAPI server (Phase 2; the
-  server tree is scaffolded now but inert until then).
+- **Update (2026-06-23):** a minimal local server now exists — `colonymind/server/` with a
+  `colonymind serve` / `cm lab` entry point that calls `cm.compile_to_code` / `cm.execute` /
+  `cm.validate` **in-process**. To keep the bundled install lean and zero-dependency for this
+  v0 (the happy path of §A6), it uses the Python **stdlib** `http.server` rather than FastAPI;
+  the FastAPI/WebSocket/streaming upgrade and the wheel-bundled `ui/` it will serve remain
+  Phase 2. (Decision 1's "thin FastAPI app" names the eventual target, not the v0.)
 - The CI boundary-check implementation (pairs with [ADR 0007](0007-open-core-licensing-boundary.md)'s
   still-deferred one-way-dependency linter).
 - The concrete update to [ADR 0007](0007-open-core-licensing-boundary.md)'s SDK/Platform
