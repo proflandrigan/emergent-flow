@@ -58,6 +58,18 @@ The proposal repeatedly names Redis as the cache. Redis is an in-memory store �
 
 ### A5. The frontend canvas is a separate repo that consumes the IR — not a co-equal codebase
 
+> **⚠️ Superseded (topology only) by [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md), accepted 2026-06-23.**
+> The product no longer ships as three repos. It is **one repo, one `pip install colonymind`
+> package with the canvas UI bundled in** (the JupyterLab model): `colony-mind-canvas` becomes
+> the `ui/` directory and `colony-mind-server` becomes `colonymind/server/`, both inside this
+> repo. **The coupling invariant below still holds verbatim** — the UI never `import`s
+> `colonymind`, and the only artifacts crossing the boundary are the same three named in this
+> section (IR JSON Schema, `compile_to_code` output, rules-as-data). What changed is *where the
+> code lives and how it ships*, enforced now by a CI boundary check instead of a repo wall.
+> Read the rest of this section as the rationale for the **contract**, which survives; ignore
+> its repo-count recommendation. Wherever this doc says `colony-mind-canvas` /
+> `colony-mind-server`, read "the `ui/` and `colonymind/server/` trees of `colony-mind`."
+
 The proposal draws the canvas (React Flow / Tailwind / Vite) and the SDK (Pandas / Pingouin / PyTorch …) as two layers of one system, which invites treating them as one codebase. The trap is co-locating a TypeScript frontend and a Python SDK in a single repo: two unrelated toolchains (`npm`/Vite/Vitest vs. `uv`/`ruff`/`mypy`/`pytest`), two CI matrices, and two dependency trees fighting in one tree — and, worse, a temptation for the frontend to reach into Python internals instead of through the published contract.
 
 **Recommendation:** Split by toolchain into separate repos that couple **only through serialized artifacts**, never a shared source import:
@@ -78,10 +90,15 @@ The boundary the canvas consumes from the SDK is exactly three published, versio
 
 ## B. Repo map: which epic lives where, and when frontend work unblocks
 
-Per §A5, this product is **three repos**, not one, coupled only through published, versioned
-artifacts. Before diving into individual epics, this section gives the at-a-glance map: which
-track (repo) owns each epic, and — for everything that touches the frontend — exactly what
-SDK contract has to exist before that frontend work can begin.
+Per §A5 **as amended by [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)**, this
+product is **one repo and one package**, not three repos — the `colony-mind-canvas` and
+`colony-mind-server` columns below now denote the `ui/` and `colonymind/server/` *directories*
+of this single `colony-mind` repo, not separate repositories. The track ownership, the
+published-contract boundary, and the "what must exist before frontend work begins" sequencing
+are all unchanged; only the repo count collapsed. Before diving into individual epics, this
+section gives the at-a-glance map: which track owns each epic, and — for everything that
+touches the frontend — exactly what SDK contract has to exist before that frontend work can
+begin.
 
 ### B1. Epic → Track → Repo
 
@@ -471,7 +488,7 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 The proposal's phasing is sound; two adjustments are recommended.
 
 **Phase 1 — Foundation (SDK + static canvas, no backend execution).**
-Epics 1, 2, 3, 4 (initial vertical slice), 5 (structural typing), 14 (basic save/load + export). Deliverable: a frontend-only canvas that maps a node graph to flawless, downloadable Python. Strongest early de-risking milestone — the whole "glass-box codegen" thesis is provable here without infrastructure. Note that even in Phase 1 this is **two repos** (A5): the Python SDK (Epics 1, 2, 5, 14) and the `colony-mind-canvas` frontend (Epics 3, 4 surface), coupled only by the published IR schema, codegen output, and rules artifact.
+Epics 1, 2, 3, 4 (initial vertical slice), 5 (structural typing), 14 (basic save/load + export). Deliverable: a frontend-only canvas that maps a node graph to flawless, downloadable Python. Strongest early de-risking milestone — the whole "glass-box codegen" thesis is provable here without infrastructure. Note that even in Phase 1 this is **two toolchains in one repo** ([ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md), superseding the original "two repos" framing of A5): the Python SDK (Epics 1, 2, 5, 14) and the `ui/` frontend tree (Epics 3, 4 surface), coupled only by the published IR schema, codegen output, and rules artifact.
 
 **Phase 2 — Living Bridge (reactive backend).**
 Epics 6, 7, 8, 9, plus 15 spinning up (auth/infra/security/observability), and 14 maturing (migrations). Deliverable: "Execute" runs real Python, with incremental caching and rich results rendered back into the canvas.
@@ -483,7 +500,7 @@ Epics 10, 11, 12, and 5's tensor-dimension layer. Deliverable: visual deep learn
 
 **Adjustment 2 — Security/sandboxing (Epics 6 + 15) is treated as a Phase-2 implementation detail in the proposal but is a first-class, high-severity deliverable.** Promote it to an explicit Phase-2 workstream with a named owner.
 
-**Adjustment 3 — The frontend is a separate repo, not a layer of one codebase (A5).** The proposal's three-layer stack diagram reads as one system; in practice the canvas (`colony-mind-canvas`) and the execution backend (`colony-mind-server`) are distinct repos from this Python SDK, coupled only through the published IR schema, codegen output, and rules-as-data. Decide the repo split at the start of Phase 1 — retrofitting a TypeScript frontend out of a shared Python repo, or untangling frontend reach-ins into SDK internals, is exactly the kind of avoidable rework A1/A2 already warned about for sync.
+**Adjustment 3 — The frontend is a contract-coupled module, not a co-equal codebase ([ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md), superseding A5's separate-repo framing).** The proposal's three-layer stack diagram reads as one system; in practice the canvas (`ui/`) and the execution backend (`colonymind/server/`) live in *this* repo but never `import colonymind` — they couple only through the published IR schema, codegen output, and rules-as-data, and the whole thing ships as one `pip install colonymind` with the UI bundled (JupyterLab model). The thing to get right at the start of Phase 1 is the **contract boundary** (now enforced by a CI check, not a repo wall): untangling frontend reach-ins into SDK internals is exactly the kind of avoidable rework A1/A2 already warned about for sync.
 
 ---
 
@@ -513,4 +530,4 @@ The two decisions that most constrain everything downstream and should be locked
 | 8 | Caching semantics for non-deterministic LLM/agent nodes? | Breaks the deterministic hash-cache assumption. | Separate execution path; cache-with-care + cost tracking. |
 | 9 | Open-core boundary: what's SDK vs. platform-only? | Affects packaging, licensing, and community story. | Decide alongside Epic 1 packaging. |
 | 10 | Where does heavy compute run at scale (10 GB+)? | Single FastAPI process won't hold it; the proposal assumes it does. | Isolated scalable workers; plan for remote/distributed. |
-| 11 | One repo or split SDK / canvas / server? | Toolchain, CI, and the open-core boundary; frontend reach-ins are hard to undo. | Separate repos (A5), coupled only by published IR schema + codegen output + rules-as-data. |
+| 11 | One repo or split SDK / canvas / server? | Toolchain, CI, and the open-core boundary; frontend reach-ins are hard to undo. | **Single repo, single package** with the UI bundled (JupyterLab model) — see [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md), which supersedes the original "separate repos (A5)" answer. The contract-only coupling is preserved and enforced by a CI boundary check instead of a repo wall. |

@@ -3,7 +3,7 @@
 *A single, linear order in which one developer can complete every epic across the whole
 product. Where the [technical roadmap](./technical_roadmap.md) gives a dependency graph with
 parallel tracks, this doc flattens it into one sequence you can walk top-to-bottom, switching
-repos only when a dependency forces it.*
+trees (and toolchains) within the one repo only when a dependency forces it.*
 
 ---
 
@@ -15,10 +15,15 @@ repos only when a dependency forces it.*
   (repo Epic 1 = roadmap Epic 1, repo Epic 2 = roadmap Epic 2, **repo Epic 3 = roadmap Epic
   5**). See [`../epics/README.md`](../epics/README.md) for the full numbering map and the
   "Epic 3" collision warning.
-- **"Both repos" is actually three.** The roadmap (§A5) splits the product across
-  `colony-mind` (this SDK), `colony-mind-canvas` (React/TS frontend), and `colony-mind-server`
-  (FastAPI/Celery backend). "All epics" cannot complete without the server repo, so this
-  timeline spans all three — flagging the repo on every step.
+- **One repo, three trees** (per [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md),
+  superseding §A5's three-repo split). The product lives in a single repo, `colony-mind`,
+  shipping as one bundled `pip install colonymind` (the JupyterLab model): the SDK
+  (`colonymind/`), the React/TS frontend (`ui/`), and the FastAPI/Celery backend
+  (`colonymind/server/`). Steps below still flag which **tree** each one touches; wherever a
+  step names `colony-mind-canvas` or `colony-mind-server`, read "the `ui/` or
+  `colonymind/server/` tree of this repo." The contract-only coupling is unchanged — the UI
+  never imports the SDK; only the IR schema, codegen output, and rules-as-data cross the
+  boundary, now enforced by a CI check rather than a repo wall.
 
 ### Status legend
 
@@ -31,8 +36,8 @@ repos only when a dependency forces it.*
 ## Phase 1 — Foundation (SDK + static canvas, no backend execution)
 
 > Deliverable: a frontend-only canvas that maps a node graph to flawless, downloadable
-> Python. Two repos (`colony-mind`, `colony-mind-canvas`), coupled only by the published IR
-> schema, codegen output, and rules-as-data artifact.
+> Python. Two trees in one repo (`colonymind/` and `ui/`; see [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)),
+> coupled only by the published IR schema, codegen output, and rules-as-data artifact.
 
 - [x] **Step 1 — Roadmap Epic 1: Core SDK & Graph IR** · `colony-mind` · *repo Epic 1*
   - Deps: none (the root). The versioned IR schema, node contract, registry, serialization.
@@ -55,7 +60,7 @@ repos only when a dependency forces it.*
   - Deps: Steps 1, 2, **3** (consumes IR schema + `compile_to_code` output + rules-as-data;
     never `import colonymind`). React Flow canvas, pan/zoom, edge drawing, grouping,
     schema-driven config panels, in-node "show code" view, live red-edge validation.
-  - **Toolchain switch:** first work in the `npm`/Vite/Vitest repo. All three SDK contracts it
+  - **Toolchain switch:** first work in the `npm`/Vite/Vitest `ui/` tree. All three SDK contracts it
     consumes have now landed — this is unblocked and is the fastest path to a usable UI.
 
 - [ ] **Step 5 — Roadmap Epic 4: Node Library & Configuration UX** · `colony-mind-canvas` + `colony-mind` *(split)*
@@ -72,7 +77,7 @@ repos only when a dependency forces it.*
 ## Phase 2 — Living Bridge (reactive backend)
 
 > Deliverable: "Execute" runs real Python, with incremental caching and rich results rendered
-> back into the canvas. Introduces the third repo, `colony-mind-server`.
+> back into the canvas. Introduces the backend tree, `colonymind/server/` (per [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md); formerly the separate `colony-mind-server` repo).
 
 - [ ] **Step 6 — Roadmap Epic 15: Platform Infrastructure, Security & Observability** · `colony-mind-server` (+ deploy infra)
   - Deps: underpins Steps 7–15. Stand up first: authn/authz, workspace/tenant model,
@@ -146,7 +151,8 @@ repos only when a dependency forces it.*
 
 - **Two unavoidable toolchain switches:** Python (`uv`/`ruff`/`mypy`/`pytest`) for Steps 1–3,
   then TypeScript (`npm`/Vite/Vitest) at Step 4, then back to Python + server infra at Step 6.
-  Steps are ordered to cluster same-repo work and minimize ping-pong.
+  These are now switches between *trees of one repo* ([ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)),
+  not between repos; steps are ordered to cluster same-toolchain work and minimize ping-pong.
 - **The canvas (Step 4) is the current frontier.** Step 3 (the type system) is done and was the
   gate for almost everything visual — its rules-as-data is published, so the canvas can wire
   real live validation now. Step 4 is the fastest path to a usable UI on top of the

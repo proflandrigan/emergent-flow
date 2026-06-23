@@ -33,6 +33,13 @@ The following decisions lock the type system's architecture; they correspond to 
 | [0011](./0011-type-model-and-compatibility.md) | Nominal type model with an optional subtype relation and three-valued compatibility | Accepted |
 | [0012](./0012-rules-as-portable-data.md) | Ship the type rules as versioned data, with the SDK as authoritative re-validator | Accepted |
 
+The following decision revisits the repo/packaging topology set out in §A5 of the
+[technical roadmap](../../planning_docs/technical_roadmap.md).
+
+| ADR | Decision | Status |
+| :-- | :------- | :----- |
+| [0013](./0013-single-repo-bundled-ui-topology.md) | Single repo, single package: bundle the canvas UI with the SDK (JupyterLab model), preserving the coupling invariant | Accepted |
+
 ## Conventions
 
 - Filenames: `NNNN-kebab-case-title.md`, numbered sequentially from `0001`.
