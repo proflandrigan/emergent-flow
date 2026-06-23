@@ -36,7 +36,12 @@ Compatibility is decided by a pure function `is_compatible(source_type, target_t
 | `anything`         | `any`          | COMPATIBLE     |
 | `any`              | `anything`     | COMPATIBLE     |
 | `Mystery`          | `DataFrame`    | UNKNOWN        |
-| `TimeSeries`       | `DataFrame`    | COMPATIBLE (subtype) |
+| `TimeSeries`       | `DataFrame`    | COMPATIBLE (subtype) † |
+
+† The `TimeSeries → DataFrame` row assumes `TimeSeries` has been registered as a subtype of
+`DataFrame` (e.g. `registry.register(TypeDef(token="TimeSeries", supertypes=("DataFrame",)))`).
+It is **not** in the shipped default catalog — against the default registry an unregistered
+token like `TimeSeries` resolves to `UNKNOWN` (a non-blocking warning), exactly like `Mystery`.
 
 ## Cardinality
 

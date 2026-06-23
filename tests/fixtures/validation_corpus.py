@@ -2,8 +2,12 @@
 Epic 3 Story 8 fixture corpus for graph-validation tests.
 
 This module defines a set of validation scenarios used by golden snapshot tests
-and unit tests. Each case is self-contained with its own node and type registries,
-ensuring that validation is pure and deterministic.
+and unit tests. Each case carries the node and type registries it validates
+against: cases needing a custom catalog (``subtype_acceptance``,
+``dangling_required_in``) build their own, while the rest reuse the package
+default singletons. The default-singleton cases are deterministic only because no
+other test mutates those singletons; give a case its own fresh registries if that
+ever changes.
 """
 
 from __future__ import annotations
