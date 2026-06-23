@@ -24,6 +24,7 @@ from colonymind.codegen.wiring import build_wiring_map
 from colonymind.ir import Direction, Graph, Paradigm
 from colonymind.ir.serialize import deserialize_graph
 from colonymind.nodes import get as get_node_definition
+from colonymind.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
 
 # Per-node execution status reported to the canvas (Epic 4 Story 2). A node is
 # "ok" if it ran, "error" if its execute() raised, "skipped" if an upstream node
@@ -38,28 +39,6 @@ def _to_graph(payload: dict[str, Any]) -> Graph:
     # Graph.model_validate) so the server applies the same schema-version checks
     # and migrations as the on-disk load path -- the two accept identical graphs.
     return deserialize_graph(json.dumps(payload))
-
-
-def _fallback(obj: Any) -> Any:
-    """Render an execute() artifact that is not JSON-native as safe summary data.
-
-    ``cm.execute`` returns *inspectable* objects (ADR 0002), but inspectable is a
-    superset of JSON-native: a DataFrame is inspectable yet not directly
-    serializable. Prefer a structured ``to_dict()`` when the object offers one,
-    else fall back to ``repr`` so a response never fails to encode.
-    """
-    to_dict = getattr(obj, "to_dict", None)
-    if callable(to_dict):
-        try:
-            return to_dict()
-        except Exception:
-            return repr(obj)
-    return repr(obj)
-
-
-def _jsonable(value: Any) -> Any:
-    """Best-effort coercion of an execute() result into JSON-native data."""
-    return json.loads(json.dumps(value, default=_fallback))
 
 
 def compile_graph(payload: dict[str, Any]) -> dict[str, Any]:
@@ -140,23 +119,43 @@ def _execute_functional_with_status(
     return results, statuses
 
 
+def _results_to_payloads(
+    results: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, dict[str, Any]]]:
+    """Map each OUT-port artifact to its typed result payload (Story 3)."""
+    return {
+        node_id: {port_name: to_payload(value) for port_name, value in ports.items()}
+        for node_id, ports in results.items()
+    }
+
+
 def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
-    """IR graph (as a dict) -> ``{"results": ..., "statuses": ...}``.
+    """IR graph (as a dict) -> ``{"payload_version", "results", "statuses"}``.
 
     Runs the whole graph in-process (Epic 4 Story 2). FUNCTIONAL graphs are walked
     node by node so a single node's runtime failure is reported as that node's
     ``error`` status (downstream nodes ``skipped``) at HTTP 200, rather than
     aborting the whole run -- the canvas colours nodes from ``statuses``. Graph-LEVEL
     rejections (validation gate, cycle, unbound input, wrong paradigm) still raise
-    and surface as the server's 422. No caching yet (roadmap Epic 7 seam).
+    and surface as the server's 422. No caching yet (roadmap Epic 7 seam). Each
+    OUT port in ``results`` is a typed result payload (Story 3), not a raw
+    artifact; ``payload_version`` stamps the contract once at the top level.
     """
     graph = _to_graph(payload)
     if graph.paradigm is Paradigm.FUNCTIONAL:
         results, statuses = _execute_functional_with_status(graph)
-        return {"results": _jsonable(results), "statuses": statuses}
+        return {
+            "payload_version": PAYLOAD_CONTRACT_VERSION,
+            "results": _results_to_payloads(results),
+            "statuses": statuses,
+        }
     # DECLARATIVE (and any future paradigm): delegate to the reference executor,
     # which is all-or-nothing. On success the single nn.module node is "ok"; its
     # rejections raise (CodegenError) -> 422.
     results = execute(graph)
     statuses = {node_id: {"status": _STATUS_OK} for node_id in results}
-    return {"results": _jsonable(results), "statuses": statuses}
+    return {
+        "payload_version": PAYLOAD_CONTRACT_VERSION,
+        "results": _results_to_payloads(results),
+        "statuses": statuses,
+    }
