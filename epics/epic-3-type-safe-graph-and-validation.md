@@ -38,9 +38,9 @@
 - [ ] A **graph validation pass** (`cm.validate(graph)`) checks every edge for type compatibility **and cardinality**, populates `Edge.type_compatible`, and returns structured **diagnostics** (severity + edge/port + human-readable reason, expected-vs-actual type) — without blocking construction of exploratory graphs.
 - [ ] **Strictness policy is implemented and documented:** structural type mismatches and cardinality violations hard-fail; things only knowable at runtime warn-don't-block.
 - [ ] `compile_to_code` and `execute` **share a single validation gate** (mirroring `_prepare_declarative`) so both paradigms accept/reject identically; a hard structural mismatch raises a clear error before any code is emitted or run.
-- [ ] A **golden diagnostics corpus** covers compatible, incompatible, unknown, dangling-required-IN, and cardinality-violation graphs; it is wired into CI alongside the existing equivalence gate.
+- [x] A **golden diagnostics corpus** covers compatible, incompatible, unknown, dangling-required-IN, and cardinality-violation graphs; it is wired into CI alongside the existing equivalence gate.
 - [ ] Tensor **dimension** inference is explicitly **not** built — only structural type compatibility (`Tensor`→`Tensor` is fine here); per-dimension shape resolution is deferred to roadmap Epic 10, which specializes this framework.
-- [ ] The many `# … is Epic 5` placeholders across `colonymind/` and `docs/` are resolved (this epic *is* that work) and the docs describe the real type system.
+- [x] The many `# … is Epic 5` placeholders across `colonymind/` and `docs/` are resolved (this epic *is* that work) and the docs describe the real type system.
 
 ---
 
@@ -143,12 +143,12 @@
 > "Codegen quality is the marketing claim" — and a graph that says *why* a connection is
 > invalid is the same trust surface. Make the diagnostics first-class, not an afterthought.
 
-- [ ] Assemble a **fixture corpus**: compatible chain, incompatible edge (e.g. `HTML`→a `DataFrame` IN), `"any"` wildcard, subtype acceptance, unregistered token (warn), dangling required IN, and ONE-vs-MANY cardinality violation.
-- [ ] Add **golden (snapshot) tests** of the `Diagnostics` output so regressions in messages/severities are caught, mirroring Epic 2's golden corpus.
-- [ ] Wire the validation/diagnostics gate into **CI** alongside the existing equivalence and golden gates.
-- [ ] Write a **type-system spec doc** (`docs/type-system-spec.md`) and a "connection validation" guide; link from the README, mirroring Epic 1/2 docs discipline.
-- [ ] **Resolve the `Epic 5` placeholders** in `colonymind/ir/port.py`, `params.py`, `edge.py`, `nodes/contract.py`, `nodes/spec.py`, `docs/ir-spec.md`, `docs/node-contract-spec.md`, `docs/authoring-a-node.md`, `docs/node-registry.md`, and ADRs 0005/0006 — pointing them at the now-real type system (and at Epic 10 for tensor dimensions specifically).
-- [ ] Update `docs/authoring-a-node.md` so a node author learns how to choose/register a `data_type` token and override `infer_types`.
+- [x] Assemble a **fixture corpus**: compatible chain, incompatible edge (e.g. `HTML`→a `DataFrame` IN), `"any"` wildcard, subtype acceptance, unregistered token (warn), dangling required IN, and ONE-vs-MANY cardinality violation.
+- [x] Add **golden (snapshot) tests** of the `Diagnostics` output so regressions in messages/severities are caught, mirroring Epic 2's golden corpus.
+- [x] Wire the validation/diagnostics gate into **CI** alongside the existing equivalence and golden gates.
+- [x] Write a **type-system spec doc** (`docs/type-system-spec.md`) and a "connection validation" guide; link from the README, mirroring Epic 1/2 docs discipline.
+- [x] **Resolve the `Epic 5` placeholders** in `colonymind/ir/port.py`, `params.py`, `edge.py`, `nodes/contract.py`, `nodes/spec.py`, `docs/ir-spec.md`, `docs/node-contract-spec.md`, `docs/authoring-a-node.md`, `docs/node-registry.md`, and ADRs 0005/0006 — pointing them at the now-real type system (and at Epic 10 for tensor dimensions specifically).
+- [x] Update `docs/authoring-a-node.md` so a node author learns how to choose/register a `data_type` token and override `infer_types`.
 
 ---
 

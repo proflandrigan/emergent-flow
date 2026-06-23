@@ -1,0 +1,106 @@
+# serializer version: 1
+# name: test_diagnostics_golden[any_wildcard]
+  dict({
+    'diagnostics': list([
+    ]),
+    'edge_compatibility': dict({
+      'e1': True,
+    }),
+  })
+# ---
+# name: test_diagnostics_golden[cardinality_violation]
+  dict({
+    'diagnostics': list([
+      dict({
+        'actual_type': None,
+        'code': 'cardinality_violation',
+        'edge_id': None,
+        'expected_type': None,
+        'message': "cardinality violation: port 'in0' IN port with cardinality 'one' accepts a single inbound edge but has 2",
+        'node_id': 'n-sink',
+        'port_id': 'p-in',
+        'port_name': 'in0',
+        'severity': 'error',
+      }),
+    ]),
+    'edge_compatibility': dict({
+    }),
+  })
+# ---
+# name: test_diagnostics_golden[compatible_chain]
+  dict({
+    'diagnostics': list([
+    ]),
+    'edge_compatibility': dict({
+      'e1': True,
+    }),
+  })
+# ---
+# name: test_diagnostics_golden[dangling_required_in]
+  dict({
+    'diagnostics': list([
+      dict({
+        'actual_type': None,
+        'code': 'required_input_unconnected',
+        'edge_id': None,
+        'expected_type': None,
+        'message': "required IN port 'in0' on node 'n-sink' has no inbound edge",
+        'node_id': 'n-sink',
+        'port_id': 'p-in',
+        'port_name': 'in0',
+        'severity': 'error',
+      }),
+    ]),
+    'edge_compatibility': dict({
+    }),
+  })
+# ---
+# name: test_diagnostics_golden[incompatible_edge]
+  dict({
+    'diagnostics': list([
+      dict({
+        'actual_type': 'HTML',
+        'code': 'type_incompatible',
+        'edge_id': 'e1',
+        'expected_type': 'DataFrame',
+        'message': "incompatible: target expects 'DataFrame', but source produces 'HTML'",
+        'node_id': 'n-sink',
+        'port_id': 'p-in',
+        'port_name': 'in0',
+        'severity': 'error',
+      }),
+    ]),
+    'edge_compatibility': dict({
+      'e1': False,
+    }),
+  })
+# ---
+# name: test_diagnostics_golden[subtype_acceptance]
+  dict({
+    'diagnostics': list([
+    ]),
+    'edge_compatibility': dict({
+      'e1': True,
+    }),
+  })
+# ---
+# name: test_diagnostics_golden[unregistered_token]
+  dict({
+    'diagnostics': list([
+      dict({
+        'actual_type': 'Mystery',
+        'code': 'type_unknown',
+        'edge_id': 'e1',
+        'expected_type': 'DataFrame',
+        'message': "unknown: source type 'Mystery' is not registered, so compatibility cannot be determined (source 'Mystery', target 'DataFrame')",
+        'node_id': 'n-sink',
+        'port_id': 'p-in',
+        'port_name': 'in0',
+        'severity': 'warning',
+      }),
+    ]),
+    'edge_compatibility': dict({
+      'e1': None,
+    }),
+  })
+# ---

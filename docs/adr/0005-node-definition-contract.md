@@ -80,6 +80,10 @@ in order.
 
 - **Discovery and registration** of definitions (the registry / plugin architecture) is
   Story 4; this ADR defines only the contract a registered node conforms to.
-- **Real type/shape inference** is Epic 5; `infer_types` here is a token-level placeholder.
+- **Type inference** is delivered by the connection type system (repo Epic 3 / roadmap
+  Epic 5): the whole-graph inference pass calls `infer_types` and feeds `cm.validate`
+  (see [ADR 0011](./0011-type-model-and-compatibility.md) and
+  [type-system-spec.md](../type-system-spec.md)). Per-dimension tensor *shape* inference
+  remains deferred to roadmap Epic 10.
 - The **production wrapped node families** (pandas, statsmodels, scikit-learn, …) are Story 8,
   built on this base class; the nodes in `colonymind.nodes.examples` are minimal references.

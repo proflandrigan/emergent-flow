@@ -7,8 +7,10 @@ A ``Param`` holds a named, typed parameter value.  Values are restricted to
 JSON-native scalars, homogeneous lists/dicts, or ``ArtifactRef`` location
 pointers (ADR 0004 — artifact bytes are never embedded).
 
-The full type system lives in Epic 5; ``type_token`` is an opaque label for
-now (e.g. ``"str"``, ``"int"``, ``"DataFrame"``).
+``type_token`` is a declared-type label for the param value (e.g. ``"str"``,
+``"int"``, ``"DataFrame"``). The connection type system (``colonymind.types``,
+``docs/type-system-spec.md``) governs *port* ``data_type`` compatibility; param
+``type_token`` is a descriptive label and is not part of that compatibility check.
 """
 
 from typing import Annotated, Any, Union
@@ -79,8 +81,9 @@ class Param(IRModel):
     name:
         Non-empty parameter name.
     type_token:
-        Opaque declared-type label (e.g. ``"str"``, ``"int"``, ``"DataFrame"``).
-        The real type system is Epic 5; this is a placeholder label only.
+        Declared-type label (e.g. ``"str"``, ``"int"``, ``"DataFrame"``). A
+        descriptive label for the param value, distinct from the port
+        ``data_type`` tokens the connection type system validates.
     value:
         Current serializable value.  Defaults to ``None``.
     default:

@@ -174,8 +174,10 @@ class NodeDefinition(ABC):
         """Infer the data-type token produced on each OUT port.
 
         The default returns each OUT port's declared ``data_type``.  Override for
-        nodes whose output type depends on inputs or params (full type/shape
-        inference is Epic 5).
+        nodes whose output type depends on inputs or params; the whole-graph
+        inference pass threads resolved upstream types in through ``input_types``
+        and feeds the result to ``cm.validate`` (see ``docs/type-system-spec.md``).
+        Per-dimension tensor shape inference is deferred to roadmap Epic 10.
 
         Parameters
         ----------
