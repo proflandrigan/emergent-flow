@@ -131,10 +131,10 @@
 > The roadmap's Epic-5 requirement that validation rules be "expressible in / shippable to the
 > client." This repo owns the rules; the separate canvas repo consumes them.
 
-- [ ] Export the **type catalog + subtype table + compatibility semantics** as a versioned, serialized artifact (JSON) the frontend can evaluate for instant edge feedback without a Python round-trip.
-- [ ] Export the **`Diagnostics` schema** (JSON Schema / Pydantic) so the canvas can render highlights and "why" tooltips against a stable contract.
-- [ ] Document the **authority model**: the frontend gives instant, best-effort feedback from the shipped rules; this SDK is the authoritative re-validator (server-side, Epic 6).
-- [ ] Version the exported rules artifact alongside the IR schema version so the frontend can detect drift (ties into Epic 14 migrations).
+- [x] Export the **type catalog + subtype table + compatibility semantics** as a versioned, serialized artifact (JSON) the frontend can evaluate for instant edge feedback without a Python round-trip.
+- [x] Export the **`Diagnostics` schema** (JSON Schema / Pydantic) so the canvas can render highlights and "why" tooltips against a stable contract.
+- [x] Document the **authority model**: the frontend gives instant, best-effort feedback from the shipped rules; this SDK is the authoritative re-validator (server-side, Epic 6).
+- [x] Version the exported rules artifact alongside the IR schema version so the frontend can detect drift (ties into Epic 14 migrations).
 
 ---
 

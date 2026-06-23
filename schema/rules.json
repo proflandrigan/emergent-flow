@@ -1,0 +1,19 @@
+{
+  "semantics": {
+    "exact": true,
+    "subtype": true,
+    "unknown": "warn",
+    "wildcard": "any"
+  },
+  "subtypes": [],
+  "top": "any",
+  "types": [
+    "AnovaResult",
+    "ClassifierResult",
+    "DataFrame",
+    "HTML",
+    "Tensor",
+    "any"
+  ],
+  "version": 1
+}

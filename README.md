@@ -229,6 +229,9 @@ colony-mind/
 - [How Codegen Works](./docs/how-codegen-works.md) — an overview of the codegen pipeline,
   the two paradigms, and the golden / equivalence quality gates that back the
   "what you see runs" promise.
+- [Connection Validation: Rules as a Portable Artifact](./docs/connection-validation.md) — the
+  type rules + `Diagnostics` schema shipped to the frontend canvas as data, and the
+  frontend-vs-SDK authority model.
 - [Versioning & Releases](./docs/versioning-and-releases.md) — Semantic Versioning policy and
   the tag-driven release process.
 - [Architecture Decision Records](./docs/adr/) — the foundational `§A` decisions.
