@@ -59,6 +59,9 @@ then generic JSON containers, falling back to `"unsupported"` for anything else.
 ### `scalar`
 
 `None`, `bool`, `int`, `float`, or a `str` of at most `MAX_TEXT_CHARS` (16384) characters.
+numpy scalars (`np.int64`, `np.bool_`, `np.float32`, …) are coerced to their native
+Python equivalents and reported as `scalar`. Non-finite floats (`NaN`/`Infinity`)
+become `null` so the payload is valid JSON for a browser's `JSON.parse`.
 
 ```json
 {"kind": "scalar", "value": 42}

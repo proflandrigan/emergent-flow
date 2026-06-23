@@ -13,6 +13,7 @@ import dataclasses
 import json
 import math
 
+import numpy as np
 import pandas as pd
 
 from colonymind.server.payload import MAX_HEAD_ROWS, MAX_TEXT_CHARS, to_payload
@@ -147,3 +148,21 @@ def test_duplicate_column_dataframe_does_not_crash() -> None:
     assert payload["columns"] == ["a", "a"]
     assert len(payload["head"]) == 2
     json.dumps(payload)  # still JSON-safe
+
+
+def test_numpy_scalars_become_native_scalars() -> None:
+    # numpy scalars are not Python int/bool subclasses, so without explicit
+    # handling they'd fall to "unsupported". They must coerce to native scalars.
+    assert to_payload(np.int64(7)) == {"kind": "scalar", "value": 7}
+    assert to_payload(np.bool_(True)) == {"kind": "scalar", "value": True}
+    f32 = to_payload(np.float32(1.5))
+    assert f32["kind"] == "scalar" and f32["value"] == 1.5
+    # native types survive the round trip
+    assert isinstance(to_payload(np.int64(7))["value"], int)
+    assert isinstance(to_payload(np.bool_(True))["value"], bool)
+
+
+def test_numpy_nonfinite_scalar_is_nulled() -> None:
+    payload = to_payload(np.float32("nan"))
+    assert payload == {"kind": "scalar", "value": None}
+    assert "NaN" not in json.dumps(payload)

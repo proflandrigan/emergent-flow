@@ -64,6 +64,16 @@ def to_payload(value: Any) -> dict[str, Any]:
             "truncated": True,
         }
 
+    import numpy as np
+
+    # numpy scalars (np.int64, np.bool_, np.float32, ...) are NOT Python
+    # int/bool subclasses, so without this they'd fall through to "unsupported".
+    # (np.float64/np.str_ ARE native subclasses and were handled above.) Convert
+    # to the native Python scalar via .item() and re-dispatch so it lands in the
+    # "scalar" branch with the same NaN/Inf sanitizing.
+    if isinstance(value, np.generic):
+        return to_payload(value.item())
+
     import pandas as pd
 
     if isinstance(value, pd.DataFrame):
