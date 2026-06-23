@@ -116,3 +116,34 @@ def test_payload_always_json_serializable() -> None:
     ]
     for sample in samples:
         json.dumps(to_payload(sample))
+
+
+def test_nonfinite_scalar_is_valid_json() -> None:
+    # json.dumps(allow_nan=True) would emit the bare token `NaN`, which Python's
+    # own loads accepts but a browser's JSON.parse rejects -- the contract's real
+    # consumer. NaN/Inf must serialize to a spec-valid `null`.
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        payload = to_payload(bad)
+        assert payload == {"kind": "scalar", "value": None}
+        assert "NaN" not in json.dumps(payload)
+        assert "Infinity" not in json.dumps(payload)
+
+
+def test_nonfinite_inside_json_container_is_nulled() -> None:
+    payload = to_payload({"vals": [1.0, float("nan"), float("inf")]})
+    assert payload["kind"] == "json"
+    assert payload["value"] == {"vals": [1.0, None, None]}
+    json.dumps(payload)  # spec-valid: no NaN/Infinity tokens
+
+
+def test_duplicate_column_dataframe_does_not_crash() -> None:
+    # to_json(orient="records") raises on duplicate column labels; because
+    # to_payload runs after the per-node try/except in service.py, an unhandled
+    # raise here would escape as a top-level 422 and wipe every node's results.
+    df = pd.DataFrame([[1, 2], [3, 4]], columns=["a", "a"])
+    payload = to_payload(df)
+    assert payload["kind"] == "table"
+    assert payload["shape"] == [2, 2]
+    assert payload["columns"] == ["a", "a"]
+    assert len(payload["head"]) == 2
+    json.dumps(payload)  # still JSON-safe

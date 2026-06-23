@@ -15,11 +15,31 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import math
 from typing import Any
 
 PAYLOAD_CONTRACT_VERSION = 1  # standalone; NOT tied to IR schema_version
 MAX_HEAD_ROWS = 50  # DataFrame rows sampled into `head`
 MAX_TEXT_CHARS = 16384  # cap for long strings / repr fallback
+
+
+def _sanitize_nonfinite(value: Any) -> Any:
+    """Recursively replace NaN/Infinity floats with ``None``.
+
+    ``json.dumps`` defaults to ``allow_nan=True``, which silently writes the
+    non-standard ``NaN``/``Infinity``/``-Infinity`` tokens -- valid to Python's own
+    decoder but **not** valid JSON, so a browser's ``JSON.parse`` (the actual
+    consumer of this contract) would choke on them. Pre-walk the structure and
+    remap non-finite floats to ``None``, matching how ``DataFrame.to_json``
+    already maps NaN to ``null``, before handing off to ``json.dumps``.
+    """
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {k: _sanitize_nonfinite(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_nonfinite(v) for v in value]
+    return value
 
 
 def to_payload(value: Any) -> dict[str, Any]:
@@ -32,7 +52,7 @@ def to_payload(value: Any) -> dict[str, Any]:
     ``"unsupported"`` for anything else (e.g. a ``torch.nn.Module``).
     """
     if value is None or isinstance(value, (bool, int, float)):
-        return {"kind": "scalar", "value": value}
+        return {"kind": "scalar", "value": _sanitize_nonfinite(value)}
 
     if isinstance(value, str):
         if len(value) <= MAX_TEXT_CHARS:
@@ -47,7 +67,19 @@ def to_payload(value: Any) -> dict[str, Any]:
     import pandas as pd
 
     if isinstance(value, pd.DataFrame):
-        head = json.loads(value.head(MAX_HEAD_ROWS).to_json(orient="records"))
+        sample = value.head(MAX_HEAD_ROWS)
+        try:
+            # to_json(orient="records") requires unique column labels; most
+            # DataFrames satisfy that, but a duplicate-column frame (e.g. from a
+            # merge/pivot upstream) would otherwise raise and crash the whole
+            # /execute response instead of degrading this one OUT port.
+            head = json.loads(sample.to_json(orient="records"))
+        except ValueError:
+            head = [
+                {str(col): cell for col, cell in zip(value.columns, row, strict=True)}
+                for row in sample.itertuples(index=False, name=None)
+            ]
+            head = json.loads(json.dumps(_sanitize_nonfinite(head), default=str))
         return {
             "kind": "table",
             "columns": [str(c) for c in value.columns],
@@ -69,7 +101,7 @@ def to_payload(value: Any) -> dict[str, Any]:
 
     if isinstance(value, (list, tuple, dict)):
         try:
-            return {"kind": "json", "value": json.loads(json.dumps(value))}
+            return {"kind": "json", "value": json.loads(json.dumps(_sanitize_nonfinite(value)))}
         except (TypeError, ValueError):
             pass
 

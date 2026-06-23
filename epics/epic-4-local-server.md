@@ -71,7 +71,7 @@
 - [x] Define a JSON-safe, **sized** payload per OUT port: small scalars/JSON inline; tabular results as `{columns, dtypes, shape, head: [...]}` with a truncation flag ("showing N of M").
 - [x] Replace the v0 `repr`/`to_dict` best-effort coercion (Story 1) with this typed contract.
 - [x] Never serialize a full large DataFrame into the response — sample/truncate to `head` at the server.
-- [x] Version the payload shape alongside the IR schema; document it in `docs/`.
+- [x] Version the payload shape with its own standalone version (decoupled from the IR schema version, to avoid spurious migrations); document it in `docs/`.
 - [x] Tests: a wide/long DataFrame truncates to the declared `head`.
 - [ ] **Deferred to roadmap Epic 8:** rich/large result types (e.g. HTML reports as a lazily-fetched reference/blob) — extend this contract only when a node actually emits them and Epic 8 renders them, to avoid building a blob-fetch path with no consumer.
 
