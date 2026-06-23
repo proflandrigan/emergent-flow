@@ -14,9 +14,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from colonymind.api import public_op
 from colonymind.codegen.validation import Diagnostics
 
 
+@public_op(name="cm.diagnostics_json_schema")
 def diagnostics_json_schema() -> dict[str, Any]:
     """Return the JSON Schema for a ``Diagnostics`` result, derived from the Pydantic model."""
     return Diagnostics.model_json_schema()

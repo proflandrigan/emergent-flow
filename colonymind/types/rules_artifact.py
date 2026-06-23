@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from colonymind.api import public_op
 from colonymind.ir.graph import CURRENT_SCHEMA_VERSION
 from colonymind.types.registry import TypeRegistry
 from colonymind.types.registry import registry as default_registry
@@ -33,6 +34,7 @@ COMPATIBILITY_SEMANTICS: dict[str, Any] = {
 }
 
 
+@public_op(name="cm.build_rules_artifact")
 def build_rules_artifact(
     registry: TypeRegistry = default_registry,
     *,
