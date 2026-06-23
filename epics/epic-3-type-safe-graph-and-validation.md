@@ -1,11 +1,12 @@
 # Epic 3 — Type-Safe Graph & Connection Validation
 
-> **Repo ↔ roadmap numbering.** This file is repo **Epic 3** (third epic delivered here) =
+> **Repo ↔ roadmap numbering.** This file is repo **Epic 3** (third epic delivered in the SDK) =
 > roadmap **Epic 5**. The roadmap's literal **Epic 3** is the *Frontend Canvas Engine*
-> (React/TS) and is **not** delivered in this repo — it ships in the separate
-> `colony-mind-canvas` repo and consumes this epic's rules-as-data. Cross-references in the
-> prose below use **roadmap** numbers. See [`epics/README.md`](./README.md) for the full
-> mapping; the per-epic "Numbering note" just below expands the rationale.
+> (React/TS); it is not part of the SDK tree — it ships in the **`ui/` tree** of this same repo
+> (per [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)) and consumes this epic's
+> rules-as-data. Cross-references in the prose below use **roadmap** numbers. See
+> [`epics/README.md`](./README.md) for the full mapping; the per-epic "Numbering note" just
+> below expands the rationale.
 
 > Prevent invalid graphs before execution. Edges carry types (`DataFrame`,
 > `ClassifierResult`, `Tensor`, `HTML`, …); incompatible connections are caught with a
@@ -154,7 +155,7 @@
 
 ## Notes / Risks (carry into planning)
 
-- **The roadmap's literal Epic 3 (Frontend Canvas) does not belong in this repo.** It is a React Flow / TypeScript app with its own toolchain (`npm`/Vite/Vitest) and lives in a separate repo (e.g. `colony-mind-canvas`); a third repo (`colony-mind-server`) will host the FastAPI/execution backend (Epic 6). The boundary between them is the **IR schema + generated-code string + the rules-as-data artifact (Story 7)**, never a shared Python import — exactly the one-way, IR-is-source-of-truth contract of ADR 0001 and the open-core split of ADR 0007. This epic is what gives that future canvas its instant, explainable connection validation.
+- **The roadmap's literal Epic 3 (Frontend Canvas) does not belong in the SDK tree.** It is a React Flow / TypeScript app with its own toolchain (`npm`/Vite/Vitest) and lives in the **`ui/` tree** of this repo; the **`colonymind/server/` tree** hosts the thin local execution backend (Epic 6). All three are one bundled package per [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md). The boundary between the canvas and the SDK is the **IR schema + generated-code string + the rules-as-data artifact (Story 7)**, never a shared Python import — exactly the one-way, IR-is-source-of-truth contract of ADR 0001 and the open-core split of ADR 0007, now enforced by a CI boundary check rather than a repo wall. This epic is what gives that canvas its instant, explainable connection validation.
 - **Don't build tensor dimension inference.** That is roadmap Epic 10 and depends on PyTorch meta-tensor / FakeTensor tracing. This epic stops at *structural* typing: `Tensor`→`Tensor` is compatible here; whether the *dims* line up is Epic 10's job, layered on this framework. Conflating the two re-introduces a torch dependency the repo deliberately avoids (`pytest.importorskip("torch")`).
 - **Validation must not block construction.** `Graph._validate_structure` hard-rejects malformed structure at build time; type/cardinality validation is deliberately a *separate* `cm.validate` call so the canvas can hold half-wired, exploratory graphs and still inspect them. Keep the two layers distinct.
 - **Equivalence (ADR 0002) extends to rejection.** Both `compile_to_code` and `execute` must reject the same invalid graphs for the same reasons — add *negative* equivalence tests, and route both through one shared gate (the `_prepare_declarative` pattern), or the two pure functions will drift on error handling.

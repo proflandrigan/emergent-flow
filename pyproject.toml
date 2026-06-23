@@ -54,6 +54,12 @@ Homepage = "https://github.com/proflandrigan/colony-mind"
 Repository = "https://github.com/proflandrigan/colony-mind"
 Issues = "https://github.com/proflandrigan/colony-mind/issues"
 
+# ADR 0013 Decision 2 / roadmap §A6: `pip install colonymind` provides a launch
+# command that boots the thin local canvas server, calling cm.* in-process. The
+# v0 uses the stdlib http.server, so this adds no runtime dependencies.
+[project.scripts]
+colonymind = "colonymind.cli:main"
+
 [dependency-groups]
 dev = [
     "pytest>=7",

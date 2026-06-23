@@ -23,7 +23,7 @@ Before the epics, §A fixes the cross-cutting architectural decisions that shape
 
 ## A. Foundational architectural decisions (read first)
 
-These five decisions are upstream of nearly every epic. Getting them right early is cheaper than retrofitting.
+These six decisions are upstream of nearly every epic. Getting them right early is cheaper than retrofitting.
 
 ### A1. The graph is the single source of truth; code is a compiled artifact
 
@@ -58,6 +58,18 @@ The proposal repeatedly names Redis as the cache. Redis is an in-memory store �
 
 ### A5. The frontend canvas is a separate repo that consumes the IR — not a co-equal codebase
 
+> **⚠️ Superseded (topology only) by [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md), accepted 2026-06-23.**
+> The product no longer ships as three repos. It is **one repo, one `pip install colonymind`
+> package with the canvas UI bundled in** (the JupyterLab model): `colony-mind-canvas` becomes
+> the `ui/` directory and `colony-mind-server` becomes `colonymind/server/`, both inside this
+> repo. **The coupling invariant below still holds verbatim** — the UI never `import`s
+> `colonymind`, and the only artifacts crossing the boundary are the same three named in this
+> section (IR JSON Schema, `compile_to_code` output, rules-as-data). What changed is *where the
+> code lives and how it ships*, enforced now by a CI boundary check instead of a repo wall.
+> Read the rest of this section as the rationale for the **contract**, which survives; ignore
+> its repo-count recommendation. Wherever this doc says `colony-mind-canvas` /
+> `colony-mind-server`, read "the `ui/` and `colonymind/server/` trees of `colony-mind`."
+
 The proposal draws the canvas (React Flow / Tailwind / Vite) and the SDK (Pandas / Pingouin / PyTorch …) as two layers of one system, which invites treating them as one codebase. The trap is co-locating a TypeScript frontend and a Python SDK in a single repo: two unrelated toolchains (`npm`/Vite/Vitest vs. `uv`/`ruff`/`mypy`/`pytest`), two CI matrices, and two dependency trees fighting in one tree — and, worse, a temptation for the frontend to reach into Python internals instead of through the published contract.
 
 **Recommendation:** Split by toolchain into separate repos that couple **only through serialized artifacts**, never a shared source import:
@@ -74,39 +86,59 @@ The boundary the canvas consumes from the SDK is exactly three published, versio
 
 **Consequences to communicate.** The frontend never `import`s `colonymind`; it talks to the IR contract (Phase 1, no backend) and later to `colony-mind-server` over REST/WebSocket (Phase 2+). This keeps the one-way, IR-is-source-of-truth model (A1), the execute-the-IR equivalence model (A2), and the open-core boundary (which is partly *a repo boundary*: SDK open, canvas/server are the product) all clean. The cost the SDK must pay back: it must **publish stable, serializable schemas and rule artifacts** (versioned alongside the IR schema) as first-class outputs, because a separate frontend can only be as good as the contract it's handed.
 
+### A6. The happy path is local and in-process; enterprise scale-out is the hosted product
+
+The bundled `pip install colonymind` package ([ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)) is a **single-user, local-first app** in the JupyterLab mould: `cm lab` (or `colonymind serve`) starts a thin FastAPI server on localhost that calls the SDK **in-process**, the same way a Jupyter kernel runs your code on your own machine. That sets the near-term *happy path* and is the antidote to over-architecting either side:
+
+- **Execution (Epic 6):** the local server calls `cm.execute(ir)` directly — no Celery, no broker, no container-per-session. The reference executor is already pure (A2), so in-process execution is correct and trivially "what-you-see-is-what-runs."
+- **Caching (Epic 7):** a simple in-memory + on-disk cache keyed by the existing execution hash (Parquet/safetensors under a project cache dir) — **no Redis, no object-store tiering**.
+- **Persistence (Epic 14):** local files — the IR JSON plus `cm.export_script` output — which already exist. No project database.
+- **Trust model:** like Jupyter, you run your own code on your own machine, so the local app needs **no sandbox, no auth, no multi-tenancy**.
+
+Everything heavyweight in the proposal — container-per-session sandboxing, Celery/distributed workers, managed Redis + object-store tiering, multi-tenancy and auth, real-time multiplayer, premium connectors, billing — is **deferred to the gated hosted product** (the proprietary platform of [ADR 0007](../docs/adr/0007-open-core-licensing-boundary.md): the dbt-Cloud to this dbt-core). Those epics keep their full designs below, but they are explicitly **not** on the bundled package's critical path; each is tagged **(hosted)** where it applies. Build the local happy path first; reach for the scale-out architecture only when the hosted offering needs it.
+
 ---
 
 ## B. Repo map: which epic lives where, and when frontend work unblocks
 
-Per §A5, this product is **three repos**, not one, coupled only through published, versioned
-artifacts. Before diving into individual epics, this section gives the at-a-glance map: which
-track (repo) owns each epic, and — for everything that touches the frontend — exactly what
-SDK contract has to exist before that frontend work can begin.
+Per §A5 **as amended by [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)**, this
+product is **one repo and one package**, not three repos — the `colony-mind-canvas` and
+`colony-mind-server` columns below now denote the `ui/` and `colonymind/server/` *directories*
+of this single `colony-mind` repo, not separate repositories. The track ownership, the
+published-contract boundary, and the "what must exist before frontend work begins" sequencing
+are all unchanged; only the repo count collapsed. Before diving into individual epics, this
+section gives the at-a-glance map: which track owns each epic, and — for everything that
+touches the frontend — exactly what SDK contract has to exist before that frontend work can
+begin.
 
-### B1. Epic → Track → Repo
+### B1. Epic → Track → Tree (one repo)
 
-| Epic | Title | Track | Repo |
+The **Tree** column gives the directory inside the single `colony-mind` repo (per ADR 0013), and
+flags **(hosted)** where the enterprise build-out of an epic belongs to the gated hosted product
+(A6) rather than the bundled package.
+
+| Epic | Title | Track | Tree (one repo) |
 | :-- | :-- | :-- | :-- |
-| 1 | Core SDK & Graph IR | **Python SDK** | `colony-mind` |
-| 2 | Code Generation Engine | **Python SDK** | `colony-mind` |
-| 3 | Frontend Canvas Engine | **Frontend** | `colony-mind-canvas` |
-| 4 | Node Library & Configuration UX | **Frontend** (config-panel UI) + **Python SDK** (node catalog/defaults) — *split* | `colony-mind-canvas` + `colony-mind` |
-| 5 | Type-Safe Graph & Connection Validation | **Cross-cutting** — SDK owns the type system + rules; canvas consumes the rules-as-data for live feedback — *split* | `colony-mind` (owns) / `colony-mind-canvas` (consumes) |
-| 6 | Backend Execution Runtime & Sandboxing | **Backend/Server** | `colony-mind-server` |
-| 7 | DAG Caching & Incremental State Management | **Backend/Server** | `colony-mind-server` |
-| 8 | Result Rendering & In-Node Visualization | **Frontend** (rendering) + **Backend/Server** (heavy-artifact rendering, payload shaping) — *split* | `colony-mind-canvas` + `colony-mind-server` |
-| 9 | Data Connectors & Credential Management | **Backend/Server** | `colony-mind-server` |
-| 10 | Deep Learning Module & Tensor Shape Resolution | **Python SDK** (layer nodes, declarative codegen, shape inference) + **Frontend** (real-time shape-mismatch UI) — *split* | `colony-mind` + `colony-mind-canvas` |
-| 11 | GenAI & Multi-Agent Orchestration | **Python SDK** (nodes, codegen) + **Backend/Server** (execution, cost tracking) + **Frontend** (live message/token viz) — *split* | all three |
-| 12 | Canvas-Aware Coding Agent (NL → graph) | **Cross-cutting** — agent logic likely SDK/server-side, propose/apply UX is frontend | `colony-mind` / `colony-mind-server` + `colony-mind-canvas` |
-| 13 | Real-Time Multiplayer Collaboration | **Frontend** (presence/cursors/CRDT client) + **Backend/Server** (sync transport) — *split* | `colony-mind-canvas` + `colony-mind-server` |
-| 14 | Project Persistence, Versioning & Git Sync | **Python SDK** (schema migrations, IR/export format) + **Backend/Server** (project storage) — *split* | `colony-mind` + `colony-mind-server` |
-| 15 | Platform Infrastructure, Security & Observability | **Cross-cutting** (underpins 6–13; mostly server/infra) | `colony-mind-server` (+ deployment infra) |
+| 1 | Core SDK & Graph IR | **Python SDK** | `colonymind/` |
+| 2 | Code Generation Engine | **Python SDK** | `colonymind/` |
+| 3 | Frontend Canvas Engine | **Frontend** | `ui/` |
+| 4 | Node Library & Configuration UX | **Frontend** (config-panel UI) + **Python SDK** (node catalog/defaults) — *split* | `ui/` + `colonymind/` |
+| 5 | Type-Safe Graph & Connection Validation | **Cross-cutting** — SDK owns the type system + rules; canvas consumes the rules-as-data for live feedback — *split* | `colonymind/` (owns) / `ui/` (consumes) |
+| 6 | Backend Execution Runtime & Sandboxing | **Backend/Server** | `colonymind/server/` — local in-process is the happy path; sandbox/distributed is **(hosted)** |
+| 7 | DAG Caching & Incremental State Management | **Backend/Server** | `colonymind/server/` — on-disk cache is the happy path; Redis+object-store tiering is **(hosted)** |
+| 8 | Result Rendering & In-Node Visualization | **Frontend** (rendering) + **Backend/Server** (heavy-artifact rendering, payload shaping) — *split* | `ui/` + `colonymind/server/` |
+| 9 | Data Connectors & Credential Management | **Backend/Server** | `colonymind/server/` — basic/local connectors are the happy path; premium connectors are **(hosted)** |
+| 10 | Deep Learning Module & Tensor Shape Resolution | **Python SDK** (layer nodes, declarative codegen, shape inference) + **Frontend** (real-time shape-mismatch UI) — *split* | `colonymind/` + `ui/` |
+| 11 | GenAI & Multi-Agent Orchestration | **Python SDK** (nodes, codegen) + **Backend/Server** (execution, cost tracking) + **Frontend** (live message/token viz) — *split* | `colonymind/` + `colonymind/server/` + `ui/` |
+| 12 | Canvas-Aware Coding Agent (NL → graph) | **Cross-cutting** — agent logic likely SDK/server-side, propose/apply UX is frontend | `colonymind/` / `colonymind/server/` + `ui/` |
+| 13 | Real-Time Multiplayer Collaboration | **Frontend** (presence/cursors/CRDT client) + **Backend/Server** (sync transport) — *split* | `ui/` + `colonymind/server/` — **(hosted)** |
+| 14 | Project Persistence, Versioning & Git Sync | **Python SDK** (schema migrations, IR/export format) + **Backend/Server** (project storage) — *split* | `colonymind/` + `colonymind/server/` |
+| 15 | Platform Infrastructure, Security & Observability | **Cross-cutting** (underpins 6–13; mostly server/infra) | `colonymind/server/` — **(hosted)** apart from basic local logging |
 
-This repo (`colony-mind`) ships Epics 1, 2, and 5 (rules-owning half) outright, plus the SDK-side
-slices of 4, 10, 11, and 14. Everything else lives downstream in `colony-mind-canvas` or
-`colony-mind-server` and only ever touches this repo through the three published artifacts
-named in §A5.
+This repo ships Epics 1, 2, and 5 (rules-owning half) outright in `colonymind/`, plus the SDK-side
+slices of 4, 10, 11, and 14. The rest lives in the `ui/` and `colonymind/server/` trees of this
+same repo and only ever touches the SDK through the three published artifacts named in §A5 — and
+the heavyweight `colonymind/server/` pieces are deferred to the hosted product per A6.
 
 ### B2. Frontend readiness: what's the gate, and is it met?
 
@@ -186,9 +218,9 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 
 ### Epic 3 — Frontend Canvas Engine
 
-**Goal:** A fluid infinite canvas: node creation, pan/zoom, edge drawing, selection, grouping/sub-graph nesting, and an extensible node-rendering framework — performant at hundreds-to-thousands of nodes.
+**Goal:** A fluid infinite canvas: node creation, pan/zoom, edge drawing, selection, grouping/sub-graph nesting, and an extensible node-rendering framework — performant at hundreds-to-thousands of nodes. *(Happy-path decomposition: repo Epic 5 ships flat node/edge interaction for the canvas→IR→code→execute loop first; grouping/sub-graph nesting is deferred to after the loop — repo Epic 5 Story 3 deferred item — since the IR already models subgraphs and nesting is a UI affordance, not on the critical path.)*
 
-**Repo / boundary (per A5):** This epic lives in its own frontend repo (`colony-mind-canvas`), *not* in the Python SDK repo. It consumes the SDK's published contract — the IR JSON Schema, the `compile_to_code` output, and the Epic-5 rules-as-data — and never imports `colonymind`. Plan the SDK side to *publish* those artifacts; plan this epic against them.
+**Tree / boundary (per A5, as amended by [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)):** This epic lives in the `ui/` tree of the one repo, *not* in the `colonymind/` SDK tree. It consumes the SDK's published contract — the IR JSON Schema, the `compile_to_code` output, and the Epic-5 rules-as-data — and never imports `colonymind`; the contract-only coupling is now enforced by a CI boundary check rather than a repo wall. Plan the SDK side to *publish* those artifacts; plan this epic against them.
 
 **Scope**
 - In: canvas runtime; node/edge rendering; interaction (drag, connect, multi-select, group); sub-graph nesting/collapse; the per-node config-panel framework; in-node "show code" view (consumes Epic 2 output).
@@ -242,7 +274,7 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 - **Strictness.** Strict static typing catches errors early but can feel rigid for exploratory work. Recommend strict on structural type (you cannot wire a Model into a DataFrame input) with softer, warn-don't-block handling for things only knowable at runtime.
 - **Where validation runs.** The frontend (separate repo, A5) needs enough of the type system to give instant feedback without a round-trip; the backend re-validates authoritatively. Plan for the rules to be expressible as **data shippable to the client** — a versioned type-catalog + compatibility-table artifact — not as Python the canvas would have to call. This artifact is the third leg of the SDK→canvas contract (A5), alongside the IR schema and the codegen output.
 
-**Repo / boundary (per A5):** This epic lives in the Python SDK repo and *owns* the type system and rules. The "live UI feedback" it enables is rendered by the separate `colony-mind-canvas` repo, which consumes the exported rules artifact and the `Diagnostics` schema — it does not import this code. The SDK is the authoritative re-validator (server-side, Epic 6).
+**Tree / boundary (per A5, as amended by [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)):** This epic lives in the `colonymind/` SDK tree and *owns* the type system and rules. The "live UI feedback" it enables is rendered by the `ui/` tree of the same repo, which consumes the exported rules artifact and the `Diagnostics` schema — it does not import this code. The SDK is the authoritative re-validator (in-process locally, server-side in the hosted tier, Epic 6).
 
 **Dependencies:** Epic 1 (port types in the IR), Epic 2 (the codegen/execute gate the validation hooks into). The canvas (Epic 3, separate repo) is a *consumer* of this epic's rules artifact, not a dependency.
 
@@ -255,16 +287,19 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 
 ### Epic 6 — Backend Execution Runtime & Sandboxing
 
-**Goal:** A live server that turns "Execute" into real Python runs, isolated and resource-bounded, with progress/logs streamed back to the canvas.
+**Goal:** A live server that turns "Execute" into real Python runs, with progress/logs streamed back to the canvas.
+
+**Happy path vs. hosted (per A6):** the bundled app's first deliverable is a thin **local** FastAPI server (`cm lab` / `colonymind serve`) that calls `cm.execute(ir)` **in-process** on localhost — no Celery, no broker, **no sandbox** (you run your own code on your own machine, Jupyter-style). The Celery workers, container-per-session sandboxing, resource caps, and distributed/remote compute in the scope below are **(hosted product)** concerns: keep the executor pure (A2) so the hosted tier can wrap it later, but do not build them into the bundled package.
 
 **Scope**
-- In: FastAPI gateway; Celery (or equivalent) task workers; execution of the IR (per A2); sandboxing/isolation; resource limits (CPU/mem/time); streaming logs and progress to the frontend over WebSockets.
+- In (bundled / happy path): a thin **local** server (`colonymind serve` / `cm lab`) that executes the IR (per A2) **in-process** via `cm.execute`; streaming logs/progress to the canvas; "run this node / run to here / run all" granularity. *(Happy-path decomposition: repo Epic 4 ships **run-all + per-node status** first [Story 2]; finer-grained "run this node / run to here" is deferred to repo Epic 4 Story 6, sequenced with the Epic 7 cache.)*
+- In (hosted, deferred): FastAPI gateway at scale; Celery (or equivalent) task workers; container-per-session sandboxing/isolation; resource limits (CPU/mem/time); controlled network egress. These activate only for the gated hosted product (A6).
 - Out: caching logic (Epic 7); result rendering (Epic 8); connectors (Epic 9).
 
 **Key design decisions & options**
 - **Isolation model.** Options: process-per-execution, container-per-session, or persistent kernels (Jupyter-style). Recommend **container-per-session** (or per-execution for untrusted code) with strict CPU/memory/timeout caps and controlled network egress — non-negotiable once raw-code nodes (Epic 4) or LLM-generated code (Epic 12) exist.
 - **Where compute runs.** A single FastAPI process cannot handle the proposal's own 10 GB-CSV example. Plan from the start for workers as separate, scalable units, with a path toward remote/distributed execution. State the scaling assumptions explicitly.
-- **Execution granularity.** Support "run this node" / "run to here" / "run all," which the caching layer (Epic 7) makes efficient.
+- **Execution granularity.** Support "run this node" / "run to here" / "run all," which the caching layer (Epic 7) makes efficient. *(Repo Epic 4 delivers "run all" up front [Story 2]; "run this node / run to here" is deferred to repo Epic 4 Story 6 to land with the cache rather than ahead of it.)*
 
 **Dependencies:** Epics 1–2; pairs tightly with Epic 7.
 
@@ -279,8 +314,11 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 
 **Goal:** Editing a downstream parameter re-runs only what changed. (Proposal Challenge 1.)
 
+**Happy path vs. hosted (per A6):** the bundled app uses a simple in-memory + on-disk cache keyed by the execution hash (Parquet/safetensors under a project cache dir). The Redis-metadata + object-store tiering (A4) and cross-user/shared caching below are **(hosted product)** optimizations — the local app needs neither.
+
 **Scope**
-- In: per-node **execution hash** (node config + ordered upstream output hashes + SDK/dependency version); backward dependency tracing; cache lookup/store; invalidation on change; the tiered artifact store from A4.
+- In (bundled / happy path): per-node **execution hash** (node config + ordered upstream output hashes + SDK/dependency version); backward dependency tracing; cache lookup/store; invalidation on change; a simple in-memory + **on-disk** artifact store under a project cache dir.
+- In (hosted, deferred): the tiered artifact store from A4 (Redis metadata + object store for large artifacts). A scale-out optimization for the hosted product (A6), not the local app.
 - Out: cross-user/shared caching (later optimization).
 
 **Key design decisions & options**
@@ -302,7 +340,7 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 **Goal:** Execution results (tables, distributions, charts, profiling reports) render richly *inside* nodes on the canvas, not just in a separate console.
 
 **Scope**
-- In: serialization of results to renderable payloads; in-node tables, charts, distribution plots (lightweight SVG/canvas); embedding of generated HTML reports (YData-Profiling/Sweetviz); handling large results (paginate/sample, never dump 10M rows into the DOM).
+- In: serialization of results to renderable payloads; in-node tables, charts, distribution plots (lightweight SVG/canvas); embedding of generated HTML reports (YData-Profiling/Sweetviz); handling large results (paginate/sample, never dump 10M rows into the DOM). *(Repo Epic 4 Story 3 defines the minimal scalar+table result-payload contract up front; the rich/large result types here — HTML reports as lazily-fetched references/blobs — are deferred to this epic, extended onto that contract only when a node actually emits them.)*
 - Out: collaborative cursors/comments (Epic 13).
 
 **Key design decisions & options**
@@ -323,7 +361,8 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 **Goal:** Pull from real sources — SQL/warehouses, cloud object storage, file uploads — with secure credential handling.
 
 **Scope**
-- In: a connector framework; first connectors (Postgres/SQL, CSV/Parquet upload, an object store); secrets storage and per-user/per-workspace credential scoping.
+- In (bundled / happy path): a connector framework; a few basic/local connectors (CSV/Parquet upload, local files, one SQL source); secrets kept out of the IR and stored locally (a local secrets file / OS keyring).
+- In (hosted, deferred): managed per-user/per-workspace credential scoping and a secret store; premium/managed connectors. Hosted-product concerns (A6).
 - Out: a long tail of niche connectors (incremental).
 
 **Key design decisions & options**
@@ -407,6 +446,8 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 
 **Goal:** Figma-style concurrent editing — multiple users on one canvas with live presence, cursors, and conflict-free merging.
 
+**(Hosted product, per A6):** multiplayer is a hosted-platform feature, not part of the bundled single-user app. Keep the IR CRDT-friendly in Epic 1 so it can be added without a rewrite, but do not build sync transport into the bundled package.
+
 **Scope**
 - In: concurrent graph editing (CRDT/OT), presence/cursors, comments; conflict resolution on the IR.
 - Out: fine-grained permissioning beyond basic share (can layer on later).
@@ -449,9 +490,12 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 
 **Goal:** The connective tissue: auth, multi-tenancy, deployment, secrets, monitoring, and the observability needed to debug user pipelines.
 
+**Happy path vs. hosted (per A6):** the bundled local app needs almost none of this — localhost, single user, no tenant model, no deploy pipeline. Auth/authz, the workspace/tenant model, managed deployment & CI/CD, and cross-service tracing are **(hosted product)** concerns. The only Phase-2 infra the bundled app needs is basic local logging and surfacing errors back into nodes.
+
 **Scope**
-- In: authn/authz; workspace/tenant model; deployment & CI/CD; secrets management (pairs with Epic 9); logging/metrics/tracing across canvas → backend → workers; execution observability (streaming logs, progress, error surfacing back to nodes).
-- Out: nothing structurally — but it activates with the backend (Phase 2), since Phase 1 is frontend-only.
+- In (bundled / happy path): basic local logging and execution observability — streaming logs, progress, and surfacing errors back into nodes. That is *all* the bundled local app needs.
+- In (hosted, deferred): authn/authz; workspace/tenant model; deployment & CI/CD; managed secrets (pairs with Epic 9); cross-service tracing across canvas → backend → workers. Hosted-product concerns (A6) — do not stand them up to make local Execute work.
+- Out: nothing structurally — but the hosted half activates only when the hosted offering does; the bundled app (Phases 1–2) needs only the local-logging sliver above.
 
 **Key design decisions & options**
 - **Deployment target.** Cloud-hosted SaaS vs. self-hostable (enterprise data-residency is a stated competitor weakness to exploit). Recommend designing for both — containerized, config-driven — even if SaaS ships first.
@@ -471,19 +515,19 @@ Epics are numbered for reference, not strictly for execution order. §E gives th
 The proposal's phasing is sound; two adjustments are recommended.
 
 **Phase 1 — Foundation (SDK + static canvas, no backend execution).**
-Epics 1, 2, 3, 4 (initial vertical slice), 5 (structural typing), 14 (basic save/load + export). Deliverable: a frontend-only canvas that maps a node graph to flawless, downloadable Python. Strongest early de-risking milestone — the whole "glass-box codegen" thesis is provable here without infrastructure. Note that even in Phase 1 this is **two repos** (A5): the Python SDK (Epics 1, 2, 5, 14) and the `colony-mind-canvas` frontend (Epics 3, 4 surface), coupled only by the published IR schema, codegen output, and rules artifact.
+Epics 1, 2, 3, 4 (initial vertical slice), 5 (structural typing), 14 (basic save/load + export). Deliverable: a frontend-only canvas that maps a node graph to flawless, downloadable Python. Strongest early de-risking milestone — the whole "glass-box codegen" thesis is provable here without infrastructure. Note that even in Phase 1 this is **two toolchains in one repo** ([ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md), superseding the original "two repos" framing of A5): the Python SDK (Epics 1, 2, 5, 14) and the `ui/` frontend tree (Epics 3, 4 surface), coupled only by the published IR schema, codegen output, and rules artifact.
 
-**Phase 2 — Living Bridge (reactive backend).**
-Epics 6, 7, 8, 9, plus 15 spinning up (auth/infra/security/observability), and 14 maturing (migrations). Deliverable: "Execute" runs real Python, with incremental caching and rich results rendered back into the canvas.
+**Phase 2 — Living Bridge (local reactive backend, bundled).**
+On the happy path (A6) this is a thin **local** FastAPI server inside the package (`cm lab` / `colonymind serve`) that runs `cm.execute(ir)` **in-process**: Epic 6 (in-process execution + WebSocket progress), Epic 7 (simple on-disk cache), Epic 8 (result rendering), Epic 9 (basic local connectors), and Epic 14 maturing (migrations). The enterprise build-out of these epics — sandboxed/distributed execution, Redis+object-store tiering, auth/multi-tenancy/deploy (Epic 15) — is **deferred to the hosted product**, not the bundled package. Deliverable: "Execute" runs real Python locally, with incremental caching and rich results rendered back into the canvas.
 
 **Phase 3 — Frontier (DL, GenAI, agents).**
-Epics 10, 11, 12, and 5's tensor-dimension layer. Deliverable: visual deep learning with shape validation, visual agent orchestration, and the natural-language canvas agent.
+Epics 10, 11, 12, and 5's tensor-dimension layer. Deliverable: visual deep learning with shape validation, visual agent orchestration, and the natural-language canvas agent. (Epic 13 multiplayer is a hosted-product feature, per A6.)
 
 **Adjustment 1 — Multiplayer (Epic 13) needs a home.** It's in the vision but absent from the phases. Recommend explicitly placing it (a planned Phase 3, or a "Phase 2.5") and, critically, designing the IR (Epic 1) to be CRDT-friendly from the very start so it can be added without a rewrite.
 
-**Adjustment 2 — Security/sandboxing (Epics 6 + 15) is treated as a Phase-2 implementation detail in the proposal but is a first-class, high-severity deliverable.** Promote it to an explicit Phase-2 workstream with a named owner.
+**Adjustment 2 — Security/sandboxing is a *hosted-product* deliverable, not a bundled-app one (per A6).** The bundled local app runs your own code on your own machine (the Jupyter trust model) and needs no sandbox. The moment code runs on shared/hosted infrastructure, sandboxing (Epics 6 + 15) becomes first-class and high-severity — promote it to an explicit workstream with a named owner *when the hosted offering starts*, and keep the executor pure (A2) until then so it can be wrapped without retrofitting.
 
-**Adjustment 3 — The frontend is a separate repo, not a layer of one codebase (A5).** The proposal's three-layer stack diagram reads as one system; in practice the canvas (`colony-mind-canvas`) and the execution backend (`colony-mind-server`) are distinct repos from this Python SDK, coupled only through the published IR schema, codegen output, and rules-as-data. Decide the repo split at the start of Phase 1 — retrofitting a TypeScript frontend out of a shared Python repo, or untangling frontend reach-ins into SDK internals, is exactly the kind of avoidable rework A1/A2 already warned about for sync.
+**Adjustment 3 — The frontend is a contract-coupled module, not a co-equal codebase ([ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md), superseding A5's separate-repo framing).** The proposal's three-layer stack diagram reads as one system; in practice the canvas (`ui/`) and the execution backend (`colonymind/server/`) live in *this* repo but never `import colonymind` — they couple only through the published IR schema, codegen output, and rules-as-data, and the whole thing ships as one `pip install colonymind` with the UI bundled (JupyterLab model). The thing to get right at the start of Phase 1 is the **contract boundary** (now enforced by a CI check, not a repo wall): untangling frontend reach-ins into SDK internals is exactly the kind of avoidable rework A1/A2 already warned about for sync.
 
 ---
 
@@ -492,6 +536,8 @@ Epics 10, 11, 12, and 5's tensor-dimension layer. Deliverable: visual deep learn
 The hard dependency spine:
 
 > **Epic 1 (IR + SDK)** → **Epic 2 (codegen)** → **Epic 3 (canvas)** → *Phase 1 demo* → **Epic 6 (execution) + Epic 7 (caching)** → **Epic 8 (results)** → *Phase 2 product* → **Epics 10 / 11** → **Epic 12 (agent)** → *Phase 3 frontier*.
+
+Here "Epic 6 / Epic 7" means the **local in-process / on-disk happy-path slice only** (per A6) — *not* the hosted sandbox/Celery/Redis build-out, which is off this critical path. And in practice a sliver of Epic 6 (the thin local server calling the already-tested `cm.execute`) is cheap enough to stand up *before* the full Epic 3 canvas, since the SDK is proven and the canvas is the larger, more uncertain build — see the bundled-app shipping note below.
 
 Run in parallel where possible: Epic 4 (node library, continuous), Epic 5 (typing, alongside 1/3), Epic 9 (connectors, alongside 6), Epic 14 (persistence, alongside 1/2), Epic 15 (infra, alongside 6). Epic 13 (multiplayer) is independent enough to schedule flexibly *if and only if* the IR was designed for it in Epic 1.
 
@@ -505,7 +551,7 @@ The two decisions that most constrain everything downstream and should be locked
 | :-- | :-- | :-- | :-- |
 | 1 | One-way codegen, or eventual bidirectional Git sync? | Determines whether a Python→graph parser is ever needed (huge). | One-way; revisit later as opt-in. |
 | 2 | Execute generated strings, or execute the IR? | Security, reliability, and the "what runs = what you see" guarantee. | Execute IR; enforce equivalence in CI. |
-| 3 | Ship a raw-code / raw-SQL escape-hatch node in v1? | Raises the ceiling but reintroduces sandboxing + codegen concerns. | Yes, sandboxed and marked un-validated. |
+| 3 | Ship a raw-code / raw-SQL escape-hatch node in v1? | Raises the ceiling; sandboxing is a *hosted* concern (A6), so for the local app it's only a codegen concern. | Yes — **unsandboxed on the local happy path** (Jupyter trust model: you run your own code), explicitly marked un-validated. Gate it behind the sandbox only in the hosted tier; don't block the local node on hosted sandboxing. |
 | 4 | Is multiplayer an MVP differentiator or a fast-follow? | Single→multi retrofit is expensive; affects IR design now. | Single-user MVP; IR built CRDT-ready. |
 | 5 | SaaS-only or self-hostable? | Enterprise data-residency is a stated competitive wedge. | Design for both; ship SaaS first. |
 | 6 | React Flow vs. Rete.js for the canvas? | Ecosystem fit vs. rendering flexibility; perf ceiling. | React Flow, with a perf budget + virtualization. |
@@ -513,4 +559,4 @@ The two decisions that most constrain everything downstream and should be locked
 | 8 | Caching semantics for non-deterministic LLM/agent nodes? | Breaks the deterministic hash-cache assumption. | Separate execution path; cache-with-care + cost tracking. |
 | 9 | Open-core boundary: what's SDK vs. platform-only? | Affects packaging, licensing, and community story. | Decide alongside Epic 1 packaging. |
 | 10 | Where does heavy compute run at scale (10 GB+)? | Single FastAPI process won't hold it; the proposal assumes it does. | Isolated scalable workers; plan for remote/distributed. |
-| 11 | One repo or split SDK / canvas / server? | Toolchain, CI, and the open-core boundary; frontend reach-ins are hard to undo. | Separate repos (A5), coupled only by published IR schema + codegen output + rules-as-data. |
+| 11 | One repo or split SDK / canvas / server? | Toolchain, CI, and the open-core boundary; frontend reach-ins are hard to undo. | **Single repo, single package** with the UI bundled (JupyterLab model) — see [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md), which supersedes the original "separate repos (A5)" answer. The contract-only coupling is preserved and enforced by a CI boundary check instead of a repo wall. |

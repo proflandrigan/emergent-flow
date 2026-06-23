@@ -1,6 +1,8 @@
 # ADR 0007 — Open-core licensing boundary (Apache-2.0 SDK, proprietary platform)
 
-- **Status:** Accepted
+- **Status:** Accepted — amended by [ADR 0013](0013-single-repo-bundled-ui-topology.md) (UI
+  placement: the single-user canvas moves into this open package; the licensing model and the
+  one-way dependency rule below are preserved)
 - **Date:** 2026-06-17
 - **Deciders:** Colony Mind core team
 
