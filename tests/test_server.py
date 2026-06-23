@@ -123,6 +123,14 @@ def test_execute_graph_runs_in_process_and_is_json_safe() -> None:
     out = execute_graph(_load_csv_graph())
     assert "n-load" in out["results"]
     json.dumps(out)  # DataFrame result must be coerced to JSON-safe data
+    assert out["payload_version"] == 1
+    frame = out["results"]["n-load"]["frame"]
+    assert frame["kind"] == "table"
+    # the table payload carries the Story 3 contract fields
+    assert set(frame) >= {"columns", "dtypes", "shape", "head", "truncated"}
+    assert frame["shape"][1] == len(frame["columns"]) == len(frame["dtypes"])
+    assert isinstance(frame["head"], list)
+    assert frame["truncated"] is False  # sample.csv has 30 rows (< 50)
 
 
 def test_execute_graph_reports_per_node_status_ok() -> None:
@@ -132,6 +140,9 @@ def test_execute_graph_reports_per_node_status_ok() -> None:
     assert "n-load" in out["results"]
     assert "n-impute" in out["results"]
     json.dumps(out)  # results + statuses must be JSON-native
+    assert out["payload_version"] == 1
+    assert out["results"]["n-load"]["frame"]["kind"] == "table"
+    assert out["results"]["n-impute"]["frame"]["kind"] == "table"
 
 
 def test_execute_graph_reports_error_and_skipped() -> None:
@@ -208,6 +219,8 @@ def test_http_compile_and_execute(base_url: str) -> None:
     status, body = _post(base_url, "/execute", _load_csv_graph())
     assert status == 200
     assert "n-load" in body["results"]
+    assert body["payload_version"] == 1
+    assert body["results"]["n-load"]["frame"]["kind"] == "table"
 
 
 def test_http_execute_node_error_reports_per_node_status(base_url: str) -> None:
