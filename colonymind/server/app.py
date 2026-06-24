@@ -9,6 +9,8 @@ bundled install lean and fully CI-testable.
 Routes:
 - ``GET  /``          -- serves ``_static/index.html`` when present, else the demo page
 - ``GET  /healthz``   -- ``{"status": "ok"}``
+- ``GET  /schema``    -- the IR JSON Schema
+- ``GET  /catalog``   -- ``{"nodes": [<NodeSpec>, ...]}``, one per registered node type
 - ``POST /compile``   -- IR JSON -> ``{"code": ...}``
 - ``POST /execute``   -- IR JSON -> ``{"results": ..., "statuses": ...}``
 - ``POST /execute_node`` -- ``{"graph", "run_node", "inputs"}`` -> single-node run
@@ -26,13 +28,25 @@ from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from colonymind.server.service import compile_graph, execute_graph, execute_node, validate_graph
+from colonymind.server.service import (
+    compile_graph,
+    execute_graph,
+    execute_node,
+    get_catalog,
+    get_schema,
+    validate_graph,
+)
 
 _ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "/compile": compile_graph,
     "/execute": execute_graph,
     "/execute_node": execute_node,
     "/validate": validate_graph,
+}
+
+_GET_ROUTES: dict[str, Callable[[], dict[str, Any]]] = {
+    "/schema": get_schema,
+    "/catalog": get_catalog,
 }
 
 # The built UI is bundled into colonymind/_static/ by the package build hook
@@ -113,6 +127,13 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_json(200, {"status": "ok"})
             return
         url_path = self.path.split("?", 1)[0]  # ignore any query string
+        get_handler = _GET_ROUTES.get(url_path)
+        if get_handler is not None:
+            try:
+                self._send_json(200, get_handler())
+            except Exception as exc:
+                self._send_json(422, {"error": f"{type(exc).__name__}: {exc}"})
+            return
         asset = _static_file(url_path)
         if asset is not None:
             content_type = mimetypes.guess_type(asset.name)[0] or "application/octet-stream"

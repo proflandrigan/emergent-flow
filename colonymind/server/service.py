@@ -22,8 +22,10 @@ from colonymind.codegen.traversal import topological_sort
 from colonymind.codegen.validation import enforce_validation_gate
 from colonymind.codegen.wiring import WiringMap, build_wiring_map
 from colonymind.ir import Direction, Graph, Paradigm
+from colonymind.ir.schema import ir_json_schema
 from colonymind.ir.serialize import deserialize_graph
 from colonymind.nodes import get as get_node_definition
+from colonymind.nodes import registry
 from colonymind.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
 
 # Per-node execution status reported to the canvas (Epic 4 Story 2). A node is
@@ -49,6 +51,25 @@ def compile_graph(payload: dict[str, Any]) -> dict[str, Any]:
 def validate_graph(payload: dict[str, Any]) -> dict[str, Any]:
     """IR graph (as a dict) -> ``{"diagnostics": <Diagnostics, JSON-native>}``."""
     return {"diagnostics": validate(_to_graph(payload)).model_dump(mode="json")}
+
+
+def get_schema() -> dict[str, Any]:
+    """Return the IR JSON Schema (a serialized ``Graph``) for the canvas to consume.
+
+    The canvas is a pure consumer of this contract (ADR 0013 Decision 3): it never imports
+    ``colonymind``; it reads this schema over HTTP (and at build time, see the export script).
+    """
+    return ir_json_schema()
+
+
+def get_catalog() -> dict[str, Any]:
+    """Return the node catalog: one JSON-able ``NodeSpec`` per registered node type.
+
+    Shape: ``{"nodes": [<NodeSpec as JSON>, ...]}``, sorted by node ``type`` (``registry.specs()``
+    already returns definitions sorted by type). The palette (Epic 5 Story 3) and the
+    schema-driven config panels (Story 4) render entirely from this -- no Python in the client.
+    """
+    return {"nodes": [spec.model_dump(mode="json") for spec in registry.specs()]}
 
 
 def _ancestors(graph: Graph, targets: set[str], wiring_map: WiringMap) -> set[str]:

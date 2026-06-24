@@ -29,11 +29,14 @@ from colonymind.ir import (
     Position,
 )
 from colonymind.ir.edge import Edge, PortRef
+from colonymind.ir.schema import ir_json_schema
 from colonymind.ir.serialize import serialize_graph
 from colonymind.server import (
     compile_graph,
     execute_graph,
     execute_node,
+    get_catalog,
+    get_schema,
     make_server,
     validate_graph,
 )
@@ -289,6 +292,22 @@ def test_execute_node_rejects_declarative_node() -> None:
         execute_node({"graph": graph, "run_node": "n-load"})
 
 
+def test_get_schema_returns_ir_schema() -> None:
+    out = get_schema()
+    assert out == ir_json_schema()
+    assert isinstance(out, dict)
+    assert out  # non-empty
+    assert "properties" in out or "$defs" in out
+
+
+def test_get_catalog_lists_registered_nodes() -> None:
+    nodes = get_catalog()["nodes"]
+    assert nodes  # non-empty
+    for spec in nodes:
+        assert {"type", "family", "label", "ports", "params"} <= set(spec)
+    assert "data.load_csv" in {spec["type"] for spec in nodes}
+
+
 # ---------------------------------------------------------------------------
 # HTTP layer (stdlib server on an ephemeral port)
 # ---------------------------------------------------------------------------
@@ -465,3 +484,16 @@ def test_http_unknown_route_is_404(base_url: str) -> None:
     status, body = _post(base_url, "/nope", {})
     assert status == 404
     assert "error" in body
+
+
+def test_http_get_schema(base_url: str) -> None:
+    with urllib.request.urlopen(base_url + "/schema") as resp:  # noqa: S310
+        assert resp.status == 200
+        assert json.loads(resp.read()) == get_schema()
+
+
+def test_http_get_catalog(base_url: str) -> None:
+    with urllib.request.urlopen(base_url + "/catalog") as resp:  # noqa: S310
+        assert resp.status == 200
+        body = json.loads(resp.read())
+        assert "data.load_csv" in {spec["type"] for spec in body["nodes"]}
