@@ -7,27 +7,58 @@ streaming upgrade is the documented Phase-2 step; this v0 deliberately keeps the
 bundled install lean and fully CI-testable.
 
 Routes:
-- ``GET  /``          -- a minimal paste-IR demo page (proves the loop end to end)
+- ``GET  /``          -- serves ``_static/index.html`` when present, else the demo page
 - ``GET  /healthz``   -- ``{"status": "ok"}``
 - ``POST /compile``   -- IR JSON -> ``{"code": ...}``
 - ``POST /execute``   -- IR JSON -> ``{"results": ..., "statuses": ...}``
+- ``POST /execute_node`` -- ``{"graph", "run_node", "inputs"}`` -> single-node run
 - ``POST /validate``  -- IR JSON -> ``{"diagnostics": ...}``
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
+import mimetypes
+import pathlib
+import webbrowser
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from colonymind.server.service import compile_graph, execute_graph, validate_graph
+from colonymind.server.service import compile_graph, execute_graph, execute_node, validate_graph
 
 _ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "/compile": compile_graph,
     "/execute": execute_graph,
+    "/execute_node": execute_node,
     "/validate": validate_graph,
 }
+
+# The built UI is bundled into colonymind/_static/ by the package build hook
+# (ADR 0013 Decision 1). It is absent in a source checkout / before `vite build`,
+# so every read is guarded and the server falls back to the v0 demo page.
+# app.py lives at colonymind/server/app.py; parents[1] is the colonymind/ package root.
+_STATIC_DIR = pathlib.Path(__file__).resolve().parents[1] / "_static"
+
+
+def _static_file(url_path: str) -> pathlib.Path | None:
+    """Resolve a GET path to a real file inside ``_STATIC_DIR``, or ``None``.
+
+    Returns ``None`` when ``_static/`` is absent, the resolved path escapes it
+    (directory-traversal guard), or the target is not an existing file. ``"/"``
+    maps to ``index.html``. The caller falls back to the demo page / a 404.
+    """
+    if not _STATIC_DIR.is_dir():
+        return None
+    relative = url_path.lstrip("/") or "index.html"
+    candidate = (_STATIC_DIR / relative).resolve()
+    if not candidate.is_relative_to(_STATIC_DIR):
+        return None
+    if candidate.is_file():
+        return candidate
+    return None
+
 
 # A deliberately tiny single-page client: paste IR JSON, hit a button, see the
 # result. It is the throwaway "prove the canvas -> IR -> code -> execute loop"
@@ -78,12 +109,20 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self) -> None:
-        if self.path in ("/", "/index.html"):
-            self._send(200, "text/html; charset=utf-8", _INDEX_HTML.encode())
-        elif self.path == "/healthz":
+        if self.path == "/healthz":
             self._send_json(200, {"status": "ok"})
-        else:
-            self._send_json(404, {"error": f"not found: {self.path}"})
+            return
+        url_path = self.path.split("?", 1)[0]  # ignore any query string
+        asset = _static_file(url_path)
+        if asset is not None:
+            content_type = mimetypes.guess_type(asset.name)[0] or "application/octet-stream"
+            self._send(200, content_type, asset.read_bytes())
+            return
+        if url_path in ("/", "/index.html"):
+            # No bundled UI present -- fall back to the throwaway v0 demo page.
+            self._send(200, "text/html; charset=utf-8", _INDEX_HTML.encode())
+            return
+        self._send_json(404, {"error": f"not found: {self.path}"})
 
     def do_POST(self) -> None:
         handler = _ROUTES.get(self.path)
@@ -108,15 +147,35 @@ class _Handler(BaseHTTPRequestHandler):
         return
 
 
+def _open_browser(url: str) -> None:
+    """Best-effort: open *url* in a browser tab; never fail the server if it can't.
+
+    A headless host (CI, a server box) has no browser; ``webbrowser.open`` may return
+    ``False`` or raise depending on the platform. Swallow everything -- opening a tab is
+    a convenience, not a requirement for ``colonymind serve`` to run.
+    """
+    with contextlib.suppress(Exception):
+        webbrowser.open(url)
+
+
 def make_server(host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
     """Build (but do not start) the local HTTP server."""
     return ThreadingHTTPServer((host, port), _Handler)
 
 
-def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
-    """Boot the local canvas server and block until interrupted."""
+def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True) -> None:
+    """Boot the local canvas server and block until interrupted.
+
+    When *open_browser* is true (the default), a browser tab is opened at the served
+    URL once the socket is listening. ``0.0.0.0`` is shown/opened as ``127.0.0.1`` since
+    a wildcard bind is not a browsable address.
+    """
     httpd = make_server(host, port)
-    print(f"Colony Mind - serving the local canvas at http://{host}:{port}  (Ctrl-C to stop)")
+    browse_host = "127.0.0.1" if host == "0.0.0.0" else host  # noqa: S104
+    url = f"http://{browse_host}:{port}"
+    print(f"Colony Mind - serving the local canvas at {url}  (Ctrl-C to stop)")
+    if open_browser:
+        _open_browser(url)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

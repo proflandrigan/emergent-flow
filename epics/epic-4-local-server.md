@@ -30,9 +30,9 @@
 - [x] The execution path stays **pure** (ADR 0002): the server only wraps the reference executor, so the hosted tier can later swap in sandboxing without re-architecting.
 - [x] Execution granularity: "run all" + per-node status over the IR (Story 2); finer-grained "run this node" / "run to here" is deferred to land with the cache (Story 6 / roadmap Epic 7).
 - [x] A **result-payload contract** — JSON-safe, sized/truncated renderable payloads — that roadmap Epic 8 (in-node rendering) consumes (Story 3).
-- [ ] `colonymind serve` serves the bundled canvas from `colonymind/_static/` once the `ui/` build hook exists (Story 4).
-- [ ] A CI **boundary check** asserts `ui/` never imports `colonymind`; the "only the three contract artifacts cross the line" rule is documented as a convention rather than a brittle CI assertion ([ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) Decision 4) (Story 5).
-- [ ] Celery / container sandboxing / distributed & streaming execution are explicitly **not** built here — deferred to the hosted product (§A6).
+- [x] `colonymind serve` serves the bundled canvas from `colonymind/_static/` once the `ui/` build hook exists (Story 4).
+- [x] A CI **boundary check** asserts `ui/` never imports `colonymind`; the "only the three contract artifacts cross the line" rule is documented as a convention rather than a brittle CI assertion ([ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) Decision 4) (Story 5).
+- [x] Celery / container sandboxing / distributed & streaming execution are explicitly **not** built here — deferred to the hosted product (§A6).
 
 ---
 
@@ -77,38 +77,41 @@
 
 ---
 
-## Story 4 — Serve the bundled canvas
+## Story 4 — Serve the bundled canvas ✅ (done)
 
 > The JupyterLab payoff: one launch command opens the real UI, not a paste box.
 
-- [ ] Serve static assets from `colonymind/_static/` (the built `ui/` tree) when present; fall back to the v0 demo page when absent.
-- [ ] `colonymind serve` prints the URL and (optionally) opens a browser tab.
-- [ ] Coordinate with the `ui/` build hook (`vite build ui/` → `colonymind/_static/`, [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) Decision 1) and the wheel-bundling test.
-- [ ] Tests: with a stub `_static/index.html`, `GET /` serves it; without, the demo page still works.
+- [x] Serve static assets from `colonymind/_static/` (the built `ui/` tree) when present; fall back to the v0 demo page when absent.
+- [x] `colonymind serve` prints the URL and (optionally) opens a browser tab (`--no-browser` opts out).
+- [x] Coordinate with the `ui/` build hook (`vite build ui/` → `colonymind/_static/`, [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) Decision 1) and the wheel-bundling test. Implemented as an in-tree PEP 517 backend (`build_backend.py`) that runs `vite build` best-effort on a real wheel build and skips cleanly when Node is absent (the editable/dev path never invokes Node). **Follow-up:** wire a Node setup step into `release.yml` so published wheels actually bundle the canvas — until then `uv build` on the Node-less release runner ships a pure-Python wheel.
+- [x] Tests: with a stub `_static/index.html`, `GET /` serves it; without, the demo page still works.
 
 ---
 
-## Story 5 — CI boundary check (replace the repo wall)
+## Story 5 — CI boundary check (replace the repo wall) ✅ (done)
 
 > [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) Decision 4: the monorepo loses
 > the physical repo wall, so a CI check must enforce the coupling invariant instead.
 
-- [ ] A check that fails CI if anything under `ui/` imports/bundles `colonymind` or reaches into Python internals. **This import ban is the mechanically-enforced invariant.**
-- [ ] Document the contract-artifact boundary (only the IR JSON Schema, `compile_to_code` output, and rules-as-data cross `ui/ ↔ colonymind/`) as a stated convention in [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) Decision 4 / `docs/` — rather than a brittle "exactly these three artifacts" CI assertion. Tighten into an enforced check only if it later proves trivially mechanizable.
-- [ ] Wire the import ban into `.github/workflows/ci.yml` alongside the existing Python gates (pairs with ADR 0007's still-deferred one-way-dependency linter).
+- [x] A check that fails CI if anything under `ui/` imports/bundles `colonymind` or reaches into Python internals (`scripts/check_ui_boundary.py` + `tests/test_ui_boundary.py`). **This import ban is the mechanically-enforced invariant.**
+- [x] Document the contract-artifact boundary (only the IR JSON Schema, `compile_to_code` output, and rules-as-data cross `ui/ ↔ colonymind/`) as a stated convention in [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) Decision 4 / `docs/` (`docs/ui-server-boundary.md`) — rather than a brittle "exactly these three artifacts" CI assertion. Tighten into an enforced check only if it later proves trivially mechanizable.
+- [x] Wire the import ban into `.github/workflows/ci.yml` alongside the existing Python gates (pairs with ADR 0007's still-deferred one-way-dependency linter).
 
 ---
 
-## Story 6 — Incremental execution granularity (deferred — lands with the cache)
+## Story 6 — Incremental execution granularity ✅ (done — built ahead of the cache)
 
-> Deferred out of Story 2 on purpose. "Run to here" / "run this node" only earns its keep once
-> re-running everything feels slow, which is exactly when the cache (roadmap Epic 7) arrives.
-> Building it earlier is speculative scaffolding for a deferred epic (§A6).
+> Originally deferred out of Story 2 to land with the cache (roadmap Epic 7). Built now at
+> the maintainer's direction (branch `epic4-story4to6`): the request shapes are stateless and
+> reuse the Epic 2 traversal + wiring, so they stand alone. The on-disk happy-path cache
+> remains roadmap Epic 7 — until it lands, re-running still recomputes, and "run this node"
+> relies on the caller supplying inputs (rich DataFrame inputs round-trip faithfully only
+> once the cache exists). See the `run_to` / `run_node` envelopes on `/execute` / `/execute_node`.
 
-- [ ] "Run to here": a request shape selecting a target node (or set) that executes only the subgraph up to and including it, reusing the Epic 2 traversal + wiring.
-- [ ] "Run this node": execute a single node given already-available upstream inputs.
-- [ ] Tests over a fan-out graph asserting only the requested subgraph executes.
-- [ ] Sequence alongside the on-disk happy-path cache (roadmap Epic 7), not before it.
+- [x] "Run to here": a request shape selecting a target node (or set) that executes only the subgraph up to and including it, reusing the Epic 2 traversal + wiring (`run_to` envelope on `/execute`; ancestor-closed subgraph).
+- [x] "Run this node": execute a single node given already-available upstream inputs (`/execute_node`, `run_node` + `inputs`).
+- [x] Tests over a fan-out graph asserting only the requested subgraph executes.
+- [ ] ~~Sequence alongside the on-disk happy-path cache (roadmap Epic 7), not before it.~~ Intentionally not honored — granularity shipped ahead of the cache; the cache remains roadmap Epic 7.
 
 ---
 

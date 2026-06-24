@@ -156,3 +156,6 @@ Thumbs.db
 .cache/
 tmp/
 temp/
+
+# Bundled UI build artifact (vite build ui/ -> colonymind/_static/, ADR 0013)
+/colonymind/_static/

@@ -141,15 +141,27 @@ pattern — while preserving the §A5 coupling invariant in full.**
   pure-Python build; the build hook and packaging need their own test.
 
 **Deferred:**
-- The concrete build-hook implementation and wheel-bundling test.
+- ~~The concrete build-hook implementation and wheel-bundling test.~~ **Done (Epic 4 Story 4d):**
+  an in-tree PEP 517 backend shim (`build_backend.py`, `build-backend = "build_backend"` with
+  `backend-path = ["."]`) runs `vite build ui/` → `colonymind/_static/` on a real wheel build
+  and bundles it via `[tool.setuptools.package-data]`. The compile is **best-effort**: with no
+  Node it is skipped (editable/dev installs never invoke Node), so the four Python gates and
+  `uv build` on a Node-less host still succeed and the server falls back to its demo page.
+  `tests/test_packaging.py` covers the hook's safety + the packaging declaration. **Remaining:**
+  add a Node setup step to `release.yml` so published wheels actually bundle the canvas.
 - **Update (2026-06-23):** a minimal local server now exists — `colonymind/server/` with a
   `colonymind serve` / `cm lab` entry point that calls `cm.compile_to_code` / `cm.execute` /
   `cm.validate` **in-process**. To keep the bundled install lean and zero-dependency for this
   v0 (the happy path of §A6), it uses the Python **stdlib** `http.server` rather than FastAPI;
-  the FastAPI/WebSocket/streaming upgrade and the wheel-bundled `ui/` it will serve remain
-  Phase 2. (Decision 1's "thin FastAPI app" names the eventual target, not the v0.)
-- The CI boundary-check implementation (pairs with [ADR 0007](0007-open-core-licensing-boundary.md)'s
-  still-deferred one-way-dependency linter).
+  the FastAPI/WebSocket/streaming upgrade remains Phase 2. (Decision 1's "thin FastAPI app"
+  names the eventual target, not the v0.) The server now also serves the bundled `ui/` from
+  `colonymind/_static/` when present (Story 4) and exposes incremental `run_to` / `run_node`
+  execution (Story 6).
+- ~~The CI boundary-check implementation~~ **Done (Epic 4 Story 5):** `scripts/check_ui_boundary.py`
+  (run as a CI step and via `tests/test_ui_boundary.py`) fails if anything under `ui/` imports
+  the package; the contract-artifact convention is documented in `docs/ui-server-boundary.md`.
+  Still pairs with [ADR 0007](0007-open-core-licensing-boundary.md)'s deferred
+  one-way-dependency linter.
 - The concrete update to [ADR 0007](0007-open-core-licensing-boundary.md)'s SDK/Platform
   inventories (a future ADR may restate the open-core boundary in full); for now the amendment
   lives in Decision 6 above and is pointed to from ADR 0007's status line.

@@ -45,3 +45,6 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+      - name: UI boundary check (ui/ must not import colonymind)
+        run: uv run python scripts/check_ui_boundary.py

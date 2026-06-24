@@ -1,6 +1,9 @@
 [build-system]
 requires = ["setuptools>=77"]
-build-backend = "setuptools.build_meta"
+# In-tree backend shim (build_backend.py): runs `vite build ui/` -> colonymind/_static/
+# on a real wheel build, best-effort. See ADR 0013 Decision 1.
+build-backend = "build_backend"
+backend-path = ["."]
 
 [project]
 name = "colonymind"
@@ -72,6 +75,12 @@ version = { attr = "colonymind.__version__" }
 
 [tool.setuptools.packages.find]
 include = ["colonymind*"]
+
+# The built canvas (vite build ui/ -> colonymind/_static/, ADR 0013 Decision 1) ships in
+# the wheel as package data. Absent in a source build (no Node) -> nothing is bundled and
+# the server serves its demo page. Two globs cover top-level and nested asset files.
+[tool.setuptools.package-data]
+colonymind = ["_static/*", "_static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -9,12 +9,13 @@ light per ADR 0007's portability guarantee.
 from __future__ import annotations
 
 from colonymind.server.app import make_server, serve
-from colonymind.server.service import compile_graph, execute_graph, validate_graph
+from colonymind.server.service import compile_graph, execute_graph, execute_node, validate_graph
 
 __all__ = [
     "make_server",
     "serve",
     "compile_graph",
     "execute_graph",
+    "execute_node",
     "validate_graph",
 ]

@@ -24,6 +24,11 @@ def _build_parser() -> argparse.ArgumentParser:
         p = sub.add_parser(name, help="Boot the local canvas server (in-process cm.*).")
         p.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1).")
         p.add_argument("--port", type=int, default=8765, help="Bind port (default: 8765).")
+        p.add_argument(
+            "--no-browser",
+            action="store_true",
+            help="Do not open a browser tab on launch.",
+        )
     return parser
 
 
@@ -33,7 +38,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command in ("serve", "lab"):
         from colonymind.server import serve
 
-        serve(host=args.host, port=args.port)
+        serve(host=args.host, port=args.port, open_browser=not args.no_browser)
         return 0
     parser.print_help()
     return 1
