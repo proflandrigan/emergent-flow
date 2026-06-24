@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { Canvas } from "./canvas/Canvas";
+import { Inspector } from "./inspector/Inspector";
+import { IRToolbar } from "./io/IRToolbar";
 import { Palette } from "./palette/Palette";
 import { useGraphStore } from "./store/graphStore";
 
@@ -93,6 +95,7 @@ export function App(): JSX.Element {
           server: {status}
         </span>
         <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem" }}>
+          <IRToolbar />
           <button
             type="button"
             disabled={!canUndo}
@@ -114,6 +117,7 @@ export function App(): JSX.Element {
         <div style={{ flex: 1, minHeight: 0 }}>
           <Canvas />
         </div>
+        <Inspector />
       </div>
     </div>
   );
