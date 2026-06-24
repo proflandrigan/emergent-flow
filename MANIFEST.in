@@ -1,0 +1,6 @@
+# build_backend.py is the in-tree PEP 517 backend (pyproject.toml's
+# build-backend / backend-path); setuptools never auto-includes root-level
+# modules outside the package tree in an sdist, so without this an
+# `sdist`-based install fails with "ModuleNotFoundError: No module named
+# 'build_backend'" before the wheel build even starts.
+include build_backend.py

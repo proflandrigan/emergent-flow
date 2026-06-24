@@ -20,7 +20,7 @@ from colonymind import compile_to_code, execute, validate
 from colonymind.codegen.errors import CodegenError, UnboundInputError
 from colonymind.codegen.traversal import topological_sort
 from colonymind.codegen.validation import enforce_validation_gate
-from colonymind.codegen.wiring import build_wiring_map
+from colonymind.codegen.wiring import WiringMap, build_wiring_map
 from colonymind.ir import Direction, Graph, Paradigm
 from colonymind.ir.serialize import deserialize_graph
 from colonymind.nodes import get as get_node_definition
@@ -51,8 +51,35 @@ def validate_graph(payload: dict[str, Any]) -> dict[str, Any]:
     return {"diagnostics": validate(_to_graph(payload)).model_dump(mode="json")}
 
 
+def _ancestors(graph: Graph, targets: set[str], wiring_map: WiringMap) -> set[str]:
+    """Return *targets* plus every node that transitively feeds their IN ports.
+
+    The returned set is ancestor-closed: for any node in it, every node feeding
+    one of its IN ports is also in it. This lets the functional walk run only the
+    subgraph "up to and including" the targets ("run to here", Epic 4 Story 6)
+    while the skip/dangling-input logic stays correct (every upstream source is present).
+    """
+    seen: set[str] = set()
+    stack = list(targets)
+    while stack:
+        node_id = stack.pop()
+        if node_id in seen:
+            continue
+        seen.add(node_id)
+        node = graph.nodes[node_id]
+        for port in node.ports:
+            if port.direction != Direction.IN:
+                continue
+            for src in wiring_map.upstream(node.id, port.id):
+                if src.node_id not in seen:
+                    stack.append(src.node_id)
+    return seen
+
+
 def _execute_functional_with_status(
     graph: Graph,
+    only: set[str] | None = None,
+    wiring_map: WiringMap | None = None,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     """Walk a FUNCTIONAL graph node by node, capturing a per-node run status.
 
@@ -61,6 +88,11 @@ def _execute_functional_with_status(
     status (and downstream nodes as "skipped") instead of aborting the whole
     run. Graph-level guards (validation gate, paradigm, cycle, unbound input)
     still raise so the caller can map them to an HTTP 422.
+
+    *wiring_map*, if given, is reused instead of rebuilt (the ``run_to`` caller
+    already built one to resolve ancestors -- building it twice per request
+    would double the wiring-map construction cost on the "fast incremental
+    re-run" path that ``run_to`` exists for).
     """
     enforce_validation_gate(graph)
     if graph.paradigm is not Paradigm.FUNCTIONAL:
@@ -69,7 +101,10 @@ def _execute_functional_with_status(
         if node.paradigm is not Paradigm.FUNCTIONAL:
             raise CodegenError(f"node {node.id} is not FUNCTIONAL")
     topo_order_ids = topological_sort(graph)
-    wiring_map = build_wiring_map(graph)
+    if only is not None:
+        topo_order_ids = [nid for nid in topo_order_ids if nid in only]
+    if wiring_map is None:
+        wiring_map = build_wiring_map(graph)
     # Dangling-input guard (raises UnboundInputError -> 422).
     for node_id in topo_order_ids:
         node = graph.nodes[node_id]
@@ -129,6 +164,17 @@ def _results_to_payloads(
     }
 
 
+def _split_request(payload: dict[str, Any]) -> tuple[dict[str, Any], Any]:
+    """Split an /execute body into (graph_dict, run_to).
+
+    Backward compatible: a bare IR graph (no ``"graph"`` key) yields ``run_to=None``.
+    An envelope ``{"graph": ..., "run_to": ...}`` selects the "run to here" subgraph.
+    """
+    if isinstance(payload.get("graph"), dict):
+        return payload["graph"], payload.get("run_to")
+    return payload, None
+
+
 def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     """IR graph (as a dict) -> ``{"payload_version", "results", "statuses"}``.
 
@@ -140,15 +186,31 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     and surface as the server's 422. No caching yet (roadmap Epic 7 seam). Each
     OUT port in ``results`` is a typed result payload (Story 3), not a raw
     artifact; ``payload_version`` stamps the contract once at the top level.
+
+    When the body is an envelope with ``run_to`` (a node id or list of ids), only the
+    subgraph up to and including those nodes runs ("run to here", Epic 4 Story 6),
+    reusing the Epic 2 traversal + wiring; the rest of the graph is left unrun.
     """
-    graph = _to_graph(payload)
+    graph_payload, run_to = _split_request(payload)
+    graph = _to_graph(graph_payload)
     if graph.paradigm is Paradigm.FUNCTIONAL:
-        results, statuses = _execute_functional_with_status(graph)
+        only: set[str] | None = None
+        wiring_map: WiringMap | None = None
+        if run_to is not None:
+            targets = {run_to} if isinstance(run_to, str) else set(run_to)
+            missing = targets - set(graph.nodes)
+            if missing:
+                raise CodegenError(f"run_to targets not in graph: {sorted(missing)}")
+            wiring_map = build_wiring_map(graph)
+            only = _ancestors(graph, targets, wiring_map)
+        results, statuses = _execute_functional_with_status(graph, only=only, wiring_map=wiring_map)
         return {
             "payload_version": PAYLOAD_CONTRACT_VERSION,
             "results": _results_to_payloads(results),
             "statuses": statuses,
         }
+    if run_to is not None:
+        raise CodegenError("run_to (run-to-here) is only supported for FUNCTIONAL graphs")
     # DECLARATIVE (and any future paradigm): delegate to the reference executor,
     # which is all-or-nothing. On success the single nn.module node is "ok"; its
     # rejections raise (CodegenError) -> 422.
@@ -158,4 +220,53 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
         "payload_version": PAYLOAD_CONTRACT_VERSION,
         "results": _results_to_payloads(results),
         "statuses": statuses,
+    }
+
+
+def execute_node(payload: dict[str, Any]) -> dict[str, Any]:
+    """Execute a single node ("run this node", Epic 4 Story 6).
+
+    Envelope body: ``{"graph": <ir>, "run_node": <node id>, "inputs": {<IN-port name>: value}}``.
+    Runs only that node's ``execute()`` with caller-supplied upstream inputs and returns
+    the same ``{"payload_version", "results", "statuses"}`` shape as ``execute_graph`` --
+    but for the single node. The server is stateless (no cache yet -- roadmap Epic 7), so
+    inputs come from the caller; rich inputs (DataFrames) round-trip faithfully only once
+    the on-disk cache lands. A node-runtime failure is reported as that node's ``error``
+    status at HTTP 200 (mirroring run-all); a bad envelope, unknown node id, or non-FUNCTIONAL
+    node RAISES (-> the server's 422). DECLARATIVE nodes (e.g. ``nn.linear``) are rejected
+    rather than run standalone: their ``execute()`` returns the bare layer object for the
+    whole-graph declarative executor to compose, not a computed result, so running one in
+    isolation would silently "succeed" with a meaningless payload instead of erroring.
+    """
+    graph_payload = payload.get("graph")
+    if not isinstance(graph_payload, dict):
+        raise CodegenError('execute_node requires an envelope: {"graph": ..., "run_node": ...}')
+    node_id = payload.get("run_node")
+    if node_id is None:
+        raise CodegenError("execute_node requires 'run_node' (a node id)")
+    inputs = payload.get("inputs")
+    if inputs is None:
+        inputs = {}
+    if not isinstance(inputs, dict):
+        raise CodegenError("execute_node 'inputs' must be an object keyed by IN-port name")
+    graph = _to_graph(graph_payload)
+    if node_id not in graph.nodes:
+        raise CodegenError(f"run_node not in graph: {node_id!r}")
+    node = graph.nodes[node_id]
+    if node.paradigm is not Paradigm.FUNCTIONAL:
+        raise CodegenError(
+            f"execute_node only supports FUNCTIONAL nodes, got {node.paradigm} for {node_id!r}"
+        )
+
+    results: dict[str, dict[str, Any]] = {}
+    try:
+        definition = get_node_definition(node.type)()
+        results[node_id] = definition.execute(node, inputs)
+        status: dict[str, Any] = {"status": _STATUS_OK}
+    except Exception as exc:  # noqa: BLE001 - any node-runtime failure -> error status
+        status = {"status": _STATUS_ERROR, "error": f"{type(exc).__name__}: {exc}"}
+    return {
+        "payload_version": PAYLOAD_CONTRACT_VERSION,
+        "results": _results_to_payloads(results),
+        "statuses": {node_id: status},
     }
