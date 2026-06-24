@@ -37,8 +37,24 @@ export function App(): JSX.Element {
   }, []);
 
   useEffect(() => {
+    function isTextEntryTarget(target: EventTarget | null): boolean {
+      if (!(target instanceof HTMLElement)) {
+        return false;
+      }
+      return (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      );
+    }
+
     function handleKeyDown(e: KeyboardEvent) {
       if (!(e.metaKey || e.ctrlKey)) {
+        return;
+      }
+      // Let native undo/redo work in text fields (e.g. the palette search box) instead of
+      // hijacking it for canvas undo/redo -- the two stacks are unrelated.
+      if (isTextEntryTarget(e.target)) {
         return;
       }
       const key = e.key.toLowerCase();
