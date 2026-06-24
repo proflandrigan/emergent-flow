@@ -20,7 +20,7 @@ from colonymind import compile_to_code, execute, validate
 from colonymind.codegen.errors import CodegenError, UnboundInputError
 from colonymind.codegen.traversal import topological_sort
 from colonymind.codegen.validation import enforce_validation_gate
-from colonymind.codegen.wiring import build_wiring_map
+from colonymind.codegen.wiring import WiringMap, build_wiring_map
 from colonymind.ir import Direction, Graph, Paradigm
 from colonymind.ir.serialize import deserialize_graph
 from colonymind.nodes import get as get_node_definition
@@ -51,7 +51,7 @@ def validate_graph(payload: dict[str, Any]) -> dict[str, Any]:
     return {"diagnostics": validate(_to_graph(payload)).model_dump(mode="json")}
 
 
-def _ancestors(graph: Graph, targets: set[str]) -> set[str]:
+def _ancestors(graph: Graph, targets: set[str], wiring_map: WiringMap) -> set[str]:
     """Return *targets* plus every node that transitively feeds their IN ports.
 
     The returned set is ancestor-closed: for any node in it, every node feeding
@@ -59,7 +59,6 @@ def _ancestors(graph: Graph, targets: set[str]) -> set[str]:
     subgraph "up to and including" the targets ("run to here", Epic 4 Story 6)
     while the skip/dangling-input logic stays correct (every upstream source is present).
     """
-    wiring_map = build_wiring_map(graph)
     seen: set[str] = set()
     stack = list(targets)
     while stack:
@@ -80,6 +79,7 @@ def _ancestors(graph: Graph, targets: set[str]) -> set[str]:
 def _execute_functional_with_status(
     graph: Graph,
     only: set[str] | None = None,
+    wiring_map: WiringMap | None = None,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
     """Walk a FUNCTIONAL graph node by node, capturing a per-node run status.
 
@@ -88,6 +88,11 @@ def _execute_functional_with_status(
     status (and downstream nodes as "skipped") instead of aborting the whole
     run. Graph-level guards (validation gate, paradigm, cycle, unbound input)
     still raise so the caller can map them to an HTTP 422.
+
+    *wiring_map*, if given, is reused instead of rebuilt (the ``run_to`` caller
+    already built one to resolve ancestors -- building it twice per request
+    would double the wiring-map construction cost on the "fast incremental
+    re-run" path that ``run_to`` exists for).
     """
     enforce_validation_gate(graph)
     if graph.paradigm is not Paradigm.FUNCTIONAL:
@@ -98,7 +103,8 @@ def _execute_functional_with_status(
     topo_order_ids = topological_sort(graph)
     if only is not None:
         topo_order_ids = [nid for nid in topo_order_ids if nid in only]
-    wiring_map = build_wiring_map(graph)
+    if wiring_map is None:
+        wiring_map = build_wiring_map(graph)
     # Dangling-input guard (raises UnboundInputError -> 422).
     for node_id in topo_order_ids:
         node = graph.nodes[node_id]
@@ -189,13 +195,15 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     graph = _to_graph(graph_payload)
     if graph.paradigm is Paradigm.FUNCTIONAL:
         only: set[str] | None = None
+        wiring_map: WiringMap | None = None
         if run_to is not None:
             targets = {run_to} if isinstance(run_to, str) else set(run_to)
             missing = targets - set(graph.nodes)
             if missing:
                 raise CodegenError(f"run_to targets not in graph: {sorted(missing)}")
-            only = _ancestors(graph, targets)
-        results, statuses = _execute_functional_with_status(graph, only=only)
+            wiring_map = build_wiring_map(graph)
+            only = _ancestors(graph, targets, wiring_map)
+        results, statuses = _execute_functional_with_status(graph, only=only, wiring_map=wiring_map)
         return {
             "payload_version": PAYLOAD_CONTRACT_VERSION,
             "results": _results_to_payloads(results),
@@ -224,8 +232,11 @@ def execute_node(payload: dict[str, Any]) -> dict[str, Any]:
     but for the single node. The server is stateless (no cache yet -- roadmap Epic 7), so
     inputs come from the caller; rich inputs (DataFrames) round-trip faithfully only once
     the on-disk cache lands. A node-runtime failure is reported as that node's ``error``
-    status at HTTP 200 (mirroring run-all); a bad envelope or unknown node id RAISES
-    (-> the server's 422).
+    status at HTTP 200 (mirroring run-all); a bad envelope, unknown node id, or non-FUNCTIONAL
+    node RAISES (-> the server's 422). DECLARATIVE nodes (e.g. ``nn.linear``) are rejected
+    rather than run standalone: their ``execute()`` returns the bare layer object for the
+    whole-graph declarative executor to compose, not a computed result, so running one in
+    isolation would silently "succeed" with a meaningless payload instead of erroring.
     """
     graph_payload = payload.get("graph")
     if not isinstance(graph_payload, dict):
@@ -233,13 +244,19 @@ def execute_node(payload: dict[str, Any]) -> dict[str, Any]:
     node_id = payload.get("run_node")
     if node_id is None:
         raise CodegenError("execute_node requires 'run_node' (a node id)")
-    inputs = payload.get("inputs") or {}
+    inputs = payload.get("inputs")
+    if inputs is None:
+        inputs = {}
     if not isinstance(inputs, dict):
         raise CodegenError("execute_node 'inputs' must be an object keyed by IN-port name")
     graph = _to_graph(graph_payload)
     if node_id not in graph.nodes:
         raise CodegenError(f"run_node not in graph: {node_id!r}")
     node = graph.nodes[node_id]
+    if node.paradigm is not Paradigm.FUNCTIONAL:
+        raise CodegenError(
+            f"execute_node only supports FUNCTIONAL nodes, got {node.paradigm} for {node_id!r}"
+        )
 
     results: dict[str, dict[str, Any]] = {}
     try:

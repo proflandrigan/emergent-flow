@@ -40,8 +40,11 @@ def _build_ui() -> None:
         print("colonymind build: npm not found; skipping ui/ build (server uses demo page).")
         return
     try:
-        if not (_UI_DIR / "node_modules").is_dir():
-            subprocess.run([npm, "install"], cwd=_UI_DIR, check=True)
+        # `npm ci` (not a node_modules-exists check) so a stale node_modules from
+        # an earlier build never skips reinstalling after package.json/package-lock.json
+        # change -- it always installs exactly what the lockfile pins, removing any
+        # existing node_modules first.
+        subprocess.run([npm, "ci"], cwd=_UI_DIR, check=True)
         subprocess.run([npm, "run", "build"], cwd=_UI_DIR, check=True)
     except (OSError, subprocess.CalledProcessError) as exc:
         print(f"colonymind build: ui/ build skipped ({exc}); server uses the demo page.")

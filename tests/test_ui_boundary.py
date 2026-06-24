@@ -53,6 +53,16 @@ def test_allows_outdir_path_string(tmp_path: pathlib.Path) -> None:
     assert find_violations(ui) == []
 
 
+def test_allows_asset_import_merely_named_after_the_package(tmp_path: pathlib.Path) -> None:
+    # A same-repo asset whose filename happens to contain "colonymind" (e.g. a logo
+    # for a project literally named Colony Mind) is NOT a package import and must
+    # be allowed -- only a "colonymind" *path segment* is a violation.
+    ui = tmp_path / "ui"
+    (ui / "src").mkdir(parents=True)
+    (ui / "src" / "logo.ts").write_text('import logo from "./icons/colonymind-logo.svg";\n')
+    assert find_violations(ui) == []
+
+
 def test_skips_node_modules(tmp_path: pathlib.Path) -> None:
     ui = tmp_path / "ui"
     (ui / "node_modules" / "pkg").mkdir(parents=True)

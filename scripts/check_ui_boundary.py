@@ -40,6 +40,20 @@ def _iter_source_files(ui_dir: Path) -> list[Path]:
     return files
 
 
+def _spec_targets_package(spec: str) -> bool:
+    """True if the import specifier names the package itself, not just contains its name.
+
+    Matches a bare/scoped module specifier (``colonymind``, ``colonymind/foo``) or a
+    relative/absolute path with a ``colonymind`` path segment (``../../colonymind/ir``).
+    A specifier that merely *contains* the substring ``colonymind`` -- e.g. a same-repo
+    asset import like ``./icons/colonymind-logo.svg`` -- is intentionally NOT a violation:
+    matching on substring rather than path segment would false-positive on any UI asset
+    named after the project.
+    """
+    segments = [s for s in spec.split("/") if s not in ("", ".", "..")]
+    return any(segment.lower() == PACKAGE for segment in segments)
+
+
 def find_violations(ui_dir: Path) -> list[str]:
     """Return human-readable violation lines: every ui import that reaches into the package."""
     violations: list[str] = []
@@ -47,7 +61,7 @@ def find_violations(ui_dir: Path) -> list[str]:
         lines = path.read_text(encoding="utf-8").splitlines()
         for lineno, line in enumerate(lines, start=1):
             for spec in _IMPORT_RE.findall(line):
-                if PACKAGE in spec.lower():
+                if _spec_targets_package(spec):
                     rel = path.relative_to(ui_dir.parent)
                     violations.append(f"{rel}:{lineno}: imports {spec!r} -> into {PACKAGE}/")
     return violations

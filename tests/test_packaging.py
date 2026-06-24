@@ -33,6 +33,16 @@ def test_pyproject_bundles_static_as_package_data() -> None:
     assert any("_static" in pattern for pattern in package_data)
 
 
+def test_manifest_includes_build_backend_for_sdist() -> None:
+    # build_backend.py lives at the repo root, outside any package setuptools
+    # auto-includes in an sdist; without a MANIFEST.in entry, `uv build --sdist`
+    # silently omits it and installing from that sdist fails with
+    # "ModuleNotFoundError: No module named 'build_backend'" before the wheel
+    # build even starts.
+    manifest = (_REPO / "MANIFEST.in").read_text(encoding="utf-8")
+    assert "build_backend.py" in manifest
+
+
 def test_backend_reexports_pep517_hooks() -> None:
     for hook in ("build_wheel", "build_sdist", "build_editable", "get_requires_for_build_wheel"):
         assert callable(getattr(build_backend, hook))

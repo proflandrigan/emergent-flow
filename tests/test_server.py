@@ -272,6 +272,23 @@ def test_execute_node_unknown_node_raises() -> None:
         execute_node({"graph": _load_csv_graph(), "run_node": "n-nope"})
 
 
+def test_execute_node_rejects_non_dict_inputs_even_when_falsy() -> None:
+    # `inputs: []` is falsy but not a dict; it must surface the envelope-validation
+    # error rather than being silently defaulted to {} and masked.
+    with pytest.raises(Exception):  # noqa: B017,PT011
+        execute_node({"graph": _load_csv_graph(), "run_node": "n-load", "inputs": []})
+
+
+def test_execute_node_rejects_declarative_node() -> None:
+    # A DECLARATIVE node's execute() returns the bare layer object for the whole-graph
+    # declarative executor to compose, not a computed result -- running it standalone
+    # must raise rather than silently "succeed" with that meaningless object.
+    graph = _load_csv_graph()
+    graph["nodes"]["n-load"]["paradigm"] = "declarative"
+    with pytest.raises(Exception):  # noqa: B017,PT011
+        execute_node({"graph": graph, "run_node": "n-load"})
+
+
 # ---------------------------------------------------------------------------
 # HTTP layer (stdlib server on an ephemeral port)
 # ---------------------------------------------------------------------------
