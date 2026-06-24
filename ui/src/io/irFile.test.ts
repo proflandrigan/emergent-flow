@@ -60,4 +60,13 @@ describe("parseImport", () => {
     expect(result.graph).toBeUndefined();
     expect(result.error).toBeTruthy();
   });
+
+  test("rejects non-object top-level JSON without throwing (null/array/primitive)", () => {
+    // Regression: checkSchemaVersion would dereference `.schema_version` on null and throw.
+    for (const text of ["null", "[]", "42", '"hi"']) {
+      const result = parseImport(text);
+      expect(result.graph).toBeUndefined();
+      expect(result.error).toBeTruthy();
+    }
+  });
 });

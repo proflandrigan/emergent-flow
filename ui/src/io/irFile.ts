@@ -22,6 +22,9 @@ export function parseImport(text: string): ImportResult {
   } catch (e) {
     return { error: `Not valid JSON: ${(e as Error).message}` };
   }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return { error: "Not a valid IR graph: expected a JSON object" };
+  }
   const versionError = checkSchemaVersion(parsed as Graph);
   if (versionError) {
     return { error: versionError };

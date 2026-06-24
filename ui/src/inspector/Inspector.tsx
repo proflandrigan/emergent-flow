@@ -1,6 +1,6 @@
-// Right-side Inspector dock (Epic 5 Story... inspector shell): a tabbed panel with Config and
-// Code tabs. This task builds only the shell + tab switching + empty states -- the Config form
-// and Code panel are filled in by later tasks; for now each tab renders a trivial placeholder.
+// Right-side Inspector dock (Epic 5 Story 4): a tabbed panel with Config and Code tabs.
+// Renders the Config form for the single selected node (or an empty-state prompt) and the
+// Code tab's live-compiled output; selection is read from `selectionStore`, never the IR.
 
 import { useState } from "react";
 
