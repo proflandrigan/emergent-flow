@@ -1,0 +1,408 @@
+{
+  "nodes": [
+    {
+      "family": "clean",
+      "label": "Impute Missing",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "mean",
+          "help": "How to compute each column's fill value.",
+          "hints": {
+            "choices": [
+              "mean",
+              "median",
+              "most_frequent"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Strategy",
+          "name": "strategy",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to impute; empty/unset imputes every column.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": false,
+          "type_token": "list[str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame whose missing cells should be filled.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The DataFrame with missing cells imputed.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.impute_missing",
+      "version": 2
+    },
+    {
+      "family": "data",
+      "label": "Load CSV",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Filesystem path to the .csv file to load.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "file"
+          },
+          "label": "CSV path",
+          "name": "path",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "utf-8",
+          "help": "Text encoding used to read the file.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Encoding",
+          "name": "encoding",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The loaded data as a pandas DataFrame.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.load_csv",
+      "version": 2
+    },
+    {
+      "family": "ml",
+      "label": "Train Classifier",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": null,
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to use as features; empty/unset uses every other column.",
+          "hints": null,
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": 0.25,
+          "help": "Fraction of rows held out for evaluation.",
+          "hints": {
+            "choices": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Test size",
+          "name": "test_size",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": 0,
+          "help": "Seed controlling the train/test split and model fit.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Random state",
+          "name": "random_state",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing features and the target column.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "ClassifierResult",
+          "direction": "out",
+          "help": "Inspectable training/evaluation metrics for the fitted classifier.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "ml.train_classifier",
+      "version": 2
+    },
+    {
+      "family": "nn",
+      "label": "Linear",
+      "paradigm": "declarative",
+      "params": [
+        {
+          "default": null,
+          "help": "Size of each input sample.",
+          "hints": null,
+          "label": "In features",
+          "name": "in_features",
+          "required": true,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Size of each output sample.",
+          "hints": null,
+          "label": "Out features",
+          "name": "out_features",
+          "required": true,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Tensor",
+          "direction": "in",
+          "help": "The input tensor to the linear layer.",
+          "label": null,
+          "name": "x",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Tensor",
+          "direction": "out",
+          "help": "The linear layer's output tensor.",
+          "label": null,
+          "name": "out",
+          "required": true
+        }
+      ],
+      "type": "nn.linear",
+      "version": 1
+    },
+    {
+      "family": "nn",
+      "label": "Module",
+      "paradigm": "declarative",
+      "params": [],
+      "ports": [],
+      "type": "nn.module",
+      "version": 1
+    },
+    {
+      "family": "nn",
+      "label": "ReLU",
+      "paradigm": "declarative",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Tensor",
+          "direction": "in",
+          "help": "The input tensor to the activation.",
+          "label": null,
+          "name": "x",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Tensor",
+          "direction": "out",
+          "help": "The activation's output tensor.",
+          "label": null,
+          "name": "out",
+          "required": true
+        }
+      ],
+      "type": "nn.relu",
+      "version": 1
+    },
+    {
+      "family": "reports",
+      "label": "HTML Summary",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "Colony Mind Data Summary",
+          "help": "Title shown at the top of the report.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Title",
+          "name": "title",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The DataFrame to profile.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "HTML",
+          "direction": "out",
+          "help": "The rendered HTML profiling report.",
+          "label": null,
+          "name": "html",
+          "required": true
+        }
+      ],
+      "type": "reports.generate_html_summary",
+      "version": 2
+    },
+    {
+      "family": "stats",
+      "label": "ANOVA",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column whose distinct values define the groups.",
+          "hints": null,
+          "label": "Group column",
+          "name": "group_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column whose values are compared across groups.",
+          "hints": null,
+          "label": "Value column",
+          "name": "value_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": 0.05,
+          "help": "Significance level recorded alongside the result.",
+          "hints": {
+            "choices": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Alpha",
+          "name": "alpha",
+          "required": false,
+          "type_token": "float"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the group and value columns.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "AnovaResult",
+          "direction": "out",
+          "help": "The structured ANOVA result.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.anova",
+      "version": 2
+    }
+  ]
+}
