@@ -105,6 +105,77 @@ describe("undo/redo: move coalescing", () => {
       originalPosition,
     );
   });
+
+  test("two separate drags of the same node are two undo steps", () => {
+    const nodeId = useGraphStore
+      .getState()
+      .addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const pastLengthAfterAdd = useGraphStore.getState().past.length;
+
+    // First gesture.
+    useGraphStore.getState().moveNode(nodeId, { x: 10, y: 10 });
+    useGraphStore.getState().moveNode(nodeId, { x: 20, y: 20 });
+    useGraphStore.getState().endNodeDrag();
+    // Second gesture on the SAME node: endNodeDrag must have reset the coalescing key so
+    // this does not merge into the first drag's history entry.
+    useGraphStore.getState().moveNode(nodeId, { x: 30, y: 30 });
+    useGraphStore.getState().endNodeDrag();
+
+    expect(useGraphStore.getState().past.length).toBe(pastLengthAfterAdd + 2);
+
+    useGraphStore.getState().undo();
+    expect(useGraphStore.getState().nodes[nodeId].position).toEqual({
+      x: 20,
+      y: 20,
+    });
+    useGraphStore.getState().undo();
+    expect(useGraphStore.getState().nodes[nodeId].position).toEqual({
+      x: 0,
+      y: 0,
+    });
+  });
+});
+
+describe("undo/redo: no-op edits do not pollute history", () => {
+  test("removing an unknown node/edge pushes no history entry", () => {
+    useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const pastLength = useGraphStore.getState().past.length;
+
+    useGraphStore.getState().removeNode("does-not-exist");
+    useGraphStore.getState().removeEdge("does-not-exist");
+
+    expect(useGraphStore.getState().past.length).toBe(pastLength);
+  });
+
+  test("deleting a node and its incident edges is a single undo step", () => {
+    const sourceId = useGraphStore
+      .getState()
+      .addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const targetId = useGraphStore
+      .getState()
+      .addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+    const sourcePort = useGraphStore.getState().nodes[sourceId].ports[0];
+    const targetPort = useGraphStore.getState().nodes[targetId].ports[0];
+    useGraphStore
+      .getState()
+      .connect(
+        { node_id: sourceId, port_id: sourcePort.id },
+        { node_id: targetId, port_id: targetPort.id },
+      );
+    const pastLength = useGraphStore.getState().past.length;
+
+    // Delete the node, then (as React Flow does) try to remove the now-orphaned edge: the
+    // edge is already gone, so removeEdge must be a no-op that adds no extra history entry.
+    const edgeId = Object.keys(useGraphStore.getState().edges)[0];
+    useGraphStore.getState().removeNode(sourceId);
+    useGraphStore.getState().removeEdge(edgeId);
+
+    expect(useGraphStore.getState().past.length).toBe(pastLength + 1);
+
+    useGraphStore.getState().undo();
+    expect(useGraphStore.getState().nodes[sourceId]).toBeDefined();
+    expect(Object.keys(useGraphStore.getState().edges)).toHaveLength(1);
+  });
 });
 
 describe("canUndo / canRedo", () => {

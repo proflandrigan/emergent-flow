@@ -27,6 +27,7 @@ export function Canvas(): JSX.Element {
   const nodes = useGraphStore((s) => s.nodes);
   const edges = useGraphStore((s) => s.edges);
   const moveNode = useGraphStore((s) => s.moveNode);
+  const endNodeDrag = useGraphStore((s) => s.endNodeDrag);
   const removeNode = useGraphStore((s) => s.removeNode);
   const removeEdge = useGraphStore((s) => s.removeEdge);
   const connect = useGraphStore((s) => s.connect);
@@ -89,6 +90,7 @@ export function Canvas(): JSX.Element {
         edges={rfEdges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
+        onNodeDragStop={endNodeDrag}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         selectionOnDrag

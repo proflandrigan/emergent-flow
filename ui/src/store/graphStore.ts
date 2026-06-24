@@ -49,6 +49,7 @@ export interface GraphStore extends CanvasModel {
   ) => string;
   removeNode: (nodeId: string) => void;
   moveNode: (nodeId: string, position: { x: number; y: number }) => void;
+  endNodeDrag: () => void;
   setParam: (nodeId: string, paramName: string, value: unknown) => void;
   connect: (
     source: { node_id: string; port_id: string },
@@ -114,6 +115,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
 
   removeNode(nodeId) {
+    if (!get().nodes[nodeId]) {
+      return; // nothing to remove -- don't push a no-op history entry
+    }
     get().pushHistory("removeNode");
     set((state) => {
       const nodes = { ...state.nodes };
@@ -129,6 +133,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
 
   moveNode(nodeId, position) {
+    if (!get().nodes[nodeId]) {
+      return; // nothing to move -- don't push a no-op history entry
+    }
     const txn = `move:${nodeId}`;
     if (get()._lastTxn !== txn) {
       get().pushHistory(txn); // captures pre-drag state once; coalesces the rest of the drag
@@ -147,7 +154,20 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     });
   },
 
+  endNodeDrag() {
+    // A drag gesture finished. Clear the move-coalescing key so the NEXT drag of the same
+    // node starts a fresh history entry instead of merging into this one -- otherwise two
+    // separate drags of one node (with no action between) would collapse to a single undo
+    // step. `_lastTxn` is only consumed by moveNode's coalescing, so clearing it is safe.
+    if (get()._lastTxn !== null) {
+      set({ _lastTxn: null });
+    }
+  },
+
   setParam(nodeId, paramName, value) {
+    if (!get().nodes[nodeId]) {
+      return; // unknown node -- don't push a no-op history entry
+    }
     get().pushHistory("setParam");
     set((state) => {
       const existing = state.nodes[nodeId];
@@ -188,6 +208,9 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
 
   removeEdge(edgeId) {
+    if (!get().edges[edgeId]) {
+      return; // already gone (e.g. removeNode cleaned it up) -- don't push a no-op entry
+    }
     get().pushHistory("removeEdge");
     set((state) => {
       const edges = { ...state.edges };
