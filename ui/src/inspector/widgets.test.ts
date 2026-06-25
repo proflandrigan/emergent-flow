@@ -1,0 +1,186 @@
+import { describe, expect, test } from "vitest";
+
+import type { CatalogParam } from "../catalog/types";
+import {
+  formatValue,
+  isListType,
+  parseValue,
+  validateValue,
+  widgetForParam,
+} from "./widgets";
+
+function param(overrides: Partial<CatalogParam> = {}): CatalogParam {
+  return {
+    name: "p",
+    type_token: "str",
+    ...overrides,
+  };
+}
+
+describe("isListType", () => {
+  test("true for list[str]", () => {
+    expect(isListType("list[str]")).toBe(true);
+  });
+
+  test("true for bare list", () => {
+    expect(isListType("list")).toBe(true);
+  });
+
+  test("false for str", () => {
+    expect(isListType("str")).toBe(false);
+  });
+});
+
+describe("widgetForParam", () => {
+  test("choices win over type_token", () => {
+    const p = param({
+      type_token: "str",
+      hints: { choices: ["mean", "median"] },
+    });
+    expect(widgetForParam(p)).toBe("select");
+  });
+
+  test("bool -> checkbox", () => {
+    expect(widgetForParam(param({ type_token: "bool" }))).toBe("checkbox");
+  });
+
+  test("int -> number", () => {
+    expect(widgetForParam(param({ type_token: "int" }))).toBe("number");
+  });
+
+  test("float -> number", () => {
+    expect(widgetForParam(param({ type_token: "float" }))).toBe("number");
+  });
+
+  test("list[str] -> list", () => {
+    expect(widgetForParam(param({ type_token: "list[str]" }))).toBe("list");
+  });
+
+  test("str -> text", () => {
+    expect(widgetForParam(param({ type_token: "str" }))).toBe("text");
+  });
+});
+
+describe("formatValue", () => {
+  test("list param joins with comma-space", () => {
+    const p = param({ type_token: "list[str]" });
+    expect(formatValue(p, ["a", "b"])).toBe("a, b");
+  });
+
+  test("null becomes empty string", () => {
+    expect(formatValue(param(), null)).toBe("");
+  });
+
+  test("undefined becomes empty string", () => {
+    expect(formatValue(param(), undefined)).toBe("");
+  });
+
+  test("number becomes its string form", () => {
+    expect(formatValue(param({ type_token: "int" }), 5)).toBe("5");
+  });
+});
+
+describe("parseValue", () => {
+  test("list param splits, trims, drops empties", () => {
+    const p = param({ type_token: "list[str]" });
+    expect(parseValue(p, "a, b ,")).toEqual(["a", "b"]);
+  });
+
+  test("empty list input -> empty array", () => {
+    const p = param({ type_token: "list[str]" });
+    expect(parseValue(p, "")).toEqual([]);
+  });
+
+  test("float parses to number", () => {
+    const p = param({ type_token: "float" });
+    expect(parseValue(p, "3.5")).toBe(3.5);
+  });
+
+  test("empty number input -> null", () => {
+    const p = param({ type_token: "int" });
+    expect(parseValue(p, "")).toBeNull();
+  });
+
+  test("non-numeric number input -> null", () => {
+    const p = param({ type_token: "int" });
+    expect(parseValue(p, "abc")).toBeNull();
+  });
+
+  test("empty text input stays empty string", () => {
+    const p = param({ type_token: "str" });
+    expect(parseValue(p, "")).toBe("");
+  });
+});
+
+describe("validateValue", () => {
+  test("required + empty -> Required", () => {
+    const p = param({ required: true });
+    expect(validateValue(p, "")).toBe("Required");
+  });
+
+  test("required + empty array -> Required", () => {
+    const p = param({ type_token: "list[str]", required: true });
+    expect(validateValue(p, [])).toBe("Required");
+  });
+
+  test("not required + empty -> null", () => {
+    const p = param({ required: false });
+    expect(validateValue(p, "")).toBeNull();
+  });
+
+  test("number below min -> message", () => {
+    const p = param({ type_token: "int", hints: { min: 10 } });
+    expect(validateValue(p, 5)).toBe("Must be ≥ 10");
+  });
+
+  test("number above max -> message", () => {
+    const p = param({ type_token: "int", hints: { max: 10 } });
+    expect(validateValue(p, 15)).toBe("Must be ≤ 10");
+  });
+
+  test("non-finite number -> Must be a number", () => {
+    const p = param({ type_token: "int" });
+    expect(validateValue(p, NaN)).toBe("Must be a number");
+  });
+
+  test("string failing pattern -> message", () => {
+    const p = param({ hints: { pattern: "^[a-z]+$" } });
+    expect(validateValue(p, "ABC")).toBe("Does not match ^[a-z]+$");
+  });
+
+  test("value in choices -> null", () => {
+    const p = param({ hints: { choices: ["mean", "median"] } });
+    expect(validateValue(p, "mean")).toBeNull();
+  });
+
+  test("value not in choices -> message", () => {
+    const p = param({ hints: { choices: ["mean", "median"] } });
+    expect(validateValue(p, "mode")).toBe("Must be one of: mean, median");
+  });
+
+  test("bad/uncompilable pattern does not throw and is treated as no check", () => {
+    const p = param({ hints: { pattern: "(unclosed" } });
+    expect(() => validateValue(p, "anything")).not.toThrow();
+    expect(validateValue(p, "anything")).toBeNull();
+  });
+
+  test("list length below min_length -> message", () => {
+    const p = param({ type_token: "list[str]", hints: { min_length: 2 } });
+    expect(validateValue(p, ["a"])).toBe("Must have at least 2 items");
+  });
+
+  test("list length above max_length -> message", () => {
+    const p = param({ type_token: "list[str]", hints: { max_length: 1 } });
+    expect(validateValue(p, ["a", "b"])).toBe("Must have at most 1 items");
+  });
+
+  test("string shorter than min_length -> message", () => {
+    const p = param({ hints: { min_length: 5 } });
+    expect(validateValue(p, "abc")).toBe("Must be at least 5 characters");
+  });
+
+  test("string longer than max_length -> message", () => {
+    const p = param({ hints: { max_length: 2 } });
+    expect(validateValue(p, "abc")).toBe("Must be at most 2 characters");
+  });
+});

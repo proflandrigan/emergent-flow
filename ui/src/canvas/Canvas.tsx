@@ -15,9 +15,10 @@ import {
   type NodeChange,
   type NodeTypes,
 } from "@xyflow/react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 
 import { useGraphStore } from "../store/graphStore";
+import { useSelectionStore } from "../store/selectionStore";
 import { CmNode } from "./nodes/CmNode";
 import { toRFEdge, toRFNode } from "./toReactFlow";
 
@@ -32,15 +33,18 @@ export function Canvas(): JSX.Element {
   const removeEdge = useGraphStore((s) => s.removeEdge);
   const connect = useGraphStore((s) => s.connect);
 
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const selNodes = useSelectionStore((s) => s.nodes);
+  const selEdges = useSelectionStore((s) => s.edges);
+  const setNodeSelected = useSelectionStore((s) => s.setNodeSelected);
+  const setEdgeSelected = useSelectionStore((s) => s.setEdgeSelected);
 
   const rfNodes = useMemo(
-    () => Object.values(nodes).map((n) => toRFNode(n, !!selected[n.id])),
-    [nodes, selected],
+    () => Object.values(nodes).map((n) => toRFNode(n, !!selNodes[n.id])),
+    [nodes, selNodes],
   );
   const rfEdges = useMemo(
-    () => Object.values(edges).map((e) => toRFEdge(e, !!selected[e.id])),
-    [edges, selected],
+    () => Object.values(edges).map((e) => toRFEdge(e, !!selEdges[e.id])),
+    [edges, selEdges],
   );
 
   const onNodesChange = useCallback(
@@ -49,26 +53,30 @@ export function Canvas(): JSX.Element {
         if (change.type === "position" && change.position) {
           moveNode(change.id, change.position);
         } else if (change.type === "remove") {
+          // Clear any lingering selection flag so a deleted node can't masquerade as a second
+          // selection and make selectedNodeId() report "multiple selected".
+          setNodeSelected(change.id, false);
           removeNode(change.id);
         } else if (change.type === "select") {
-          setSelected((prev) => ({ ...prev, [change.id]: change.selected }));
+          setNodeSelected(change.id, change.selected);
         }
       }
     },
-    [moveNode, removeNode],
+    [moveNode, removeNode, setNodeSelected],
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
       for (const change of changes) {
         if (change.type === "remove") {
+          setEdgeSelected(change.id, false);
           removeEdge(change.id);
         } else if (change.type === "select") {
-          setSelected((prev) => ({ ...prev, [change.id]: change.selected }));
+          setEdgeSelected(change.id, change.selected);
         }
       }
     },
-    [removeEdge],
+    [removeEdge, setEdgeSelected],
   );
 
   const onConnect = useCallback(
