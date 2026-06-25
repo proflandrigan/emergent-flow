@@ -1,6 +1,9 @@
 {
+  "catalog_version": 1,
   "nodes": [
     {
+      "category": "Transform",
+      "description": "Fill missing values in selected columns using a chosen strategy.",
       "family": "clean",
       "label": "Impute Missing",
       "paradigm": "functional",
@@ -70,6 +73,8 @@
       "version": 2
     },
     {
+      "category": "Ingest",
+      "description": "Load a CSV file into a pandas DataFrame.",
       "family": "data",
       "label": "Load CSV",
       "paradigm": "functional",
@@ -126,6 +131,150 @@
       "version": 2
     },
     {
+      "category": "Ingest",
+      "description": "Load a JSON file into a pandas DataFrame.",
+      "family": "data",
+      "label": "Load JSON",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Filesystem path to the .json file to load.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "file"
+          },
+          "label": "JSON path",
+          "name": "path",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "pandas read_json orient (e.g. 'records'); unset uses pandas' default.",
+          "hints": null,
+          "label": "Orient",
+          "name": "orient",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The loaded data as a pandas DataFrame.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.load_json",
+      "version": 1
+    },
+    {
+      "category": "Ingest",
+      "description": "Load a Parquet file into a pandas DataFrame.",
+      "family": "data",
+      "label": "Load Parquet",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Filesystem path to the .parquet file to load.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "file"
+          },
+          "label": "Parquet path",
+          "name": "path",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional subset of columns to read; empty/unset reads all columns.",
+          "hints": null,
+          "label": "Columns",
+          "name": "columns",
+          "required": false,
+          "type_token": "list[str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The loaded data as a pandas DataFrame.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.load_parquet",
+      "version": 1
+    },
+    {
+      "category": "Ingest",
+      "description": "Load a small bundled sample dataset (zero filesystem setup).",
+      "family": "data",
+      "label": "Load Sample",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "iris",
+          "help": "Which bundled sample dataset to load.",
+          "hints": {
+            "choices": [
+              "iris",
+              "wine",
+              "diabetes"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Dataset",
+          "name": "name",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The loaded data as a pandas DataFrame.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.load_sample",
+      "version": 1
+    },
+    {
+      "category": "Machine Learning",
+      "description": "Train a logistic-regression classifier and report evaluation metrics.",
       "family": "ml",
       "label": "Train Classifier",
       "paradigm": "functional",
@@ -209,6 +358,8 @@
       "version": 2
     },
     {
+      "category": "Neural Network",
+      "description": "A linear (fully-connected) layer.",
       "family": "nn",
       "label": "Linear",
       "paradigm": "declarative",
@@ -256,6 +407,8 @@
       "version": 1
     },
     {
+      "category": "Neural Network",
+      "description": "An nn.Module that owns a subgraph of layers.",
       "family": "nn",
       "label": "Module",
       "paradigm": "declarative",
@@ -265,6 +418,8 @@
       "version": 1
     },
     {
+      "category": "Neural Network",
+      "description": "A ReLU activation layer.",
       "family": "nn",
       "label": "ReLU",
       "paradigm": "declarative",
@@ -293,6 +448,8 @@
       "version": 1
     },
     {
+      "category": "Reporting",
+      "description": "Generate an HTML profiling report summarising a DataFrame.",
       "family": "reports",
       "label": "HTML Summary",
       "paradigm": "functional",
@@ -340,6 +497,8 @@
       "version": 2
     },
     {
+      "category": "Statistics",
+      "description": "One-way ANOVA testing a numeric column across groups.",
       "family": "stats",
       "label": "ANOVA",
       "paradigm": "functional",

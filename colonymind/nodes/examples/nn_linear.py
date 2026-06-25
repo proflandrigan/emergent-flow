@@ -38,6 +38,8 @@ class NnLinear(NodeDefinition):
     version = 1
     family = "nn"
     label = "Linear"
+    category = "Neural Network"
+    description = "A linear (fully-connected) layer."
     paradigm = Paradigm.DECLARATIVE
 
     ports = [

@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from colonymind import compile_to_code, execute, validate
+from colonymind import compile_to_code, execute, export_catalog, validate
 from colonymind.codegen.errors import CodegenError, UnboundInputError
 from colonymind.codegen.traversal import topological_sort
 from colonymind.codegen.validation import enforce_validation_gate
@@ -25,7 +25,6 @@ from colonymind.ir import Direction, Graph, Paradigm
 from colonymind.ir.schema import ir_json_schema
 from colonymind.ir.serialize import deserialize_graph
 from colonymind.nodes import get as get_node_definition
-from colonymind.nodes import registry
 from colonymind.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
 
 # Per-node execution status reported to the canvas (Epic 4 Story 2). A node is
@@ -63,13 +62,16 @@ def get_schema() -> dict[str, Any]:
 
 
 def get_catalog() -> dict[str, Any]:
-    """Return the node catalog: one JSON-able ``NodeSpec`` per registered node type.
+    """Return the versioned node catalog artifact (ADR 0015).
 
-    Shape: ``{"nodes": [<NodeSpec as JSON>, ...]}``, sorted by node ``type`` (``registry.specs()``
-    already returns definitions sorted by type). The palette (Epic 5 Story 3) and the
-    schema-driven config panels (Story 4) render entirely from this -- no Python in the client.
+    Delegates to the single canonical builder ``cm.export_catalog`` so the server's
+    ``GET /catalog``, the committed ``ui/src/generated/catalog.json``, and the SDK's
+    ``cm.export_catalog()`` all serve byte-identical data -- one source of truth, no
+    two-tier palette. Shape: ``{"catalog_version": <int>, "nodes": [<NodeSpec as JSON>, ...]}``,
+    nodes sorted by ``type``. The palette (Epic 5 Story 3) and the schema-driven config
+    panels (Story 4) render entirely from this -- no Python in the client.
     """
-    return {"nodes": [spec.model_dump(mode="json") for spec in registry.specs()]}
+    return export_catalog()
 
 
 def _ancestors(graph: Graph, targets: set[str], wiring_map: WiringMap) -> set[str]:

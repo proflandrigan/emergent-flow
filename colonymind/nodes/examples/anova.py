@@ -33,6 +33,8 @@ class Anova(NodeDefinition):
     version = 2
     family = "stats"
     label = "ANOVA"
+    category = "Statistics"
+    description = "One-way ANOVA testing a numeric column across groups."
 
     ports = [
         PortSpec(

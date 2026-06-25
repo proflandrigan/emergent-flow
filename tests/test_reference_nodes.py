@@ -21,6 +21,9 @@ from colonymind.nodes.examples import (
     GenerateHtmlSummary,
     ImputeMissing,
     LoadCsv,
+    LoadJson,
+    LoadParquet,
+    LoadSample,
     TrainClassifier,
 )
 
@@ -264,3 +267,123 @@ class TestWholeGraphWiring:
         an_lhs = an_frag.body.split("=", 1)[0].strip()
         tr_lhs = tr_frag.body.split("=", 1)[0].strip()
         assert an_lhs != tr_lhs
+
+
+# ---------------------------------------------------------------------------
+# data.load_parquet
+# ---------------------------------------------------------------------------
+
+
+class TestLoadParquet:
+    @pytest.fixture
+    def parquet_file(self, tmp_path):
+        path = tmp_path / "data.parquet"
+        pd.DataFrame({"a": [1, 2, 3], "b": ["x", "x", "y"]}).to_parquet(path)
+        return str(path)
+
+    def test_to_spec_source_node(self):
+        spec = LoadParquet().to_spec()
+        assert spec.type == "data.load_parquet"
+        assert spec.category == "Ingest" and spec.description
+        out_ports = [p for p in spec.ports if p.direction == Direction.OUT]
+        assert [p.name for p in out_ports] == ["frame"]
+        assert not [p for p in spec.ports if p.direction == Direction.IN]
+
+    def test_missing_required_path_flagged(self):
+        node = LoadParquet().instantiate()
+        errors = LoadParquet().validate_node(node)
+        assert any("required param 'path'" in e for e in errors)
+
+    def test_codegen_body_golden(self, parquet_file):
+        defn = LoadParquet()
+        node = defn.instantiate(path=parquet_file)
+        frag = defn.preview(node)
+        assert frag.imports == ["import colonymind as cm"]
+        assert frag.body == f"frame = cm.data.load_parquet({parquet_file!r}, columns=None)"
+
+    def test_codegen_matches_execute(self, parquet_file):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = LoadParquet()
+        node = defn.instantiate(path=parquet_file)
+        executed = defn.execute(node, inputs={})
+        scope = _run_codegen(defn, node, {})
+        assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
+# data.load_json
+# ---------------------------------------------------------------------------
+
+
+class TestLoadJson:
+    @pytest.fixture
+    def json_file(self, tmp_path):
+        path = tmp_path / "data.json"
+        pd.DataFrame({"a": [1, 2, 3], "b": ["x", "x", "y"]}).to_json(path, orient="records")
+        return str(path)
+
+    def test_to_spec_source_node(self):
+        spec = LoadJson().to_spec()
+        assert spec.type == "data.load_json"
+        assert spec.category == "Ingest" and spec.description
+        out_ports = [p for p in spec.ports if p.direction == Direction.OUT]
+        assert [p.name for p in out_ports] == ["frame"]
+        assert not [p for p in spec.ports if p.direction == Direction.IN]
+
+    def test_missing_required_path_flagged(self):
+        node = LoadJson().instantiate()
+        errors = LoadJson().validate_node(node)
+        assert any("required param 'path'" in e for e in errors)
+
+    def test_codegen_body_golden(self, json_file):
+        defn = LoadJson()
+        node = defn.instantiate(path=json_file, orient="records")
+        frag = defn.preview(node)
+        assert frag.imports == ["import colonymind as cm"]
+        assert frag.body == f"frame = cm.data.load_json({json_file!r}, orient='records')"
+
+    def test_codegen_matches_execute(self, json_file):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = LoadJson()
+        node = defn.instantiate(path=json_file, orient="records")
+        executed = defn.execute(node, inputs={})
+        scope = _run_codegen(defn, node, {})
+        assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
+# data.load_sample
+# ---------------------------------------------------------------------------
+
+
+class TestLoadSample:
+    def test_to_spec_source_node_with_choices(self):
+        spec = LoadSample().to_spec()
+        assert spec.type == "data.load_sample"
+        assert spec.category == "Ingest" and spec.description
+        out_ports = [p for p in spec.ports if p.direction == Direction.OUT]
+        assert [p.name for p in out_ports] == ["frame"]
+        assert not [p for p in spec.ports if p.direction == Direction.IN]
+        name = next(p for p in spec.params if p.name == "name")
+        assert name.default == "iris"
+        assert "iris" in name.hints.choices
+
+    def test_unknown_name_flagged(self):
+        node = LoadSample().instantiate(name="not-real")
+        errors = LoadSample().validate_node(node)
+        assert any("not one of" in e for e in errors)
+
+    def test_codegen_body_golden(self):
+        defn = LoadSample()
+        node = defn.instantiate(name="iris")
+        frag = defn.preview(node)
+        assert frag.imports == ["import colonymind as cm"]
+        assert frag.body == "frame = cm.data.load_sample(name='iris')"
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = LoadSample()
+        node = defn.instantiate(name="iris")
+        executed = defn.execute(node, inputs={})
+        scope = _run_codegen(defn, node, {})
+        assert scope["frame"].equals(executed["frame"])

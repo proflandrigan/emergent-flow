@@ -33,6 +33,8 @@ class ImputeMissing(NodeDefinition):
     version = 2
     family = "clean"
     label = "Impute Missing"
+    category = "Transform"
+    description = "Fill missing values in selected columns using a chosen strategy."
 
     ports = [
         PortSpec(
