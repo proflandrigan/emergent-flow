@@ -57,7 +57,7 @@ class LoadParquet(NodeDefinition):
             type_token="list[str]",
             default=None,
             label="Columns",
-            help="Optional subset of columns to read; empty/unset reads all columns.",
+            help="Optional subset of columns to read; leave unset to read all columns.",
         ),
     ]
 

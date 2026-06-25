@@ -206,7 +206,7 @@
         },
         {
           "default": null,
-          "help": "Optional subset of columns to read; empty/unset reads all columns.",
+          "help": "Optional subset of columns to read; leave unset to read all columns.",
           "hints": null,
           "label": "Columns",
           "name": "columns",

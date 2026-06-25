@@ -208,7 +208,7 @@
           }),
           dict({
             'default': None,
-            'help': 'Optional subset of columns to read; empty/unset reads all columns.',
+            'help': 'Optional subset of columns to read; leave unset to read all columns.',
             'hints': None,
             'label': 'Columns',
             'name': 'columns',

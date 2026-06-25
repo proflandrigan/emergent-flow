@@ -10,7 +10,7 @@ Routes:
 - ``GET  /``          -- serves ``_static/index.html`` when present, else the demo page
 - ``GET  /healthz``   -- ``{"status": "ok"}``
 - ``GET  /schema``    -- the IR JSON Schema
-- ``GET  /catalog``   -- ``{"nodes": [<NodeSpec>, ...]}``, one per registered node type
+- ``GET  /catalog``   -- ``{"catalog_version": <int>, "nodes": [<NodeSpec>, ...]}`` (ADR 0015)
 - ``POST /compile``   -- IR JSON -> ``{"code": ...}``
 - ``POST /execute``   -- IR JSON -> ``{"results": ..., "statuses": ...}``
 - ``POST /execute_node`` -- ``{"graph", "run_node", "inputs"}`` -> single-node run
