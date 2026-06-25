@@ -30,6 +30,7 @@ generally roadmap-Epic-N.
 | **Epic 3** | [`epic-3-type-safe-graph-and-validation.md`](./epic-3-type-safe-graph-and-validation.md) | **Epic 5** | Type-Safe Graph & Connection Validation | Python SDK (`colonymind/`) owns the rules; `ui/` consumes them |
 | **Epic 4** | [`epic-4-local-server.md`](./epic-4-local-server.md) | **Epic 6** (happy-path sliver) | Local Execution Server (bundled, in-process) | Local server — `colonymind/server/` |
 | **Epic 5** | [`epic-5-frontend-canvas.md`](./epic-5-frontend-canvas.md) | **Epic 3** | Frontend Canvas Engine | Frontend — `ui/` |
+| **Epic 6** | [`epic-6-node-library.md`](./epic-6-node-library.md) | **Epic 4** | Node Library & Configuration UX | Python SDK (`colonymind/`) owns the catalog; `ui/` renders palette/panels |
 
 > **Delivery vs. roadmap order.** Repo Epics 4 (local server) and 5 (canvas) are *planned*
 > (Epic 4's v0 server has shipped; Epic 5 is not started). The server was front-loaded ahead of
@@ -43,8 +44,10 @@ These are referenced by the roadmap but do not yet have a story-level epic file 
 in the `ui/`, `colonymind/server/`, or SDK trees (same repo, per ADR 0013) and gain a file when
 picked up:
 
-- **Roadmap Epic 4 — Node Library & Configuration UX** → *split*: config-panel UI in `ui/`,
-  node catalog/defaults in the SDK (`colonymind/`) tree (folded into the SDK node work).
+- ~~**Roadmap Epic 4 — Node Library & Configuration UX**~~ → now decomposed as **repo Epic 6**
+  ([`epic-6-node-library.md`](./epic-6-node-library.md)): the SDK (`colonymind/`) tree owns the
+  node catalog/defaults + the catalog-as-data export; the config-panel UI in `ui/` (repo Epic 5
+  Stories 3–4) consumes it.
 - **Roadmap Epics 7–15** → the `colonymind/server/` and/or `ui/` trees (with the heavyweight
   hosted pieces deferred to the gated hosted product per §A6). The happy-path sliver of roadmap
   **Epic 6** is already decomposed as **repo Epic 4** above.

@@ -56,21 +56,34 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
   - **Unblocks Step 4:** the rules-as-data artifact (Story 7) is published, so the canvas can
     now wire real live validation.
 
-- [ ] **Step 4 — Roadmap Epic 3: Frontend Canvas Engine** · `ui/` tree · *story-level decomposition: [repo Epic 5](../epics/epic-5-frontend-canvas.md)*
+- [x] **Step 4 — Roadmap Epic 3: Frontend Canvas Engine** · `ui/` tree · *story-level decomposition: [repo Epic 5](../epics/epic-5-frontend-canvas.md)*
   - Deps: Steps 1, 2, **3** (consumes IR schema + `compile_to_code` output + rules-as-data;
     never `import colonymind`), and now **Phase 1.5** (calls the local server's `/compile`,
     `/validate`, `/execute` instead of re-implementing codegen/validation in TS — [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)
     Decision 5). React Flow canvas, pan/zoom, edge drawing, grouping, schema-driven config
     panels, in-node "show code" view, live red-edge validation.
+  - Status: **done** — [repo Epic 5](../epics/epic-5-frontend-canvas.md) Stories 1–9 merged to
+    `main` (canvas runtime, schema-driven config panels, IR round-trip, in-node "show code", live
+    red-edge validation via `/validate`, download `.py` + minimal `/execute` loop, and the perf
+    pass). The Phase-1 milestone (canvas → valid IR → downloadable, runnable Python, plus live
+    execute over the local server) is met.
   - **Toolchain switch:** first work in the `npm`/Vite/Vitest `ui/` tree. All three SDK contracts it
     consumes have landed *and* the local server already serves them — this is unblocked and is
     the fastest path to a usable UI. Stories are broken out in [`epics/epic-5-frontend-canvas.md`](../epics/epic-5-frontend-canvas.md).
 
-- [ ] **Step 5 — Roadmap Epic 4: Node Library & Configuration UX** · `ui/` + `colonymind/` *(split)*
+- [ ] **Step 5 — Roadmap Epic 4: Node Library & Configuration UX** · `ui/` + `colonymind/` *(split)* · *story-level decomposition: [repo Epic 6](../epics/epic-6-node-library.md)*
   - Deps: Steps 1–3, 4. The end-to-end vertical slice (load → clean → one stats test → one
-    model → HTML report), node palette/search, defaults & help text. SDK owns node
-    catalog/defaults; canvas owns the config-panel surface. Treat as continuous after the
-    first slice.
+    model → HTML report) already exists as the five reference nodes; this step **widens** each
+    family by the demo narrative, ships per-node defaults/help/validation hints, and exports a
+    versioned **catalog-as-data** artifact for the palette. SDK (`colonymind/`) owns the node
+    catalog/defaults + export; the canvas (`ui/`) renders the palette + config panels it already
+    built (repo Epic 5 Stories 3–4). Treat as continuous after the first widening.
+  - Status: **not started — the active frontier.** Story-level plan landed in
+    [repo Epic 6](../epics/epic-6-node-library.md). The execution machinery is already done
+    (`cm.execute` + the local server), so this is purely catalog breadth + metadata — the last
+    piece between the app and real, useful data work. **Out of scope:** DL nodes (Step 12 / Epic
+    10), GenAI nodes (Step 13 / Epic 11), credentialed connectors (Step 10 / Epic 9 — local-file
+    loaders only), and the raw-code escape-hatch node (decided + deferred in repo Epic 6 Story 1).
 
 > **End of Phase 1 milestone:** canvas → valid IR → downloadable, runnable Python, zero
 > backend. The strongest early de-risking demo.
@@ -243,15 +256,17 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
 
 | Done | In progress | Not started |
 | :-- | :-- | :-- |
-| Roadmap Epics **1, 2, 5** (repo Epics 1–3) | Roadmap Epic **6** (repo Epic 4 — local server **v0 done**, Story 1) | Roadmap Epics **3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15** |
+| Roadmap Epics **1, 2, 5, 3** (repo Epics 1–3, 5) | Roadmap Epic **6** (repo Epic 4 — local server **v0 done**, Story 1) | Roadmap Epics **4, 7, 8, 9, 10, 11, 12, 13, 14, 15** |
 
-**3 of 15 epics complete, + a running v0 local server.** The Python package is usable today
-(`cm.compile_to_code`, `cm.execute`, `cm.validate`, `cm.export_script`), and there is now a
-literal `pip install colonymind && colonymind serve` that executes graphs in-process over REST
-([repo Epic 4](../epics/epic-4-local-server.md)). Next concrete milestone: **Step 4 — the
-frontend canvas** (roadmap Epic 3, the `ui/` tree; story-level plan in
-[repo Epic 5](../epics/epic-5-frontend-canvas.md)) — fully unblocked by the published IR schema,
-codegen output, and rules-as-data artifact, *and* by the local server that already serves them.
+**4 of 15 epics complete, + a running v0 local server.** The Python package is usable today
+(`cm.compile_to_code`, `cm.execute`, `cm.validate`, `cm.export_script`), there is a literal
+`pip install colonymind && colonymind serve` that executes graphs in-process over REST
+([repo Epic 4](../epics/epic-4-local-server.md)), and the **frontend canvas has landed**
+([repo Epic 5](../epics/epic-5-frontend-canvas.md), Stories 1–9) — the Phase-1 milestone
+(canvas → valid IR → downloadable, runnable Python + live execute) is met. Next concrete
+milestone: **Step 5 — the node library** (roadmap Epic 4; story-level plan in
+[repo Epic 6](../epics/epic-6-node-library.md)). The execution machinery is already done, so this
+is catalog breadth + per-node metadata — the last piece between the app and real, useful data work.
 
 ---
 
