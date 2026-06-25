@@ -12,19 +12,27 @@ import {
   ReactFlow,
   type Connection,
   type EdgeChange,
+  type EdgeTypes,
   type NodeChange,
   type NodeTypes,
 } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 
+import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
+import { useLiveValidation } from "../store/useLiveValidation";
+import { useValidationStore } from "../store/validationStore";
+import { CmEdge } from "./edges/CmEdge";
 import { CmNode } from "./nodes/CmNode";
 import { toRFEdge, toRFNode } from "./toReactFlow";
 
 const nodeTypes: NodeTypes = { cmNode: CmNode };
+const edgeTypes: EdgeTypes = { cmEdge: CmEdge };
 
 export function Canvas(): JSX.Element {
+  useLiveValidation();
+
   const nodes = useGraphStore((s) => s.nodes);
   const edges = useGraphStore((s) => s.edges);
   const moveNode = useGraphStore((s) => s.moveNode);
@@ -38,13 +46,35 @@ export function Canvas(): JSX.Element {
   const setNodeSelected = useSelectionStore((s) => s.setNodeSelected);
   const setEdgeSelected = useSelectionStore((s) => s.setEdgeSelected);
 
+  const edgeCompatibility = useValidationStore((s) => s.edgeCompatibility);
+  const diagnostics = useValidationStore((s) => s.diagnostics);
+
+  const statuses = useExecutionStore((s) => s.statuses);
+  const results = useExecutionStore((s) => s.results);
+
+  const reasons = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const d of diagnostics) {
+      if (d.edge_id) {
+        m[d.edge_id] = d.message;
+      }
+    }
+    return m;
+  }, [diagnostics]);
+
   const rfNodes = useMemo(
-    () => Object.values(nodes).map((n) => toRFNode(n, !!selNodes[n.id])),
-    [nodes, selNodes],
+    () =>
+      Object.values(nodes).map((n) =>
+        toRFNode(n, !!selNodes[n.id], statuses[n.id]?.status, results[n.id]),
+      ),
+    [nodes, selNodes, statuses, results],
   );
   const rfEdges = useMemo(
-    () => Object.values(edges).map((e) => toRFEdge(e, !!selEdges[e.id])),
-    [edges, selEdges],
+    () =>
+      Object.values(edges).map((e) =>
+        toRFEdge(e, !!selEdges[e.id], edgeCompatibility[e.id], reasons[e.id]),
+      ),
+    [edges, selEdges, edgeCompatibility, reasons],
   );
 
   const onNodesChange = useCallback(
@@ -97,6 +127,7 @@ export function Canvas(): JSX.Element {
         nodes={rfNodes}
         edges={rfEdges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onNodeDragStop={endNodeDrag}
         onEdgesChange={onEdgesChange}
@@ -105,6 +136,7 @@ export function Canvas(): JSX.Element {
         multiSelectionKeyCode="Shift"
         deleteKeyCode={["Backspace", "Delete"]}
         fitView
+        onlyRenderVisibleElements
       >
         <Background />
         <Controls />

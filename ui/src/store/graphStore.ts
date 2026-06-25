@@ -58,6 +58,7 @@ export interface GraphStore extends CanvasModel {
   removeEdge: (edgeId: string) => void;
   toIR: () => Graph;
   loadIR: (graph: Graph) => void;
+  loadModel: (model: CanvasModel) => void;
   reset: () => void;
   pushHistory: (txn: string) => void;
   undo: () => void;
@@ -233,6 +234,17 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   loadIR(graph) {
     get().pushHistory("loadIR");
     set(fromIR(graph));
+  },
+
+  loadModel(model) {
+    get().pushHistory("loadModel");
+    set({
+      schemaVersion: model.schemaVersion,
+      name: model.name,
+      paradigm: model.paradigm,
+      nodes: model.nodes,
+      edges: model.edges,
+    });
   },
 
   reset() {
