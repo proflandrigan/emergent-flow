@@ -7,9 +7,9 @@ import type { CatalogParam } from "../catalog/types";
 
 export type WidgetKind = "select" | "checkbox" | "number" | "text" | "list";
 
-// True when the type token is a list/sequence, e.g. "list[str]".
+// True when the type token is a list/sequence, e.g. "list" or "list[str]".
 export function isListType(typeToken: string): boolean {
-  return typeToken.startsWith("list[") || typeToken.startsWith("list");
+  return typeToken === "list" || typeToken.startsWith("list[");
 }
 
 // Choose the widget. Precedence: explicit choices -> "select"; then by type_token:
@@ -103,12 +103,14 @@ export function validateValue(
   }
 
   if (kind === "list") {
+    // For lists, min_length/max_length bound the number of items (matching the backend's
+    // generic length check in nodes/contract.py), not a character count.
     const arr = Array.isArray(value) ? value : [];
     if (hints?.min_length != null && arr.length < hints.min_length) {
-      return `Must be at least ${hints.min_length} characters`;
+      return `Must have at least ${hints.min_length} items`;
     }
     if (hints?.max_length != null && arr.length > hints.max_length) {
-      return `Must be at most ${hints.max_length} characters`;
+      return `Must have at most ${hints.max_length} items`;
     }
     return null;
   }

@@ -46,7 +46,14 @@ export function IRToolbar(): JSX.Element {
     if (!file) {
       return;
     }
-    const text = await readFileText(file);
+    let text: string;
+    try {
+      text = await readFileText(file);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Could not read file: ${msg}`);
+      return;
+    }
     const res = parseImport(text);
     if (res.graph) {
       useGraphStore.getState().loadIR(res.graph);

@@ -21,6 +21,15 @@ describe("selectedNodeId", () => {
   test("returns null when zero nodes are selected", () => {
     expect(selectedNodeId(useSelectionStore.getState())).toBeNull();
   });
+
+  test("a deselected (deleted) node does not count toward the selection", () => {
+    // Mirrors Canvas's remove handler: deleting a selected node deselects it, so a later
+    // single selection still resolves cleanly instead of reading as "two selected".
+    useSelectionStore.getState().setNodeSelected("n1", true);
+    useSelectionStore.getState().setNodeSelected("n1", false);
+    useSelectionStore.getState().setNodeSelected("n2", true);
+    expect(selectedNodeId(useSelectionStore.getState())).toBe("n2");
+  });
 });
 
 describe("clear", () => {

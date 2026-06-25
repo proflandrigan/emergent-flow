@@ -53,6 +53,9 @@ export function Canvas(): JSX.Element {
         if (change.type === "position" && change.position) {
           moveNode(change.id, change.position);
         } else if (change.type === "remove") {
+          // Clear any lingering selection flag so a deleted node can't masquerade as a second
+          // selection and make selectedNodeId() report "multiple selected".
+          setNodeSelected(change.id, false);
           removeNode(change.id);
         } else if (change.type === "select") {
           setNodeSelected(change.id, change.selected);
@@ -66,6 +69,7 @@ export function Canvas(): JSX.Element {
     (changes: EdgeChange[]) => {
       for (const change of changes) {
         if (change.type === "remove") {
+          setEdgeSelected(change.id, false);
           removeEdge(change.id);
         } else if (change.type === "select") {
           setEdgeSelected(change.id, change.selected);

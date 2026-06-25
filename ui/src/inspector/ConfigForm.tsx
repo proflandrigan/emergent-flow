@@ -89,22 +89,9 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
         }
       />
     );
-  } else if (kind === "list") {
-    widget = (
-      <input
-        type="text"
-        data-testid={testId}
-        value={formatValue(catalogParam, param.value)}
-        onChange={(e) =>
-          setParam(
-            node.id,
-            param.name,
-            parseValue(catalogParam, e.target.value),
-          )
-        }
-      />
-    );
   } else {
+    // text + list both edit as a plain text input; `parseValue` splits a list on commas, and
+    // the "comma-separated" hint below is rendered only for the list kind.
     widget = (
       <input
         type="text"

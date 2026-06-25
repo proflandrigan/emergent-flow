@@ -166,12 +166,12 @@ describe("validateValue", () => {
 
   test("list length below min_length -> message", () => {
     const p = param({ type_token: "list[str]", hints: { min_length: 2 } });
-    expect(validateValue(p, ["a"])).toBe("Must be at least 2 characters");
+    expect(validateValue(p, ["a"])).toBe("Must have at least 2 items");
   });
 
   test("list length above max_length -> message", () => {
     const p = param({ type_token: "list[str]", hints: { max_length: 1 } });
-    expect(validateValue(p, ["a", "b"])).toBe("Must be at most 1 characters");
+    expect(validateValue(p, ["a", "b"])).toBe("Must have at most 1 items");
   });
 
   test("string shorter than min_length -> message", () => {
