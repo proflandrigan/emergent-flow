@@ -5,11 +5,15 @@
 import type { Edge as RFEdge, Node as RFNode } from "@xyflow/react";
 
 import type { EdgeModel, NodeModel } from "../store/model";
+import type { NodeStatus, Payload } from "../store/execution";
+import type { CmEdgeData } from "./edges/CmEdge";
 import type { CmNodeData } from "./nodes/CmNode";
 
 export function toRFNode(
   node: NodeModel,
   selected: boolean,
+  status: NodeStatus | null | undefined,
+  results: Record<string, Payload> | null | undefined,
 ): RFNode<CmNodeData> {
   return {
     id: node.id,
@@ -23,17 +27,26 @@ export function toRFNode(
         name: port.name,
         direction: port.direction,
       })),
+      status: status ?? null,
+      results: results ?? null,
     },
   };
 }
 
-export function toRFEdge(edge: EdgeModel, selected: boolean): RFEdge {
+export function toRFEdge(
+  edge: EdgeModel,
+  selected: boolean,
+  compatible: boolean | null | undefined,
+  reason: string | null | undefined,
+): RFEdge<CmEdgeData> {
   return {
     id: edge.id,
+    type: "cmEdge",
     source: edge.source.node_id,
     sourceHandle: edge.source.port_id,
     target: edge.target.node_id,
     targetHandle: edge.target.port_id,
     selected,
+    data: { incompatible: compatible === false, reason: reason ?? null },
   };
 }

@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 
 import { Canvas } from "./canvas/Canvas";
+import { ExecutionToolbar } from "./exec/ExecutionToolbar";
 import { Inspector } from "./inspector/Inspector";
 import { IRToolbar } from "./io/IRToolbar";
 import { Palette } from "./palette/Palette";
 import { useGraphStore } from "./store/graphStore";
+import { DevControls } from "./dev/DevControls";
 
 type ServerStatus = "connecting" | "ok" | "unreachable";
 
@@ -96,6 +98,8 @@ export function App(): JSX.Element {
         </span>
         <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem" }}>
           <IRToolbar />
+          <ExecutionToolbar />
+          <DevControls />
           <button
             type="button"
             disabled={!canUndo}
