@@ -7,8 +7,10 @@ import { create } from "zustand";
 
 import type { CatalogNode } from "../catalog/types";
 import type { Graph } from "../generated/ir";
+import { useExecutionStore } from "./executionStore";
 import { newId } from "./ids";
 import { fromIR, toIR } from "./ir";
+import { useValidationStore } from "./validationStore";
 import type {
   CanvasModel,
   EdgeModel,
@@ -16,6 +18,17 @@ import type {
   ParamModel,
   PortModel,
 } from "./model";
+
+// Replacing the whole graph (import / dev-load) invalidates any prior /execute and /validate
+// verdicts: those are keyed by node/edge id, and ids are PRESERVED across export -> re-import,
+// so without this a graph re-imported after a run would show stale results, node-status colours,
+// and red edges against the freshly loaded graph. Validation re-runs automatically via
+// useLiveValidation; clearing here just avoids the stale window. Execution has no live re-run,
+// so clearing is the only thing that drops its now-orphaned results.
+function clearDerivedStores(): void {
+  useExecutionStore.getState().clear();
+  useValidationStore.getState().clear();
+}
 
 function emptyGraph(): CanvasModel {
   return {
@@ -234,6 +247,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   loadIR(graph) {
     get().pushHistory("loadIR");
     set(fromIR(graph));
+    clearDerivedStores();
   },
 
   loadModel(model) {
@@ -245,10 +259,12 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       nodes: model.nodes,
       edges: model.edges,
     });
+    clearDerivedStores();
   },
 
   reset() {
     set({ ...emptyGraph(), past: [], future: [], _lastTxn: null });
+    clearDerivedStores();
   },
 
   undo() {
