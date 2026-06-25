@@ -1,18 +1,18 @@
 [build-system]
 requires = ["setuptools>=77"]
-# In-tree backend shim (build_backend.py): runs `vite build ui/` -> colonymind/_static/
+# In-tree backend shim (build_backend.py): runs `vite build ui/` -> emergentflow/_static/
 # on a real wheel build, best-effort. See ADR 0013 Decision 1.
 build-backend = "build_backend"
 backend-path = ["."]
 
 [project]
-name = "colonymind"
+name = "emergentflow"
 dynamic = ["version"]
-description = "Colony Mind — core SDK and graph intermediate representation (IR)."
+description = "Emergent Flow — core SDK and graph intermediate representation (IR)."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
-    { name = "Colony Mind" },
+    { name = "Emergent Flow" },
 ]
 keywords = ["data-science", "machine-learning", "visual-programming", "graph", "ir"]
 license = "Apache-2.0"
@@ -33,12 +33,12 @@ dependencies = [
     # dependencies: the SDK's first concrete node families are thin wrappers
     # over these trusted libraries (see docs/sdk-design-philosophy.md).
     "pandas>=2,<3",
-    # statsmodels (BSD-3-Clause) backs cm.stats.anova. It replaced pingouin,
+    # statsmodels (BSD-3-Clause) backs ef.stats.anova. It replaced pingouin,
     # which is GPL-3.0 and incompatible with this SDK's Apache-2.0 license
     # (see docs/licensing-and-dependencies.md).
     "statsmodels>=0.14,<1",
     "scikit-learn>=1.4",
-    # pyarrow (Apache-2.0) is the parquet engine backing cm.data.load_parquet.
+    # pyarrow (Apache-2.0) is the parquet engine backing ef.data.load_parquet.
     # Apache-2.0 is compatible with this SDK's license (see docs/licensing-and-dependencies.md);
     # it is NOT a GPL dep. pandas.read_parquet needs an engine, so this is a hard dependency.
     "pyarrow>=15",
@@ -57,15 +57,15 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/proflandrigan/colony-mind"
-Repository = "https://github.com/proflandrigan/colony-mind"
-Issues = "https://github.com/proflandrigan/colony-mind/issues"
+Homepage = "https://github.com/proflandrigan/emergent-flow"
+Repository = "https://github.com/proflandrigan/emergent-flow"
+Issues = "https://github.com/proflandrigan/emergent-flow/issues"
 
-# ADR 0013 Decision 2 / roadmap §A6: `pip install colonymind` provides a launch
-# command that boots the thin local canvas server, calling cm.* in-process. The
+# ADR 0013 Decision 2 / roadmap §A6: `pip install emergentflow` provides a launch
+# command that boots the thin local canvas server, calling ef.* in-process. The
 # v0 uses the stdlib http.server, so this adds no runtime dependencies.
 [project.scripts]
-colonymind = "colonymind.cli:main"
+emergentflow = "emergentflow.cli:main"
 
 [dependency-groups]
 dev = [
@@ -75,16 +75,16 @@ dev = [
 ]
 
 [tool.setuptools.dynamic]
-version = { attr = "colonymind.__version__" }
+version = { attr = "emergentflow.__version__" }
 
 [tool.setuptools.packages.find]
-include = ["colonymind*"]
+include = ["emergentflow*"]
 
-# The built canvas (vite build ui/ -> colonymind/_static/, ADR 0013 Decision 1) ships in
+# The built canvas (vite build ui/ -> emergentflow/_static/, ADR 0013 Decision 1) ships in
 # the wheel as package data. Absent in a source build (no Node) -> nothing is bundled and
 # the server serves its demo page. Two globs cover top-level and nested asset files.
 [tool.setuptools.package-data]
-colonymind = ["_static/*", "_static/**/*"]
+emergentflow = ["_static/*", "_static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -100,12 +100,12 @@ target-version = "py311"
 select = ["E", "F", "I", "UP", "B", "SIM"]
 # UP042: the IR enums deliberately subclass (str, Enum) for stable JSON serialization
 # semantics; migrating them to enum.StrEnum changes str()/value behavior and is out of
-# scope here (see colonymind/ir/common.py).
+# scope here (see emergentflow/ir/common.py).
 ignore = ["UP042"]
 
 [tool.mypy]
 python_version = "3.11"
-files = ["colonymind"]
+files = ["emergentflow"]
 plugins = ["pydantic.mypy"]
 warn_redundant_casts = true
 warn_unused_ignores = true

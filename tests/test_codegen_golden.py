@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pathlib
 
-from colonymind.codegen.compiler import compile_to_code
-from colonymind.ir import load_graph
+from emergentflow.codegen.compiler import compile_to_code
+from emergentflow.ir import load_graph
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent
 

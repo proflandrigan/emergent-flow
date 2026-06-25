@@ -3,9 +3,9 @@ tests/test_serialize.py
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Story 5 — graph serialization & deserialization.
 
-Covers the public API in ``colonymind.ir.serialize``:
+Covers the public API in ``emergentflow.ir.serialize``:
   - lossless, string-stable round-tripping across a corpus of sample graphs;
-  - file I/O via save_graph / load_graph (.cm.json convention);
+  - file I/O via save_graph / load_graph (.ef.json convention);
   - validate-on-load (malformed JSON and structurally invalid graphs);
   - schema-version policy (reject newer; migrate older up to current — Story 9).
 
@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from colonymind.ir import (
+from emergentflow.ir import (
     CURRENT_SCHEMA_VERSION,
     ArtifactRef,
     Direction,
@@ -130,18 +130,18 @@ class TestRoundTrip:
 
 class TestFileIO:
     def test_save_then_load_is_equal(self, tmp_path, sample_graph: Graph):
-        path = tmp_path / "pipeline.cm.json"
+        path = tmp_path / "pipeline.ef.json"
         returned = save_graph(sample_graph, path)
         assert returned == path
         assert load_graph(path) == sample_graph
 
     def test_saved_file_ends_with_newline(self, tmp_path):
-        path = save_graph(build_functional_pipeline(), tmp_path / "g.cm.json")
+        path = save_graph(build_functional_pipeline(), tmp_path / "g.ef.json")
         assert path.read_text(encoding="utf-8").endswith("}\n")
 
     def test_load_missing_file_raises_clean_error(self, tmp_path):
         with pytest.raises(GraphDeserializationError):
-            load_graph(tmp_path / "does-not-exist.cm.json")
+            load_graph(tmp_path / "does-not-exist.ef.json")
 
 
 # ---------------------------------------------------------------------------
@@ -248,7 +248,7 @@ class TestSchemaVersionPolicy:
         With CURRENT == 1 the only older version (0) is always migratable, so we remove the
         v0->v1 step to make a v0 graph unmigratable through the real load path.
         """
-        from colonymind.ir import migrate as migrate_mod
+        from emergentflow.ir import migrate as migrate_mod
 
         monkeypatch.setattr(migrate_mod, "_MIGRATIONS", {}, raising=True)
         raw = json.loads(serialize_graph(build_functional_pipeline()))

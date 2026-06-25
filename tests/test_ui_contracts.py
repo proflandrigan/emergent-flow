@@ -1,7 +1,7 @@
 """Tests for the build-time UI contract export (scripts/export_ui_contracts.py).
 
 Mirrors the staleness-test pattern in tests/test_rules_artifact.py: the committed JSON under
-ui/src/generated/ must always equal what colonymind.server.service currently produces, so the
+ui/src/generated/ must always equal what emergentflow.server.service currently produces, so the
 canvas build never drifts from the SDK contract (ADR 0014 Decision 5).
 """
 
@@ -12,7 +12,7 @@ import pathlib
 import subprocess
 import sys
 
-from colonymind.server.service import get_catalog, get_schema
+from emergentflow.server.service import get_catalog, get_schema
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
@@ -33,7 +33,7 @@ def _fresh_contracts() -> dict[str, object]:
     """
     code = (
         "import json,sys;"
-        "from colonymind.server.service import get_schema,get_catalog;"
+        "from emergentflow.server.service import get_schema,get_catalog;"
         "json.dump({'schema':get_schema(),'catalog':get_catalog()},sys.stdout)"
     )
     out = subprocess.run(

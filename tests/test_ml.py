@@ -1,6 +1,6 @@
-"""Tests for ``colonymind.ml`` (Epic 1, Story 8).
+"""Tests for ``emergentflow.ml`` (Epic 1, Story 8).
 
-Covers ``cm.ml.train_classifier``: a thin wrapper over
+Covers ``ef.ml.train_classifier``: a thin wrapper over
 ``sklearn.linear_model.LogisticRegression`` that trains a classifier and
 returns inspectable metrics (never the fitted estimator itself, per Story 7
 rule 4).
@@ -11,8 +11,8 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from colonymind.api import PUBLIC_OPS
-from colonymind.ml import ClassifierResult, train_classifier
+from emergentflow.api import PUBLIC_OPS
+from emergentflow.ml import ClassifierResult, train_classifier
 
 
 def _make_df() -> pd.DataFrame:
@@ -83,4 +83,4 @@ def test_train_missing_target_raises() -> None:
 
 
 def test_train_registered_as_public_op() -> None:
-    assert "cm.ml.train_classifier" in PUBLIC_OPS
+    assert "ef.ml.train_classifier" in PUBLIC_OPS

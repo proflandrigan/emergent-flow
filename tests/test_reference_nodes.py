@@ -1,4 +1,4 @@
-"""Tests for the reference node definitions (colonymind.nodes.examples).
+"""Tests for the reference node definitions (emergentflow.nodes.examples).
 
 Covers contract conformance for both reference nodes and the ADR-0002 invariant
 at node granularity: for a given IR node, ``execute`` must produce the same
@@ -10,13 +10,13 @@ import csv
 import pandas as pd
 import pytest
 
-from colonymind.codegen.context import build_codegen_context
-from colonymind.codegen.naming import build_name_map
-from colonymind.codegen.wiring import build_wiring_map
-from colonymind.ir.common import Direction, Paradigm
-from colonymind.ir.edge import Edge, PortRef
-from colonymind.ir.graph import Graph
-from colonymind.nodes.examples import (
+from emergentflow.codegen.context import build_codegen_context
+from emergentflow.codegen.naming import build_name_map
+from emergentflow.codegen.wiring import build_wiring_map
+from emergentflow.ir.common import Direction, Paradigm
+from emergentflow.ir.edge import Edge, PortRef
+from emergentflow.ir.graph import Graph
+from emergentflow.nodes.examples import (
     Anova,
     GenerateHtmlSummary,
     ImputeMissing,
@@ -203,7 +203,7 @@ class TestGenerateHtmlSummary:
         """ADR 0002: execute == result of running the emitted code.
 
         ydata-profiling embeds a generation timestamp, so the HTML is not
-        byte-reproducible between calls (see ``colonymind.reports``). We assert
+        byte-reproducible between calls (see ``emergentflow.reports``). We assert
         the structural equivalence the reports module prescribes instead: both
         paths return a non-empty HTML string carrying the requested title.
         """
@@ -250,7 +250,7 @@ class TestWholeGraphWiring:
         ctx = build_codegen_context(an, nm, wm)
         frag = Anova().codegen(an, ctx)
         # the anova call reads the exact variable load_csv bound its output to
-        assert f"cm.stats.anova({load_var}" in frag.body
+        assert f"ef.stats.anova({load_var}" in frag.body
         assert frag.body.startswith(nm.var_for(an.id, _out_port(an, "result").id))
 
     def test_colliding_outputs_get_distinct_names(self):
@@ -298,8 +298,8 @@ class TestLoadParquet:
         defn = LoadParquet()
         node = defn.instantiate(path=parquet_file)
         frag = defn.preview(node)
-        assert frag.imports == ["import colonymind as cm"]
-        assert frag.body == f"frame = cm.data.load_parquet({parquet_file!r}, columns=None)"
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == f"frame = ef.data.load_parquet({parquet_file!r}, columns=None)"
 
     def test_codegen_matches_execute(self, parquet_file):
         """ADR 0002: execute == result of running the emitted code."""
@@ -339,8 +339,8 @@ class TestLoadJson:
         defn = LoadJson()
         node = defn.instantiate(path=json_file, orient="records")
         frag = defn.preview(node)
-        assert frag.imports == ["import colonymind as cm"]
-        assert frag.body == f"frame = cm.data.load_json({json_file!r}, orient='records')"
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == f"frame = ef.data.load_json({json_file!r}, orient='records')"
 
     def test_codegen_matches_execute(self, json_file):
         """ADR 0002: execute == result of running the emitted code."""
@@ -377,8 +377,8 @@ class TestLoadSample:
         defn = LoadSample()
         node = defn.instantiate(name="iris")
         frag = defn.preview(node)
-        assert frag.imports == ["import colonymind as cm"]
-        assert frag.body == "frame = cm.data.load_sample(name='iris')"
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == "frame = ef.data.load_sample(name='iris')"
 
     def test_codegen_matches_execute(self):
         """ADR 0002: execute == result of running the emitted code."""

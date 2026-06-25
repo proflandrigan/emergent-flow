@@ -1,16 +1,16 @@
-# Colony Mind
+# Emergent Flow
 
 ### The Visual Architecture Platform for Data Science, Analytics & Machine Learning
 
-[![CI](https://github.com/proflandrigan/colony-mind/actions/workflows/ci.yml/badge.svg)](https://github.com/proflandrigan/colony-mind/actions/workflows/ci.yml)
+[![CI](https://github.com/proflandrigan/emergent-flow/actions/workflows/ci.yml/badge.svg)](https://github.com/proflandrigan/emergent-flow/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
 
-Colony Mind is an **infinite-canvas** visual development platform that unifies the
+Emergent Flow is an **infinite-canvas** visual development platform that unifies the
 fragmented data ecosystem. It bridges the divide between low-code/no-code visual tools
 (which lack flexibility and lock users into proprietary environments) and code-first
 environments (which are linear, complex, and prone to technical friction).
 
-Through a **Figma-like multiplayer whiteboard interface**, Colony Mind lets you visually
+Through a **Figma-like multiplayer whiteboard interface**, Emergent Flow lets you visually
 architect entire data lifecycles — from raw ETL and classical hypothesis testing, to
 AutoML, custom deep-learning architectures, and generative-AI multi-agent orchestration.
 Crucially, the visual canvas maps **1:1** with an underlying, optimized open-source Python
@@ -19,7 +19,7 @@ Python — eliminating vendor lock-in and preserving true developer freedom.
 
 > **Status:** Phase 1 (Foundation), in active development. The open-source Python SDK is
 > taking shape: the graph IR with its node contract and registry (Epic 1) and the
-> code-generation engine — the pure `cm.compile_to_code` / `cm.execute` pair over one IR,
+> code-generation engine — the pure `ef.compile_to_code` / `ef.execute` pair over one IR,
 > including the declarative `nn.Module` codegen seam (Epic 2) — are implemented and
 > CI-tested. See the [Technical Roadmap](./planning_docs/technical_roadmap.md) for the
 > engineering decomposition and the [Product Proposal](./planning_docs/proposal.md) for
@@ -27,11 +27,11 @@ Python — eliminating vendor lock-in and preserving true developer freedom.
 
 ---
 
-## Why Colony Mind
+## Why Emergent Flow
 
 Traditional data science happens in linear, isolated environments like Jupyter notebooks,
 which obscure data lineage, make collaboration difficult, and hide the structure of complex
-pipelines. Colony Mind brings the design paradigm of Figma and Miro to the DE / DS / ML / GenAI
+pipelines. Emergent Flow brings the design paradigm of Figma and Miro to the DE / DS / ML / GenAI
 stack:
 
 - **Complete lifecycle visibility** — trace data lineage transparently from a raw SQL
@@ -52,29 +52,29 @@ stack:
 
 ## Architecture
 
-Colony Mind ships as **one repository and one bundled `pip install colonymind`** — the
+Emergent Flow ships as **one repository and one bundled `pip install emergentflow`** — the
 JupyterLab model: the Python data-science engine *and* a local web canvas in a single install,
-launched with `colonymind serve` (alias `cm lab`). The canvas and the SDK are separate
+launched with `emergentflow serve` (alias `ef lab`). The canvas and the SDK are separate
 toolchains that couple **only** through three published artifacts (the IR JSON Schema, the
 `compile_to_code` output string, and the connection-validation rules-as-data) — the UI never
 imports Python. See [ADR 0013](./docs/adr/0013-single-repo-bundled-ui-topology.md).
 
 ```
-            pip install colonymind  →  colonymind serve  (alias: cm lab)
+            pip install emergentflow  →  emergentflow serve  (alias: ef lab)
 ┌──────────────────────────────────────────────────────────┐
 │   ui/  —  CANVAS (React Flow, Tailwind, Vite)            │  bundled into the wheel
-│         talks only via IR schema · codegen · rules-data  │  (never imports colonymind)
+│         talks only via IR schema · codegen · rules-data  │  (never imports emergentflow)
 └────────────────────────────┬─────────────────────────────┘
                              │ localhost REST  (no shared import)
                              ▼
 ┌──────────────────────────────────────────────────────────┐
-│   colonymind/server/  —  thin LOCAL server                │  calls cm.* in-process
-│         in-process cm.compile_to_code / cm.execute        │  (no Celery / Redis / sandbox)
+│   emergentflow/server/  —  thin LOCAL server             │  calls ef.* in-process
+│         in-process ef.compile_to_code / ef.execute       │  (no Celery / Redis / sandbox)
 └────────────────────────────┬─────────────────────────────┘
                              │ (pure functions over one IR)
                              ▼
 ┌──────────────────────────────────────────────────────────┐
-│   colonymind/  —  CORE PYTHON SDK & EXECUTION             │
+│   emergentflow/  —  CORE PYTHON SDK & EXECUTION          │
 │    Pandas / Polars  |  Statsmodels  |  Scikit-Learn       │
 │          PyTorch  |  LangGraph  |  YData-Profiling        │
 └──────────────────────────────────────────────────────────┘
@@ -128,17 +128,17 @@ The visual builder compiles structured SDK objects rather than arbitrary code bl
 output stays clean and maintainable:
 
 ```python
-import colonymind as cm
+import emergentflow as ef
 
 # 1. Data ingestion & imputation
-df = cm.data.load_csv("customer_churn.csv")
-df_clean = cm.clean.impute_missing(df, columns=["age", "income"], strategy="median")
+df = ef.data.load_csv("customer_churn.csv")
+df_clean = ef.clean.impute_missing(df, columns=["age", "income"], strategy="median")
 
 # 2. Statistical validation
-stat_results = cm.stats.anova(df_clean, dv="churn_risk", between="segment")
+stat_results = ef.stats.anova(df_clean, dv="churn_risk", between="segment")
 
 # 3. Model architecture & pipeline training
-model, metrics = cm.ml.train_classifier(
+model, metrics = ef.ml.train_classifier(
     data=df_clean,
     target="churn_risk",
     model_type="random_forest",
@@ -146,10 +146,10 @@ model, metrics = cm.ml.train_classifier(
 )
 
 # 4. Export artifacts
-cm.reports.generate_html_summary(model, metrics, output_path="churn_report.html")
+ef.reports.generate_html_summary(model, metrics, output_path="churn_report.html")
 ```
 
-The same `cm.compile_to_code` entry point dispatches on paradigm: **declarative**
+The same `ef.compile_to_code` entry point dispatches on paradigm: **declarative**
 `nn.Module` graphs compile through a `libcst`-based generator to idiomatic PyTorch class
 definitions (an `__init__` of layers plus a `forward` chain) rather than a flat script.
 See the [Declarative Codegen Seam](./docs/codegen-declarative.md) for the worked example.
@@ -161,7 +161,7 @@ See the [Declarative Codegen Seam](./docs/codegen-declarative.md) for the worked
 | Layer | Technologies |
 | :--- | :--- |
 | **Canvas (`ui/` tree, bundled)** | React Flow / Rete.js, Tailwind CSS, Vite |
-| **Local server (`colonymind/server/`)** | thin local HTTP server, in-process `cm.*` |
+| **Local server (`emergentflow/server/`)** | thin local HTTP server, in-process `ef.*` |
 | **Backend engine (hosted tier)** | FastAPI, Celery, Redis — *deferred to the hosted product (ADR 0013 / §A6)* |
 | **Data wrangling** | Pandas, Polars |
 | **Statistics** | Statsmodels |
@@ -184,7 +184,7 @@ save/load + export. **Deliverable:** a frontend-only canvas that maps a node gra
 flawless, downloadable Python — no backend execution required.
 
 ### Phase 2 — Living Bridge (local reactive backend, bundled)
-A thin **local** server bundled in the package (`colonymind serve`) that runs `cm.execute(ir)`
+A thin **local** server bundled in the package (`emergentflow serve`) that runs `ef.execute(ir)`
 **in-process**, a simple on-disk incremental cache, and rich in-node result rendering. The
 enterprise build-out — Celery/sandboxed/distributed execution, Redis + object-store caching,
 auth/multi-tenancy/deploy — is **deferred to the gated hosted product** (ADR 0013 / §A6), not
@@ -202,15 +202,15 @@ with the IR designed CRDT-ready from the start.
 ## Repository Layout
 
 ```
-colony-mind/
-├── colonymind/               # Python SDK source
+emergent-flow/
+├── emergentflow/               # Python SDK source
 │   ├── ir/                   # Graph intermediate representation (schema, serialization)
 │   ├── nodes/                # Node contract, registry, and reference examples
 │   ├── codegen/              # Whole-graph compiler + reference executor (compile_to_code / execute)
 │   ├── types/                # Type catalog, compatibility rules, rules-as-data artifact
 │   ├── data, clean, stats, ml, reports/   # Reference node-family SDK wrappers
-│   ├── server/               # Thin local HTTP server (cm.* in-process) — `colonymind serve`
-│   ├── cli.py                # `colonymind` console entry point (serve / lab)
+│   ├── server/               # Thin local HTTP server (ef.* in-process) — `emergentflow serve`
+│   ├── cli.py                # `emergentflow` console entry point (serve / lab)
 │   └── api.py                # @public_op decorator + inspectable-return contract
 ├── ui/                       # TypeScript/React canvas (Vite) — bundled into the wheel (planned)
 ├── docs/
@@ -226,7 +226,7 @@ colony-mind/
 │   ├── epic-1-core-sdk-and-ir.md          # Epic 1 — Core SDK & graph IR
 │   └── epic-2-code-generation-engine.md   # Epic 2 — Code generation engine
 ├── examples/
-│   └── plugin_stub/          # Out-of-core node plugin example (cm-texttools, text.reverse)
+│   └── plugin_stub/          # Out-of-core node plugin example (ef-texttools, text.reverse)
 ├── planning_docs/
 │   ├── proposal.md           # Product vision & market mapping
 │   └── technical_roadmap.md  # Engineering decomposition (epics, phases, decisions)
@@ -240,12 +240,12 @@ colony-mind/
 
 ## Documentation
 
-- [Package Layout & Namespace Conventions](./docs/package-layout.md) — the `colonymind` / `cm`
+- [Package Layout & Namespace Conventions](./docs/package-layout.md) — the `emergentflow` / `ef`
   package structure and the planned functional-pipeline namespaces.
 - [Public API Conventions](./docs/public-api-conventions.md) — naming, signatures, and the
   serializable + inspectable return-object contract every wrapper must meet.
 - [SDK Design Philosophy](./docs/sdk-design-philosophy.md) — the thin / deterministic / pure
-  rules and the `@cm.public_op` runtime check that enforces them.
+  rules and the `@ef.public_op` runtime check that enforces them.
 - [Codegen Engine](./docs/codegen-compiler.md) — the whole-graph `compile_to_code` compiler
   and reference `execute` interpreter, plus the
   [declarative `nn.Module` seam](./docs/codegen-declarative.md).
@@ -253,7 +253,7 @@ colony-mind/
   the two paradigms, and the golden / equivalence quality gates that back the
   "what you see runs" promise.
 - [The Type System & Connection Validation](./docs/type-system-spec.md) — the nominal type
-  model, compatibility + cardinality rules, whole-graph inference, `cm.validate`/`Diagnostics`,
+  model, compatibility + cardinality rules, whole-graph inference, `ef.validate`/`Diagnostics`,
   the strictness policy, and the shared codegen/execute gate.
 - [Connection Validation: Rules as a Portable Artifact](./docs/connection-validation.md) — the
   type rules + `Diagnostics` schema shipped to the frontend canvas as data, and the
@@ -271,8 +271,8 @@ Python 3.11 and 3.12.
 
 ## License
 
-The Colony Mind SDK in this repository is licensed under the
-[Apache License 2.0](./LICENSE). Colony Mind follows an **open-core** model: the
+The Emergent Flow SDK in this repository is licensed under the
+[Apache License 2.0](./LICENSE). Emergent Flow follows an **open-core** model: the
 Python SDK is open source, while the collaborative platform (visual canvas,
 real-time multiplayer, hosting, and enterprise features) is a separate
 proprietary product. See [Open-Core Boundary](./docs/open-core-boundary.md) for

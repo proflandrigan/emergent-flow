@@ -460,7 +460,7 @@
         'paradigm': 'functional',
         'params': list([
           dict({
-            'default': 'Colony Mind Data Summary',
+            'default': 'Emergent Flow Data Summary',
             'help': 'Title shown at the top of the report.',
             'hints': dict({
               'choices': None,

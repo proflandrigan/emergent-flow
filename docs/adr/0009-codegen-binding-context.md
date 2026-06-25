@@ -2,18 +2,18 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-18
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
 Every node's `codegen` today hardcodes its variable names directly into `CodeFragment.body`.
-`colonymind/nodes/examples/load_csv.py` emits `frame = cm.data.load_csv(...)`, naming its
-output literally `frame`. `colonymind/nodes/examples/anova.py` emits
-`result = cm.stats.anova(frame, ...)`, reading its input as literally `frame` and naming its
-output literally `result`. `colonymind/nodes/examples/train.py` emits
-`result = cm.ml.train_classifier(frame, ...)`, also naming its output literally `result`. The
+`emergentflow/nodes/examples/load_csv.py` emits `frame = ef.data.load_csv(...)`, naming its
+output literally `frame`. `emergentflow/nodes/examples/anova.py` emits
+`result = ef.stats.anova(frame, ...)`, reading its input as literally `frame` and naming its
+output literally `result`. `emergentflow/nodes/examples/train.py` emits
+`result = ef.ml.train_classifier(frame, ...)`, also naming its output literally `result`. The
 contract these nodes implement, `codegen(self, node: Node) -> CodeFragment` (see
-`colonymind/nodes/contract.py`), gives a node no way to learn which names it is actually
+`emergentflow/nodes/contract.py`), gives a node no way to learn which names it is actually
 supposed to use — it can only guess, and the guess is baked into the template.
 
 Two concrete failures follow from this. First, a node cannot be wired into a real graph: its
@@ -44,7 +44,7 @@ the context for names rather than inventing them.
 
 A node therefore no longer invents identifiers. It asks the context for them. The intended
 shape is illustrative only — for example `ctx.in_var(port_name)` and `ctx.out_var(port_name)`,
-used to emit something like `ctx.out_var("result") = cm.stats.anova(ctx.in_var("frame"), …)`.
+used to emit something like `ctx.out_var("result") = ef.stats.anova(ctx.in_var("frame"), …)`.
 These method names are a sketch of the interface, not a commitment; Story 4 fixes the final
 API when the contract change actually lands.
 
@@ -52,7 +52,7 @@ Single-node preview is preserved. `CodeFragment` (imports plus body) remains the
 by `codegen`, and `CodeFragment.render()` keeps working for the canvas "show code" panel
 (Epic 3). A single-node preview constructs a trivial default `CodegenContext` that falls back
 to port names, so `data.load_csv` previewed alone still renders as
-`frame = cm.data.load_csv(...)`. No node loses its standalone preview as a result of this
+`frame = ef.data.load_csv(...)`. No node loses its standalone preview as a result of this
 change.
 
 This is the central, riskiest contract change of the epic: it touches the `NodeDefinition`

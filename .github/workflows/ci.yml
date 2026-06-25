@@ -41,12 +41,12 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Type-check (mypy)
-        run: uv run mypy colonymind
+        run: uv run mypy emergentflow
 
       - name: Run tests
         run: uv run pytest
 
-      - name: UI boundary check (ui/ must not import colonymind)
+      - name: UI boundary check (ui/ must not import emergentflow)
         run: uv run python scripts/check_ui_boundary.py
 
   ui:

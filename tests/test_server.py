@@ -3,7 +3,7 @@
 Exercises the in-process service functions and the stdlib HTTP layer end to end:
 build a real IR graph, round-trip it through serialize, and confirm
 compile / validate / execute return JSON-safe payloads -- proving the
-canvas -> IR -> code/execute loop that the bundled ``colonymind serve`` exposes.
+canvas -> IR -> code/execute loop that the bundled ``emergentflow serve`` exposes.
 No torch, no network, no fixtures beyond the bundled sample CSV.
 """
 
@@ -19,7 +19,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from colonymind.ir import (
+from emergentflow.ir import (
     Direction,
     Graph,
     Node,
@@ -28,10 +28,10 @@ from colonymind.ir import (
     Port,
     Position,
 )
-from colonymind.ir.edge import Edge, PortRef
-from colonymind.ir.schema import ir_json_schema
-from colonymind.ir.serialize import serialize_graph
-from colonymind.server import (
+from emergentflow.ir.edge import Edge, PortRef
+from emergentflow.ir.schema import ir_json_schema
+from emergentflow.ir.serialize import serialize_graph
+from emergentflow.server import (
     compile_graph,
     execute_graph,
     execute_node,
@@ -175,7 +175,7 @@ def _fanout_graph(path: str | None = None) -> dict:
 
 def test_compile_graph_returns_runnable_code() -> None:
     out = compile_graph(_load_csv_graph())
-    assert "import colonymind as cm" in out["code"]
+    assert "import emergentflow as ef" in out["code"]
     assert "load_csv" in out["code"]
 
 
@@ -362,11 +362,11 @@ def test_healthz(base_url: str) -> None:
 def test_index_page_served(base_url: str) -> None:
     with urllib.request.urlopen(base_url + "/") as resp:  # noqa: S310
         assert resp.status == 200
-        assert b"Colony Mind" in resp.read()
+        assert b"Emergent Flow" in resp.read()
 
 
 def test_static_index_served_when_present(tmp_path, monkeypatch) -> None:
-    import colonymind.server.app as app_mod
+    import emergentflow.server.app as app_mod
 
     static_dir = tmp_path / "_static"
     static_dir.mkdir()
@@ -381,7 +381,7 @@ def test_static_index_served_when_present(tmp_path, monkeypatch) -> None:
 
 
 def test_static_asset_served_with_content_type(tmp_path, monkeypatch) -> None:
-    import colonymind.server.app as app_mod
+    import emergentflow.server.app as app_mod
 
     static_dir = tmp_path / "_static"
     (static_dir / "assets").mkdir(parents=True)
@@ -397,7 +397,7 @@ def test_static_asset_served_with_content_type(tmp_path, monkeypatch) -> None:
 
 
 def test_demo_page_when_static_absent(tmp_path, monkeypatch) -> None:
-    import colonymind.server.app as app_mod
+    import emergentflow.server.app as app_mod
 
     monkeypatch.setattr(app_mod, "_STATIC_DIR", (tmp_path / "_static").resolve())
     with (
@@ -405,11 +405,11 @@ def test_demo_page_when_static_absent(tmp_path, monkeypatch) -> None:
         urllib.request.urlopen(base + "/") as resp,  # noqa: S310
     ):
         assert resp.status == 200
-        assert b"Colony Mind" in resp.read()
+        assert b"Emergent Flow" in resp.read()
 
 
 def test_static_file_blocks_directory_traversal(tmp_path, monkeypatch) -> None:
-    import colonymind.server.app as app_mod
+    import emergentflow.server.app as app_mod
 
     static_dir = tmp_path / "_static"
     static_dir.mkdir()
@@ -423,7 +423,7 @@ def test_static_file_blocks_directory_traversal(tmp_path, monkeypatch) -> None:
 
 
 def test_open_browser_invokes_webbrowser(monkeypatch) -> None:
-    import colonymind.server.app as app_mod
+    import emergentflow.server.app as app_mod
 
     opened: list[str] = []
     monkeypatch.setattr(app_mod.webbrowser, "open", lambda url, *a, **k: opened.append(url))
@@ -432,7 +432,7 @@ def test_open_browser_invokes_webbrowser(monkeypatch) -> None:
 
 
 def test_open_browser_swallows_errors(monkeypatch) -> None:
-    import colonymind.server.app as app_mod
+    import emergentflow.server.app as app_mod
 
     def boom(url, *a, **k):
         raise RuntimeError("no browser on this host")
@@ -444,7 +444,7 @@ def test_open_browser_swallows_errors(monkeypatch) -> None:
 def test_http_compile_and_execute(base_url: str) -> None:
     status, body = _post(base_url, "/compile", _load_csv_graph())
     assert status == 200
-    assert "import colonymind as cm" in body["code"]
+    assert "import emergentflow as ef" in body["code"]
 
     status, body = _post(base_url, "/execute", _load_csv_graph())
     assert status == 200

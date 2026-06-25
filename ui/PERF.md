@@ -16,15 +16,15 @@ Three structural levers keep the canvas responsive at scale:
 
 1. **Virtualization** — `onlyRenderVisibleElements` in `src/canvas/Canvas.tsx` (line 139) ensures only nodes and edges in the current viewport are rendered; off-screen nodes are culled from the DOM.
 
-2. **Level-of-detail (LOD)** — `src/canvas/nodes/lod.ts` defines `LOD_ZOOM_THRESHOLD = 0.4`; below this zoom level, `CmNode` hides port-name text (via `visibility: hidden`, preserving handle anchors) and suppresses the in-node results panel to reduce render overhead when zoomed out.
+2. **Level-of-detail (LOD)** — `src/canvas/nodes/lod.ts` defines `LOD_ZOOM_THRESHOLD = 0.4`; below this zoom level, `EfNode` hides port-name text (via `visibility: hidden`, preserving handle anchors) and suppresses the in-node results panel to reduce render overhead when zoomed out.
 
-3. **Lazy heavy views** — In-node `/execute` result panels default to collapsed state in `CmNode`, deferring expensive rendering until the user explicitly opens them. This pairs with roadmap Epic 8's richer result renderers.
+3. **Lazy heavy views** — In-node `/execute` result panels default to collapsed state in `EfNode`, deferring expensive rendering until the user explicitly opens them. This pairs with roadmap Epic 8's richer result renderers.
 
 All three are implemented up front because they are cheap, structural, and require no user intervention; further perf work (e.g., canvas-level culling, web-worker layout) is deferred until a real graph misses the budget (pragmatism over edge cases).
 
 ## How to reproduce a measurement
 
-1. Run `cd ui && npm run dev`; optionally start `colonymind serve` (not required for pan/zoom perf testing, but needed if testing the `/compile` workflow).
+1. Run `cd ui && npm run dev`; optionally start `emergentflow serve` (not required for pan/zoom perf testing, but needed if testing the `/compile` workflow).
 
 2. Click the dev **"Load 1000 nodes"** button (visible only in dev builds; search for `data-testid="dev-load-large"` in `src/dev/DevControls.tsx`).
 

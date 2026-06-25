@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-16
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
@@ -20,7 +20,7 @@ community extensibility entirely.
 The forces at play:
 
 - **In-tree nodes need zero-ceremony registration.** A reference node added to
-  `colonymind/nodes/examples/` should be available to the rest of the system the moment its
+  `emergentflow/nodes/examples/` should be available to the rest of the system the moment its
   module is imported, with no separate catalog file to edit.
 - **Third parties need to add nodes without forking core.** Community node libraries must be
   able to contribute types via a package-level declaration — the Python ecosystem's
@@ -44,7 +44,7 @@ string resolvable to a concrete definition.
 We will implement the following:
 
 1. **A `NodeRegistry` class** that indexes `NodeDefinition` subclasses by their `type` catalog
-   key, with a module-level default singleton (`colonymind.nodes.registry`). All in-tree code
+   key, with a module-level default singleton (`emergentflow.nodes.registry`). All in-tree code
    and the default plugin-discovery path target this singleton. Tests create isolated
    `NodeRegistry()` instances.
 
@@ -56,7 +56,7 @@ We will implement the following:
      `to_spec()` that raises, and a different class attempting to claim an already-registered
      `type` key (re-registering the same class is a no-op).
    - An **entry-point path** for out-of-core plugins. Third-party packages publish node
-     definitions by declaring an entry point in the `colonymind.nodes` group (the constant
+     definitions by declaring an entry point in the `emergentflow.nodes` group (the constant
      `ENTRY_POINT_GROUP`). `NodeRegistry.discover()` loads every entry point via
      `importlib.metadata` and passes each result to `register()`. Plugins do not call
      `@register` themselves; the entry-point declaration is the only integration surface.
@@ -108,7 +108,7 @@ We will implement the following:
   silent misbehavior, but the resolution still requires manual intervention by the plugin
   authors.
 - The entry-point discovery surface is now part of the public contract. The group name
-  `"colonymind.nodes"` and the expectation that each entry-point value resolves to a
+  `"emergentflow.nodes"` and the expectation that each entry-point value resolves to a
   `NodeDefinition` subclass are stable commitments.
 
 **Deferred:**
@@ -123,4 +123,4 @@ We will implement the following:
   plain strings for registry lookup. Type-system-aware compatibility — the `"any"` wildcard
   and the declared subtype relation (e.g. `"DataFrame"` satisfies a `"Table"` port) — lives
   in the connection type system (repo Epic 3 / roadmap Epic 5); see
-  [ADR 0011](./0011-type-model-and-compatibility.md) and `cm.validate`.
+  [ADR 0011](./0011-type-model-and-compatibility.md) and `ef.validate`.

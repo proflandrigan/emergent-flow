@@ -48,6 +48,6 @@ export function checkSchemaVersion(graph: Graph): string | null {
     return null;
   return (
     `This graph uses IR schema version ${v}, but this canvas supports version ` +
-    `${supportedSchemaVersion}. Update Colony Mind (or migrate the graph) to open it.`
+    `${supportedSchemaVersion}. Update Emergent Flow (or migrate the graph) to open it.`
   );
 }

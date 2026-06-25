@@ -1,7 +1,7 @@
 """
 tests.test_edge
 ~~~~~~~~~~~~~~~
-Tests for colonymind.ir.edge module: PortRef and Edge models.
+Tests for emergentflow.ir.edge module: PortRef and Edge models.
 
 Coverage:
   - Valid edge construction
@@ -15,7 +15,7 @@ Coverage:
 import pytest
 from pydantic import ValidationError
 
-from colonymind.ir.edge import Edge, PortRef
+from emergentflow.ir.edge import Edge, PortRef
 
 
 class TestPortRef:

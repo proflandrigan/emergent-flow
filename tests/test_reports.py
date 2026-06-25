@@ -1,13 +1,13 @@
 # NOTE: this module is slow — ydata-profiling is heavy to import and run, so
 # datasets here are kept intentionally tiny.
-"""Tests for ``colonymind.reports`` (Epic 1, Story 8)."""
+"""Tests for ``emergentflow.reports`` (Epic 1, Story 8)."""
 
 from __future__ import annotations
 
 import pandas as pd
 import pytest
 
-from colonymind.reports import generate_html_summary
+from emergentflow.reports import generate_html_summary
 
 
 def _tiny_df() -> pd.DataFrame:
@@ -43,9 +43,9 @@ def test_generate_empty_df_raises() -> None:
 
 
 def test_generate_registered_as_public_op() -> None:
-    from colonymind.api import PUBLIC_OPS
+    from emergentflow.api import PUBLIC_OPS
 
-    assert "cm.reports.generate_html_summary" in PUBLIC_OPS
+    assert "ef.reports.generate_html_summary" in PUBLIC_OPS
 
 
 def test_generate_does_not_mutate_input() -> None:

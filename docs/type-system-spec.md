@@ -1,19 +1,19 @@
-# The Colony Mind Type System & Connection Validation
+# The Emergent Flow Type System & Connection Validation
 
-This document describes the type system and connection validation logic for the Colony Mind
+This document describes the type system and connection validation logic for the Emergent Flow
 Python SDK. It is the Epic 3 deliverable, built on
 [ADR 0011](./adr/0011-type-model-and-compatibility.md) (the type model and compatibility) and
 [ADR 0012](./adr/0012-rules-as-portable-data.md) (rules as portable data). The type system is
-nominal with subtype relationships, and `cm.validate()` uses this to check graph connections
+nominal with subtype relationships, and `ef.validate()` uses this to check graph connections
 for compatibility and structural integrity.
 
 ## The type model (nominal + subtype relation)
 
-The Colony Mind type system is **nominal**. A type is a string token; the only relationships are token equality and declared subtype/supertype relations. `"any"` is the explicit TOP / wildcard type, which is a supertype of all registered types and a subtype of nothing else. Every type is implicitly a subtype of `"any"`.
+The Emergent Flow type system is **nominal**. A type is a string token; the only relationships are token equality and declared subtype/supertype relations. `"any"` is the explicit TOP / wildcard type, which is a supertype of all registered types and a subtype of nothing else. Every type is implicitly a subtype of `"any"`.
 
 Registered tokens today: `DataFrame`, `ClassifierResult`, `AnovaResult`, `HTML`, `Tensor`, and `any`.
 
-The registry lives in `colonymind/types/` and supports declarative extensibility: an out-of-core package can register new type tokens, mirroring the node registry plugin pattern (ADR 0006). An example stub is provided at `examples/type_plugin_stub/`. The registry and its subtype table serialize to JSON so the frontend requires no Python.
+The registry lives in `emergentflow/types/` and supports declarative extensibility: an out-of-core package can register new type tokens, mirroring the node registry plugin pattern (ADR 0006). An example stub is provided at `examples/type_plugin_stub/`. The registry and its subtype table serialize to JSON so the frontend requires no Python.
 
 ## Compatibility semantics
 
@@ -51,9 +51,9 @@ Each port has a declared `Cardinality.ONE` or `Cardinality.MANY`. A `Cardinality
 
 Whole-graph type inference walks the IR in topological order, threading each node's resolved OUT types into downstream IN ports. Each node's `infer_types(node, input_types)` is called to resolve its output types. The default `infer_types` echoes each OUT port's declared `data_type`.
 
-## Validating a graph: `cm.validate`
+## Validating a graph: `ef.validate`
 
-The headline call `cm.validate(graph) -> Diagnostics` runs inference and checks every edge with the rules engine plus structural cardinality and required-IN checks. It is a `@public_op`, serializable, and inspectable.
+The headline call `ef.validate(graph) -> Diagnostics` runs inference and checks every edge with the rules engine plus structural cardinality and required-IN checks. It is a `@public_op`, serializable, and inspectable.
 
 `Diagnostics` is JSON-native and contains:
 - A list of `Diagnostic` findings
@@ -74,13 +74,13 @@ Known diagnostic codes:
 | `cardinality_violation`   | error     | Cardinality constraint violated     |
 | `required_input_unconnected` | error  | Required input port not connected   |
 
-`cm.apply_type_compatibility(graph, diagnostics)` returns a copy of the graph with each `Edge.type_compatible` populated from the verdict map (pure; input graph is not mutated).
+`ef.apply_type_compatibility(graph, diagnostics)` returns a copy of the graph with each `Edge.type_compatible` populated from the verdict map (pure; input graph is not mutated).
 
 ## Strictness policy
 
 Structural type mismatches and cardinality violations **HARD-FAIL** (error severity). Unregistered tokens only generate warnings and do not block validation.
 
-`cm.validate` is deliberately separate from `Graph`'s construction-time structural validation so exploratory, half-wired graphs can still be built and inspected on the canvas. `cm.validate` never blocks construction.
+`ef.validate` is deliberately separate from `Graph`'s construction-time structural validation so exploratory, half-wired graphs can still be built and inspected on the canvas. `ef.validate` never blocks construction.
 
 ## The shared codegen/execute gate
 

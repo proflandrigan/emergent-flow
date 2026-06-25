@@ -12,9 +12,9 @@ from pathlib import Path
 STUB = Path(__file__).resolve().parent.parent / "examples" / "plugin_stub"
 sys.path.insert(0, str(STUB))
 
-from cm_texttools.nodes import ReverseText  # noqa: E402
+from ef_texttools.nodes import ReverseText  # noqa: E402
 
-from colonymind.nodes.registry import NodeRegistry  # noqa: E402
+from emergentflow.nodes.registry import NodeRegistry  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers (mirror the _run_codegen pattern from test_reference_nodes.py)
@@ -78,7 +78,7 @@ class TestDiscoveredViaEntryPoint:
 
         class _StubEP:
             name = "text_reverse"
-            value = "cm_texttools.nodes:ReverseText"
+            value = "ef_texttools.nodes:ReverseText"
 
             def load(self):
                 return ReverseText
@@ -95,13 +95,13 @@ class TestDiscoveredViaEntryPoint:
 
 class TestEntryPointDeclaredInPyproject:
     def test_pyproject_contains_entry_point_group(self):
-        """The stub pyproject.toml declares the colonymind.nodes entry-point group."""
+        """The stub pyproject.toml declares the emergentflow.nodes entry-point group."""
         pyproject = STUB / "pyproject.toml"
         text = pyproject.read_text(encoding="utf-8")
-        assert '[project.entry-points."colonymind.nodes"]' in text
+        assert '[project.entry-points."emergentflow.nodes"]' in text
 
     def test_pyproject_names_reversetext(self):
-        """The stub pyproject.toml points at cm_texttools.nodes:ReverseText."""
+        """The stub pyproject.toml points at ef_texttools.nodes:ReverseText."""
         pyproject = STUB / "pyproject.toml"
         text = pyproject.read_text(encoding="utf-8")
-        assert "cm_texttools.nodes:ReverseText" in text
+        assert "ef_texttools.nodes:ReverseText" in text

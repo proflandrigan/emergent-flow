@@ -2,17 +2,17 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-20
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
 Epic 1 gave the IR the *shape* of a type system but none of its *substance*. Every port
-carries a `data_type` token (`colonymind/ir/port.py`) — but it is an opaque free string
+carries a `data_type` token (`emergentflow/ir/port.py`) — but it is an opaque free string
 defaulting to `"any"`, and tokens like `DataFrame`, `ClassifierResult`, `AnovaResult`,
 `HTML`, and `Tensor` are used ad hoc across the reference nodes in
-`colonymind/nodes/examples/` with no registry to give them meaning. Every edge carries a
-`type_compatible: bool | None` field (`colonymind/ir/edge.py`), but nothing ever fills it
-in — it is permanently `None`. `NodeDefinition.infer_types` (`colonymind/nodes/contract.py`)
+`emergentflow/nodes/examples/` with no registry to give them meaning. Every edge carries a
+`type_compatible: bool | None` field (`emergentflow/ir/edge.py`), but nothing ever fills it
+in — it is permanently `None`. `NodeDefinition.infer_types` (`emergentflow/nodes/contract.py`)
 exists, but its default merely echoes each OUT port's declared `data_type`, and nothing calls
 it across a graph. `Graph._validate_structure` checks node/port existence and OUT→IN
 direction, but never type compatibility and never cardinality. The codebase is littered with
@@ -22,7 +22,7 @@ The result: an invalid graph — wiring an `HTML` output into a `DataFrame` inpu
 if at all, only as a runtime crash deep inside `execute`, with no machine-readable reason and
 no way for a future canvas to mark the edge red before the user runs anything.
 
-Before building the registry, the rules engine, the inference pass, and `cm.validate`, we
+Before building the registry, the rules engine, the inference pass, and `ef.validate`, we
 must fix the foundational choices those stories all depend on and that are expensive to
 retrofit: what *kind* of type system this is, when two types are compatible, how strict the
 checker is, and how this relates to the tensor-shape work deferred to roadmap Epic 10. These
@@ -94,7 +94,7 @@ Validation is **two-tiered** by what is knowable statically:
   edge into a `Cardinality.ONE` IN port). These produce error-severity diagnostics and, when
   they reach the codegen/execute gate (Epic 3 Story 6), raise a clear, node/edge-naming error
   *before* any code is emitted or any node runs — exactly as the declarative seam already
-  raises `CodegenError` early in `colonymind/codegen/declarative.py`.
+  raises `CodegenError` early in `emergentflow/codegen/declarative.py`.
 - **Warn-don't-block (warning severity)** — things only knowable at runtime, or not knowable
   at all from a static catalog: UNKNOWN results (unregistered tokens), dynamically-shaped
   frames, and similar. These surface as warnings on the diagnostics object but never block
@@ -103,7 +103,7 @@ Validation is **two-tiered** by what is knowable statically:
 Crucially, **type/cardinality validation never blocks graph construction.** This is a
 deliberate split from `Graph._validate_structure`, which hard-rejects malformed *structure*
 (missing nodes/ports, wrong edge direction) at build time. Type and cardinality checking lives
-in a *separate* `cm.validate(graph)` call (Epic 3 Story 5) so the canvas can hold half-wired,
+in a *separate* `ef.validate(graph)` call (Epic 3 Story 5) so the canvas can hold half-wired,
 exploratory graphs and still inspect them. The two layers stay distinct: structure is a build
 invariant; types and cardinality are an inspectable, non-blocking analysis.
 
@@ -131,7 +131,7 @@ dimensional typing would entangle the portable, pure rules with a heavy runtime 
 
 - The whole later epic has a fixed spine: Story 2 (registry) implements the catalog +
   subtype relation; Story 3 (rules engine) implements the three-valued function; Story 5
-  (`cm.validate`) applies it and populates the long-dormant `Edge.type_compatible`.
+  (`ef.validate`) applies it and populates the long-dormant `Edge.type_compatible`.
 - Nominal-plus-optional-subtype is the simplest model that is both expressive enough
   (wildcard, exact, subtype) and serializable as plain data, satisfying the frontend-portability
   constraint without a Python round-trip.
@@ -160,7 +160,7 @@ dimensional typing would entangle the portable, pure rules with a heavy runtime 
   Story 2.
 - The pure `is_compatible(...)` rules engine and the cardinality rule — Epic 3 Story 3.
 - The whole-graph type-inference pass that resolves types before checking — Epic 3 Story 4.
-- `cm.validate(graph)`, the `Diagnostics` shape, and populating `Edge.type_compatible` — Epic
+- `ef.validate(graph)`, the `Diagnostics` shape, and populating `Edge.type_compatible` — Epic
   3 Story 5.
 - The shared codegen/execute validation gate and negative-equivalence corpus — Epic 3 Story 6.
 - **Portability** — exporting the catalog + subtype table + semantics as shippable data — is

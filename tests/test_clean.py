@@ -1,6 +1,6 @@
-"""Tests for colonymind.clean (Epic 1, Story 8).
+"""Tests for emergentflow.clean (Epic 1, Story 8).
 
-Covers ``cm.clean.impute_missing``: a thin wrapper over
+Covers ``ef.clean.impute_missing``: a thin wrapper over
 ``sklearn.impute.SimpleImputer`` that fills missing values column-wise while
 remaining pure (never mutating its input DataFrame).
 """
@@ -10,8 +10,8 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from colonymind.api import PUBLIC_OPS
-from colonymind.clean import impute_missing
+from emergentflow.api import PUBLIC_OPS
+from emergentflow.clean import impute_missing
 
 
 def test_impute_mean_fills_nan() -> None:
@@ -48,4 +48,4 @@ def test_impute_returns_dataframe() -> None:
 
 
 def test_impute_registered_as_public_op() -> None:
-    assert "cm.clean.impute_missing" in PUBLIC_OPS
+    assert "ef.clean.impute_missing" in PUBLIC_OPS

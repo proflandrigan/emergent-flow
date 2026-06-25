@@ -1,7 +1,7 @@
 """
 tests/test_codegen_inference.py
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Tests for colonymind.codegen.inference — the whole-graph type-inference pass
+Tests for emergentflow.codegen.inference — the whole-graph type-inference pass
 (Epic 3, Story 4). Covers a linear chain, diamond fan-out/fan-in, a dangling
 IN port, and a node whose OUT type depends on its inputs.
 """
@@ -10,12 +10,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from colonymind.api import is_inspectable
-from colonymind.codegen.inference import _reduce_inbound_types, infer_graph_types
-from colonymind.ir import Cardinality, Direction, Edge, Graph, Node, Port, PortRef
-from colonymind.nodes.contract import NodeDefinition
-from colonymind.nodes.registry import NodeRegistry
-from colonymind.nodes.spec import PortSpec
+from emergentflow.api import is_inspectable
+from emergentflow.codegen.inference import _reduce_inbound_types, infer_graph_types
+from emergentflow.ir import Cardinality, Direction, Edge, Graph, Node, Port, PortRef
+from emergentflow.nodes.contract import NodeDefinition
+from emergentflow.nodes.registry import NodeRegistry
+from emergentflow.nodes.spec import PortSpec
 
 
 def _graph(nodes: list[Node], edges: list[Edge]) -> Graph:

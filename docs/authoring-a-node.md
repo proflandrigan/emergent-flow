@@ -1,9 +1,9 @@
 # How to Author a Node
 
-This guide walks through writing a node that conforms to the Colony Mind node-definition
+This guide walks through writing a node that conforms to the Emergent Flow node-definition
 contract. For the full field reference see [`node-contract-spec.md`](node-contract-spec.md);
 for the rationale see [ADR 0005](adr/0005-node-definition-contract.md). We build up the
-`clean.impute_missing` reference node (`colonymind/nodes/examples/impute.py`) step by step.
+`clean.impute_missing` reference node (`emergentflow/nodes/examples/impute.py`) step by step.
 
 ## Mental model
 
@@ -19,7 +19,7 @@ subclass of `NodeDefinition`.
 ## Step 1 — Subclass `NodeDefinition` and set the metadata
 
 ```python
-from colonymind.nodes.contract import NodeDefinition
+from emergentflow.nodes.contract import NodeDefinition
 
 class ImputeMissing(NodeDefinition):
     type = "clean.impute_missing"   # catalog key; equals Node.type; registry lookup key
@@ -38,8 +38,8 @@ Ports are templates (`PortSpec`) — no ids; ids are minted per instance. Mark I
 `required=False` if the node can run without them.
 
 ```python
-from colonymind.ir.common import Direction
-from colonymind.nodes.spec import PortSpec
+from emergentflow.ir.common import Direction
+from emergentflow.nodes.spec import PortSpec
 
     ports = [
         PortSpec(name="table", direction=Direction.IN, data_type="Table",
@@ -50,7 +50,7 @@ from colonymind.nodes.spec import PortSpec
 ```
 
 `data_type` is a token from the type registry; it drives connection-compatibility checks
-during `cm.validate`. See Step 6 and [type-system-spec.md](type-system-spec.md) for how to
+during `ef.validate`. See Step 6 and [type-system-spec.md](type-system-spec.md) for how to
 choose, register, and infer types.
 
 ## Step 3 — Declare typed params, with defaults and validation hints
@@ -59,7 +59,7 @@ choose, register, and infer types.
 widget choice. These are what the Epic 4 config UI renders and what `validate_node` enforces.
 
 ```python
-from colonymind.nodes.spec import ParamSpec, ValidationHints
+from emergentflow.nodes.spec import ParamSpec, ValidationHints
 
     params = [
         ParamSpec(name="strategy", type_token="str", default="mean",
@@ -103,7 +103,7 @@ pattern — is to have both call the *same* runtime helper:
     def codegen(self, node, ctx):
         strategy, columns = self._args(node)
         return CodeFragment(
-            imports=["from colonymind.nodes.examples.impute import impute_missing"],
+            imports=["from emergentflow.nodes.examples.impute import impute_missing"],
             body=(
                 f"{ctx.out_var('table')} = impute_missing("
                 f"{ctx.in_var('table')}, strategy={strategy!r}, columns={columns!r})"
@@ -119,7 +119,7 @@ drift. Add a test that runs both and asserts equal results — for `codegen`, th
 ## Step 6 — (Optional) override `infer_types`
 
 A node's output ports declare their `data_type`, which is a token from the nominal type
-registry (`colonymind/types/`). Built-in tokens include `DataFrame`, `ClassifierResult`,
+registry (`emergentflow/types/`). Built-in tokens include `DataFrame`, `ClassifierResult`,
 `AnovaResult`, `HTML`, `Tensor`, and `any` (the wildcard top type). Prefer reusing an existing
 token so connections type-check against other nodes. Use `"any"` only when the port genuinely
 accepts anything.
@@ -128,12 +128,12 @@ If you need a new token, register it by declaring a `TypeDef` in the registry, o
 specifying supertypes for subtype compatibility:
 
 ```python
-from colonymind.types.registry import TypeDef, registry
+from emergentflow.types.registry import TypeDef, registry
 registry.register(TypeDef(token="TimeSeries", supertypes=("DataFrame",)))
 ```
 
 An out-of-core package can ship its own tokens; see `examples/type_plugin_stub/`. An
-unregistered token is not an error — `cm.validate` reports it as a non-blocking warning
+unregistered token is not an error — `ef.validate` reports it as a non-blocking warning
 (`type_unknown`).
 
 Override `infer_types` only when the output type depends on inputs or params. The default
@@ -176,5 +176,5 @@ A conformance checklist for your test file:
 ## Registration
 
 Registering the definition so the catalog can discover it (without core changes) is the
-**registry / plugin architecture**, Story 4 — it will live alongside `colonymind/nodes/`. This
+**registry / plugin architecture**, Story 4 — it will live alongside `emergentflow/nodes/`. This
 guide covers authoring a conforming definition; registration is the next story.

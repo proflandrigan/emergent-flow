@@ -13,7 +13,7 @@ export type NodeId = string;
  */
 export type PortId = string;
 /**
- * Type-compatibility metadata. None="not yet checked". Set to bool by cm.apply_type_compatibility from a cm.validate result.
+ * Type-compatibility metadata. None="not yet checked". Set to bool by ef.apply_type_compatibility from a ef.validate result.
  */
 export type TypeCompatible = boolean | null;
 export type Name = string | null;
@@ -68,7 +68,7 @@ export type SchemaVersion = number;
 export type Type = string;
 
 /**
- * Top-level, serialisable IR graph for a Colony Mind pipeline.
+ * Top-level, serialisable IR graph for an Emergent Flow pipeline.
  *
  * Attributes
  * ----------
@@ -107,7 +107,7 @@ export interface Edges {
  *     target: PortRef identifying the IN-side endpoint.
  *     type_compatible: Optional type-compatibility metadata. None means "not yet
  *         checked" (or unknown/unregistered token). Populated by
- *         ``cm.apply_type_compatibility`` from a ``cm.validate`` result, recording
+ *         ``ef.apply_type_compatibility`` from a ``ef.validate`` result, recording
  *         whether source/target data-type tokens were found compatible.
  *
  * Note: Structural validation of whether referenced nodes/ports exist is handled
@@ -137,7 +137,7 @@ export interface Nodes {
   [k: string]: Node;
 }
 /**
- * A typed, parameterised node in the Colony Mind graph IR.
+ * A typed, parameterised node in the Emergent Flow graph IR.
  *
  * Attributes
  * ----------
@@ -162,7 +162,7 @@ export interface Nodes {
  *     Optional inner graph for composite/module/agent nodes (Option A
  *     nesting from ADR 0003).  ``None`` for leaf nodes.  Forward-ref to
  *     ``Graph``; resolved by ``Node.model_rebuild()`` in Task 07
- *     (``colonymind/ir/graph.py``).
+ *     (``emergentflow/ir/graph.py``).
  */
 export interface Node {
   group_id?: GroupId;
@@ -235,7 +235,7 @@ export interface ArtifactRef {
  *     name: Port name, unique within its node (required, non-empty).
  *     direction: IN or OUT (required).
  *     data_type: Data-type token (default "any"); validated against the type
- *         registry and resolved by inference during ``cm.validate``.
+ *         registry and resolved by inference during ``ef.validate``.
  *     cardinality: How many edges may attach (ONE or MANY; default ONE).
  */
 export interface Port {
@@ -253,7 +253,7 @@ export interface Position {
   y?: Y;
 }
 /**
- * Top-level, serialisable IR graph for a Colony Mind pipeline.
+ * Top-level, serialisable IR graph for an Emergent Flow pipeline.
  *
  * Attributes
  * ----------

@@ -3,7 +3,7 @@
 
 The monorepo (ADR 0013) replaced the physical repo wall with this check. The canvas under
 ``ui/`` talks to the local server only over HTTP; it must not ``import``/``require``/bundle
-``colonymind``. Only the four contract artifacts (the IR JSON Schema, the
+``emergentflow``. Only the four contract artifacts (the IR JSON Schema, the
 ``compile_to_code`` output string, the rules-as-data artifact, and the node catalog
 artifact -- ADR 0015) cross the boundary -- and they cross as data, not as a code import.
 Run standalone (``python
@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 UI_DIR = Path(__file__).resolve().parents[1] / "ui"
-PACKAGE = "colonymind"
+PACKAGE = "emergentflow"
 SOURCE_SUFFIXES = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue"}
 SKIP_DIRS = {"node_modules", "dist", ".vite"}
 
@@ -44,10 +44,10 @@ def _iter_source_files(ui_dir: Path) -> list[Path]:
 def _spec_targets_package(spec: str) -> bool:
     """True if the import specifier names the package itself, not just contains its name.
 
-    Matches a bare/scoped module specifier (``colonymind``, ``colonymind/foo``) or a
-    relative/absolute path with a ``colonymind`` path segment (``../../colonymind/ir``).
-    A specifier that merely *contains* the substring ``colonymind`` -- e.g. a same-repo
-    asset import like ``./icons/colonymind-logo.svg`` -- is intentionally NOT a violation:
+    Matches a bare/scoped module specifier (``emergentflow``, ``emergentflow/foo``) or a
+    relative/absolute path with a ``emergentflow`` path segment (``../../emergentflow/ir``).
+    A specifier that merely *contains* the substring ``emergentflow`` -- e.g. a same-repo
+    asset import like ``./icons/emergentflow-logo.svg`` -- is intentionally NOT a violation:
     matching on substring rather than path segment would false-positive on any UI asset
     named after the project.
     """
@@ -74,7 +74,7 @@ def main() -> int:
         return 0
     violations = find_violations(UI_DIR)
     if violations:
-        print("ui/ -> colonymind IMPORT-BAN VIOLATION (ADR 0013 Decision 4):")
+        print("ui/ -> emergentflow IMPORT-BAN VIOLATION (ADR 0013 Decision 4):")
         for violation in violations:
             print(f"  {violation}")
         print(

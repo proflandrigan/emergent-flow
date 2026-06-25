@@ -1,6 +1,6 @@
 """Tests for the SDK design-philosophy enforcement contract (Epic 1, Story 7).
 
-Covers colonymind.api: is_inspectable / assert_inspectable / public_op / PUBLIC_OPS.
+Covers emergentflow.api: is_inspectable / assert_inspectable / public_op / PUBLIC_OPS.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import pytest
 from pydantic import BaseModel
 
-from colonymind.api import (
+from emergentflow.api import (
     PUBLIC_OPS,
     InspectableContractError,
     assert_inspectable,
@@ -120,8 +120,8 @@ def test_assert_inspectable_raises_for_opaque() -> None:
 
 
 def test_assert_inspectable_message_names_location() -> None:
-    with pytest.raises(InspectableContractError, match="cm.demo.op"):
-        assert_inspectable(_Opaque(), where="cm.demo.op")
+    with pytest.raises(InspectableContractError, match="ef.demo.op"):
+        assert_inspectable(_Opaque(), where="ef.demo.op")
 
 
 def test_contract_error_is_a_type_error() -> None:
@@ -181,12 +181,12 @@ def test_registered_ops_are_all_marked() -> None:
 
 def test_contract_surface_reexported_from_package_root() -> None:
     # The design-philosophy doc promises all four contract tools (plus the error
-    # type) are reachable as cm.<name>; PUBLIC_OPS is the registry a Story-8 sweep
+    # type) are reachable as ef.<name>; PUBLIC_OPS is the registry a Story-8 sweep
     # iterates, so it must be importable from the package root.
-    import colonymind as cm
+    import emergentflow as ef
 
-    assert cm.PUBLIC_OPS is PUBLIC_OPS
-    assert cm.is_inspectable is is_inspectable
-    assert cm.assert_inspectable is assert_inspectable
-    assert cm.public_op is public_op
-    assert cm.InspectableContractError is InspectableContractError
+    assert ef.PUBLIC_OPS is PUBLIC_OPS
+    assert ef.is_inspectable is is_inspectable
+    assert ef.assert_inspectable is assert_inspectable
+    assert ef.public_op is public_op
+    assert ef.InspectableContractError is InspectableContractError

@@ -1,6 +1,6 @@
 # Node Registry and Plugin Discovery
 
-The registry is the indexed catalog of every node type Colony Mind knows about. It bridges
+The registry is the indexed catalog of every node type Emergent Flow knows about. It bridges
 the gap between a fixed tool (a monolith where every node is hardcoded) and a platform (a
 system where new node types are added declaratively and the catalog grows without touching
 core). The catalog can expand via two paths: in-tree definitions that self-register at
@@ -15,7 +15,7 @@ registry and plugin model, see [ADR 0006](adr/0006-node-registry-and-plugin-disc
 
 ## What the registry is
 
-`colonymind.nodes.NodeRegistry` is an indexed catalog of `NodeDefinition` subclasses, keyed
+`emergentflow.nodes.NodeRegistry` is an indexed catalog of `NodeDefinition` subclasses, keyed
 by their `type` string (e.g. `"data.load_csv"`). That key equals `NodeSpec.type` and
 `Node.type` — it is the single thread tying the catalog entry to every IR instance of that
 type.
@@ -23,7 +23,7 @@ type.
 The module exposes a default singleton:
 
 ```python
-from colonymind.nodes import registry        # the shared NodeRegistry instance
+from emergentflow.nodes import registry        # the shared NodeRegistry instance
 ```
 
 Most code targets this singleton through the thin module-level wrappers (`register`, `get`,
@@ -36,12 +36,12 @@ fresh `NodeRegistry()` instead.
 
 ### In-tree: `@register` decorator
 
-In-tree node definitions (those shipped as part of `colonymind`) use the `@register`
+In-tree node definitions (those shipped as part of `emergentflow`) use the `@register`
 decorator, which registers the class in the default singleton immediately at import time:
 
 ```python
-from colonymind.nodes.contract import NodeDefinition
-from colonymind.nodes.registry import register
+from emergentflow.nodes.contract import NodeDefinition
+from emergentflow.nodes.registry import register
 
 @register
 class LoadCsv(NodeDefinition):
@@ -51,29 +51,29 @@ class LoadCsv(NodeDefinition):
     ...
 ```
 
-Registration fires when the module is imported. Importing `colonymind.nodes` pulls in
+Registration fires when the module is imported. Importing `emergentflow.nodes` pulls in
 the reference-node package for you, so the default `registry` is populated with both
 reference nodes (`data.load_csv` and `clean.impute_missing`) on first import:
 
 ```python
-from colonymind.nodes import registry   # importing the package registers the in-tree nodes
+from emergentflow.nodes import registry   # importing the package registers the in-tree nodes
 
 assert "data.load_csv" in registry
 assert "clean.impute_missing" in registry
 ```
 
-The reference implementations live in `colonymind/nodes/examples/`.
+The reference implementations live in `emergentflow/nodes/examples/`.
 
 ### Out-of-core: entry points + `discover()`
 
-A third-party package (or any package outside `colonymind`) contributes nodes by declaring
-an entry point in the `colonymind.nodes` group. No fork of core is required.
+A third-party package (or any package outside `emergentflow`) contributes nodes by declaring
+an entry point in the `emergentflow.nodes` group. No fork of core is required.
 
 In the plugin's `pyproject.toml`:
 
 ```toml
-[project.entry-points."colonymind.nodes"]
-text_reverse = "cm_texttools.nodes:ReverseText"
+[project.entry-points."emergentflow.nodes"]
+text_reverse = "ef_texttools.nodes:ReverseText"
 ```
 
 Each value is a dotted import path to a `NodeDefinition` subclass. The key (`text_reverse`)
@@ -84,15 +84,15 @@ The plugin class itself does **not** call `@register`; registration is handled b
 `discover()` when the host application loads plugins:
 
 ```python
-from colonymind.nodes import discover
+from emergentflow.nodes import discover
 
-problems = discover()      # scans "colonymind.nodes" entry points
+problems = discover()      # scans "emergentflow.nodes" entry points
 if problems:
     for p in problems:
         print("plugin warning:", p)
 ```
 
-The worked example is `examples/plugin_stub/` (package `cm-texttools`, node `text.reverse`).
+The worked example is `examples/plugin_stub/` (package `ef-texttools`, node `text.reverse`).
 Install it with `pip install -e examples/plugin_stub/` and then call `discover()` to add
 `text.reverse` to the default registry.
 
@@ -109,7 +109,7 @@ catalog.
 Raises `KeyError` if absent.
 
 ```python
-from colonymind.nodes import get
+from emergentflow.nodes import get
 
 LoadCsv = get("data.load_csv")
 spec = LoadCsv().to_spec()
@@ -120,7 +120,7 @@ spec = LoadCsv().to_spec()
 Non-raising variant; returns `None` if the key is not registered.
 
 ```python
-from colonymind.nodes import registry
+from emergentflow.nodes import registry
 
 defn = registry.try_get("data.load_csv")
 if defn is not None:
@@ -132,7 +132,7 @@ if defn is not None:
 Returns all definitions whose `family` equals the argument, sorted by `type`.
 
 ```python
-from colonymind.nodes import by_family
+from emergentflow.nodes import by_family
 
 data_nodes = by_family("data")      # [LoadCsv, ...]
 ```
@@ -140,12 +140,12 @@ data_nodes = by_family("data")      # [LoadCsv, ...]
 ### `by_port_type(data_type, direction=None) -> list[type[NodeDefinition]]`
 
 Returns all definitions declaring at least one port with the given `data_type` token.
-`direction` is a `colonymind.ir.common.Direction` (`Direction.IN` or `Direction.OUT`), or
+`direction` is a `emergentflow.ir.common.Direction` (`Direction.IN` or `Direction.OUT`), or
 `None` to match ports of either direction. Results are sorted by `type`.
 
 ```python
-from colonymind.nodes import by_port_type
-from colonymind.ir.common import Direction
+from emergentflow.nodes import by_port_type
+from emergentflow.ir.common import Direction
 
 consumers = by_port_type("Table", direction=Direction.IN)
 producers = by_port_type("Table", direction=Direction.OUT)
@@ -154,14 +154,14 @@ either    = by_port_type("Table")
 
 Note: `by_port_type` is a plain token comparison for registry lookup. Type-system-aware
 compatibility (the `"any"` wildcard and the subtype relation) lives in the connection
-type system — see [type-system-spec.md](./type-system-spec.md) and `cm.validate`.
+type system — see [type-system-spec.md](./type-system-spec.md) and `ef.validate`.
 
 ### `all() -> list[type[NodeDefinition]]`
 
 Returns every registered definition, sorted by `type`.
 
 ```python
-from colonymind.nodes import registry
+from emergentflow.nodes import registry
 
 for defn in registry.all():
     print(defn.type, defn.label)
@@ -176,7 +176,7 @@ Returns a serializable catalog view — one `NodeSpec` per registered definition
 Python behavior.
 
 ```python
-from colonymind.nodes import registry
+from emergentflow.nodes import registry
 import json
 
 catalog_json = json.dumps([s.model_dump() for s in registry.specs()])
@@ -185,7 +185,7 @@ catalog_json = json.dumps([s.model_dump() for s in registry.specs()])
 ### `in` operator
 
 ```python
-from colonymind.nodes import registry
+from emergentflow.nodes import registry
 
 if "data.load_csv" in registry:
     ...
@@ -219,7 +219,7 @@ module raises on import rather than silently polluting the catalog.
 (never raises, never modifies the registry). Use it in CI startup checks:
 
 ```python
-from colonymind.nodes import validate
+from emergentflow.nodes import validate
 
 problems = validate()
 assert not problems, "\n".join(problems)
@@ -237,17 +237,17 @@ Checks performed per definition:
 
 ## Discovery
 
-`discover(*, group="colonymind.nodes") -> list[str]` scans all installed packages for entry
+`discover(*, group="emergentflow.nodes") -> list[str]` scans all installed packages for entry
 points in `group`, loads each one, and passes the result to `register()`.
 
 ```python
-from colonymind.nodes import discover, ENTRY_POINT_GROUP
+from emergentflow.nodes import discover, ENTRY_POINT_GROUP
 
-print("scanning group:", ENTRY_POINT_GROUP)   # "colonymind.nodes"
+print("scanning group:", ENTRY_POINT_GROUP)   # "emergentflow.nodes"
 problems = discover()
 ```
 
-The constant `ENTRY_POINT_GROUP = "colonymind.nodes"` is the canonical group name; override
+The constant `ENTRY_POINT_GROUP = "emergentflow.nodes"` is the canonical group name; override
 `group` only in tests or when running a custom plugin marketplace.
 
 **Resilience contract:** a single misbehaving entry point — `load()` raises, the loaded
@@ -267,10 +267,10 @@ rather than a raised exception.
 ### Register a node (in-tree)
 
 ```python
-from colonymind.nodes.contract import NodeDefinition, CodeFragment
-from colonymind.nodes.registry import register
-from colonymind.nodes.spec import PortSpec, ParamSpec
-from colonymind.ir.common import Direction
+from emergentflow.nodes.contract import NodeDefinition, CodeFragment
+from emergentflow.nodes.registry import register
+from emergentflow.nodes.spec import PortSpec, ParamSpec
+from emergentflow.ir.common import Direction
 
 @register
 class Normalize(NodeDefinition):
@@ -292,7 +292,7 @@ class Normalize(NodeDefinition):
 
     def codegen(self, node):
         return CodeFragment(
-            imports=["from colonymind.nodes.examples.normalize import normalize"],
+            imports=["from emergentflow.nodes.examples.normalize import normalize"],
             body="table = normalize(table)",
         )
 ```
@@ -305,7 +305,7 @@ class Normalize(NodeDefinition):
 2. Declare the entry point in `pyproject.toml`:
 
    ```toml
-   [project.entry-points."colonymind.nodes"]
+   [project.entry-points."emergentflow.nodes"]
    my_node = "mypackage.nodes:MyNodeClass"
    ```
 
@@ -318,5 +318,5 @@ class Normalize(NodeDefinition):
    assert not problems
    ```
 
-See `examples/plugin_stub/` for a complete, minimal example (`cm-texttools`, node
+See `examples/plugin_stub/` for a complete, minimal example (`ef-texttools`, node
 `text.reverse`).

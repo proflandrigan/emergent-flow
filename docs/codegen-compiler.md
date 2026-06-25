@@ -1,15 +1,15 @@
 # Codegen Compiler (Story 5)
 
-The code-generation engine (`colonymind.codegen`, Epic 2) turns a graph IR into runnable Python code (`cm.compile_to_code`, Story 5). This document details the key decisions and architectural patterns adopted during the implementation of the compiler.
+The code-generation engine (`emergentflow.codegen`, Epic 2) turns a graph IR into runnable Python code (`ef.compile_to_code`, Story 5). This document details the key decisions and architectural patterns adopted during the implementation of the compiler.
 
 ## Public surface
 
-The `compile_to_code` function is exposed through the lazily-imported `cm` namespace:
+The `compile_to_code` function is exposed through the lazily-imported `ef` namespace:
 
 ```python
-import colonymind as cm
+import emergentflow as ef
 
-source = cm.compile_to_code(graph)  # str — a complete, runnable Python module
+source = ef.compile_to_code(graph)  # str — a complete, runnable Python module
 ```
 
 For details on how the compiler traverses the graph, refer to [How codegen traversal works](codegen-traversal.md). Further architectural decisions are captured in [ADR 0008: Codegen templating vs AST](adr/0008-codegen-templating-vs-ast.md), [ADR 0009: Codegen binding context](adr/0009-codegen-binding-context.md), and [ADR 0010: Codegen package placement](adr/0010-codegen-package-placement.md).
@@ -24,12 +24,12 @@ Any required input (IN) port on a node that remains unconnected at compile-time 
 
 ## Import collection
 
-All `import` statements gathered from individual node code fragments are consolidated into a `set` to ensure uniqueness, then `sorted()` alphabetically, and finally joined to form the import block of the generated module. Currently, the reference-node catalog primarily emits `"import colonymind as cm"`. The alphabetical join is only a stable pre-order: the formatting pass (below) runs `ruff check --select I` over the assembled module, so the final import block is grouped isort-clean (stdlib before third-party) even once the node catalog emits a more diverse mix of imports.
+All `import` statements gathered from individual node code fragments are consolidated into a `set` to ensure uniqueness, then `sorted()` alphabetically, and finally joined to form the import block of the generated module. Currently, the reference-node catalog primarily emits `"import emergentflow as ef"`. The alphabetical join is only a stable pre-order: the formatting pass (below) runs `ruff check --select I` over the assembled module, so the final import block is grouped isort-clean (stdlib before third-party) even once the node catalog emits a more diverse mix of imports.
 
 ## The ruff normalization passes
 
-As specified in [ADR 0008](adr/0008-codegen-templating-vs-ast.md), a ruff normalization step is the final stage before `compile_to_code` returns the generated source code. This is invoked via `colonymind.codegen.formatting.format_source`, which shells out to `python -m ruff` twice over stdin: first `ruff check --select I --fix` to organize imports (since `ruff format` never reorders them, a stdlib + third-party mix would otherwise emit `I001`-dirty output), then `ruff format` to normalize whitespace, quotes and line length. The `--select I` flag forces the import-order rule regardless of config discovery, and every `I` violation is auto-fixable, so the pass only fails if the assembled source does not parse. Consequently, `ruff` is now a runtime dependency (listed in `[project.dependencies]` in `pyproject.toml`), not solely a development tool, due to its integral role in maintaining code style and consistency.
+As specified in [ADR 0008](adr/0008-codegen-templating-vs-ast.md), a ruff normalization step is the final stage before `compile_to_code` returns the generated source code. This is invoked via `emergentflow.codegen.formatting.format_source`, which shells out to `python -m ruff` twice over stdin: first `ruff check --select I --fix` to organize imports (since `ruff format` never reorders them, a stdlib + third-party mix would otherwise emit `I001`-dirty output), then `ruff format` to normalize whitespace, quotes and line length. The `--select I` flag forces the import-order rule regardless of config discovery, and every `I` violation is auto-fixable, so the pass only fails if the assembled source does not parse. Consequently, `ruff` is now a runtime dependency (listed in `[project.dependencies]` in `pyproject.toml`), not solely a development tool, due to its integral role in maintaining code style and consistency.
 
 ## Paradigm scope
 
-The string-template assembly described in this document handles `Paradigm.FUNCTIONAL` graphs. `compile_to_code` dispatches on `graph.paradigm`: `Paradigm.DECLARATIVE` graphs are compiled by the sibling declarative path (`compile_declarative`, `colonymind/codegen/declarative.py`), the `libcst`-based `nn.Module` generator added in Epic 2 Story 8 — see [`docs/codegen-declarative.md`](codegen-declarative.md). Both paths share the final `ruff format` pass. A `Paradigm.FUNCTIONAL` graph that contains a stray declarative node is still rejected with a `CodegenError` by the functional assembly.
+The string-template assembly described in this document handles `Paradigm.FUNCTIONAL` graphs. `compile_to_code` dispatches on `graph.paradigm`: `Paradigm.DECLARATIVE` graphs are compiled by the sibling declarative path (`compile_declarative`, `emergentflow/codegen/declarative.py`), the `libcst`-based `nn.Module` generator added in Epic 2 Story 8 — see [`docs/codegen-declarative.md`](codegen-declarative.md). Both paths share the final `ruff format` pass. A `Paradigm.FUNCTIONAL` graph that contains a stray declarative node is still rejected with a `CodegenError` by the functional assembly.

@@ -1,7 +1,7 @@
-# Colony Mind — canvas (ui/)
+# Emergent Flow — canvas (ui/)
 
 The bundled single-user canvas (ADR 0013). A Vite + TypeScript app that talks to the
-local `colonymind serve` server over HTTP and is a **pure consumer** of its contract.
+local `emergentflow serve` server over HTTP and is a **pure consumer** of its contract.
 
 ## Develop
 
@@ -9,7 +9,7 @@ local `colonymind serve` server over HTTP and is a **pure consumer** of its cont
 cd ui
 npm install
 npm run dev        # Vite dev server
-npm run build      # emits compiled assets into ../colonymind/_static/
+npm run build      # emits compiled assets into ../emergentflow/_static/
 npm run typecheck  # tsc --noEmit
 npm test           # vitest run
 npm run lint       # eslint .
@@ -20,5 +20,5 @@ npm run gen:types  # regenerate TS types from ir.schema.json (schema itself from
 ## Boundary rule (load-bearing)
 
 This directory MUST NOT `import` or bundle the Python package. The only artifacts that
-cross the `ui/ ↔ colonymind/` boundary are the IR JSON Schema, the `compile_to_code`
+cross the `ui/ ↔ emergentflow/` boundary are the IR JSON Schema, the `compile_to_code`
 output string, and the rules-as-data artifact. A CI check enforces the import ban.

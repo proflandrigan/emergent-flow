@@ -1,9 +1,9 @@
-"""Tests for colonymind.ir.common — core primitives."""
+"""Tests for emergentflow.ir.common — core primitives."""
 
 import pytest
 from pydantic import ValidationError
 
-from colonymind.ir.common import (
+from emergentflow.ir.common import (
     ArtifactRef,
     Cardinality,
     Direction,

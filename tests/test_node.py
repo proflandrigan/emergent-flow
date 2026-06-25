@@ -1,4 +1,4 @@
-"""Tests for colonymind.ir.node — Node and Position models.
+"""Tests for emergentflow.ir.node — Node and Position models.
 
 NOTE: Graph does not exist yet (Task 07).  All tests here construct nodes
 WITHOUT a subgraph.  Full round-trip including subgraph is tested in Task 07.
@@ -9,10 +9,10 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from colonymind.ir.common import Direction, Paradigm
-from colonymind.ir.node import Node, Position
-from colonymind.ir.params import Param
-from colonymind.ir.port import Port
+from emergentflow.ir.common import Direction, Paradigm
+from emergentflow.ir.node import Node, Position
+from emergentflow.ir.params import Param
+from emergentflow.ir.port import Port
 
 # ---------------------------------------------------------------------------
 # Position model

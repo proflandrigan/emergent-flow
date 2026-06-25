@@ -1,17 +1,17 @@
 # Open-Core Boundary
 
-Colony Mind is developed using an open-core model. The foundational SDK is open source under the Apache License, Version 2.0 (Apache-2.0), while the collaborative platform, visual orchestration, and enterprise features are proprietary.
+Emergent Flow is developed using an open-core model. The foundational SDK is open source under the Apache License, Version 2.0 (Apache-2.0), while the collaborative platform, visual orchestration, and enterprise features are proprietary.
 
 ## What is in the open-source SDK (Apache-2.0)
 
-The `colonymind` Python SDK, contained in this repository, includes all the machinery required to define, serialize, and execute graph-based data pipelines:
+The `emergentflow` Python SDK, contained in this repository, includes all the machinery required to define, serialize, and execute graph-based data pipelines:
 
-- **IR schema & models (`colonymind/ir`):** The internal representation of the graph, including models for nodes, edges, and schemas.
+- **IR schema & models (`emergentflow/ir`):** The internal representation of the graph, including models for nodes, edges, and schemas.
 - **Node-definition contract:** The standard interface for defining new node types with serializable specs and Python behavior.
-- **Node registry & plugin discovery (`colonymind/nodes`):** The machinery for indexing node types and discovering third-party nodes via entry points.
+- **Node registry & plugin discovery (`emergentflow/nodes`):** The machinery for indexing node types and discovering third-party nodes via entry points.
 - **Serialization:** Logic for graph serialization and deserialization (JSON).
 - **Schema versioning & migrations:** The system for evolving the IR and migrating legacy graphs.
-- **Functional-pipeline node families:** The standard catalog of data processing nodes, including `colonymind/data` (loading), `clean`, `stats`, `ml`, and `reports`.
+- **Functional-pipeline node families:** The standard catalog of data processing nodes, including `emergentflow/data` (loading), `clean`, `stats`, `ml`, and `reports`.
 - **Execution machinery:** The compile-to-code and execute-the-IR engine that turns graphs into runnable Python.
 
 ## What is platform-only (proprietary)
@@ -29,10 +29,10 @@ The platform components are maintained in a separate, private repository and are
 
 We enforce a strict one-way dependency rule to ensure the SDK remains independent and portable:
 
-- **Platform → SDK:** The proprietary platform may depend on and import the `colonymind` open-source SDK.
+- **Platform → SDK:** The proprietary platform may depend on and import the `emergentflow` open-source SDK.
 - **SDK ↛ Platform:** The open-source SDK MUST NOT depend on or import any platform-only code.
 
-This ensures that the SDK remains fully functional and installable on its own (`pip install colonymind`) without leaking any proprietary dependencies or "phoning home" to the platform.
+This ensures that the SDK remains fully functional and installable on its own (`pip install emergentflow`) without leaking any proprietary dependencies or "phoning home" to the platform.
 
 ## Premium nodes
 

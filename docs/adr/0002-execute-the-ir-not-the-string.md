@@ -2,11 +2,11 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-16
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
-There are two ways to "run" a graph in Colony Mind. Option (a): generate a Python string from
+There are two ways to "run" a graph in Emergent Flow. Option (a): generate a Python string from
 the IR and `exec()` it. Option (b): interpret the IR directly by calling SDK functions at
 runtime.
 

@@ -1,4 +1,4 @@
-# Colony Mind Node-Definition Contract
+# Emergent Flow Node-Definition Contract
 
 - **Version:** 2
 - **Status:** Accepted
@@ -8,14 +8,14 @@
 
 ## Overview
 
-Every node type in Colony Mind conforms to one contract so the registry, codegen, executor,
+Every node type in Emergent Flow conforms to one contract so the registry, codegen, executor,
 and config UI can all consume it uniformly. The contract has two halves bound by one base
 class (see [ADR 0005](adr/0005-node-definition-contract.md)):
 
 - a **serializable spec** — ports, typed params, defaults, validation hints, version — that
-  the frontend renders with no Python present (`colonymind/nodes/spec.py`);
+  the frontend renders with no Python present (`emergentflow/nodes/spec.py`);
 - **Python behaviour** — codegen, executor, type-inference — implemented on the
-  `NodeDefinition` base class (`colonymind/nodes/contract.py`).
+  `NodeDefinition` base class (`emergentflow/nodes/contract.py`).
 
 A node *definition* is the catalog template for a node *type*; an IR `Node` (Story 2) is an
 *instance* of that type on the canvas. The link between them is the `type` string:
@@ -35,7 +35,7 @@ All spec models are Pydantic v2 subclasses of `IRModel` (`extra="forbid"`,
 
 ### NodeSpec
 
-`colonymind.nodes.spec.NodeSpec` — the complete declarative descriptor a definition emits via
+`emergentflow.nodes.spec.NodeSpec` — the complete declarative descriptor a definition emits via
 `to_spec()`.
 
 | Field | Type | Default | Semantics |
@@ -52,14 +52,14 @@ All spec models are Pydantic v2 subclasses of `IRModel` (`extra="forbid"`,
 
 ### PortSpec
 
-`colonymind.nodes.spec.PortSpec` — a declared connection point; the template for an IR `Port`
+`emergentflow.nodes.spec.PortSpec` — a declared connection point; the template for an IR `Port`
 (no `id`; ids are minted per instance).
 
 | Field | Type | Default | Semantics |
 |---|---|---|---|
 | `name` | `str` | — | Port name, unique among the node's ports of the same direction (non-empty). IN and OUT may share a name — `execute` keys inputs/outputs in separate namespaces. |
 | `direction` | `Direction` | — | `"in"` or `"out"`. |
-| `data_type` | `str` | `"any"` | Data-type token; validated against the type registry and resolved by inference during `cm.validate` (see [type-system-spec.md](./type-system-spec.md)). |
+| `data_type` | `str` | `"any"` | Data-type token; validated against the type registry and resolved by inference during `ef.validate` (see [type-system-spec.md](./type-system-spec.md)). |
 | `cardinality` | `Cardinality` | `"one"` | How many edges may attach (`"one"`/`"many"`). |
 | `required` | `bool` | `True` | For IN ports, whether an edge must connect. Ignored for OUT. |
 | `label` | `str \| None` | `None` | Optional display label. |
@@ -67,7 +67,7 @@ All spec models are Pydantic v2 subclasses of `IRModel` (`extra="forbid"`,
 
 ### ParamSpec
 
-`colonymind.nodes.spec.ParamSpec` — a declared typed parameter; the template for an IR
+`emergentflow.nodes.spec.ParamSpec` — a declared typed parameter; the template for an IR
 `Param` plus the authoring metadata the config UI needs.
 
 | Field | Type | Default | Semantics |
@@ -82,7 +82,7 @@ All spec models are Pydantic v2 subclasses of `IRModel` (`extra="forbid"`,
 
 ### ValidationHints
 
-`colonymind.nodes.spec.ValidationHints` — every field optional; an unset field imposes no
+`emergentflow.nodes.spec.ValidationHints` — every field optional; an unset field imposes no
 constraint. Consumed by the Epic 4 config UI and by `validate_node`.
 
 | Field | Type | Applies to | Semantics |
@@ -98,7 +98,7 @@ constraint. Consumed by the Epic 4 config UI and by `validate_node`.
 
 ## The behaviour: `NodeDefinition`
 
-`colonymind.nodes.contract.NodeDefinition` is an abstract base class. A concrete definition
+`emergentflow.nodes.contract.NodeDefinition` is an abstract base class. A concrete definition
 sets the class-level metadata attributes (`type`, `version`, `family`, `label`, `category`,
 `description`, `paradigm`, `ports`, `params`) and implements the behaviour.
 
@@ -119,7 +119,7 @@ sets the class-level metadata attributes (`type`, `version`, `family`, `label`, 
 - **`infer_types(self, node, input_types) -> dict`** — type-inference. The default
   returns each OUT port's declared `data_type`; override when output type depends on inputs or
   params. The whole-graph inference pass threads resolved upstream types in via `input_types`
-  and feeds the result to `cm.validate` (see [type-system-spec.md](./type-system-spec.md)).
+  and feeds the result to `ef.validate` (see [type-system-spec.md](./type-system-spec.md)).
   Per-dimension tensor shape inference is deferred to roadmap Epic 10.
 
 ### Derived (provided; do not override)
@@ -140,7 +140,7 @@ sets the class-level metadata attributes (`type`, `version`, `family`, `label`, 
 
 ### CodeFragment
 
-`colonymind.nodes.contract.CodeFragment` — what `codegen` returns.
+`emergentflow.nodes.contract.CodeFragment` — what `codegen` returns.
 
 | Field | Type | Default | Semantics |
 |---|---|---|---|
@@ -152,7 +152,7 @@ tests; the real compiler renders imports once per graph.
 
 ### CodegenContext
 
-`colonymind.codegen.context.CodegenContext` — the per-node binding context the whole-graph
+`emergentflow.codegen.context.CodegenContext` — the per-node binding context the whole-graph
 compiler passes into `codegen` (see
 [ADR 0009](adr/0009-codegen-binding-context.md)). The compiler builds it from the graph's
 wiring and naming maps via `build_codegen_context`; `preview()` instead builds the identity
@@ -190,4 +190,4 @@ A node type conforms to the contract when it:
 4. overrides `infer_types` where output type is not simply the declared OUT-port type.
 
 See [`authoring-a-node.md`](authoring-a-node.md) for a step-by-step walkthrough, and
-`colonymind/nodes/examples/` for two reference implementations.
+`emergentflow/nodes/examples/` for two reference implementations.

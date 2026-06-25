@@ -1,17 +1,17 @@
 # Codegen Reference Executor & Equivalence (Story 6)
 
-The code-generation engine (`colonymind.codegen`, Epic 2) commits — per
+The code-generation engine (`emergentflow.codegen`, Epic 2) commits — per
 [ADR 0002](adr/0002-execute-the-ir-not-the-string.md) — to **two pure functions
-over one IR**: `cm.compile_to_code(graph) -> str` (Story 5) emits runnable Python,
-and `cm.execute(graph) -> results` (Story 6) runs the graph directly. Their
+over one IR**: `ef.compile_to_code(graph) -> str` (Story 5) emits runnable Python,
+and `ef.execute(graph) -> results` (Story 6) runs the graph directly. Their
 artifacts must be *equivalent*.
 
 ## Public surface
 
 ```python
-import colonymind as cm
+import emergentflow as ef
 
-results = cm.execute(graph)   # {node_id: {out_port_name: value}}
+results = ef.execute(graph)   # {node_id: {out_port_name: value}}
 ```
 
 `execute` is the structural twin of `compile_to_code`: it reuses the same Story 2
@@ -21,7 +21,7 @@ same guards with the same error messages — a non-`FUNCTIONAL` paradigm raises
 emitting a `CodeFragment` per node it calls the node's `execute(node, inputs)`,
 threading each OUT-port value to every downstream IN port. The return value is a
 mapping from node id to that node's outputs (keyed by OUT-port name) and satisfies
-the SDK inspectable-result contract (`colonymind/api.py`).
+the SDK inspectable-result contract (`emergentflow/api.py`).
 
 ## The A2 equivalence invariant
 

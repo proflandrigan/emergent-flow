@@ -1,11 +1,11 @@
-"""Tests for the Story 2 node-catalog artifact (cm.export_catalog)."""
+"""Tests for the Story 2 node-catalog artifact (ef.export_catalog)."""
 
 from __future__ import annotations
 
 import pytest
 
-from colonymind.nodes.catalog import CATALOG_VERSION, export_catalog
-from colonymind.nodes.examples import (
+from emergentflow.nodes.catalog import CATALOG_VERSION, export_catalog
+from emergentflow.nodes.examples import (
     Anova,
     GenerateHtmlSummary,
     ImputeMissing,
@@ -18,7 +18,7 @@ from colonymind.nodes.examples import (
     NnReLU,
     TrainClassifier,
 )
-from colonymind.nodes.registry import NodeRegistry
+from emergentflow.nodes.registry import NodeRegistry
 
 REFERENCE_NODES = [
     LoadCsv,

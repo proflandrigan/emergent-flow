@@ -18,7 +18,7 @@ import pathlib
 
 import pytest
 
-from colonymind.ir import (
+from emergentflow.ir import (
     Direction,
     Edge,
     Graph,

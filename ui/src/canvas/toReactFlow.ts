@@ -6,18 +6,18 @@ import type { Edge as RFEdge, Node as RFNode } from "@xyflow/react";
 
 import type { EdgeModel, NodeModel } from "../store/model";
 import type { NodeStatus, Payload } from "../store/execution";
-import type { CmEdgeData } from "./edges/CmEdge";
-import type { CmNodeData } from "./nodes/CmNode";
+import type { EfEdgeData } from "./edges/EfEdge";
+import type { EfNodeData } from "./nodes/EfNode";
 
 export function toRFNode(
   node: NodeModel,
   selected: boolean,
   status: NodeStatus | null | undefined,
   results: Record<string, Payload> | null | undefined,
-): RFNode<CmNodeData> {
+): RFNode<EfNodeData> {
   return {
     id: node.id,
-    type: "cmNode",
+    type: "efNode",
     position: node.position,
     selected,
     data: {
@@ -38,10 +38,10 @@ export function toRFEdge(
   selected: boolean,
   compatible: boolean | null | undefined,
   reason: string | null | undefined,
-): RFEdge<CmEdgeData> {
+): RFEdge<EfEdgeData> {
   return {
     id: edge.id,
-    type: "cmEdge",
+    type: "efEdge",
     source: edge.source.node_id,
     sourceHandle: edge.source.port_id,
     target: edge.target.node_id,

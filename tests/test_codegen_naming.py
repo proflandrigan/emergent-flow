@@ -1,4 +1,4 @@
-"""Tests for colonymind.codegen.naming — string-level slug and identifier
+"""Tests for emergentflow.codegen.naming — string-level slug and identifier
 helpers, plus smoke tests for the whole-graph `NameMap` / `build_name_map`
 (Epic 2, Story 3). The exhaustive naming corpus comes in a later task."""
 
@@ -8,14 +8,14 @@ import keyword
 
 import pytest
 
-from colonymind.api import is_inspectable
-from colonymind.codegen.naming import (
+from emergentflow.api import is_inspectable
+from emergentflow.codegen.naming import (
     NameMap,
     _sanitize_identifier,
     _slugify,
     build_name_map,
 )
-from colonymind.ir import Direction, Graph, Node, Port
+from emergentflow.ir import Direction, Graph, Node, Port
 
 # ---------------------------------------------------------------------------
 # _slugify

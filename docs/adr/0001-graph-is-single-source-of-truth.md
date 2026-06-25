@@ -2,11 +2,11 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-16
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
-Colony Mind promises both a visual canvas for building pipelines and clean, exportable Python
+Emergent Flow promises both a visual canvas for building pipelines and clean, exportable Python
 that users can push to Git. These two representations create a tempting symmetry: what the
 user draws on the canvas becomes runnable code, and ideally any edits to that code would
 reflect back on the canvas.
@@ -36,7 +36,7 @@ contained, opt-in feature but will not gate the platform.
 **Positive:**
 
 - Preserves the "glass-box" promise: users can always see and run the exact generated code
-  without Colony Mind owning a Python decompiler.
+  without Emergent Flow owning a Python decompiler.
 - Dramatically narrows scope for Epic 1: the IR is the only format that must be kept
   consistent; code generation is a one-directional transform.
 - Eliminates an entire class of hard-to-diagnose sync bugs where canvas state and file state

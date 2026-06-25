@@ -2,7 +2,7 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-// The local `colonymind serve` server (ADR 0013) listens here in dev; the canvas talks to it
+// The local `emergentflow serve` server (ADR 0013) listens here in dev; the canvas talks to it
 // ONLY over these HTTP routes and never imports the Python package.
 const LOCAL_SERVER = "http://127.0.0.1:8765";
 const SERVER_ROUTES = [
@@ -21,7 +21,7 @@ export default defineConfig({
   // (ADR 0013 Decision 1); the local `serve` command serves it. This is a build
   // OUTPUT path, not a code import -- the UI never imports the Python package.
   build: {
-    outDir: "../colonymind/_static",
+    outDir: "../emergentflow/_static",
     emptyOutDir: true,
   },
   server: {

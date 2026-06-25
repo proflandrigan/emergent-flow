@@ -17,7 +17,7 @@
 
 **Phase:** 1 (Foundation).
 **Lives in:** `ui/` (React / Vite / Vitest — own toolchain, bundled into the wheel).
-**Coupling (per [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) Decision 3):** the canvas **never** imports `colonymind`. It consumes the IR JSON Schema (Epic 1), the `compile_to_code` output string (Epic 2), and the rules-as-data artifact (repo Epic 3), and talks to the local server (repo Epic 4) over REST.
+**Coupling (per [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) Decision 3):** the canvas **never** imports `emergentflow`. It consumes the IR JSON Schema (Epic 1), the `compile_to_code` output string (Epic 2), and the rules-as-data artifact (repo Epic 3), and talks to the local server (repo Epic 4) over REST.
 **Dependencies:** Epic 1 (IR schema), Epic 2 (codegen output), repo Epic 3 / roadmap 5 (rules-as-data), repo Epic 4 (local server endpoints `/compile` `/validate` `/execute`).
 **Blocks:** roadmap Epic 4 (node-config UX surface), Epic 8 (in-node result rendering), Epic 10/11 (shape-mismatch & token-flow UIs), Epic 13 (multiplayer — **hosted**).
 
@@ -31,7 +31,7 @@
 - [ ] An in-node **"show code"** panel renders the Python from the server's `/compile` for the current graph.
 - [ ] **Live connection validation**: incompatible edges go red with an explainable reason, via `/validate` (and/or the rules-as-data artifact).
 - [ ] A user can **download the runnable script** and (minimally) **execute** the graph via `/execute` and see raw results in-node (rich rendering is roadmap Epic 8).
-- [ ] The canvas **never imports `colonymind`**; the CI boundary check (repo Epic 4 Story 5) passes.
+- [ ] The canvas **never imports `emergentflow`**; the CI boundary check (repo Epic 4 Story 5) passes.
 - [ ] Performance: a documented budget with a plan (virtualization / level-of-detail) — verified later against a synthetic large graph, not gold-plated up front.
 
 ---
@@ -54,9 +54,9 @@
 
 - [ ] Create `ui/` with `package.json`, Vite, Vitest, TypeScript, lint/format config — independent of the `uv`/`ruff`/`mypy`/`pytest` toolchain.
 - [ ] Add a Node CI job to `.github/workflows/ci.yml` (build + unit tests + lint), running alongside the Python matrix.
-- [ ] Land the **CI boundary check** stub (repo Epic 4 Story 5): `ui/` must not import `colonymind`.
+- [ ] Land the **CI boundary check** stub (repo Epic 4 Story 5): `ui/` must not import `emergentflow`.
 - [ ] Generate/consume TypeScript types from the **published IR JSON Schema** so the client and IR can't drift.
-- [ ] A trivial "hello canvas" page renders and the dev server proxies to `colonymind serve` on localhost.
+- [ ] A trivial "hello canvas" page renders and the dev server proxies to `emergentflow serve` on localhost.
 
 ---
 

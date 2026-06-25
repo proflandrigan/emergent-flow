@@ -1,12 +1,12 @@
-"""Tests for colonymind.ir.port — Port model."""
+"""Tests for emergentflow.ir.port — Port model."""
 
 import json
 
 import pytest
 from pydantic import ValidationError
 
-from colonymind.ir.common import Cardinality, Direction
-from colonymind.ir.port import Port
+from emergentflow.ir.common import Cardinality, Direction
+from emergentflow.ir.port import Port
 
 # ---------------------------------------------------------------------------
 # Basic construction

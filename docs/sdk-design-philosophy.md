@@ -1,7 +1,7 @@
 # SDK Design Philosophy
 
 > These conventions are cheap to adopt now and very expensive to retrofit, so they are
-> enforced as acceptance criteria for **every** wrapper in the Colony Mind SDK (Epic 1,
+> enforced as acceptance criteria for **every** wrapper in the Emergent Flow SDK (Epic 1,
 > Story 7). This document states the rules and the machinery that enforces them. For the
 > concrete naming/signature/return mechanics, see
 > [Public API Conventions](./public-api-conventions.md).
@@ -57,7 +57,7 @@ wrapper to do reverse-engineering work — a violation of rule 1 (thin) as well.
 ## How the rules are enforced
 
 The rules are not merely documented — they are checked at runtime and in CI by
-[`colonymind/api.py`](../colonymind/api.py):
+[`emergentflow/api.py`](../emergentflow/api.py):
 
 | Tool | What it does |
 | --- | --- |
@@ -69,17 +69,17 @@ The rules are not merely documented — they are checked at runtime and in CI by
 All four are re-exported from the package root:
 
 ```python
-import colonymind as cm
+import emergentflow as ef
 
-@cm.public_op
+@ef.public_op
 def my_op(df, *, alpha: float = 0.05):
     ...  # returns a Pydantic model / dataclass / DataFrame / JSON-native value
 ```
 
 `tests/test_api_conventions.py` is the lint/test check Story 7 calls for: it proves the
 contract accepts the sanctioned shapes and **flags** opaque objects, generators, file
-handles, and raw bytes. As Story 8 adds the first real wrappers (`cm.data`, `cm.clean`,
-`cm.stats`, `cm.ml`, `cm.reports`), each one decorated with `@public_op` inherits this
+handles, and raw bytes. As Story 8 adds the first real wrappers (`ef.data`, `ef.clean`,
+`ef.stats`, `ef.ml`, `ef.reports`), each one decorated with `@public_op` inherits this
 enforcement for free.
 
 ## Related documentation

@@ -1,14 +1,14 @@
-"""Tests for the ``colonymind`` console entry point (ADR 0013 Decision 2)."""
+"""Tests for the ``emergentflow`` console entry point (ADR 0013 Decision 2)."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from colonymind.cli import main
+from emergentflow.cli import main
 
 
 def _patch_serve(monkeypatch) -> dict[str, Any]:
-    import colonymind.server as server_pkg
+    import emergentflow.server as server_pkg
 
     calls: dict[str, Any] = {}
 

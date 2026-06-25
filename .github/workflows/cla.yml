@@ -23,7 +23,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           path-to-signatures: 'signatures/cla.json'
-          path-to-document: 'https://github.com/proflandrigan/colony-mind/blob/main/CLA.md'
+          path-to-document: 'https://github.com/proflandrigan/emergent-flow/blob/main/CLA.md'
           branch: 'main'
           allowlist: 'dependabot[bot]'
           custom-pr-sign-comment: 'I have read the CLA Document and I hereby sign the CLA'

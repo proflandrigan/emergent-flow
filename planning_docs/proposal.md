@@ -1,17 +1,17 @@
-# Product Proposal: Colony Mind
+# Product Proposal: Emergent Flow
 ## The Visual Architecture Platform for Data Science, Analytics & Machine Learning
 
 ---
 
 ### Executive Summary
-**Colony Mind** is an "infinite canvas" visual development platform designed to unify the fragmented data ecosystem. It bridges the deep divide between low-code/no-code visual tools (which lack flexibility and lock users into proprietary environments) and code-first environments (which are linear, complex, and prone to technical friction). 
+**Emergent Flow** is an "infinite canvas" visual development platform designed to unify the fragmented data ecosystem. It bridges the deep divide between low-code/no-code visual tools (which lack flexibility and lock users into proprietary environments) and code-first environments (which are linear, complex, and prone to technical friction). 
 
-By providing a **Figma-like multiplayer whiteboard interface**, Colony Mind allows users to visually architect entire data lifecycles—from raw ETL data engineering, classical hypothesis testing, and advanced AutoML, to custom Deep Learning architectures and generative AI multi-agent orchestration. Crucially, the visual canvas maps 1:1 with an underlying, highly optimized open-source Python SDK. Every drag-and-drop connection produces beautiful, production-grade, human-readable Python code, eliminating vendor lock-in and offering true developer freedom.
+By providing a **Figma-like multiplayer whiteboard interface**, Emergent Flow allows users to visually architect entire data lifecycles—from raw ETL data engineering, classical hypothesis testing, and advanced AutoML, to custom Deep Learning architectures and generative AI multi-agent orchestration. Crucially, the visual canvas maps 1:1 with an underlying, highly optimized open-source Python SDK. Every drag-and-drop connection produces beautiful, production-grade, human-readable Python code, eliminating vendor lock-in and offering true developer freedom.
 
 ---
 
 ### 1. The Vision: The Infinite Canvas for Data
-Traditional data science happens in linear, isolated environments like Jupyter Notebooks, which obscure data lineage, make collaboration difficult, and hide the structural flow of complex pipelines. Colony Mind brings the design paradigm shift of Figma and Miro to the data, DS, and ML stack.
+Traditional data science happens in linear, isolated environments like Jupyter Notebooks, which obscure data lineage, make collaboration difficult, and hide the structural flow of complex pipelines. Emergent Flow brings the design paradigm shift of Figma and Miro to the data, DS, and ML stack.
 
 ```
 [ Data Source Node ] ──> [ Data Prep / Impute ] ──> [ Custom DL Layer ] ──> [ Agent Orchestrator ]
@@ -27,7 +27,7 @@ Users interact with an unbounded visual canvas where data, math, and model archi
 ---
 
 ### 2. Market Mapping: Navigating the Competitor Landscape
-To achieve market dominance, Colony Mind will combine the specialized strengths of existing tools while aggressively addressing their systemic limitations.
+To achieve market dominance, Emergent Flow will combine the specialized strengths of existing tools while aggressively addressing their systemic limitations.
 
 | Category | Key Players | Strengths to Absorb | Weaknesses to Exploit / Overcome |
 | :--- | :--- | :--- | :--- |
@@ -41,7 +41,7 @@ To achieve market dominance, Colony Mind will combine the specialized strengths 
 ---
 
 ### 3. Core Technical Architecture & Under-the-Hood Stack
-Colony Mind is engineered around a modular, three-layered stack that separates presentation, execution, and orchestration.
+Emergent Flow is engineered around a modular, three-layered stack that separates presentation, execution, and orchestration.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -76,7 +76,7 @@ A hyper-responsive, fluid frontend optimized for rendering hundreds of data comp
 * **Canvas Engine:** Built using *React Flow* or *Rete.js* to power node creation, infinite pan/zoom, interactive edge connection, and sub-graph nesting.
 * **State Rendering:** Rich embedded charts, distribution graphs, and matrix tables rendered directly inside node expansion windows using lightweight SVG libraries.
 
-> **Engineering note — the canvas is a contract-coupled module, not a layer of the SDK.** Although drawn here as one stack, the TypeScript/React canvas is a distinct toolchain that couples to the Python SDK *only* through published, versioned artifacts — the graph IR schema, the generated-code string, and the connection-validation rules as data — so the frontend never imports Python and the open-source boundary stays clean. Per [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) (superseding the original three-repo split), all of this lives in **one repo** and ships as a **single `pip install colonymind` with the UI bundled** (the JupyterLab model): the canvas is the `ui/` tree and the backend is `colonymind/server/`. See §A5 / §B Epic 3 of the technical roadmap for the contract, and ADR 0013 for the topology.
+> **Engineering note — the canvas is a contract-coupled module, not a layer of the SDK.** Although drawn here as one stack, the TypeScript/React canvas is a distinct toolchain that couples to the Python SDK *only* through published, versioned artifacts — the graph IR schema, the generated-code string, and the connection-validation rules as data — so the frontend never imports Python and the open-source boundary stays clean. Per [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) (superseding the original three-repo split), all of this lives in **one repo** and ships as a **single `pip install emergentflow` with the UI bundled** (the JupyterLab model): the canvas is the `ui/` tree and the backend is `emergentflow/server/`. See §A5 / §B Epic 3 of the technical roadmap for the contract, and ADR 0013 for the topology.
 
 #### Layer 3: The Backend Execution & State Server (The Bridge)
 A high-throughput API gateway built with *FastAPI* that coordinates interaction between the browser canvas and the Python SDK runtime.
@@ -93,19 +93,19 @@ In a traditional python script, operations execute sequentially. On an infinite 
 #### Challenge 2: Avoiding the "Ugly Code" Trap
 Automated workflow engines typically output completely unmaintainable, messy code full of auto-generated intermediate variable strings (e.g., `df_step_3_v2_final = df_step2.apply(...)`).
 * **The Solution:** Force strict 1:1 mapping between UI components and our tailored Python SDK API. The visual builder does not generate arbitrary code blocks; it compiles structured SDK objects.
-* *Example of clean output code generated by Colony Mind:*
+* *Example of clean output code generated by Emergent Flow:*
     ```python
-    import colonymind as cm
+    import emergentflow as ef
 
     # 1. Data Ingestion & Imputation
-    df = cm.data.load_csv("customer_churn.csv")
-    df_clean = cm.clean.impute_missing(df, columns=["age", "income"], strategy="median")
+    df = ef.data.load_csv("customer_churn.csv")
+    df_clean = ef.clean.impute_missing(df, columns=["age", "income"], strategy="median")
 
     # 2. Statistical Validation
-    stat_results = cm.stats.anova(df_clean, dv="churn_risk", between="segment")
+    stat_results = ef.stats.anova(df_clean, dv="churn_risk", between="segment")
 
     # 3. Model Architecture & Pipeline Training
-    model, metrics = cm.ml.train_classifier(
+    model, metrics = ef.ml.train_classifier(
         data=df_clean, 
         target="churn_risk", 
         model_type="random_forest", 
@@ -113,7 +113,7 @@ Automated workflow engines typically output completely unmaintainable, messy cod
     )
 
     # 4. Export Artifacts
-    cm.reports.generate_html_summary(model, metrics, output_path="churn_report.html")
+    ef.reports.generate_html_summary(model, metrics, output_path="churn_report.html")
     ```
 
 #### Challenge 3: Tensor Shape Validation in Deep Learning
@@ -123,7 +123,7 @@ When visually building deep neural networks, connecting incompatible layers (e.g
 ---
 
 ### 5. Future Horizons: GenAI Stack & Autonomous Coding Agents
-Colony Mind is architected to seamlessly expand past traditional data science into the frontier of generative AI engineering.
+Emergent Flow is architected to seamlessly expand past traditional data science into the frontier of generative AI engineering.
 
 ```
 ┌─────────────────┐      ┌──────────────────┐      ┌───────────────────┐
@@ -144,5 +144,5 @@ Embed an LLM agent directly into the canvas space. Instead of hand-building grap
 To mitigate execution risk and optimize time-to-market, development is structured into three iterative phases:
 
 * **Phase 1: The Foundation (Core SDK & Static Canvas):** Focus entirely on engineering the wrapper Python SDK. Simultaneously build a pure frontend React Flow whiteboard canvas capable of mapping visual node arrangements to flawless, downloadable text scripts. Zero backend execution at this stage—focus entirely on layout and structural code generation. *(The SDK and the canvas are two toolchains in one repo, shipped as a single bundled `pip install` — see [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md), which supersedes the original two-repo framing — coupled only by the published IR schema, codegen output, and connection-validation rules.)*
-* **Phase 2: The Living Bridge (Reactive Backend Integration):** Connect the canvas to a **local** FastAPI runtime bundled in the package (`cm lab` / `colonymind serve`) that executes the graph **in-process** — the JupyterLab/dbt-core tier (see [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) and §A6 of the technical roadmap). A simple on-disk cache lets clicking "Execute Node" re-run only what changed and pipe rich data visualizations, descriptive tables, and charts back into the whiteboard. The heavyweight scale-out — sandboxed/distributed workers, managed Redis + object-store caching, auth and multi-tenancy — is **deferred to the gated hosted product** (the dbt-Cloud tier), not the bundled package, so we don't over-architect the local app.
+* **Phase 2: The Living Bridge (Reactive Backend Integration):** Connect the canvas to a **local** FastAPI runtime bundled in the package (`ef lab` / `emergentflow serve`) that executes the graph **in-process** — the JupyterLab/dbt-core tier (see [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md) and §A6 of the technical roadmap). A simple on-disk cache lets clicking "Execute Node" re-run only what changed and pipe rich data visualizations, descriptive tables, and charts back into the whiteboard. The heavyweight scale-out — sandboxed/distributed workers, managed Redis + object-store caching, auth and multi-tenancy — is **deferred to the gated hosted product** (the dbt-Cloud tier), not the bundled package, so we don't over-architect the local app.
 * **Phase 3: The Frontier (Deep Learning, GenAI, and Agent Automation):** Introduce the real-time tensor tensor shape engine, deploy visual LangGraph agent configuration modules, and integrate the natural-language canvas agent to allow conversational platform construct

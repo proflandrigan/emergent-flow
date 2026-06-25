@@ -1,13 +1,13 @@
-"""Tests for colonymind.codegen.traversal — deterministic topological sort and
+"""Tests for emergentflow.codegen.traversal — deterministic topological sort and
 cycle detection (Epic 2, Story 2)."""
 
 from __future__ import annotations
 
 import pytest
 
-from colonymind.codegen import CycleError
-from colonymind.codegen.traversal import topological_sort
-from colonymind.ir import Direction, Edge, Graph, Node, Port, PortRef
+from emergentflow.codegen import CycleError
+from emergentflow.codegen.traversal import topological_sort
+from emergentflow.ir import Direction, Edge, Graph, Node, Port, PortRef
 
 # ---------------------------------------------------------------------------
 # Builders — small helpers for crafting graphs with valid ports/edges

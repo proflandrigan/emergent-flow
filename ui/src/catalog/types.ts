@@ -1,5 +1,5 @@
 // Hand-written TS mirrors of the node catalog shape served by the local
-// `colonymind serve` server (ADR 0013) at `/catalog` and emitted to
+// `emergentflow serve` server (ADR 0013) at `/catalog` and emitted to
 // `ui/src/generated/catalog.json`. Kept exact so the palette task can rely on them.
 
 export type CatalogDirection = "in" | "out";
