@@ -33,6 +33,8 @@ class LoadCsv(NodeDefinition):
     version = 2
     family = "data"
     label = "Load CSV"
+    category = "Ingest"
+    description = "Load a CSV file into a pandas DataFrame."
 
     ports = [
         PortSpec(

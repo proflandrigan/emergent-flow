@@ -3,9 +3,10 @@
 
 The monorepo (ADR 0013) replaced the physical repo wall with this check. The canvas under
 ``ui/`` talks to the local server only over HTTP; it must not ``import``/``require``/bundle
-``colonymind``. Only the three contract artifacts (the IR JSON Schema, the
-``compile_to_code`` output string, and the rules-as-data artifact) cross the boundary --
-and they cross as data, not as a code import. Run standalone (``python
+``colonymind``. Only the four contract artifacts (the IR JSON Schema, the
+``compile_to_code`` output string, the rules-as-data artifact, and the node catalog
+artifact -- ADR 0015) cross the boundary -- and they cross as data, not as a code import.
+Run standalone (``python
 scripts/check_ui_boundary.py`` -> exit 1 on violation) or via ``tests/test_ui_boundary.py``.
 """
 

@@ -34,6 +34,8 @@ class GenerateHtmlSummary(NodeDefinition):
     version = 2
     family = "reports"
     label = "HTML Summary"
+    category = "Reporting"
+    description = "Generate an HTML profiling report summarising a DataFrame."
 
     ports = [
         PortSpec(

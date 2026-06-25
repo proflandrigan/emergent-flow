@@ -34,6 +34,8 @@ class NnModule(NodeDefinition):
     version = 1
     family = "nn"
     label = "Module"
+    category = "Neural Network"
+    description = "An nn.Module that owns a subgraph of layers."
     paradigm = Paradigm.DECLARATIVE
 
     ports = []

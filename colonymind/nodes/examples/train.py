@@ -33,6 +33,8 @@ class TrainClassifier(NodeDefinition):
     version = 2
     family = "ml"
     label = "Train Classifier"
+    category = "Machine Learning"
+    description = "Train a logistic-regression classifier and report evaluation metrics."
 
     ports = [
         PortSpec(

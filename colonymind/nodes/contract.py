@@ -105,6 +105,10 @@ class NodeDefinition(ABC):
         Coarse catalog grouping, e.g. ``"data"``, ``"clean"``, ``"stats"``.
     label:
         Human-friendly display name.
+    category:
+        Human-friendly palette grouping, e.g. ``"Ingest"``, ``"Transform"``.
+    description:
+        One-line description shown in the palette / tooltips.
     paradigm:
         Execution paradigm (ADR 0003); default FUNCTIONAL.
     ports:
@@ -117,6 +121,8 @@ class NodeDefinition(ABC):
     version: ClassVar[int] = 1
     family: ClassVar[str]
     label: ClassVar[str]
+    category: ClassVar[str] = ""
+    description: ClassVar[str] = ""
     paradigm: ClassVar[Paradigm] = Paradigm.FUNCTIONAL
     ports: ClassVar[list[PortSpec]] = []
     params: ClassVar[list[ParamSpec]] = []
@@ -212,6 +218,8 @@ class NodeDefinition(ABC):
             version=cls.version,
             family=cls.family,
             label=cls.label,
+            category=cls.category,
+            description=cls.description,
             paradigm=cls.paradigm,
             ports=list(cls.ports),
             params=list(cls.params),

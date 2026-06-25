@@ -217,6 +217,10 @@ class NodeSpec(IRModel):
         Coarse grouping for catalog/UI organisation, e.g. ``"data"``, ``"stats"``.
     label:
         Human-friendly display name.
+    category:
+        Human-friendly palette grouping, e.g. "Ingest", "Transform".
+    description:
+        One-line description shown in the palette / tooltips.
     paradigm:
         Which execution paradigm this node belongs to (ADR 0003).
     ports:
@@ -229,6 +233,8 @@ class NodeSpec(IRModel):
     version: int = 1
     family: str
     label: str
+    category: str = ""
+    description: str = ""
     paradigm: Paradigm = Paradigm.FUNCTIONAL
     ports: list[PortSpec] = Field(default_factory=list)
     params: list[ParamSpec] = Field(default_factory=list)

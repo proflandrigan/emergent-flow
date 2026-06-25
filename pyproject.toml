@@ -38,6 +38,10 @@ dependencies = [
     # (see docs/licensing-and-dependencies.md).
     "statsmodels>=0.14,<1",
     "scikit-learn>=1.4",
+    # pyarrow (Apache-2.0) is the parquet engine backing cm.data.load_parquet.
+    # Apache-2.0 is compatible with this SDK's license (see docs/licensing-and-dependencies.md);
+    # it is NOT a GPL dep. pandas.read_parquet needs an engine, so this is a hard dependency.
+    "pyarrow>=15",
     "ydata-profiling>=4",
     # ydata-profiling imports pkg_resources at runtime but does not declare
     # setuptools as a dependency. Pin it explicitly, and below 81 where

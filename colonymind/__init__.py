@@ -38,6 +38,7 @@ _LAZY_ENTRY_POINTS = {
     "apply_type_compatibility": ("colonymind.codegen.validation", "apply_type_compatibility"),
     "build_rules_artifact": ("colonymind.types.rules_artifact", "build_rules_artifact"),
     "diagnostics_json_schema": ("colonymind.codegen.diagnostics_schema", "diagnostics_json_schema"),
+    "export_catalog": ("colonymind.nodes.catalog", "export_catalog"),
 }
 
 if TYPE_CHECKING:  # let type-checkers resolve cm.data, cm.codegen, ... statically
@@ -47,6 +48,7 @@ if TYPE_CHECKING:  # let type-checkers resolve cm.data, cm.codegen, ... statical
     from colonymind.codegen.executor import execute
     from colonymind.codegen.export import export_script
     from colonymind.codegen.validation import apply_type_compatibility, validate
+    from colonymind.nodes.catalog import export_catalog
     from colonymind.types.rules_artifact import build_rules_artifact
 
 __all__ = [
@@ -69,6 +71,7 @@ __all__ = [
     "apply_type_compatibility",
     "build_rules_artifact",
     "diagnostics_json_schema",
+    "export_catalog",
 ]
 
 

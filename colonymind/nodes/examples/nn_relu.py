@@ -38,6 +38,8 @@ class NnReLU(NodeDefinition):
     version = 1
     family = "nn"
     label = "ReLU"
+    category = "Neural Network"
+    description = "A ReLU activation layer."
     paradigm = Paradigm.DECLARATIVE
 
     ports = [

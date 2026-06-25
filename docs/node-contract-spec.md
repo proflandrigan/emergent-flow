@@ -44,6 +44,8 @@ All spec models are Pydantic v2 subclasses of `IRModel` (`extra="forbid"`,
 | `version` | `int` | `1` | Per-node catalog version (see [Versioning](#versioning)). Must be ≥ 1. |
 | `family` | `str` | — | Coarse grouping for catalog/UI, e.g. `"data"`, `"clean"`. |
 | `label` | `str` | — | Human-friendly display name. |
+| `category` | `str` | `""` | Human-friendly palette grouping, e.g. `"Ingest"`, `"Transform"`. |
+| `description` | `str` | `""` | One-line description shown in the palette / tooltips. |
 | `paradigm` | `Paradigm` | `"functional"` | Execution paradigm (ADR 0003). |
 | `ports` | `list[PortSpec]` | `[]` | Declared ports (templates for IR ports). |
 | `params` | `list[ParamSpec]` | `[]` | Declared typed params (templates for IR params). |
@@ -97,8 +99,8 @@ constraint. Consumed by the Epic 4 config UI and by `validate_node`.
 ## The behaviour: `NodeDefinition`
 
 `colonymind.nodes.contract.NodeDefinition` is an abstract base class. A concrete definition
-sets the class-level metadata attributes (`type`, `version`, `family`, `label`, `paradigm`,
-`ports`, `params`) and implements the behaviour.
+sets the class-level metadata attributes (`type`, `version`, `family`, `label`, `category`,
+`description`, `paradigm`, `ports`, `params`) and implements the behaviour.
 
 ### Required (abstract)
 
