@@ -41,11 +41,14 @@ export interface CatalogNode {
   version: number;
   family: string;
   label: string;
+  category?: string;
+  description?: string;
   paradigm: string;
   ports: CatalogPort[];
   params: CatalogParam[];
 }
 
 export interface Catalog {
+  catalog_version: number;
   nodes: CatalogNode[];
 }

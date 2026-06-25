@@ -137,9 +137,9 @@ or dict iteration order; the sort is applied explicitly before serialization.
 
 ## Producer
 
-`cm.export_catalog()` (alongside `cm.export_rules()` and the other artifact exporters, in the
-`cm.codegen`/export namespace) builds this artifact from the **live node registry**. Like
-every other exporter in this chain, it is:
+`cm.export_catalog()` (alongside `cm.build_rules_artifact()` and the other artifact exporters,
+each a top-level `cm.*` entry point) builds this artifact from the **live node registry**.
+Like every other exporter in this chain, it is:
 
 - **Pure** — no I/O, no global state; it reads the registry and returns data.
 - **Deterministic** — the same registry state always produces the same artifact (guaranteed by
