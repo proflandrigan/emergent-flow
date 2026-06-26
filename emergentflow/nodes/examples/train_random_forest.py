@@ -96,9 +96,13 @@ class TrainRandomForest(NodeDefinition):
         values = {p.name: p.value for p in node.params}
         target = values.get("target")
         features = values.get("features")
-        task = values.get("task", "classification")
+        task = values.get("task", "classification") or "classification"
         n_estimators = values.get("n_estimators", 100)
+        if n_estimators is None:
+            n_estimators = 100
         random_state = values.get("random_state", 0)
+        if random_state is None:
+            random_state = 0
         return (
             cast(str, target),
             cast("list[str] | None", features),

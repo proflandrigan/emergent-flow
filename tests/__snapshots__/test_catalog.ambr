@@ -170,7 +170,7 @@
           }),
           dict({
             'default': '==',
-            'help': None,
+            'help': 'How to compare: ==/!=/</<=/>/>= test a scalar value; isin tests list membership.',
             'hints': dict({
               'choices': list([
                 '==',

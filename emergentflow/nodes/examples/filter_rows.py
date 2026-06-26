@@ -65,6 +65,7 @@ class FilterRows(NodeDefinition):
             type_token="str",
             default="==",
             label="Operator",
+            help="How to compare: ==/!=/</<=/>/>= test a scalar value; isin tests list membership.",
             hints=ValidationHints(
                 choices=["==", "!=", "<", "<=", ">", ">=", "isin"],
                 widget="select",

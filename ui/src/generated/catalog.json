@@ -168,7 +168,7 @@
         },
         {
           "default": "==",
-          "help": null,
+          "help": "How to compare: ==/!=/</<=/>/>= test a scalar value; isin tests list membership.",
           "hints": {
             "choices": [
               "==",
