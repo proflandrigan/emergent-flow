@@ -1,15 +1,15 @@
-"""Tests for colonymind.codegen.context — the per-node CodegenContext binding
+"""Tests for emergentflow.codegen.context — the per-node CodegenContext binding
 context and `build_codegen_context` (Epic 2, Story 4)."""
 
 from __future__ import annotations
 
 import pytest
 
-from colonymind.codegen.context import CodegenContext, build_codegen_context
-from colonymind.codegen.naming import build_name_map
-from colonymind.codegen.wiring import build_wiring_map
-from colonymind.ir import Cardinality, Direction, Edge, Graph, Node, Port, PortRef
-from colonymind.nodes.examples import Anova, ImputeMissing, LoadCsv
+from emergentflow.codegen.context import CodegenContext, build_codegen_context
+from emergentflow.codegen.naming import build_name_map
+from emergentflow.codegen.wiring import build_wiring_map
+from emergentflow.ir import Cardinality, Direction, Edge, Graph, Node, Port, PortRef
+from emergentflow.nodes.examples import Anova, ImputeMissing, LoadCsv
 
 # ---------------------------------------------------------------------------
 # Builders

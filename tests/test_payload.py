@@ -1,9 +1,9 @@
 """Tests for the result-payload contract (ADR 0013, §A6; ADR 0002).
 
 Exercises ``to_payload`` against the real artifact shapes that flow out of
-``cm.execute``: scalars, oversized strings, JSON containers, ``pandas.DataFrame``
+``ef.execute``: scalars, oversized strings, JSON containers, ``pandas.DataFrame``
 (small, truncated, and NaN-bearing), a ``@dataclass`` with a nested DataFrame
-(mirroring ``colonymind.stats.AnovaResult``), and an arbitrary unsupported
+(mirroring ``emergentflow.stats.AnovaResult``), and an arbitrary unsupported
 object. No torch, no network.
 """
 
@@ -16,7 +16,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from colonymind.server.payload import MAX_HEAD_ROWS, MAX_TEXT_CHARS, to_payload
+from emergentflow.server.payload import MAX_HEAD_ROWS, MAX_TEXT_CHARS, to_payload
 
 
 def test_scalar_kinds() -> None:

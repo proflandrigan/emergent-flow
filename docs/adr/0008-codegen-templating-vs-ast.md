@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-18
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
@@ -13,9 +13,9 @@ correct, idiomatic Python for both, and that Python must satisfy the equivalence
 against `execute(ir)`.
 
 The two paradigms do not have the same generation problem. A functional pipeline compiles to a
-flat sequence of `out_var = cm.<family>.<fn>(in_var, **params)` statements — one logical
+flat sequence of `out_var = ef.<family>.<fn>(in_var, **params)` statements — one logical
 statement per node, with no nesting and no shared indentation context. This is exactly what
-`CodeFragment` in `colonymind/nodes/contract.py` already models today: a structured pair of
+`CodeFragment` in `emergentflow/nodes/contract.py` already models today: a structured pair of
 `imports` and `body` strings that the whole-graph compiler concatenates in topological order.
 The declarative paradigm has the opposite shape: a class body, method bodies inside it, and
 indentation that depends on where a fragment lands in that structure. Assembling that by string
@@ -30,7 +30,7 @@ is normalized into one consistent visual style, is needed before the codegen com
 
 ## Decision
 
-We will dispatch codegen on the graph/node `paradigm` (`colonymind.ir.common.Paradigm`,
+We will dispatch codegen on the graph/node `paradigm` (`emergentflow.ir.common.Paradigm`,
 `FUNCTIONAL` vs `DECLARATIVE`) and use a different emission strategy on each branch.
 
 For `Paradigm.FUNCTIONAL`, the compiler emits string templates. Each node contributes a

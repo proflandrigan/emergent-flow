@@ -22,7 +22,7 @@
 > roadmap's **Epic 5** (*Type-Safe Graph & Connection Validation*). The roadmap's literal
 > Epic 3 — the *Frontend Canvas Engine* (React Flow / TypeScript) — is **out of scope here**:
 > it is a separate frontend repo that consumes this repo's published IR schema and codegen
-> output, never `import colonymind`. This Python SDK repo owns the type *system* and the
+> output, never `import emergentflow`. This Python SDK repo owns the type *system* and the
 > *rules*; the canvas consumes them. See "Notes / Risks" for the repo-split rationale.
 
 **Phase:** 1 (Foundation) — structural typing only.
@@ -36,12 +36,12 @@
 - [ ] A formal **type-token system** replaces the opaque `data_type` string: known types are registered, `"any"` is the explicit wildcard/top type, and the catalog is serializable (the frontend needs it with no Python present).
 - [ ] A pure, deterministic **compatibility function** decides whether an OUT-port type may feed an IN-port type, returning one of *compatible / incompatible / unknown* (with a reason), and is expressible as **data shippable to the client** so the canvas gives instant feedback without a round-trip.
 - [ ] A **whole-graph type-inference pass** propagates resolved types from sources downstream (generalizing per-node `infer_types`), so compatibility checks run against *resolved* types, not just declared ones.
-- [ ] A **graph validation pass** (`cm.validate(graph)`) checks every edge for type compatibility **and cardinality**, populates `Edge.type_compatible`, and returns structured **diagnostics** (severity + edge/port + human-readable reason, expected-vs-actual type) — without blocking construction of exploratory graphs.
+- [ ] A **graph validation pass** (`ef.validate(graph)`) checks every edge for type compatibility **and cardinality**, populates `Edge.type_compatible`, and returns structured **diagnostics** (severity + edge/port + human-readable reason, expected-vs-actual type) — without blocking construction of exploratory graphs.
 - [ ] **Strictness policy is implemented and documented:** structural type mismatches and cardinality violations hard-fail; things only knowable at runtime warn-don't-block.
 - [ ] `compile_to_code` and `execute` **share a single validation gate** (mirroring `_prepare_declarative`) so both paradigms accept/reject identically; a hard structural mismatch raises a clear error before any code is emitted or run.
 - [x] A **golden diagnostics corpus** covers compatible, incompatible, unknown, dangling-required-IN, and cardinality-violation graphs; it is wired into CI alongside the existing equivalence gate.
 - [ ] Tensor **dimension** inference is explicitly **not** built — only structural type compatibility (`Tensor`→`Tensor` is fine here); per-dimension shape resolution is deferred to roadmap Epic 10, which specializes this framework.
-- [x] The many `# … is Epic 5` placeholders across `colonymind/` and `docs/` are resolved (this epic *is* that work) and the docs describe the real type system.
+- [x] The many `# … is Epic 5` placeholders across `emergentflow/` and `docs/` are resolved (this epic *is* that work) and the docs describe the real type system.
 
 ---
 
@@ -64,9 +64,9 @@
 > `ClassifierResult`, `AnovaResult`, `HTML`, `Tensor` used ad hoc across the reference nodes.
 > Give them a registry so compatibility can be reasoned about and shipped as data.
 
-- [x] Implement a **type registry** (e.g. `colonymind/types/` or `colonymind/ir/types.py`) cataloguing known data types and an optional **subtype relation** between them.
+- [x] Implement a **type registry** (e.g. `emergentflow/types/` or `emergentflow/ir/types.py`) cataloguing known data types and an optional **subtype relation** between them.
 - [x] Make `"any"` the explicit **top/wildcard** type with documented semantics (connects to/from anything, warns nowhere).
-- [x] **Inventory and register** every token currently in use (`DataFrame`, `ClassifierResult`, `AnovaResult`, `HTML`, `Tensor`, `any`) from `colonymind/nodes/examples/*.py`; keep `data_type` a `str` on the wire (no IR schema break) but validate it against the registry during the validation pass, not at construction.
+- [x] **Inventory and register** every token currently in use (`DataFrame`, `ClassifierResult`, `AnovaResult`, `HTML`, `Tensor`, `any`) from `emergentflow/nodes/examples/*.py`; keep `data_type` a `str` on the wire (no IR schema break) but validate it against the registry during the validation pass, not at construction.
 - [x] Make the registry **declaratively extensible** (an out-of-core node can register a new type token), consistent with the node registry/plugin pattern (ADR 0006) — and add a stub demonstrating it, like `examples/plugin_stub`.
 - [x] Ensure the registry + subtype table **serialize to JSON** (the frontend consumes them with no Python present, same constraint that drove the IR).
 - [x] Unit-test: registration, duplicate/conflict detection, subtype transitivity, `"any"` semantics.
@@ -99,12 +99,12 @@
 
 ---
 
-## Story 5 — Graph validation pass & diagnostics (`cm.validate`)
+## Story 5 — Graph validation pass & diagnostics (`ef.validate`)
 
 > The headline deliverable: one call that tells you everything wrong with a graph's wiring,
 > structured for both humans and the canvas.
 
-- [x] Implement `cm.validate(graph) -> Diagnostics` (a `@public_op`, serializable + inspectable) that runs inference (Story 4) then checks every edge with the rules engine (Story 3).
+- [x] Implement `ef.validate(graph) -> Diagnostics` (a `@public_op`, serializable + inspectable) that runs inference (Story 4) then checks every edge with the rules engine (Story 3).
 - [x] Emit structured **diagnostics**: each carries `severity` (error/warning), the offending edge/port ids, a human-readable message, and expected-vs-actual type. Make `Diagnostics` JSON-native so the frontend renders it directly.
 - [x] **Do not block construction.** Unlike `Graph._validate_structure` (which hard-rejects malformed structure at build time), type/cardinality validation is a *separate* call so exploratory, half-wired graphs can exist on the canvas and still be inspected. Document this split explicitly.
 - [x] **Populate `Edge.type_compatible`** (currently always `None`) as a side-output of validation, fulfilling the field Epic 1 reserved.
@@ -121,7 +121,7 @@
 
 - [x] Add a **single shared validation gate** that `compile_to_code` and `execute` both call before doing any work, so the two paradigms and the two pure functions accept/reject identically.
 - [x] On a hard structural mismatch (error-severity diagnostic), raise a **clear, node/edge-naming error** before any code is emitted or any node runs — consistent with the existing `CodegenError` pattern for the declarative seam.
-- [x] Let warnings **pass through** (warn-don't-block) so exploratory runs still execute; surface them on the result/diagnostics object. (Return types are unchanged; warnings are non-blocking and surfaced via `cm.validate(graph)` — wrapping the artifacts in a result object would break the ADR-0002 equivalence harness and the `@public_op` inspectable contract.)
+- [x] Let warnings **pass through** (warn-don't-block) so exploratory runs still execute; surface them on the result/diagnostics object. (Return types are unchanged; warnings are non-blocking and surfaced via `ef.validate(graph)` — wrapping the artifacts in a result object would break the ADR-0002 equivalence harness and the `@public_op` inspectable contract.)
 - [x] Extend the **equivalence corpus** so a known-invalid graph is rejected by *both* `compile_to_code` and `execute` with equivalent errors (negative equivalence).
 - [x] Confirm purity is preserved — the gate adds no I/O or global state (Epic 6 still wraps the executor cleanly).
 
@@ -148,16 +148,16 @@
 - [x] Add **golden (snapshot) tests** of the `Diagnostics` output so regressions in messages/severities are caught, mirroring Epic 2's golden corpus.
 - [x] Wire the validation/diagnostics gate into **CI** alongside the existing equivalence and golden gates.
 - [x] Write a **type-system spec doc** (`docs/type-system-spec.md`) and a "connection validation" guide; link from the README, mirroring Epic 1/2 docs discipline.
-- [x] **Resolve the `Epic 5` placeholders** in `colonymind/ir/port.py`, `params.py`, `edge.py`, `nodes/contract.py`, `nodes/spec.py`, `docs/ir-spec.md`, `docs/node-contract-spec.md`, `docs/authoring-a-node.md`, `docs/node-registry.md`, and ADRs 0005/0006 — pointing them at the now-real type system (and at Epic 10 for tensor dimensions specifically).
+- [x] **Resolve the `Epic 5` placeholders** in `emergentflow/ir/port.py`, `params.py`, `edge.py`, `nodes/contract.py`, `nodes/spec.py`, `docs/ir-spec.md`, `docs/node-contract-spec.md`, `docs/authoring-a-node.md`, `docs/node-registry.md`, and ADRs 0005/0006 — pointing them at the now-real type system (and at Epic 10 for tensor dimensions specifically).
 - [x] Update `docs/authoring-a-node.md` so a node author learns how to choose/register a `data_type` token and override `infer_types`.
 
 ---
 
 ## Notes / Risks (carry into planning)
 
-- **The roadmap's literal Epic 3 (Frontend Canvas) does not belong in the SDK tree.** It is a React Flow / TypeScript app with its own toolchain (`npm`/Vite/Vitest) and lives in the **`ui/` tree** of this repo; the **`colonymind/server/` tree** hosts the thin local execution backend (Epic 6). All three are one bundled package per [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md). The boundary between the canvas and the SDK is the **IR schema + generated-code string + the rules-as-data artifact (Story 7)**, never a shared Python import — exactly the one-way, IR-is-source-of-truth contract of ADR 0001 and the open-core split of ADR 0007, now enforced by a CI boundary check rather than a repo wall. This epic is what gives that canvas its instant, explainable connection validation.
+- **The roadmap's literal Epic 3 (Frontend Canvas) does not belong in the SDK tree.** It is a React Flow / TypeScript app with its own toolchain (`npm`/Vite/Vitest) and lives in the **`ui/` tree** of this repo; the **`emergentflow/server/` tree** hosts the thin local execution backend (Epic 6). All three are one bundled package per [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md). The boundary between the canvas and the SDK is the **IR schema + generated-code string + the rules-as-data artifact (Story 7)**, never a shared Python import — exactly the one-way, IR-is-source-of-truth contract of ADR 0001 and the open-core split of ADR 0007, now enforced by a CI boundary check rather than a repo wall. This epic is what gives that canvas its instant, explainable connection validation.
 - **Don't build tensor dimension inference.** That is roadmap Epic 10 and depends on PyTorch meta-tensor / FakeTensor tracing. This epic stops at *structural* typing: `Tensor`→`Tensor` is compatible here; whether the *dims* line up is Epic 10's job, layered on this framework. Conflating the two re-introduces a torch dependency the repo deliberately avoids (`pytest.importorskip("torch")`).
-- **Validation must not block construction.** `Graph._validate_structure` hard-rejects malformed structure at build time; type/cardinality validation is deliberately a *separate* `cm.validate` call so the canvas can hold half-wired, exploratory graphs and still inspect them. Keep the two layers distinct.
+- **Validation must not block construction.** `Graph._validate_structure` hard-rejects malformed structure at build time; type/cardinality validation is deliberately a *separate* `ef.validate` call so the canvas can hold half-wired, exploratory graphs and still inspect them. Keep the two layers distinct.
 - **Equivalence (ADR 0002) extends to rejection.** Both `compile_to_code` and `execute` must reject the same invalid graphs for the same reasons — add *negative* equivalence tests, and route both through one shared gate (the `_prepare_declarative` pattern), or the two pure functions will drift on error handling.
 - **Strictness is a UX judgement call.** Too strict frustrates exploratory work; too loose lets crashes through. The recommended split — hard-block structural/cardinality, warn on runtime-only-knowables — should be revisited with the first design partner.
 - **Keep the rules pure and serializable.** The same purity that lets Epic 6 sandbox the executor lets the frontend ship the rules client-side. Any I/O or global state in the compatibility engine breaks both.

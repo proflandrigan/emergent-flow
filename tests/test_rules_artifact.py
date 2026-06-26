@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 import pathlib
 
-from colonymind.codegen.diagnostics_schema import (
+from emergentflow.codegen.diagnostics_schema import (
     diagnostics_json_schema,
     write_diagnostics_json_schema,
 )
-from colonymind.ir.graph import CURRENT_SCHEMA_VERSION
-from colonymind.types.rules_artifact import build_rules_artifact, write_rules_artifact
+from emergentflow.ir.graph import CURRENT_SCHEMA_VERSION
+from emergentflow.types.rules_artifact import build_rules_artifact, write_rules_artifact
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -77,7 +77,7 @@ def test_committed_rules_artifact_not_stale():
         data = json.load(fh)
     assert data == build_rules_artifact(), (
         "Committed rules artifact is stale. "
-        "Run `python -m colonymind.types.rules_artifact schema/rules.json` "
+        "Run `python -m emergentflow.types.rules_artifact schema/rules.json` "
         "to regenerate."
     )
 
@@ -88,6 +88,6 @@ def test_committed_diagnostics_schema_not_stale():
         data = json.load(fh)
     assert data == diagnostics_json_schema(), (
         "Committed diagnostics schema is stale. "
-        "Run `python -m colonymind.codegen.diagnostics_schema "
+        "Run `python -m emergentflow.codegen.diagnostics_schema "
         "schema/diagnostics.schema.json` to regenerate."
     )

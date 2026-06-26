@@ -2,11 +2,11 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-23
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
-`cm.execute` returns *inspectable* objects ([ADR 0002](./adr/0002-execute-the-ir-not-the-string.md)):
+`ef.execute` returns *inspectable* objects ([ADR 0002](./adr/0002-execute-the-ir-not-the-string.md)):
 JSON-native values, Pydantic models, dataclasses, tidy DataFrames, and containers thereof. That
 contract is a **superset** of JSON-native — a `pandas.DataFrame` or a `@dataclass`/Pydantic
 result is inspectable yet not directly serializable, and a large DataFrame is not safe to ship
@@ -26,8 +26,8 @@ build a renderer per `kind` without churn once Epic 8 starts.
 
 ## Where it lives
 
-`colonymind/server/payload.py::to_payload` is a single pure function, applied to every OUT-port
-artifact inside `execute_graph` (`colonymind/server/service.py`). It has no I/O and touches no
+`emergentflow/server/payload.py::to_payload` is a single pure function, applied to every OUT-port
+artifact inside `execute_graph` (`emergentflow/server/service.py`). It has no I/O and touches no
 global state — `pandas`/`pydantic` are imported lazily inside the function so importing the
 module stays light, and `torch` is never imported (unsupported objects, including
 `torch.nn.Module`, are detected structurally by exclusion). Keeping it pure preserves the
@@ -134,7 +134,7 @@ object. `repr` is capped at `MAX_TEXT_CHARS`.
 
 ## Sizing & truncation
 
-Two caps, both defined in `colonymind/server/payload.py`:
+Two caps, both defined in `emergentflow/server/payload.py`:
 
 - `MAX_HEAD_ROWS = 50` — the number of DataFrame rows sampled into `table.head`.
 - `MAX_TEXT_CHARS = 16384` — the cap applied to long strings (`text.value`) and to the `repr`
@@ -148,7 +148,7 @@ holding (or transmitting) the complete frame in the JSON payload.
 ## Versioning
 
 `PAYLOAD_CONTRACT_VERSION = 1` is emitted once as the top-level `payload_version` field on every
-`/execute` response (`colonymind/server/service.py::execute_graph`).
+`/execute` response (`emergentflow/server/service.py::execute_graph`).
 
 This version is **deliberately standalone** — it is NOT tied to the IR `schema_version`
 (see [IR Serialization Format](./ir-serialization-format.md)). The IR schema version drives the

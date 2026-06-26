@@ -1,12 +1,12 @@
-"""Tests for colonymind.nodes.registry — NodeRegistry and the default singleton."""
+"""Tests for emergentflow.nodes.registry — NodeRegistry and the default singleton."""
 
 import importlib.metadata
 
 import pytest
 
-from colonymind.ir.common import Direction
-from colonymind.nodes.contract import CodeFragment, NodeDefinition
-from colonymind.nodes.registry import (
+from emergentflow.ir.common import Direction
+from emergentflow.nodes.contract import CodeFragment, NodeDefinition
+from emergentflow.nodes.registry import (
     ENTRY_POINT_GROUP,
     NodeRegistry,
     by_family,
@@ -17,7 +17,7 @@ from colonymind.nodes.registry import (
     registry,
     validate,
 )
-from colonymind.nodes.spec import NodeSpec, ParamSpec, PortSpec
+from emergentflow.nodes.spec import NodeSpec, ParamSpec, PortSpec
 
 # ---------------------------------------------------------------------------
 # Shared concrete stub helpers

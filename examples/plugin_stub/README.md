@@ -1,8 +1,8 @@
-# cm-texttools — Example Colony Mind node plugin
+# ef-texttools — Example Emergent Flow node plugin
 
 This package is a minimal, self-contained demonstration of **out-of-core node
 discovery**: a node that lives in a *separate* Python package, completely
-outside `colonymind` core, is automatically picked up by the Colony Mind node
+outside `emergentflow` core, is automatically picked up by the Emergent Flow node
 registry with **zero changes to core**.
 
 ## The key idea
@@ -10,34 +10,34 @@ registry with **zero changes to core**.
 The entire integration surface is one line in this package's `pyproject.toml`:
 
 ```toml
-[project.entry-points."colonymind.nodes"]
-text_reverse = "cm_texttools.nodes:ReverseText"
+[project.entry-points."emergentflow.nodes"]
+text_reverse = "ef_texttools.nodes:ReverseText"
 ```
 
 When this package is pip-installed, Python's packaging metadata records the
-entry point.  When `colonymind.nodes.discover()` is called, it enumerates all
-installed entry points in the `colonymind.nodes` group, loads each one, and
+entry point.  When `emergentflow.nodes.discover()` is called, it enumerates all
+installed entry points in the `emergentflow.nodes` group, loads each one, and
 registers it in the node catalog — no fork, no core edit, no import-time side
 effects required.
 
 ## What's in the box
 
-- **`cm_texttools/nodes.py`** — a single transform node, `text.reverse`, that
+- **`ef_texttools/nodes.py`** — a single transform node, `text.reverse`, that
   reverses a `Text` string.  Dependency-free (pure Python).  Conforms to
   `NodeDefinition` exactly like in-tree reference nodes (`load_csv.py` is the
   pattern).  No `@register` decorator — discovery happens via the entry point.
-- **`cm_texttools/__init__.py`** — re-exports `ReverseText`.
+- **`ef_texttools/__init__.py`** — re-exports `ReverseText`.
 - **`pyproject.toml`** — the installable package with the entry-point declaration.
 
 ## How to try it
 
 ```bash
-# Install the stub into the same environment as colonymind:
+# Install the stub into the same environment as emergentflow:
 pip install -e examples/plugin_stub
 
 # Verify it loads cleanly via the entry-point path:
 python -c "
-from colonymind.nodes import registry, discover
+from emergentflow.nodes import registry, discover
 problems = discover()
 print('problems:', problems)          # should be []
 print('text.reverse in registry:', 'text.reverse' in registry)  # True
@@ -45,7 +45,7 @@ print('text.reverse in registry:', 'text.reverse' in registry)  # True
 ```
 
 `discover()` returns a list of problem strings (empty on success) and is the
-function Colony Mind core calls to pull in all installed plugins.  A non-empty
+function Emergent Flow core calls to pull in all installed plugins.  A non-empty
 list means a plugin failed to load; it is recorded but never raises, so other
 plugins continue loading.
 

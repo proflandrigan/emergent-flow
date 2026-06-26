@@ -89,7 +89,7 @@ export function App(): JSX.Element {
           borderBottom: "1px solid #ddd",
         }}
       >
-        <h1 style={{ fontSize: "1rem", margin: 0 }}>Colony Mind — canvas</h1>
+        <h1 style={{ fontSize: "1rem", margin: 0 }}>Emergent Flow — canvas</h1>
         <span
           data-testid="server-status"
           style={{ marginLeft: "1rem", color: "#666" }}

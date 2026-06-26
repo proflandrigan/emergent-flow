@@ -1,12 +1,12 @@
-"""Tests for colonymind.ir.params — typed parameter model."""
+"""Tests for emergentflow.ir.params — typed parameter model."""
 
 import json
 
 import pytest
 from pydantic import ValidationError
 
-from colonymind.ir.common import ArtifactRef
-from colonymind.ir.params import Param
+from emergentflow.ir.common import ArtifactRef
+from emergentflow.ir.params import Param
 
 # ---------------------------------------------------------------------------
 # Scalar round-trip
@@ -192,7 +192,7 @@ class TestValidationRejections:
 
 class TestImports:
     def test_param_importable(self):
-        from colonymind.ir.params import Param as _Param  # noqa: F401
+        from emergentflow.ir.params import Param as _Param  # noqa: F401
 
     def test_param_value_importable(self):
-        from colonymind.ir.params import ParamValue as _ParamValue  # noqa: F401
+        from emergentflow.ir.params import ParamValue as _ParamValue  # noqa: F401

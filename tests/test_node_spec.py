@@ -1,4 +1,4 @@
-"""Tests for colonymind.nodes.spec — the serializable half of the contract.
+"""Tests for emergentflow.nodes.spec — the serializable half of the contract.
 
 These mirror the IR round-trip tests (Story 2): a spec must validate its fields
 and round-trip losslessly through JSON, since the frontend consumes it with no
@@ -8,8 +8,8 @@ Python present.
 import pytest
 from pydantic import ValidationError
 
-from colonymind.ir.common import Cardinality, Direction, Paradigm
-from colonymind.nodes.spec import NodeSpec, ParamSpec, PortSpec, ValidationHints
+from emergentflow.ir.common import Cardinality, Direction, Paradigm
+from emergentflow.nodes.spec import NodeSpec, ParamSpec, PortSpec, ValidationHints
 
 
 class TestPortSpec:

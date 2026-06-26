@@ -56,7 +56,7 @@
     },
     "Edge": {
       "additionalProperties": false,
-      "description": "An edge connecting an OUT port on a source node to an IN port on a target node.\n\nEdges reference endpoints by id (node_id + port_id) for CRDT-friendliness,\nnot by object reference. Each edge has a unique stable id.\n\nAttributes:\n    id: Stable unique identifier for this edge.\n    source: PortRef identifying the OUT-side endpoint.\n    target: PortRef identifying the IN-side endpoint.\n    type_compatible: Optional type-compatibility metadata. None means \"not yet\n        checked\" (or unknown/unregistered token). Populated by\n        ``cm.apply_type_compatibility`` from a ``cm.validate`` result, recording\n        whether source/target data-type tokens were found compatible.\n\nNote: Structural validation of whether referenced nodes/ports exist is handled\nby the Graph model (Task 07), which has full node/port context.",
+      "description": "An edge connecting an OUT port on a source node to an IN port on a target node.\n\nEdges reference endpoints by id (node_id + port_id) for CRDT-friendliness,\nnot by object reference. Each edge has a unique stable id.\n\nAttributes:\n    id: Stable unique identifier for this edge.\n    source: PortRef identifying the OUT-side endpoint.\n    target: PortRef identifying the IN-side endpoint.\n    type_compatible: Optional type-compatibility metadata. None means \"not yet\n        checked\" (or unknown/unregistered token). Populated by\n        ``ef.apply_type_compatibility`` from a ``ef.validate`` result, recording\n        whether source/target data-type tokens were found compatible.\n\nNote: Structural validation of whether referenced nodes/ports exist is handled\nby the Graph model (Task 07), which has full node/port context.",
       "properties": {
         "id": {
           "description": "Stable unique identifier for this edge.",
@@ -81,7 +81,7 @@
             }
           ],
           "default": null,
-          "description": "Type-compatibility metadata. None=\"not yet checked\". Set to bool by cm.apply_type_compatibility from a cm.validate result.",
+          "description": "Type-compatibility metadata. None=\"not yet checked\". Set to bool by ef.apply_type_compatibility from a ef.validate result.",
           "title": "Type Compatible"
         }
       },
@@ -94,7 +94,7 @@
     },
     "Graph": {
       "additionalProperties": false,
-      "description": "Top-level, serialisable IR graph for a Colony Mind pipeline.\n\nAttributes\n----------\nschema_version:\n    Embedded schema version (default: CURRENT_SCHEMA_VERSION).  Allows\n    loaders to detect and reject stale or future graphs.\nparadigm:\n    Graph-level paradigm tag (default: FUNCTIONAL).  Combined with\n    per-node ``paradigm``, this drives codegen/execution branching.\nname:\n    Optional human-friendly label for the graph.\nnodes:\n    CRDT-friendly id\u2192Node map.  Keys MUST equal ``node.id``.\nedges:\n    CRDT-friendly id\u2192Edge map.  Keys MUST equal ``edge.id``.",
+      "description": "Top-level, serialisable IR graph for an Emergent Flow pipeline.\n\nAttributes\n----------\nschema_version:\n    Embedded schema version (default: CURRENT_SCHEMA_VERSION).  Allows\n    loaders to detect and reject stale or future graphs.\nparadigm:\n    Graph-level paradigm tag (default: FUNCTIONAL).  Combined with\n    per-node ``paradigm``, this drives codegen/execution branching.\nname:\n    Optional human-friendly label for the graph.\nnodes:\n    CRDT-friendly id\u2192Node map.  Keys MUST equal ``node.id``.\nedges:\n    CRDT-friendly id\u2192Edge map.  Keys MUST equal ``edge.id``.",
       "properties": {
         "edges": {
           "additionalProperties": {
@@ -137,7 +137,7 @@
     },
     "Node": {
       "additionalProperties": false,
-      "description": "A typed, parameterised node in the Colony Mind graph IR.\n\nAttributes\n----------\nid:\n    Stable unique identifier (auto-generated via ``new_id()``).\ntype:\n    Node type/family key, e.g. ``\"data.load_csv\"`` (required, non-empty).\nlabel:\n    Optional human-friendly display label.\nparadigm:\n    Which execution paradigm this node belongs to (default: FUNCTIONAL).\nparams:\n    Typed parameter values attached to this node.\nports:\n    The node's in/out connection points.\nposition:\n    Canvas coordinates (default: origin ``(0.0, 0.0)``).\ngroup_id:\n    ID of the parent group/composite node this node belongs to, or\n    ``None`` if this is a top-level node.\nsubgraph:\n    Optional inner graph for composite/module/agent nodes (Option A\n    nesting from ADR 0003).  ``None`` for leaf nodes.  Forward-ref to\n    ``Graph``; resolved by ``Node.model_rebuild()`` in Task 07\n    (``colonymind/ir/graph.py``).",
+      "description": "A typed, parameterised node in the Emergent Flow graph IR.\n\nAttributes\n----------\nid:\n    Stable unique identifier (auto-generated via ``new_id()``).\ntype:\n    Node type/family key, e.g. ``\"data.load_csv\"`` (required, non-empty).\nlabel:\n    Optional human-friendly display label.\nparadigm:\n    Which execution paradigm this node belongs to (default: FUNCTIONAL).\nparams:\n    Typed parameter values attached to this node.\nports:\n    The node's in/out connection points.\nposition:\n    Canvas coordinates (default: origin ``(0.0, 0.0)``).\ngroup_id:\n    ID of the parent group/composite node this node belongs to, or\n    ``None`` if this is a top-level node.\nsubgraph:\n    Optional inner graph for composite/module/agent nodes (Option A\n    nesting from ADR 0003).  ``None`` for leaf nodes.  Forward-ref to\n    ``Graph``; resolved by ``Node.model_rebuild()`` in Task 07\n    (``emergentflow/ir/graph.py``).",
       "properties": {
         "group_id": {
           "anyOf": [
@@ -287,7 +287,7 @@
     },
     "Port": {
       "additionalProperties": false,
-      "description": "A typed connection point on a node.\n\nAttributes:\n    id: Stable unique identifier (auto-generated via new_id()).\n    name: Port name, unique within its node (required, non-empty).\n    direction: IN or OUT (required).\n    data_type: Data-type token (default \"any\"); validated against the type\n        registry and resolved by inference during ``cm.validate``.\n    cardinality: How many edges may attach (ONE or MANY; default ONE).",
+      "description": "A typed connection point on a node.\n\nAttributes:\n    id: Stable unique identifier (auto-generated via new_id()).\n    name: Port name, unique within its node (required, non-empty).\n    direction: IN or OUT (required).\n    data_type: Data-type token (default \"any\"); validated against the type\n        registry and resolved by inference during ``ef.validate``.\n    cardinality: How many edges may attach (ONE or MANY; default ONE).",
       "properties": {
         "cardinality": {
           "$ref": "#/$defs/Cardinality",

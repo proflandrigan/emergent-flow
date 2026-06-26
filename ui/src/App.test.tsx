@@ -26,7 +26,7 @@ test("renders the canvas heading", () => {
   mockHealth("ok");
   render(<App />);
   expect(
-    screen.getByRole("heading", { name: /Colony Mind/ }),
+    screen.getByRole("heading", { name: /Emergent Flow/ }),
   ).toBeInTheDocument();
 });
 

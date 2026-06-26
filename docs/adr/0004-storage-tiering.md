@@ -2,11 +2,11 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-16
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
-The Colony Mind proposal names Redis as the cache throughout. Redis is an in-memory store —
+The Emergent Flow proposal names Redis as the cache throughout. Redis is an in-memory store —
 its design is optimized for small, fast key-value lookups, not bulk binary data. Pushing
 multi-GB DataFrames or tensors through it would exhaust available memory rapidly and incur
 slow serialization round-trips on every cache read and write.

@@ -1,12 +1,12 @@
-"""Tests for colonymind.nodes.contract — NodeDefinition ABC and its helpers."""
+"""Tests for emergentflow.nodes.contract — NodeDefinition ABC and its helpers."""
 
 import pytest
 
-from colonymind.ir.common import Direction, Paradigm
-from colonymind.ir.graph import Graph
-from colonymind.ir.node import Node, Position
-from colonymind.nodes.contract import CodeFragment, NodeDefinition
-from colonymind.nodes.spec import NodeSpec, ParamSpec, PortSpec, ValidationHints
+from emergentflow.ir.common import Direction, Paradigm
+from emergentflow.ir.graph import Graph
+from emergentflow.ir.node import Node, Position
+from emergentflow.nodes.contract import CodeFragment, NodeDefinition
+from emergentflow.nodes.spec import NodeSpec, ParamSpec, PortSpec, ValidationHints
 
 
 # A tiny self-contained definition exercising every contract feature.
@@ -156,7 +156,7 @@ class TestValidateNode:
         assert any("does not match pattern" in e for e in errors)
 
     def test_undeclared_param_flagged(self):
-        from colonymind.ir.params import Param
+        from emergentflow.ir.params import Param
 
         node = _Demo().instantiate()
         node.params.append(Param(name="ghost", type_token="str", value="x"))

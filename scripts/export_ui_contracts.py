@@ -1,13 +1,13 @@
 """Export the IR JSON Schema and node catalog as static artifacts for the canvas build.
 
 The canvas (ui/) is a pure consumer of the SDK contract (ADR 0013 Decision 3) and never imports
-colonymind. This script writes the two contract artifacts the build consumes:
+emergentflow. This script writes the two contract artifacts the build consumes:
 
   ui/src/generated/ir.schema.json  -- the IR JSON Schema (drives TypeScript type generation)
   ui/src/generated/catalog.json    -- the node catalog (palette + config-panel templates)
 
 Both are byte-identical to what the local server's GET /schema and GET /catalog serve, because
-this script and the server call the SAME colonymind.server.service functions (ADR 0014 Dec. 5).
+this script and the server call the SAME emergentflow.server.service functions (ADR 0014 Dec. 5).
 
 Regenerate after changing the IR models or any node's spec:
     uv run python scripts/export_ui_contracts.py
@@ -19,7 +19,7 @@ import json
 import pathlib
 from typing import Any
 
-from colonymind.server.service import get_catalog, get_schema
+from emergentflow.server.service import get_catalog, get_schema
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 GENERATED_DIR = REPO_ROOT / "ui" / "src" / "generated"

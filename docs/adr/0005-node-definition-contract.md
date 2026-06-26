@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-16
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
@@ -30,14 +30,14 @@ without doing either.
 
 We will define the node-definition contract as **two halves bound by one base class**:
 
-1. A **serializable spec** (`colonymind.nodes.spec`): `NodeSpec` — with `PortSpec`,
+1. A **serializable spec** (`emergentflow.nodes.spec`): `NodeSpec` — with `PortSpec`,
    `ParamSpec`, and `ValidationHints` — is a pure, JSON-able descriptor (Pydantic models,
    same `IRModel` base as the IR). It carries the type key, per-node `version`, family,
    label, paradigm, declared ports, and declared typed params with their defaults and
    validation hints. This is everything the registry indexes and the config UI renders; it
    contains no Python behaviour.
 
-2. A **behaviour-bearing base class** (`colonymind.nodes.contract.NodeDefinition`, an ABC):
+2. A **behaviour-bearing base class** (`emergentflow.nodes.contract.NodeDefinition`, an ABC):
    it declares the same metadata as class attributes and adds the Python behaviour —
    `codegen(node) -> CodeFragment` (the codegen template), `execute(node, inputs) -> dict`
    (the executor), and `infer_types(...)` (shape/type-inference, with a default that returns
@@ -81,9 +81,9 @@ in order.
 - **Discovery and registration** of definitions (the registry / plugin architecture) is
   Story 4; this ADR defines only the contract a registered node conforms to.
 - **Type inference** is delivered by the connection type system (repo Epic 3 / roadmap
-  Epic 5): the whole-graph inference pass calls `infer_types` and feeds `cm.validate`
+  Epic 5): the whole-graph inference pass calls `infer_types` and feeds `ef.validate`
   (see [ADR 0011](./0011-type-model-and-compatibility.md) and
   [type-system-spec.md](../type-system-spec.md)). Per-dimension tensor *shape* inference
   remains deferred to roadmap Epic 10.
 - The **production wrapped node families** (pandas, statsmodels, scikit-learn, …) are Story 8,
-  built on this base class; the nodes in `colonymind.nodes.examples` are minimal references.
+  built on this base class; the nodes in `emergentflow.nodes.examples` are minimal references.

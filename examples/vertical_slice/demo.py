@@ -1,4 +1,4 @@
-"""Worked example: the Colony Mind functional-pipeline vertical slice.
+"""Worked example: the Emergent Flow functional-pipeline vertical slice.
 
 load_csv -> impute_missing -> (anova, train_classifier, generate_html_summary)
 
@@ -10,7 +10,7 @@ from __future__ import annotations
 import pathlib
 from typing import Any
 
-import colonymind as cm
+import emergentflow as ef
 
 HERE = pathlib.Path(__file__).parent
 SAMPLE_CSV = HERE / "sample.csv"
@@ -27,13 +27,13 @@ def run(
     plus the key inspectable metrics from each stage.
     """
     output_dir = pathlib.Path(output_dir)
-    frame = cm.data.load_csv(str(csv_path))
-    clean = cm.clean.impute_missing(frame, strategy="median")
-    anova_result = cm.stats.anova(clean, group_col="cohort", value_col="score")
-    classifier = cm.ml.train_classifier(
+    frame = ef.data.load_csv(str(csv_path))
+    clean = ef.clean.impute_missing(frame, strategy="median")
+    anova_result = ef.stats.anova(clean, group_col="cohort", value_col="score")
+    classifier = ef.ml.train_classifier(
         clean, target="converted", features=["age", "spend", "score"], random_state=0
     )
-    html = cm.reports.generate_html_summary(clean, title="Colony Mind — Vertical Slice")
+    html = ef.reports.generate_html_summary(clean, title="Emergent Flow — Vertical Slice")
     report_path = output_dir / "report.html"
     report_path.write_text(html, encoding="utf-8")
     return {

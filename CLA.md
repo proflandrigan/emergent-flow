@@ -1,6 +1,6 @@
-# Colony Mind Contributor License Agreement (CLA)
+# Emergent Flow Contributor License Agreement (CLA)
 
-Thank you for contributing to Colony Mind. To keep the project's licensing clear
+Thank you for contributing to Emergent Flow. To keep the project's licensing clear
 and to preserve the maintainers' ability to evolve the project's license over
 time, we ask all contributors to agree to the following terms for any
 Contribution submitted to this repository.
@@ -15,7 +15,7 @@ grants the licenses described below; it is **not** a copyright assignment.
   project (e.g. via a pull request or patch).
 
 ## 2. Grant of Copyright License
-You grant to the Colony Mind project maintainers and to recipients of software
+You grant to the Emergent Flow project maintainers and to recipients of software
 distributed by the project a **perpetual, worldwide, non-exclusive, royalty-free,
 irrevocable** copyright license to reproduce, prepare derivative works of,
 publicly display, publicly perform, sublicense, and distribute Your Contribution

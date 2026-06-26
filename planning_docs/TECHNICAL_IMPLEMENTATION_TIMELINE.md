@@ -1,4 +1,4 @@
-# Colony Mind — Technical Implementation Timeline
+# Emergent Flow — Technical Implementation Timeline
 
 *A single, linear order in which one developer can complete every epic across the whole
 product. Where the [technical roadmap](./technical_roadmap.md) gives a dependency graph with
@@ -16,12 +16,12 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
   5**). See [`../epics/README.md`](../epics/README.md) for the full numbering map and the
   "Epic 3" collision warning.
 - **One repo, three trees** (per [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md),
-  superseding §A5's three-repo split). The product lives in a single repo, `colony-mind`,
-  shipping as one bundled `pip install colonymind` (the JupyterLab model): the SDK
-  (`colonymind/`), the React/TS frontend (`ui/`), and the FastAPI/Celery backend
-  (`colonymind/server/`). Steps below still flag which **tree** each one touches; wherever a
-  step names `colony-mind-canvas` or `colony-mind-server`, read "the `ui/` or
-  `colonymind/server/` tree of this repo." The contract-only coupling is unchanged — the UI
+  superseding §A5's three-repo split). The product lives in a single repo, `emergent-flow`,
+  shipping as one bundled `pip install emergentflow` (the JupyterLab model): the SDK
+  (`emergentflow/`), the React/TS frontend (`ui/`), and the FastAPI/Celery backend
+  (`emergentflow/server/`). Steps below still flag which **tree** each one touches; wherever a
+  step names `emergent-flow-canvas` or `emergent-flow-server`, read "the `ui/` or
+  `emergentflow/server/` tree of this repo." The contract-only coupling is unchanged — the UI
   never imports the SDK; only the IR schema, codegen output, and rules-as-data cross the
   boundary, now enforced by a CI check rather than a repo wall.
 
@@ -36,29 +36,29 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
 ## Phase 1 — Foundation (SDK + static canvas, no backend execution)
 
 > Deliverable: a frontend-only canvas that maps a node graph to flawless, downloadable
-> Python. Two trees in one repo (`colonymind/` and `ui/`; see [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)),
+> Python. Two trees in one repo (`emergentflow/` and `ui/`; see [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)),
 > coupled only by the published IR schema, codegen output, and rules-as-data artifact.
 
-- [x] **Step 1 — Roadmap Epic 1: Core SDK & Graph IR** · `colony-mind` · *repo Epic 1*
+- [x] **Step 1 — Roadmap Epic 1: Core SDK & Graph IR** · `emergent-flow` · *repo Epic 1*
   - Deps: none (the root). The versioned IR schema, node contract, registry, serialization.
-  - Status: **done** — `colonymind/ir/`, node contract/registry, `cm` public API all landed.
+  - Status: **done** — `emergentflow/ir/`, node contract/registry, `ef` public API all landed.
 
-- [x] **Step 2 — Roadmap Epic 2: Code Generation Engine** · `colony-mind` · *repo Epic 2*
+- [x] **Step 2 — Roadmap Epic 2: Code Generation Engine** · `emergent-flow` · *repo Epic 2*
   - Deps: Step 1. `compile_to_code(ir)` + `execute(ir)`, equivalence as a CI gate, golden corpus.
   - Status: **done** — through Story 9 (`compiler.py`, `executor.py`, formatting, fixtures).
 
-- [x] **Step 3 — Roadmap Epic 5: Type-Safe Graph & Connection Validation** · `colony-mind` · *repo Epic 3*
+- [x] **Step 3 — Roadmap Epic 5: Type-Safe Graph & Connection Validation** · `emergent-flow` · *repo Epic 3*
   - Deps: Steps 1–2. The type-token system, compatibility rules, whole-graph inference,
-    `cm.validate`, and the rules-as-data artifact the canvas consumes.
+    `ef.validate`, and the rules-as-data artifact the canvas consumes.
   - Status: **done** — Stories 1–8 merged to `main` (ADRs 0011/0012, type registry/catalog,
-    compatibility + cardinality engine, graph inference, `cm.validate`, shared codegen/execute
+    compatibility + cardinality engine, graph inference, `ef.validate`, shared codegen/execute
     gate, rules-export artifact, golden diagnostics corpus).
   - **Unblocks Step 4:** the rules-as-data artifact (Story 7) is published, so the canvas can
     now wire real live validation.
 
 - [x] **Step 4 — Roadmap Epic 3: Frontend Canvas Engine** · `ui/` tree · *story-level decomposition: [repo Epic 5](../epics/epic-5-frontend-canvas.md)*
   - Deps: Steps 1, 2, **3** (consumes IR schema + `compile_to_code` output + rules-as-data;
-    never `import colonymind`), and now **Phase 1.5** (calls the local server's `/compile`,
+    never `import emergentflow`), and now **Phase 1.5** (calls the local server's `/compile`,
     `/validate`, `/execute` instead of re-implementing codegen/validation in TS — [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)
     Decision 5). React Flow canvas, pan/zoom, edge drawing, grouping, schema-driven config
     panels, in-node "show code" view, live red-edge validation.
@@ -71,16 +71,16 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
     consumes have landed *and* the local server already serves them — this is unblocked and is
     the fastest path to a usable UI. Stories are broken out in [`epics/epic-5-frontend-canvas.md`](../epics/epic-5-frontend-canvas.md).
 
-- [ ] **Step 5 — Roadmap Epic 4: Node Library & Configuration UX** · `ui/` + `colonymind/` *(split)* · *story-level decomposition: [repo Epic 6](../epics/epic-6-node-library.md)*
+- [ ] **Step 5 — Roadmap Epic 4: Node Library & Configuration UX** · `ui/` + `emergentflow/` *(split)* · *story-level decomposition: [repo Epic 6](../epics/epic-6-node-library.md)*
   - Deps: Steps 1–3, 4. The end-to-end vertical slice (load → clean → one stats test → one
     model → HTML report) already exists as the five reference nodes; this step **widens** each
     family by the demo narrative, ships per-node defaults/help/validation hints, and exports a
-    versioned **catalog-as-data** artifact for the palette. SDK (`colonymind/`) owns the node
+    versioned **catalog-as-data** artifact for the palette. SDK (`emergentflow/`) owns the node
     catalog/defaults + export; the canvas (`ui/`) renders the palette + config panels it already
     built (repo Epic 5 Stories 3–4). Treat as continuous after the first widening.
   - Status: **not started — the active frontier.** Story-level plan landed in
     [repo Epic 6](../epics/epic-6-node-library.md). The execution machinery is already done
-    (`cm.execute` + the local server), so this is purely catalog breadth + metadata — the last
+    (`ef.execute` + the local server), so this is purely catalog breadth + metadata — the last
     piece between the app and real, useful data work. **Out of scope:** DL nodes (Step 12 / Epic
     10), GenAI nodes (Step 13 / Epic 11), credentialed connectors (Step 10 / Epic 9 — local-file
     loaders only), and the raw-code escape-hatch node (decided + deferred in repo Epic 6 Story 1).
@@ -97,17 +97,17 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
 > tested functions is the shortest path to a runnable app (roadmap §A6 / §E, the Sonnet plan
 > review). Story-level decomposition: [repo Epic 4](../epics/epic-4-local-server.md).
 
-- [x] **Step 3.5 — Local Execution Server v0** · `colonymind/server/` · *[repo Epic 4](../epics/epic-4-local-server.md) Story 1*
-  - Deps: Steps 1–3. `colonymind serve` (alias `cm lab`) boots a **stdlib** `http.server` that
-    calls `cm.compile_to_code` / `cm.execute` / `cm.validate` **in-process** and returns JSON
+- [x] **Step 3.5 — Local Execution Server v0** · `emergentflow/server/` · *[repo Epic 4](../epics/epic-4-local-server.md) Story 1*
+  - Deps: Steps 1–3. `emergentflow serve` (alias `ef lab`) boots a **stdlib** `http.server` that
+    calls `ef.compile_to_code` / `ef.execute` / `ef.validate` **in-process** and returns JSON
     (`/compile`, `/execute`, `/validate`, `/healthz`, plus a paste-IR demo page). Zero new
     dependencies; bad graphs come back as JSON errors, never a crash.
-  - Status: **done** — `colonymind/server/`, `colonymind/cli.py`, `[project.scripts]`, and
+  - Status: **done** — `emergentflow/server/`, `emergentflow/cli.py`, `[project.scripts]`, and
     `tests/test_server.py` (service + HTTP round-trip incl. a real in-process execute) landed and
     green under the four CI gates.
   - **Why before Step 4:** it gives the canvas (Step 4) real `/compile` and `/validate`
     endpoints to call (ADR 0013 Decision 5), and makes "ship" a literal
-    `pip install colonymind && colonymind serve`. Remaining server stories (execution
+    `pip install emergentflow && emergentflow serve`. Remaining server stories (execution
     granularity, the result-payload contract, serving the bundled UI, the CI boundary check) are
     in [repo Epic 4](../epics/epic-4-local-server.md) and continue inside Phase 2.
 
@@ -116,11 +116,11 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
 ## Phase 2 — Living Bridge (reactive backend)
 
 > Deliverable: "Execute" runs real Python, with incremental caching and rich results rendered
-> back into the canvas. Introduces the backend tree, `colonymind/server/` (per [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md); formerly the separate `colony-mind-server` repo).
+> back into the canvas. Introduces the backend tree, `emergentflow/server/` (per [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md); formerly the separate `emergent-flow-server` repo).
 >
 > **Happy path — local and in-process (no over-architecting).** On the bundled package's path,
-> Phase 2 is a *thin local* FastAPI server (`cm lab` / `colonymind serve`) that calls
-> `cm.execute(ir)` **in-process** on localhost — the JupyterLab/dbt-core tier. The reference
+> Phase 2 is a *thin local* FastAPI server (`ef lab` / `emergentflow serve`) that calls
+> `ef.execute(ir)` **in-process** on localhost — the JupyterLab/dbt-core tier. The reference
 > executor is already pure ([ADR 0002](../docs/adr/0002-execute-the-ir-not-the-string.md)), so
 > in-process execution is correct and trivially "what-you-see-is-what-runs." The enterprise
 > build-out below — Celery/distributed workers, container-per-session sandboxing, Redis +
@@ -128,7 +128,7 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
 > (the dbt-Cloud tier, proprietary per [ADR 0007](../docs/adr/0007-open-core-licensing-boundary.md)).
 > Steps below tag those pieces **(hosted)**; they are not on the bundled package's critical path.
 
-- [ ] **Step 6 — Roadmap Epic 15: Platform Infrastructure, Security & Observability** · `colonymind/server/` (mostly **hosted**)
+- [ ] **Step 6 — Roadmap Epic 15: Platform Infrastructure, Security & Observability** · `emergentflow/server/` (mostly **hosted**)
   - **Happy path:** the bundled local app needs almost none of this. It runs on localhost as a
     single user, so there is **no auth, no tenant model, no deploy pipeline** to stand up — only
     basic local logging and surfacing errors back into nodes. Do *that* much here.
@@ -138,9 +138,9 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
     (local in-process execution); this step's hosted half spins up only when the hosted offering
     starts, then runs continuously through Phase 3.
 
-- [~] **Step 7 — Roadmap Epic 6: Backend Execution Runtime & Sandboxing** · `colonymind/server/` · *[repo Epic 4](../epics/epic-4-local-server.md)*
+- [~] **Step 7 — Roadmap Epic 6: Backend Execution Runtime & Sandboxing** · `emergentflow/server/` · *[repo Epic 4](../epics/epic-4-local-server.md)*
   - Deps: Steps 1–2 (wraps the reference executor). **Happy path:** a thin local server
-    (`cm lab` / `colonymind serve`) that calls `cm.execute(ir)` **in-process**. No Celery, no
+    (`ef lab` / `emergentflow serve`) that calls `ef.execute(ir)` **in-process**. No Celery, no
     broker, **no sandbox** — you run your own code on your own machine, the Jupyter trust model.
     This is the whole "Execute runs real Python" demo.
   - Status: **v0 done in Phase 1.5** (Step 3.5 above / [repo Epic 4](../epics/epic-4-local-server.md)
@@ -153,7 +153,7 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
     ([ADR 0002](../docs/adr/0002-execute-the-ir-not-the-string.md)) so the hosted tier can wrap
     it later without retrofitting.
 
-- [ ] **Step 8 — Roadmap Epic 7: DAG Caching & Incremental State Management** · `colonymind/server/`
+- [ ] **Step 8 — Roadmap Epic 7: DAG Caching & Incremental State Management** · `emergentflow/server/`
   - Deps: Step 7 (pairs tightly with it). Per-node execution hash (config + upstream hashes +
     SDK version), backward dependency tracing, invalidation. **Happy path:** a simple in-memory +
     **on-disk** cache keyed by that hash (Parquet/safetensors under a project cache dir) — no
@@ -161,15 +161,15 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
   - **(Hosted)** the Redis-metadata + object-store tiering ([A4](./technical_roadmap.md)) and
     cross-user/shared caching are scale-out optimizations, deferred to the hosted product.
 
-- [ ] **Step 9 — Roadmap Epic 14: Project Persistence, Versioning & Git Sync** · `colonymind/` + `colonymind/server/` *(split)*
+- [ ] **Step 9 — Roadmap Epic 14: Project Persistence, Versioning & Git Sync** · `emergentflow/` + `emergentflow/server/` *(split)*
   - Deps: Steps 1–2 (SDK half: export format + schema-migration scaffolding), Step 7 (server
     half: project storage needs the local server to exist), Step 8 (versioning interacts with the
     cache hash, which includes the SDK version). **Happy path:** basic save/load to **local
-    files** (the IR JSON + `cm.export_script` output, both already serializable) and one-way Git
+    files** (the IR JSON + `ef.export_script` output, both already serializable) and one-way Git
     export of generated code — no project database. A managed/multi-tenant project store is
     **(hosted)**.
   - **Moved out of Phase 1** (was the old Step 4): nothing on the path to a usable package or
-    UI depends on it, the IR is already serializable (Step 1) and `cm.export_script` already
+    UI depends on it, the IR is already serializable (Step 1) and `ef.export_script` already
     emits runnable code (Step 2), and the server-side storage half cannot be built until the
     server exists here in Phase 2.
   - **Caveat:** keep bumping `Graph.schema_version` on every wire-format change in the
@@ -177,13 +177,13 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
     lands. Migrations continue to *mature* through Step 11 as the schema evolves under real
     saved projects.
 
-- [ ] **Step 10 — Roadmap Epic 9: Data Connectors & Credential Management** · `colonymind/server/`
+- [ ] **Step 10 — Roadmap Epic 9: Data Connectors & Credential Management** · `emergentflow/server/`
   - Deps: Steps 1, 7. **Happy path:** connector framework + a few local/basic connectors (CSV/
     Parquet upload, local files, one SQL source); secrets kept out of the IR, stored locally
     (e.g., a local secrets file / OS keyring). Per-workspace managed secrets and premium
     connectors are **(hosted)**.
 
-- [ ] **Step 11 — Roadmap Epic 8: Result Rendering & In-Node Visualization** · `ui/` + `colonymind/server/` *(split)*
+- [ ] **Step 11 — Roadmap Epic 8: Result Rendering & In-Node Visualization** · `ui/` + `emergentflow/server/` *(split)*
   - Deps: Steps 4, 7, 8. Renderable result payloads (server shapes heavy artifacts; client
     renders small/interactive), in-node tables/charts/profiling HTML, truncation/pagination.
 
@@ -197,22 +197,22 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
 > Deliverable: visual deep learning with shape validation, visual agent orchestration, the
 > natural-language canvas agent, and real-time collaboration.
 
-- [ ] **Step 12 — Roadmap Epic 10: Deep Learning Module & Tensor Shape Resolution** · `colonymind/` + `ui/` *(split)*
+- [ ] **Step 12 — Roadmap Epic 10: Deep Learning Module & Tensor Shape Resolution** · `emergentflow/` + `ui/` *(split)*
   - Deps: Steps 1, 2, **3** (specializes the structural type framework), 7. PyTorch layer
     nodes, declarative `nn.Module` codegen, real-time shape inference (meta-tensor/FakeTensor
     tracing), shape-mismatch UI. Adds dimension inference on top of Step 3's structural typing.
 
-- [ ] **Step 13 — Roadmap Epic 11: GenAI & Multi-Agent Orchestration** · `colonymind/` + `colonymind/server/` + `ui/` (all three trees)
+- [ ] **Step 13 — Roadmap Epic 11: GenAI & Multi-Agent Orchestration** · `emergentflow/` + `emergentflow/server/` + `ui/` (all three trees)
   - Deps: Steps 1, 2, 7; benefits from Step 11. Provider-agnostic LLM nodes, prompt/router
     nodes, agent-group nodes, LangGraph codegen, live message/token viz, cost & token
     tracking. LLM nodes break the deterministic cache — needs a cache-with-care path.
 
-- [ ] **Step 14 — Roadmap Epic 12: Canvas-Aware Coding Agent (NL → graph)** · `colonymind/` / `colonymind/server/` + `ui/`
+- [ ] **Step 14 — Roadmap Epic 12: Canvas-Aware Coding Agent (NL → graph)** · `emergentflow/` / `emergentflow/server/` + `ui/`
   - Deps: Steps 1, 5, 3; ideally 7–11. The agent emits **validated IR mutations** (not free
     text), grounded in the node catalog + type system, with propose-then-apply UX. Quality is
     bounded by the catalog (Step 5) and the type system (Step 3) — do it after they mature.
 
-- [ ] **Step 15 — Roadmap Epic 13: Real-Time Multiplayer Collaboration** · `ui/` + `colonymind/server/` *(split, **hosted**)*
+- [ ] **Step 15 — Roadmap Epic 13: Real-Time Multiplayer Collaboration** · `ui/` + `emergentflow/server/` *(split, **hosted**)*
   - Deps: Steps 1 (IR must be CRDT-friendly), 4, 7. Concurrent editing (CRDT/OT), presence,
     cursors, comments, IR conflict resolution. **(Hosted)** — multiplayer is a hosted-product
     feature, not part of the bundled single-user app. Keep the IR CRDT-friendly in Epic 1 so it
@@ -222,7 +222,7 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
 
 ## Sequencing notes for a solo dev
 
-- **Stay on the happy path; don't over-architect.** The bundled `pip install colonymind` is a
+- **Stay on the happy path; don't over-architect.** The bundled `pip install emergentflow` is a
   **single-user, local-first app** (JupyterLab / dbt-core tier, per
   [A6](./technical_roadmap.md) and [ADR 0013](../docs/adr/0013-single-repo-bundled-ui-topology.md)):
   local server, in-process execution, on-disk cache, local-file persistence. The enterprise
@@ -259,8 +259,8 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
 | Roadmap Epics **1, 2, 5, 3** (repo Epics 1–3, 5) | Roadmap Epic **6** (repo Epic 4 — local server **v0 done**, Story 1) | Roadmap Epics **4, 7, 8, 9, 10, 11, 12, 13, 14, 15** |
 
 **4 of 15 epics complete, + a running v0 local server.** The Python package is usable today
-(`cm.compile_to_code`, `cm.execute`, `cm.validate`, `cm.export_script`), there is a literal
-`pip install colonymind && colonymind serve` that executes graphs in-process over REST
+(`ef.compile_to_code`, `ef.execute`, `ef.validate`, `ef.export_script`), there is a literal
+`pip install emergentflow && emergentflow serve` that executes graphs in-process over REST
 ([repo Epic 4](../epics/epic-4-local-server.md)), and the **frontend canvas has landed**
 ([repo Epic 5](../epics/epic-5-frontend-canvas.md), Stories 1–9) — the Phase-1 milestone
 (canvas → valid IR → downloadable, runnable Python + live execute) is met. Next concrete

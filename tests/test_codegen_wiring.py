@@ -1,14 +1,14 @@
-"""Tests for colonymind.codegen.wiring — input-wiring map, fan-in/out, cardinality
+"""Tests for emergentflow.codegen.wiring — input-wiring map, fan-in/out, cardinality
 enforcement, and the dangling-port policy (Epic 2, Story 2)."""
 
 from __future__ import annotations
 
 import pytest
 
-from colonymind.api import is_inspectable
-from colonymind.codegen import CardinalityError
-from colonymind.codegen.wiring import WiringMap, build_wiring_map
-from colonymind.ir import Cardinality, Direction, Edge, Graph, Node, Port, PortRef
+from emergentflow.api import is_inspectable
+from emergentflow.codegen import CardinalityError
+from emergentflow.codegen.wiring import WiringMap, build_wiring_map
+from emergentflow.ir import Cardinality, Direction, Edge, Graph, Node, Port, PortRef
 
 # ---------------------------------------------------------------------------
 # Builders

@@ -9,7 +9,7 @@ re-loads and validates it -- then separately runs the runnable demo
 dataset.
 
 Mirrors tests/test_examples.py's builder/fixture/round-trip pattern for the
-IR half of this file (part a). Part (b) drives the real cm.* pipeline, so
+IR half of this file (part a). Part (b) drives the real ef.* pipeline, so
 those tests are slow: they invoke ydata-profiling to render the HTML report.
 
 ADR refs: ADR 0002 (golden-test corpus), ADR 0003 (two paradigms).
@@ -22,7 +22,7 @@ import pathlib
 
 import pytest
 
-from colonymind.ir import (
+from emergentflow.ir import (
     Direction,
     Edge,
     Graph,
@@ -164,7 +164,7 @@ def build_vertical_slice() -> Graph:
         label="HTML Summary",
         paradigm=Paradigm.FUNCTIONAL,
         params=[
-            Param(name="title", type_token="str", value="Colony Mind — Vertical Slice"),
+            Param(name="title", type_token="str", value="Emergent Flow — Vertical Slice"),
         ],
         ports=[
             Port(

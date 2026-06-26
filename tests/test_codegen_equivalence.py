@@ -43,14 +43,14 @@ from typing import Any
 
 import pytest
 
-from colonymind.codegen.compiler import _assemble, compile_to_code
-from colonymind.codegen.errors import CycleError, GraphValidationError
-from colonymind.codegen.executor import execute
-from colonymind.codegen.validation import validate
-from colonymind.ir import Direction, Edge, Graph, Node, Port, PortRef, load_graph
-from colonymind.nodes.contract import CodeFragment, NodeDefinition
-from colonymind.nodes.registry import register
-from colonymind.nodes.spec import PortSpec
+from emergentflow.codegen.compiler import _assemble, compile_to_code
+from emergentflow.codegen.errors import CycleError, GraphValidationError
+from emergentflow.codegen.executor import execute
+from emergentflow.codegen.validation import validate
+from emergentflow.ir import Direction, Edge, Graph, Node, Port, PortRef, load_graph
+from emergentflow.nodes.contract import CodeFragment, NodeDefinition
+from emergentflow.nodes.registry import register
+from emergentflow.nodes.spec import PortSpec
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent
 

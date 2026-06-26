@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from colonymind.types.registry import (
+from emergentflow.types.registry import (
     TOP_TYPE,
     TypeDef,
     TypeRegistry,

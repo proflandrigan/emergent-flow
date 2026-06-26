@@ -23,12 +23,12 @@ import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
 import { useLiveValidation } from "../store/useLiveValidation";
 import { useValidationStore } from "../store/validationStore";
-import { CmEdge } from "./edges/CmEdge";
-import { CmNode } from "./nodes/CmNode";
+import { EfEdge } from "./edges/EfEdge";
+import { EfNode } from "./nodes/EfNode";
 import { toRFEdge, toRFNode } from "./toReactFlow";
 
-const nodeTypes: NodeTypes = { cmNode: CmNode };
-const edgeTypes: EdgeTypes = { cmEdge: CmEdge };
+const nodeTypes: NodeTypes = { efNode: EfNode };
+const edgeTypes: EdgeTypes = { efEdge: EfEdge };
 
 export function Canvas(): JSX.Element {
   useLiveValidation();

@@ -3,7 +3,7 @@ tests/test_migrate.py
 ~~~~~~~~~~~~~~~~~~~~~~
 Story 9 — migration framework core.
 
-Covers the public API in ``colonymind.ir.migrate``:
+Covers the public API in ``emergentflow.ir.migrate``:
   - chaining ordered migration steps and stamping ``schema_version`` after each;
   - no-op when already at the target version;
   - clear errors for missing intermediate steps and downgrade attempts;
@@ -19,8 +19,8 @@ from __future__ import annotations
 
 import pytest
 
-from colonymind.ir.graph import CURRENT_SCHEMA_VERSION
-from colonymind.ir.migrate import MigrationError, migrate_to_current, register_migration
+from emergentflow.ir.graph import CURRENT_SCHEMA_VERSION
+from emergentflow.ir.migrate import MigrationError, migrate_to_current, register_migration
 
 # ---------------------------------------------------------------------------
 # Step helpers
@@ -116,7 +116,7 @@ class TestRegisterValidates:
         # Only versions < CURRENT_SCHEMA_VERSION are registerable at all. Register once,
         # confirm the second registration for the same version is rejected, then clean up
         # so this test doesn't leak global state to other tests.
-        from colonymind.ir.migrate import _MIGRATIONS
+        from emergentflow.ir.migrate import _MIGRATIONS
 
         from_version = CURRENT_SCHEMA_VERSION - 1
         assert from_version >= 0, "CURRENT_SCHEMA_VERSION must be >= 1 for this test to apply"
@@ -139,19 +139,19 @@ class TestRegisterValidates:
 
 class TestExampleMigrationAndDocumentWalk:
     def test_v0_to_v1_step_renames_mode_to_paradigm(self):
-        from colonymind.ir.migrate import _migrate_v0_to_v1
+        from emergentflow.ir.migrate import _migrate_v0_to_v1
 
         result = _migrate_v0_to_v1({"mode": "declarative"})
         assert result == {"paradigm": "declarative"}
         assert "mode" not in result
 
     def test_example_step_is_registered(self):
-        import colonymind.ir.migrate
+        import emergentflow.ir.migrate
 
-        assert 0 in colonymind.ir.migrate._MIGRATIONS
+        assert 0 in emergentflow.ir.migrate._MIGRATIONS
 
     def test_migrate_document_flat_v0(self):
-        from colonymind.ir.migrate import migrate_document
+        from emergentflow.ir.migrate import migrate_document
 
         doc = {"schema_version": 0, "mode": "functional", "nodes": {}, "edges": {}}
         result = migrate_document(doc)
@@ -160,7 +160,7 @@ class TestExampleMigrationAndDocumentWalk:
         assert "mode" not in result
 
     def test_migrate_document_recurses_into_subgraph(self):
-        from colonymind.ir.migrate import migrate_document
+        from emergentflow.ir.migrate import migrate_document
 
         doc = {
             "schema_version": 1,
@@ -186,7 +186,7 @@ class TestExampleMigrationAndDocumentWalk:
         assert "mode" not in sub
 
     def test_migrate_document_does_not_mutate_input(self):
-        from colonymind.ir.migrate import migrate_document
+        from emergentflow.ir.migrate import migrate_document
 
         doc = {"schema_version": 0, "mode": "functional", "nodes": {}, "edges": {}}
         original = doc

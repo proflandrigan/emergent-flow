@@ -1,17 +1,17 @@
 # How Codegen Works (Epic 2 overview)
 
-Colony Mind compiles a graph IR to Python two ways, and guarantees the two
+Emergent Flow compiles a graph IR to Python two ways, and guarantees the two
 agree. This is the orientation doc for the code-generation engine
-(`colonymind/codegen/`); for component detail see [the compiler](codegen-compiler.md),
+(`emergentflow/codegen/`); for component detail see [the compiler](codegen-compiler.md),
 [the declarative seam](codegen-declarative.md), [the executor](codegen-executor.md),
 and [traversal](codegen-traversal.md).
 
 ## Two pure functions over one IR
 
 Per [ADR 0002](adr/0002-execute-the-ir-not-the-string.md), the engine commits to
-**two pure functions over one IR**: `cm.compile_to_code(graph) -> str`
-(`colonymind/codegen/compiler.py`) emits a runnable Python module, and
-`cm.execute(graph) -> results` (`colonymind/codegen/executor.py`) runs the same
+**two pure functions over one IR**: `ef.compile_to_code(graph) -> str`
+(`emergentflow/codegen/compiler.py`) emits a runnable Python module, and
+`ef.execute(graph) -> results` (`emergentflow/codegen/executor.py`) runs the same
 graph directly in-process. Their artifacts must be equivalent — the "A2"
 invariant — so running the code produced by `compile_to_code(ir)` must yield the
 same per-port results as `execute(ir)`. Both functions are pure: no I/O, no
@@ -22,7 +22,7 @@ artifact while the platform itself can choose to execute the IR directly.
 ## The functional compile pipeline
 
 `compile_to_code` assembles `Paradigm.FUNCTIONAL` graphs through a chain of small,
-deterministic passes, each its own module under `colonymind/codegen/`:
+deterministic passes, each its own module under `emergentflow/codegen/`:
 `traversal.py` (topological sort + cycle detection) feeds `wiring.py` (resolving
 each IN port to its upstream OUT port), which feeds `naming.py` (deriving
 readable, collision-free variable names from node labels), which feeds
@@ -43,7 +43,7 @@ Both `compile_to_code` and `execute` dispatch on `graph.paradigm`, per
 [ADR 0003](adr/0003-sdk-supports-two-paradigms.md). `Paradigm.FUNCTIONAL` graphs
 are emitted as a flat sequence of string-template statements wrapped in a
 `def main() -> dict[str, object]:` function. `Paradigm.DECLARATIVE` graphs delegate to
-`compile_declarative` (`colonymind/codegen/declarative.py`), which compiles an
+`compile_declarative` (`emergentflow/codegen/declarative.py`), which compiles an
 `nn.module` node's subgraph into an `nn.Module` subclass using a real **libcst**
 concrete syntax tree rather than string splicing — see
 [the declarative seam](codegen-declarative.md) for a worked example. Despite the

@@ -14,13 +14,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from colonymind.ir import Cardinality, Direction, Edge, Graph, Node, Port, PortRef
-from colonymind.nodes import registry as default_node_registry
-from colonymind.nodes.contract import NodeDefinition
-from colonymind.nodes.registry import NodeRegistry
-from colonymind.nodes.spec import PortSpec
-from colonymind.types.registry import TypeDef, TypeRegistry
-from colonymind.types.registry import registry as default_type_registry
+from emergentflow.ir import Cardinality, Direction, Edge, Graph, Node, Port, PortRef
+from emergentflow.nodes import registry as default_node_registry
+from emergentflow.nodes.contract import NodeDefinition
+from emergentflow.nodes.registry import NodeRegistry
+from emergentflow.nodes.spec import PortSpec
+from emergentflow.types.registry import TypeDef, TypeRegistry
+from emergentflow.types.registry import registry as default_type_registry
 
 
 @dataclass(frozen=True)

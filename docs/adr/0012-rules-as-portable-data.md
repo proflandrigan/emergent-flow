@@ -2,14 +2,14 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-20
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
 The roadmap's Epic 5 requirement is not only that invalid graphs be caught, but that the
 validation rules be *expressible in and shippable to the client*. The visual canvas — roadmap
-Epic 3, a React Flow / TypeScript app in a **separate repo** (`colony-mind-canvas`), never
-`import colonymind` — must give instant red-edge feedback as the user drags a connection,
+Epic 3, a React Flow / TypeScript app in a **separate repo** (`emergent-flow-canvas`), never
+`import emergentflow` — must give instant red-edge feedback as the user drags a connection,
 with **no Python present and no server round-trip**. This is the same constraint that drove
 serializing the IR itself: the boundary between this SDK and the frontend is the IR schema,
 the generated-code string, and (now) the rules-as-data artifact — never a shared Python import
@@ -58,7 +58,7 @@ illustrative, not the final catalog, which Story 2 inventories.)
 
 **Authority model.** The shipped artifact gives the frontend *instant, best-effort* feedback.
 This SDK remains the **authoritative re-validator**: server-side validation (Epic 6) re-runs
-`cm.validate` and its verdict is final. The frontend's job is fast UX, not correctness of
+`ef.validate` and its verdict is final. The frontend's job is fast UX, not correctness of
 record; if the two ever disagree (e.g. a stale artifact), the SDK wins.
 
 **Versioning.** The artifact carries a `version` and is versioned **alongside the IR schema

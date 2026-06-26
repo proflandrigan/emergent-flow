@@ -1,7 +1,7 @@
 """
 tests/test_codegen_validation.py
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Tests for colonymind.codegen.validation — the graph validation pass &
+Tests for emergentflow.codegen.validation — the graph validation pass &
 diagnostics (Epic 3, Story 5). Covers a compatible chain (no diagnostics), an
 incompatible edge (error), an unregistered token (warning), the "any" wildcard,
 a dangling required IN port (error), a cardinality violation (error, no crash),
@@ -16,19 +16,19 @@ from typing import Any
 
 import pytest
 
-from colonymind.api import is_inspectable
-from colonymind.codegen.errors import GraphValidationError
-from colonymind.codegen.validation import (
+from emergentflow.api import is_inspectable
+from emergentflow.codegen.errors import GraphValidationError
+from emergentflow.codegen.validation import (
     Diagnostics,
     Severity,
     apply_type_compatibility,
     enforce_validation_gate,
     validate,
 )
-from colonymind.ir import Cardinality, Direction, Edge, Graph, Node, Port, PortRef
-from colonymind.nodes.contract import NodeDefinition
-from colonymind.nodes.registry import NodeRegistry
-from colonymind.nodes.spec import PortSpec
+from emergentflow.ir import Cardinality, Direction, Edge, Graph, Node, Port, PortRef
+from emergentflow.nodes.contract import NodeDefinition
+from emergentflow.nodes.registry import NodeRegistry
+from emergentflow.nodes.spec import PortSpec
 
 
 def _graph(nodes: list[Node], edges: list[Edge]) -> Graph:

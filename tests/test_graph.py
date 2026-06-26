@@ -1,4 +1,4 @@
-"""Tests for colonymind.ir.graph — Graph model and structural validators.
+"""Tests for emergentflow.ir.graph — Graph model and structural validators.
 
 Coverage:
   - Valid graph construction + JSON round-trip.
@@ -17,9 +17,9 @@ import json
 import pytest
 from pydantic import ValidationError
 
-# Importing colonymind.ir triggers model_rebuild() via graph.py — this is the
+# Importing emergentflow.ir triggers model_rebuild() via graph.py — this is the
 # canonical import path that guarantees Node.subgraph is fully resolved.
-from colonymind.ir import (
+from emergentflow.ir import (
     CURRENT_SCHEMA_VERSION,
     Direction,
     Edge,

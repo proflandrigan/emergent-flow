@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-24
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
@@ -12,11 +12,11 @@ IR and codegen decisions first, because they are cheap to decide now and expensi
 once nodes, edges, and panels exist on top of them.
 
 [ADR 0013](0013-single-repo-bundled-ui-topology.md) already fixed the *topology*: a single
-repo, a single bundled package, and a coupling invariant where `ui/` never imports `colonymind`
+repo, a single bundled package, and a coupling invariant where `ui/` never imports `emergentflow`
 and only the IR JSON Schema, the `compile_to_code` output string, and the rules-as-data
 artifact ([ADR 0012](0012-rules-as-portable-data.md)) cross the boundary; everything else talks
 to the local server over REST. ADR 0013 Decision 5 further established that, because the local
-server can call the real `cm.validate` / `cm.compile_to_code` over localhost, the canvas does
+server can call the real `ef.validate` / `ef.compile_to_code` over localhost, the canvas does
 not need to reimplement codegen or validation in TypeScript for Phase 1.
 
 What ADR 0013 left open is the *internal* architecture of the canvas itself: which

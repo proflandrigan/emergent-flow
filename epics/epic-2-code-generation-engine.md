@@ -6,11 +6,11 @@
 > here, but diverge for later epics). Cross-references in the prose below (e.g. "Blocks: Epic
 > 3 (canvas), Epic 10/11") use **roadmap** numbers. See [`epics/README.md`](./README.md) for
 > the full mapping — notably, the roadmap's Epics 3 & 4 (the React/TS frontend canvas &
-> node-config UX) ship in the separate `colony-mind-canvas` repo, not here.
+> node-config UX) ship in the separate `emergent-flow-canvas` repo, not here.
 
 > Deterministic IR → idiomatic, PEP8-clean, runnable Python. The "glass-box"
 > promise made real. Epic 1 gave every node a per-node `codegen(node) -> CodeFragment`
-> (`colonymind/nodes/contract.py`) and a per-node `execute(node, inputs)`, but there is
+> (`emergentflow/nodes/contract.py`) and a per-node `execute(node, inputs)`, but there is
 > **no whole-graph compiler** and **no whole-graph executor** yet. This epic builds the
 > two pure functions ADR 0002 commits to — `compile_to_code(ir)` and `execute(ir)` — over
 > the existing IR, and makes their equivalence a hard, CI-enforced invariant.
@@ -42,8 +42,8 @@
 > them down before building the compiler, mirroring how Epic 1 Story 1 fixed §A.
 
 - [x] **Templating vs. AST construction.** Decide the hybrid: string/template emission for flat functional pipelines (already how `CodeFragment.body` works in `contract.py`), AST/`libcst` for the declarative paradigm where nested structure matters (per roadmap Epic 2 key decisions). Record an ADR. → [ADR 0008](../docs/adr/0008-codegen-templating-vs-ast.md)
-- [x] **Variable-binding model.** Decide how the whole-graph compiler supplies each node with the *input* variable names (per IN port, from upstream bindings) and *output* variable names (per OUT port). This is the central contract change — today nodes hardcode `frame`/`result`/`html` in their `body` (see `colonymind/nodes/examples/*.py`), which cannot wire a real graph. Record an ADR (a `CodegenContext` passed into `codegen`). → [ADR 0009](../docs/adr/0009-codegen-binding-context.md)
-- [x] **Package placement.** Decide the home for the engine (e.g. `colonymind/codegen/`) and the public entry points `cm.compile_to_code` / `cm.execute`, consistent with `docs/public-api-conventions.md`. → [ADR 0010](../docs/adr/0010-codegen-package-placement.md)
+- [x] **Variable-binding model.** Decide how the whole-graph compiler supplies each node with the *input* variable names (per IN port, from upstream bindings) and *output* variable names (per OUT port). This is the central contract change — today nodes hardcode `frame`/`result`/`html` in their `body` (see `emergentflow/nodes/examples/*.py`), which cannot wire a real graph. Record an ADR (a `CodegenContext` passed into `codegen`). → [ADR 0009](../docs/adr/0009-codegen-binding-context.md)
+- [x] **Package placement.** Decide the home for the engine (e.g. `emergentflow/codegen/`) and the public entry points `ef.compile_to_code` / `ef.execute`, consistent with `docs/public-api-conventions.md`. → [ADR 0010](../docs/adr/0010-codegen-package-placement.md)
 - [x] **Formatting toolchain.** Choose the post-generation formatter; the repo already standardizes on `ruff` (`[tool.ruff]` in `pyproject.toml`), so prefer `ruff format` over adding `black`. → folded into [ADR 0008](../docs/adr/0008-codegen-templating-vs-ast.md)
 - [x] **Restate the equivalence invariant** (ADR 0002): `execute(ir)` and running `compile_to_code(ir)` must produce equivalent artifacts; link the new ADRs back to `docs/adr/0002-execute-the-ir-not-the-string.md`. → folded into [ADR 0010](../docs/adr/0010-codegen-package-placement.md)
 
@@ -52,13 +52,13 @@
 ## Story 2 — Graph traversal & compilation foundation
 
 > Shared plumbing both `compile_to_code` and `execute` need. Today `Graph`
-> (`colonymind/ir/graph.py`) stores nodes/edges as id→object maps with structural
+> (`emergentflow/ir/graph.py`) stores nodes/edges as id→object maps with structural
 > validation but offers no traversal helpers.
 
 - [x] Implement a **deterministic topological sort** over `Graph.nodes`/`Graph.edges`, with a stable tie-break (e.g. by node id) so the same graph always orders identically.
 - [x] Implement **cycle detection**: functional-pipeline graphs must be acyclic; reject cycles with a clear, node-naming error message.
 - [x] Build the **input-wiring map**: for each node's IN port, resolve the upstream `(node_id, OUT port_id)` from `Graph.edges` (`Edge.source` → `Edge.target`).
-- [x] Handle **fan-out** (one OUT port feeding many targets) and **fan-in / cardinality** (an IN port's `cardinality`, see `colonymind/ir/port.py`).
+- [x] Handle **fan-out** (one OUT port feeding many targets) and **fan-in / cardinality** (an IN port's `cardinality`, see `emergentflow/ir/port.py`).
 - [x] Define behaviour for **dangling IN ports** (no upstream edge) — error vs. leave unbound — and document it.
 - [x] Add unit tests over crafted graphs (linear chain, diamond/fan-out, disconnected, cyclic).
 
@@ -85,7 +85,7 @@
 
 - [x] Extend the contract so `codegen` receives a **binding context** (input var name per IN port, output var name per OUT port) — e.g. `codegen(node, ctx) -> CodeFragment` — per the Story 1 ADR.
 - [x] Keep `CodeFragment` (`imports` + `body`) as the unit; confirm `render()` still works for single-node previews and the canvas "show code" panel (Epic 3).
-- [x] Migrate all five reference nodes to consume the context instead of literals: `data.load_csv`, `clean.impute_missing`, `stats.anova`, `ml.train_classifier`, `reports.generate_html_summary` (`colonymind/nodes/examples/*.py`).
+- [x] Migrate all five reference nodes to consume the context instead of literals: `data.load_csv`, `clean.impute_missing`, `stats.anova`, `ml.train_classifier`, `reports.generate_html_summary` (`emergentflow/nodes/examples/*.py`).
 - [x] Bump each migrated node's `version` (per-node catalog version) since codegen semantics change (see the `version` ClassVar in `contract.py`).
 - [x] Update `tests/test_reference_nodes.py` and the node-contract tests to assert codegen wiring against the context.
 - [x] Update `docs/node-contract-spec.md` and `docs/authoring-a-node.md` so "how to author a node" reflects the new `codegen` signature.
@@ -101,7 +101,7 @@
 - [x] Emit body statements in topological order with correct upstream→downstream variable wiring.
 - [x] Assemble a complete module: header/docstring, import block, then body; decide flat-script vs. `def main()` wrapping and document it.
 - [x] Run the **formatting pass** (`ruff format`) so output is PEP8-clean.
-- [x] Expose the public entry point (`cm.compile_to_code`) and register it under the public-API conventions; ensure it returns an inspectable `str`.
+- [x] Expose the public entry point (`ef.compile_to_code`) and register it under the public-API conventions; ensure it returns an inspectable `str`.
 - [x] Handle edge cases: empty graph, single source node, fan-out, fan-in.
 
 ---
@@ -114,7 +114,7 @@
 > prove equivalence.
 
 - [x] Implement `execute(graph) -> results`: topo-walk the IR, call each node's `execute(node, inputs)`, and thread OUT-port outputs to downstream IN ports via the Story 2 wiring map.
-- [x] Return inspectable results keyed by node/port, consistent with `colonymind/api.py` (`is_inspectable`).
+- [x] Return inspectable results keyed by node/port, consistent with `emergentflow/api.py` (`is_inspectable`).
 - [x] Build the **equivalence harness**: for a corpus of graphs, assert artifacts from `execute(ir)` equal artifacts from running `compile_to_code(ir)`.
 - [x] Cover the vertical slice end to end (`examples/vertical_slice/pipeline.json`) plus `examples/functional_pipeline.json`.
 - [x] Document the boundary: this executor is the equivalence reference; Epic 6 wraps it with sandboxing, resource limits, and streaming.

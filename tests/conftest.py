@@ -1,7 +1,7 @@
 """Shared pytest fixtures.
 
 Test isolation for the global node registry. A handful of tests exercise the module-level
-``@register`` decorator, which mutates the shared default :data:`colonymind.nodes.registry`
+``@register`` decorator, which mutates the shared default :data:`emergentflow.nodes.registry`
 singleton (see ``test_registry.py``). Without cleanup those dummy ``x.*`` node types leak into
 the singleton for the rest of the session, which then surfaces anywhere that reads the live
 catalog -- e.g. ``server.service.get_catalog`` and the ``ui/src/generated/catalog.json``
@@ -16,7 +16,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from colonymind.nodes import registry
+from emergentflow.nodes import registry
 
 
 @pytest.fixture(autouse=True)

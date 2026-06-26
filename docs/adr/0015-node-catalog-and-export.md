@@ -2,12 +2,12 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-25
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
 Repo Epic 6 (roadmap Epic 4 — Node Library & Configuration UX) widens each family
-(`cm.data`, `cm.clean`, `cm.stats`, `cm.ml`, `cm.reports`) from the one reference node that
+(`ef.data`, `ef.clean`, `ef.stats`, `ef.ml`, `ef.reports`) from the one reference node that
 proved the contract by construction (the proposal's vertical slice: `load_csv →
 impute_missing → anova → train_classifier → generate_html_summary`) into a genuinely usable
 palette. Before any family is widened, the catalog-level decisions need to be fixed the same
@@ -29,7 +29,7 @@ Four questions are open:
    contract, ADR 0005) as the catalog grows and existing nodes' codegen/params change?
 
 These are catalog-wide policy calls, not per-node implementation details, so they belong in
-an ADR rather than being decided ad hoc inside Story 2's `cm.export_catalog()` work.
+an ADR rather than being decided ad hoc inside Story 2's `ef.export_catalog()` work.
 
 ## Decision
 
@@ -131,7 +131,7 @@ of any `Graph.schema_version` migration, the same drift signal ADR 0012 gives th
   cannot be expressed by the fixed catalog.
 - DL nodes (roadmap Epic 10), GenAI nodes (roadmap Epic 11), and credentialed/remote
   connectors beyond local-file loaders (roadmap Epic 9).
-- The catalog metadata fields, the `cm.export_catalog()` builder, and the golden test on its
+- The catalog metadata fields, the `ef.export_catalog()` builder, and the golden test on its
   output — Story 2, specified in [`docs/node-catalog-artifact.md`](../node-catalog-artifact.md).
 - The actual per-family node additions (Stories 3–6) and the end-to-end acceptance pipeline
   (Story 7), which build on the breadth policy fixed here.

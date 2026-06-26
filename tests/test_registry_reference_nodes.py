@@ -1,25 +1,25 @@
 """Tests for declarative registration of the reference nodes.
 
-Importing ``colonymind.nodes`` pulls in the reference-node package, firing the
+Importing ``emergentflow.nodes`` pulls in the reference-node package, firing the
 ``@register`` decorators on all five Story 8 reference nodes and populating the
 default ``registry``.  These tests assert that the end-to-end registration path
 works correctly and that the registry public API is re-exported from
-``colonymind.nodes``.
+``emergentflow.nodes``.
 """
 
 import subprocess
 import sys
 
-import colonymind.nodes.examples  # noqa: F401 — import triggers registration
-from colonymind.nodes import registry
-from colonymind.nodes.examples import (
+import emergentflow.nodes.examples  # noqa: F401 — import triggers registration
+from emergentflow.nodes import registry
+from emergentflow.nodes.examples import (
     Anova,
     GenerateHtmlSummary,
     ImputeMissing,
     LoadCsv,
     TrainClassifier,
 )
-from colonymind.nodes.registry import NodeRegistry
+from emergentflow.nodes.registry import NodeRegistry
 
 
 class TestReferenceNodesRegistered:
@@ -29,14 +29,14 @@ class TestReferenceNodesRegistered:
         assert "clean.impute_missing" in registry
 
     def test_importing_package_alone_registers_reference_nodes(self):
-        """Importing only ``colonymind.nodes`` (not ``.examples``) registers them.
+        """Importing only ``emergentflow.nodes`` (not ``.examples``) registers them.
 
         Runs in a fresh subprocess so no other test's ``import
-        colonymind.nodes.examples`` can mask the regression: ``colonymind.nodes``
+        emergentflow.nodes.examples`` can mask the regression: ``emergentflow.nodes``
         must pull the reference nodes in on its own.
         """
         code = (
-            "import colonymind.nodes as n; "
+            "import emergentflow.nodes as n; "
             "assert 'data.load_csv' in n.registry, 'load_csv not registered'; "
             "assert 'clean.impute_missing' in n.registry, 'impute not registered'"
         )
@@ -64,8 +64,8 @@ class TestReferenceNodesRegistered:
         assert fresh.validate() == []
 
     def test_package_reexports(self):
-        """All nine registry names are importable directly from colonymind.nodes."""
-        from colonymind.nodes import (  # noqa: F401
+        """All nine registry names are importable directly from emergentflow.nodes."""
+        from emergentflow.nodes import (  # noqa: F401
             ENTRY_POINT_GROUP,
             NodeRegistry,
             by_family,

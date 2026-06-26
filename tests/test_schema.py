@@ -1,4 +1,4 @@
-"""Tests for colonymind.ir.schema — JSON Schema export."""
+"""Tests for emergentflow.ir.schema — JSON Schema export."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import pathlib
 
 import pytest
 
-from colonymind.ir.schema import ir_json_schema, write_ir_json_schema
+from emergentflow.ir.schema import ir_json_schema, write_ir_json_schema
 
 
 def _graph_properties(schema: dict) -> dict:

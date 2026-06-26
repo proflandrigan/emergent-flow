@@ -29,7 +29,7 @@ def test_build_backend_is_the_in_tree_shim() -> None:
 
 
 def test_pyproject_bundles_static_as_package_data() -> None:
-    package_data = _pyproject()["tool"]["setuptools"]["package-data"]["colonymind"]
+    package_data = _pyproject()["tool"]["setuptools"]["package-data"]["emergentflow"]
     assert any("_static" in pattern for pattern in package_data)
 
 

@@ -2,11 +2,11 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-16
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
-The clean example in the Colony Mind proposal — `load_csv(...) → impute_missing(...) → anova(...)` — is a **functional pipeline**: each node is a single function call returning an inspectable object. That shape maps naturally to data engineering, statistics, and classical ML, where work is expressed as a DAG of pure-ish transforms.
+The clean example in the Emergent Flow proposal — `load_csv(...) → impute_missing(...) → anova(...)` — is a **functional pipeline**: each node is a single function call returning an inspectable object. That shape maps naturally to data engineering, statistics, and classical ML, where work is expressed as a DAG of pure-ish transforms.
 
 It does not, however, map cleanly to two other important workload families:
 
@@ -23,30 +23,30 @@ We will design the SDK and codegen around two first-class paradigms from day one
 1. **Functional pipeline** — a DAG of pure-ish transforms, where each node is a function call returning an inspectable result. This paradigm covers data engineering, statistics, classical ML, and reporting. Example:
 
    ```python
-   import colonymind as cm
+   import emergentflow as ef
 
    # Each namespaced call adds a node to the graph (IR); execute(ir) runs it (ADR 0002).
-   df = cm.data.load_csv("data/experiment.csv")
-   df = cm.clean.impute_missing(df, strategy="median")
-   graph = cm.stats.anova(df, group_col="treatment", value_col="response")
-   result = cm.execute(graph)
+   df = ef.data.load_csv("data/experiment.csv")
+   df = ef.clean.impute_missing(df, strategy="median")
+   graph = ef.stats.anova(df, group_col="treatment", value_col="response")
+   result = ef.execute(graph)
    ```
 
 2. **Declarative module/graph definition** — a definition compiled into a class or graph object rather than executed as a chain of calls. This paradigm covers deep learning architectures (via PyTorch `nn.Module`) and agent graphs (via LangGraph). Example:
 
    ```python
-   import colonymind as cm
+   import emergentflow as ef
 
-   classifier = cm.nn_module(
+   classifier = ef.nn_module(
        layers=[
-           cm.linear(in_features=128, out_features=64),
-           cm.relu(),
-           cm.linear(in_features=64, out_features=10),
+           ef.linear(in_features=128, out_features=64),
+           ef.relu(),
+           ef.linear(in_features=64, out_features=10),
        ],
        name="SimpleClassifier",
    )
    # compile_to_code emits a proper nn.Module subclass; execute builds the module object
-   model = cm.execute(classifier)
+   model = ef.execute(classifier)
    ```
 
 The IR schema must be capable of representing both paradigms. `compile_to_code(ir)` and `execute(ir)` (ADR 0002) must produce correct, idiomatic output for nodes belonging to either paradigm — functional-pipeline nodes emit chained function calls; declarative nodes emit class bodies or graph-construction code.

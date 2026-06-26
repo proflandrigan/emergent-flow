@@ -1,13 +1,13 @@
 import pytest
 from pydantic import ValidationError
 
-from colonymind.ir.common import Cardinality
-from colonymind.types.compatibility import (
+from emergentflow.ir.common import Cardinality
+from emergentflow.types.compatibility import (
     Compatibility,
     check_cardinality,
     is_compatible,
 )
-from colonymind.types.registry import TypeDef, TypeRegistry
+from emergentflow.types.registry import TypeDef, TypeRegistry
 
 
 @pytest.fixture

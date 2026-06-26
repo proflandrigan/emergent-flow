@@ -4,13 +4,13 @@ import importlib.metadata
 import sys
 from pathlib import Path
 
-from colonymind.types import registry
-from colonymind.types.registry import TOP_TYPE, TypeDef, TypeRegistry
+from emergentflow.types import registry
+from emergentflow.types.registry import TOP_TYPE, TypeDef, TypeRegistry
 
 STUB = Path(__file__).resolve().parent.parent / "examples" / "type_plugin_stub"
 sys.path.insert(0, str(STUB))
 
-from cm_timeseries.types import TIMESERIES  # noqa: E402
+from ef_timeseries.types import TIMESERIES  # noqa: E402
 
 
 class TestBuiltinCatalog:
@@ -52,13 +52,13 @@ class TestTypePluginStub:
     def test_discover_registers_stub(self, monkeypatch):
         class _StubEP:
             name = "time_series"
-            value = "cm_timeseries.types:TIMESERIES"
+            value = "ef_timeseries.types:TIMESERIES"
 
             def load(self):
                 return TIMESERIES
 
         def fake_entry_points(*, group):
-            return [_StubEP()] if group == "colonymind.types" else []
+            return [_StubEP()] if group == "emergentflow.types" else []
 
         monkeypatch.setattr(importlib.metadata, "entry_points", fake_entry_points)
         reg = TypeRegistry()
@@ -73,8 +73,8 @@ class TestTypePluginStub:
 class TestPluginPyproject:
     def test_pyproject_declares_entry_point_group(self):
         text = (STUB / "pyproject.toml").read_text(encoding="utf-8")
-        assert '[project.entry-points."colonymind.types"]' in text
+        assert '[project.entry-points."emergentflow.types"]' in text
 
     def test_pyproject_names_timeseries(self):
         text = (STUB / "pyproject.toml").read_text(encoding="utf-8")
-        assert "cm_timeseries.types:TIMESERIES" in text
+        assert "ef_timeseries.types:TIMESERIES" in text

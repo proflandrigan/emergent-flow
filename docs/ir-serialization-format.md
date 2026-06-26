@@ -2,12 +2,12 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-16
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
-Story 2 of Epic 1 publishes the Colony Mind IR as a formal spec. The IR models are defined
-in Pydantic v2 (`colonymind/ir/`); the serialization format is the wire/at-rest encoding
+Story 2 of Epic 1 publishes the Emergent Flow IR as a formal spec. The IR models are defined
+in Pydantic v2 (`emergentflow/ir/`); the serialization format is the wire/at-rest encoding
 that the frontend writes, the backend reads, and external tools validate against.
 
 Several options exist: JSON, MessagePack, Protobuf, CBOR, or a custom binary. Each trades
@@ -16,21 +16,21 @@ differently.
 
 ## Decision
 
-JSON is the canonical on-the-wire and at-rest serialization format for the Colony Mind IR
+JSON is the canonical on-the-wire and at-rest serialization format for the Emergent Flow IR
 during Phase 1.
 
 - **Reference serializer / deserializer:** Pydantic v2 `model_dump_json()` and
-  `model_validate_json()` on `colonymind.ir.graph.Graph`.
-- **Language-agnostic contract:** the JSON Schema emitted by `colonymind.ir.schema.ir_json_schema()`
+  `model_validate_json()` on `emergentflow.ir.graph.Graph`.
+- **Language-agnostic contract:** the JSON Schema emitted by `emergentflow.ir.schema.ir_json_schema()`
   (derived from `Graph.model_json_schema()`) is the validation contract for non-Python clients
   such as the TypeScript frontend.
-- **File extension convention:** `.cm.json` for persisted graph files.
+- **File extension convention:** `.ef.json` for persisted graph files.
 
-## Public API (`colonymind.ir.serialize`)
+## Public API (`emergentflow.ir.serialize`)
 
 The reference Pydantic methods above are wrapped by a small, stable public API (Story 5).
 Application code should use these rather than calling Pydantic directly — they add
-schema-version enforcement, clean error types, and file I/O over the ``.cm.json`` convention.
+schema-version enforcement, clean error types, and file I/O over the ``.ef.json`` convention.
 
 | Function | Purpose |
 | --- | --- |
@@ -39,7 +39,7 @@ schema-version enforcement, clean error types, and file I/O over the ``.cm.json`
 | `save_graph(graph, path, *, indent=2) -> Path` | Serialize and write UTF-8 (trailing newline). |
 | `load_graph(path) -> Graph` | Read a file and deserialize it. |
 
-All four are re-exported from `colonymind.ir`.
+All four are re-exported from `emergentflow.ir`.
 
 ### Validation on load
 
@@ -65,7 +65,7 @@ composite nodes — each carries its own `schema_version` and is checked on load
 
 ### Error types
 
-All defined in `colonymind.ir.serialize` and re-exported from `colonymind.ir`:
+All defined in `emergentflow.ir.serialize` and re-exported from `emergentflow.ir`:
 
 - `GraphSerializationError` — base class.
 - `GraphDeserializationError` — malformed JSON, non-object payload, or failed validation.

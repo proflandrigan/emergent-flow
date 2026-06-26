@@ -1,4 +1,4 @@
-"""Tests for colonymind.codegen.executor."""
+"""Tests for emergentflow.codegen.executor."""
 
 from __future__ import annotations
 
@@ -8,15 +8,15 @@ from typing import Any
 
 import pytest
 
-import colonymind as cm
-from colonymind.api import is_inspectable
-from colonymind.codegen.errors import CodegenError, GraphValidationError
-from colonymind.codegen.executor import execute
-from colonymind.ir import Direction, Edge, Graph, Node, Paradigm, Port, PortRef
-from colonymind.ir.common import Cardinality
-from colonymind.nodes.contract import CodeFragment, NodeDefinition
-from colonymind.nodes.registry import register
-from colonymind.nodes.spec import PortSpec
+import emergentflow as ef
+from emergentflow.api import is_inspectable
+from emergentflow.codegen.errors import CodegenError, GraphValidationError
+from emergentflow.codegen.executor import execute
+from emergentflow.ir import Direction, Edge, Graph, Node, Paradigm, Port, PortRef
+from emergentflow.ir.common import Cardinality
+from emergentflow.nodes.contract import CodeFragment, NodeDefinition
+from emergentflow.nodes.registry import register
+from emergentflow.nodes.spec import PortSpec
 
 
 @register
@@ -177,25 +177,25 @@ def test_return_is_inspectable() -> None:
 
 
 def test_cm_execute_is_lazily_wired() -> None:
-    """cm.execute is lazily wired."""
+    """ef.execute is lazily wired."""
     script = """
 import sys
-import colonymind as cm
+import emergentflow as ef
 
-# colonymind.codegen should not be imported yet
-assert 'colonymind.codegen' not in sys.modules
+# emergentflow.codegen should not be imported yet
+assert 'emergentflow.codegen' not in sys.modules
 
-# Accessing cm.execute should trigger the import
-_ = cm.execute
+# Accessing ef.execute should trigger the import
+_ = ef.execute
 
 # Now it should be imported
-assert 'colonymind.codegen' in sys.modules
+assert 'emergentflow.codegen' in sys.modules
 """
     result = subprocess.run(
         [sys.executable, "-c", script], capture_output=True, text=True, check=False
     )
     assert result.returncode == 0, f"Subprocess failed:\n{result.stderr}\n{result.stdout}"
-    assert "execute" in cm.__all__
+    assert "execute" in ef.__all__
 
 
 @register

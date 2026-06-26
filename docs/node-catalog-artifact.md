@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-25
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
@@ -19,7 +19,7 @@ canvas (ADR 0013, ADR 0014) consumes **data**, never a shared Python import.
 This document is the artifact's contract spec — the concrete field-by-field shape, ordering
 guarantee, and producer contract — the sibling of
 [`docs/result-payload-contract.md`](./result-payload-contract.md) and the rules-as-data ADR,
-written at the same level of detail so Story 2's `cm.export_catalog()` implementation and any
+written at the same level of detail so Story 2's `ef.export_catalog()` implementation and any
 canvas-side consumer can code against it without re-deriving the decision.
 
 ## Purpose
@@ -137,8 +137,8 @@ or dict iteration order; the sort is applied explicitly before serialization.
 
 ## Producer
 
-`cm.export_catalog()` (alongside `cm.build_rules_artifact()` and the other artifact exporters,
-each a top-level `cm.*` entry point) builds this artifact from the **live node registry**.
+`ef.export_catalog()` (alongside `ef.build_rules_artifact()` and the other artifact exporters,
+each a top-level `ef.*` entry point) builds this artifact from the **live node registry**.
 Like every other exporter in this chain, it is:
 
 - **Pure** — no I/O, no global state; it reads the registry and returns data.
@@ -151,7 +151,7 @@ Like every other exporter in this chain, it is:
 Two consumers are produced from this **single builder** — there is no second, divergent code
 path:
 
-- The local server's `GET /catalog` endpoint calls `cm.export_catalog()` at request time.
+- The local server's `GET /catalog` endpoint calls `ef.export_catalog()` at request time.
 - The committed `ui/src/generated/catalog.json` is generated from the same builder (e.g. at
   build time or via a regeneration script), so the bundled canvas (ADR 0013) ships a catalog
   snapshot without needing a live server round-trip.
@@ -162,7 +162,7 @@ serializations of the same registry through the same function.
 
 ## Out of scope (this document)
 
-- The `cm.export_catalog()` implementation itself, and its golden test — Epic 6 Story 2.
+- The `ef.export_catalog()` implementation itself, and its golden test — Epic 6 Story 2.
 - Backfilling `label`/`category`/`description`/param `help`/`hints` onto the five existing
   reference nodes — Story 2.
 - Any new node added to widen a family (Stories 3–6) — this document fixes the shape every

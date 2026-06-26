@@ -1,6 +1,6 @@
 # Architecture Decision Records
 
-This directory records the significant architectural decisions for Colony Mind, using a
+This directory records the significant architectural decisions for Emergent Flow, using a
 lightweight [MADR](https://adr.github.io/madr/)-style format (Status · Context · Decision ·
 Consequences). See [`TEMPLATE.md`](./TEMPLATE.md) to author a new one.
 
@@ -23,7 +23,7 @@ The following decisions lock the codegen engine's architecture; they correspond 
 | :-- | :------- | :----- |
 | [0008](./0008-codegen-templating-vs-ast.md) | Codegen: string templates for functional pipelines, AST construction for the declarative paradigm | Accepted |
 | [0009](./0009-codegen-binding-context.md) | The whole-graph compiler supplies variable names to nodes via a `CodegenContext` | Accepted |
-| [0010](./0010-codegen-package-placement.md) | The codegen engine lives in `colonymind/codegen` with `cm.compile_to_code` / `cm.execute` entry points | Accepted |
+| [0010](./0010-codegen-package-placement.md) | The codegen engine lives in `emergentflow/codegen` with `ef.compile_to_code` / `ef.execute` entry points | Accepted |
 
 The following decisions lock the type system's architecture; they correspond to Story 1 of
 [Epic 3](../../epics/epic-3-type-safe-graph-and-validation.md).

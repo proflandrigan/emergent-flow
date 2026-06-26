@@ -166,7 +166,7 @@ wheels = [
 ]
 
 [[package]]
-name = "colonymind"
+name = "emergentflow"
 source = { editable = "." }
 dependencies = [
     { name = "libcst" },

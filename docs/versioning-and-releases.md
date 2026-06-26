@@ -1,12 +1,12 @@
 # Versioning & Releases
 
-The Colony Mind SDK uses Semantic Versioning to manage releases and communicates changes to users
+The Emergent Flow SDK uses Semantic Versioning to manage releases and communicates changes to users
 through version numbers. This document describes the versioning scheme and the automated tag-driven
 release process.
 
 ## Semantic Versioning
 
-Colony Mind follows [Semantic Versioning](https://semver.org/) for the SDK package:
+Emergent Flow follows [Semantic Versioning](https://semver.org/) for the SDK package:
 
 - **MAJOR** — incremented for incompatible API changes.
 - **MINOR** — incremented for backward-compatible new features.
@@ -31,8 +31,8 @@ keep them separate:
 
 | Version Type | Scope | Managed by | Example |
 | --- | --- | --- | --- |
-| **SDK package version** | The `colonymind` Python package on PyPI. | This document; bumped in `colonymind/__init__.py::__version__`. | `0.1.0` |
-| **IR schema version** | The serialization format of the intermediate representation (graphs). Applies to `schema_version` embedded in `.cm.json` files. | Story 9 (migration framework); no migration logic in this release. | `1` (current) |
+| **SDK package version** | The `emergentflow` Python package on PyPI. | This document; bumped in `emergentflow/__init__.py::__version__`. | `0.1.0` |
+| **IR schema version** | The serialization format of the intermediate representation (graphs). Applies to `schema_version` embedded in `.ef.json` files. | Story 9 (migration framework); no migration logic in this release. | `1` (current) |
 | **Node catalog version** | The version of a node's contract (inputs, outputs, metadata). Set per-node in the node's catalog entry. | Individual node authors; does not affect SDK releases. | `1`, `2`, etc. |
 
 Only the **SDK package version** is the subject of this document and the release workflow.
@@ -42,17 +42,17 @@ Only the **SDK package version** is the subject of this document and the release
 The SDK version is single-sourced in one place:
 
 ```
-colonymind/__init__.py::__version__ = "0.1.0"
+emergentflow/__init__.py::__version__ = "0.1.0"
 ```
 
 This value is:
 
-- Read directly by consumers: `from colonymind import __version__`.
+- Read directly by consumers: `from emergentflow import __version__`.
 - Exposed to the build system via `pyproject.toml` dynamic version configuration:
 
 ```toml
 [tool.setuptools.dynamic]
-version = { attr = "colonymind.__version__" }
+version = { attr = "emergentflow.__version__" }
 ```
 
 This ensures the version number is always consistent: bump it in `__init__.py`, and the
@@ -62,7 +62,7 @@ built wheel and source distribution automatically get the same version.
 
 To release a new version of the SDK, follow these steps **in order**:
 
-1. **Update the version** in `colonymind/__init__.py`:
+1. **Update the version** in `emergentflow/__init__.py`:
    ```python
    __version__ = "0.2.0"  # Change only this line
    ```
@@ -86,7 +86,7 @@ To release a new version of the SDK, follow these steps **in order**:
    - GitHub Actions detects the `v*` tag.
    - Builds sdist and wheel with `uv build`.
    - Publishes to PyPI using Trusted Publishing (see below).
-   - The new version becomes available to install via `pip install colonymind==0.2.0`.
+   - The new version becomes available to install via `pip install emergentflow==0.2.0`.
 
 ## Trusted Publishing
 
@@ -102,7 +102,7 @@ The release workflow uses **PyPI Trusted Publishing** (OIDC) to authenticate to 
 The workflow in `.github/workflows/release.yml` is a **scaffold** that has not yet been exercised.
 Before the first real release:
 
-- PyPI Trusted Publishing must be configured for the `colonymind` project on PyPI.
+- PyPI Trusted Publishing must be configured for the `emergentflow` project on PyPI.
 - Consult [PyPI's Trusted Publishing docs](https://docs.pypi.org/trusted-publishers/) for setup.
 - Once configured, the workflow will publish automatically on each `v*` tag push.
 

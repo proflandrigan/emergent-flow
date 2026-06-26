@@ -1,14 +1,14 @@
 # Public API Conventions
 
-This document defines the conventions for the colonymind SDK's public API. These standards ensure that all wrapped operations are predictable, inspectable, and maintainable across the library's namespaces.
+This document defines the conventions for the emergentflow SDK's public API. These standards ensure that all wrapped operations are predictable, inspectable, and maintainable across the library's namespaces.
 
 ## Naming
 
 **Package and Alias:**
-- The package is `colonymind`; the public alias is `import colonymind as cm`. Never use `omnicanvas` or `oc`.
+- The package is `emergentflow`; the public alias is `import emergentflow as ef`. Never use `omnicanvas` or `oc`.
 
 **Namespace Structure:**
-- Functional namespaces are noun-based domains: `cm.data`, `cm.clean`, `cm.stats`, `cm.ml`, `cm.reports`.
+- Functional namespaces are noun-based domains: `ef.data`, `ef.clean`, `ef.stats`, `ef.ml`, `ef.reports`.
 - Each namespace groups related operations by domain.
 
 **Function Names:**
@@ -68,8 +68,8 @@ Every public function must return a **serializable and inspectable object**:
 - This makes code more readable and future-proof for API extensions.
 
 **Enforcement:**
-- These conventions are enforced at runtime and in CI by `colonymind.api`: decorate every
-  wrapper with `@cm.public_op` (it validates the return via `assert_inspectable` on each
+- These conventions are enforced at runtime and in CI by `emergentflow.api`: decorate every
+  wrapper with `@ef.public_op` (it validates the return via `assert_inspectable` on each
   call and registers it in `PUBLIC_OPS`), and `tests/test_api_conventions.py` sweeps the
   registry to flag opaque/non-serializable returns. See
   [SDK Design Philosophy](sdk-design-philosophy.md). Compliance is a design-time requirement.
@@ -115,7 +115,7 @@ def load_csv(filepath: str, *, encoding: str = "utf-8") -> DataLoadResult:
 **Compliant Pattern:**
 ```python
 # Good: returns an inspectable, structured result
-result = cm.stats.anova(df, group_col="group", value_col="score", alpha=0.05)
+result = ef.stats.anova(df, group_col="group", value_col="score", alpha=0.05)
 
 # result is an AnovaResult dataclass with:
 #   - f_statistic: float

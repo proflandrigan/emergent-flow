@@ -3,14 +3,14 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cm-texttools"
+name = "ef-texttools"
 version = "0.1.0"
-description = "Example out-of-core Colony Mind node plugin (Epic 1, Story 4)."
+description = "Example out-of-core Emergent Flow node plugin (Epic 1, Story 4)."
 requires-python = ">=3.11"
-dependencies = ["colonymind"]
+dependencies = ["emergentflow"]
 
-[project.entry-points."colonymind.nodes"]
-text_reverse = "cm_texttools.nodes:ReverseText"
+[project.entry-points."emergentflow.nodes"]
+text_reverse = "ef_texttools.nodes:ReverseText"
 
 [tool.setuptools.packages.find]
-include = ["cm_texttools*"]
+include = ["ef_texttools*"]

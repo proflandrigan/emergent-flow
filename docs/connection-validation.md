@@ -1,8 +1,8 @@
 # Connection Validation: Rules as a Portable Artifact
 
-The Colony Mind Python SDK defines type compatibility rules for its visual
+The Emergent Flow Python SDK defines type compatibility rules for its visual
 data/ML platform. These rules are shipped to the separate frontend canvas
-(`colony-mind-canvas`, which never does `import colonymind`) as data, not code.
+(`emergent-flow-canvas`, which never does `import emergentflow`) as data, not code.
 This page documents how that data is structured and used. It is the Epic 3
 Story 7 deliverable, built on the type model of [ADR 0011](./adr/0011-type-model-and-compatibility.md)
 and the rules-as-data decision of [ADR 0012](./adr/0012-rules-as-portable-data.md).
@@ -13,7 +13,7 @@ Two artifacts are committed in `schema/`:
 
 - `schema/rules.json`: contains the type compatibility rules.
 - `schema/diagnostics.schema.json`: defines the JSON Schema of validation
-  diagnostics returned by `cm.validate(graph)`.
+  diagnostics returned by `ef.validate(graph)`.
 
 The `rules.json` artifact has this exact structure:
 
@@ -66,7 +66,7 @@ here; per-dimension shape checking is a future epic, not part of these rules.
 The frontend uses `rules.json` for instant, offline feedback during graph
 construction — red edges as you drag, no server round-trip. However, the SDK is
 the authoritative re-validator. Server-side validation (Epic 6) runs
-`cm.validate` and its verdict is final. If the two disagree (e.g., a stale
+`ef.validate` and its verdict is final. If the two disagree (e.g., a stale
 artifact), the SDK wins. The canvas provides fast UX, not correctness of record.
 
 ## Versioning and drift
@@ -82,10 +82,10 @@ model, preventing silent drift.
 To regenerate the committed artifacts:
 
 ```bash
-python -m colonymind.types.rules_artifact schema/rules.json
-python -m colonymind.codegen.diagnostics_schema schema/diagnostics.schema.json
+python -m emergentflow.types.rules_artifact schema/rules.json
+python -m emergentflow.codegen.diagnostics_schema schema/diagnostics.schema.json
 ```
 
 In-process Python APIs:
-- `cm.build_rules_artifact()` returns the `rules.json` dict.
-- `cm.diagnostics_json_schema()` returns the Diagnostics JSON Schema dict.
+- `ef.build_rules_artifact()` returns the `rules.json` dict.
+- `ef.diagnostics_json_schema()` returns the Diagnostics JSON Schema dict.

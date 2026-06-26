@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-06-23
-- **Deciders:** Colony Mind core team
+- **Deciders:** Emergent Flow core team
 
 ## Context
 
@@ -15,7 +15,7 @@ discipline the repo must keep deliberately.
 ## The invariant (mechanically enforced)
 
 **Nothing under `ui/` may `import`, `require`, or bundle the Python package.** The canvas
-talks to the local server (`colonymind serve`) only over HTTP. This is the load-bearing
+talks to the local server (`emergentflow serve`) only over HTTP. This is the load-bearing
 coupling rule from ADR 0013 Decision 3, and it is the one enforced by a check:
 
 - `scripts/check_ui_boundary.py` scans every TypeScript/JavaScript source file under `ui/`
@@ -24,13 +24,13 @@ coupling rule from ADR 0013 Decision 3, and it is the one enforced by a check:
 - It runs two ways: as the pytest gate `tests/test_ui_boundary.py`, and as a standalone
   CI step (`uv run python scripts/check_ui_boundary.py`) in `.github/workflows/ci.yml`.
 
-A build-output *path string* (e.g. the Vite `outDir: "../colonymind/_static"`) is not an
+A build-output *path string* (e.g. the Vite `outDir: "../emergentflow/_static"`) is not an
 import and is intentionally allowed — the UI writes its compiled assets there; it does not
 import code from there.
 
 ## The contract artifacts (a stated convention)
 
-Only three artifacts are intended to cross the `ui/ ↔ colonymind/` boundary, and they
+Only three artifacts are intended to cross the `ui/ ↔ emergentflow/` boundary, and they
 cross as **data**, never as a code import:
 
 1. the **IR JSON Schema** (Epic 1),

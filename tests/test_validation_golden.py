@@ -1,5 +1,5 @@
 """
-Golden snapshot tests of `cm.validate` diagnostics over the Story 8 fixture
+Golden snapshot tests of `ef.validate` diagnostics over the Story 8 fixture
 corpus, mirroring Epic 2's golden codegen corpus; regenerate with
 `uv run pytest tests/test_validation_golden.py --snapshot-update`. Also note
 a parametrized sanity test asserts the expected top-level severity per case.
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from colonymind.codegen.validation import validate
+from emergentflow.codegen.validation import validate
 from tests.fixtures.validation_corpus import CORPUS
 
 _CASES = [pytest.param(case, id=case.name) for case in CORPUS]

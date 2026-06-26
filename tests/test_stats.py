@@ -1,11 +1,11 @@
-"""Tests for ``colonymind.stats`` (Epic 1, Story 8)."""
+"""Tests for ``emergentflow.stats`` (Epic 1, Story 8)."""
 
 from __future__ import annotations
 
 import pandas as pd
 import pytest
 
-from colonymind.stats import AnovaResult, anova
+from emergentflow.stats import AnovaResult, anova
 
 
 def _separable_groups_df() -> pd.DataFrame:
@@ -76,6 +76,6 @@ def test_anova_deterministic() -> None:
 
 
 def test_anova_registered_as_public_op() -> None:
-    from colonymind.api import PUBLIC_OPS
+    from emergentflow.api import PUBLIC_OPS
 
-    assert "cm.stats.anova" in PUBLIC_OPS
+    assert "ef.stats.anova" in PUBLIC_OPS

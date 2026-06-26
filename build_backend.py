@@ -1,4 +1,4 @@
-"""In-tree PEP 517 build backend: compile ui/ into colonymind/_static/ before the wheel.
+"""In-tree PEP 517 build backend: compile ui/ into emergentflow/_static/ before the wheel.
 
 Wraps ``setuptools.build_meta`` so a real wheel build (``uv build`` / ``python -m build`` /
 ``pip wheel``) runs ``vite build`` and bundles the compiled canvas. The compile is
@@ -32,12 +32,12 @@ _UI_DIR = _ROOT / "ui"
 
 
 def _build_ui() -> None:
-    """Best-effort: compile ui/ into colonymind/_static/. Never raises out of the build."""
+    """Best-effort: compile ui/ into emergentflow/_static/. Never raises out of the build."""
     if not (_UI_DIR / "package.json").is_file():
         return
     npm = shutil.which("npm")
     if npm is None:
-        print("colonymind build: npm not found; skipping ui/ build (server uses demo page).")
+        print("emergentflow build: npm not found; skipping ui/ build (server uses demo page).")
         return
     try:
         # `npm ci` (not a node_modules-exists check) so a stale node_modules from
@@ -47,7 +47,7 @@ def _build_ui() -> None:
         subprocess.run([npm, "ci"], cwd=_UI_DIR, check=True)
         subprocess.run([npm, "run", "build"], cwd=_UI_DIR, check=True)
     except (OSError, subprocess.CalledProcessError) as exc:
-        print(f"colonymind build: ui/ build skipped ({exc}); server uses the demo page.")
+        print(f"emergentflow build: ui/ build skipped ({exc}); server uses the demo page.")
 
 
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):

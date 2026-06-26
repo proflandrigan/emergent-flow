@@ -6,9 +6,9 @@
 > here, but diverge for later epics). Cross-references in the prose below (e.g. "Blocks:
 > Epics 3, 5") use **roadmap** numbers. See [`epics/README.md`](./README.md) for the full
 > mapping — notably, the roadmap's Epics 3 & 4 (the React/TS frontend canvas & node-config
-> UX) ship in the separate `colony-mind-canvas` repo, not here.
+> UX) ship in the separate `emergent-flow-canvas` repo, not here.
 
-> The spine of Colony Mind. A versioned, open-source Python SDK plus a
+> The spine of Emergent Flow. A versioned, open-source Python SDK plus a
 > canonical graph schema (the IR) that every other layer reads and writes. Nothing else
 > can be built reliably until this is right — and the IR schema is the single hardest
 > thing to change later.
@@ -101,7 +101,7 @@
 
 ## Story 6 — SDK packaging, versioning & public API conventions
 
-- [x] Establish the package layout and namespace (e.g. `import colonymind as cm`, `cm.data`, `cm.clean`, `cm.stats`, `cm.ml`, `cm.reports`).
+- [x] Establish the package layout and namespace (e.g. `import emergentflow as ef`, `ef.data`, `ef.clean`, `ef.stats`, `ef.ml`, `ef.reports`).
 - [x] **Pin all dependency versions** (deterministic, reproducible installs).
 - [x] Adopt a versioning scheme (semantic versioning) and document the release process.
 - [x] Set up build + publish pipeline to a package index.
@@ -127,11 +127,11 @@
 > Deliberately narrow but end-to-end: the exact flow from the proposal example
 > (load → clean → one stats test → one model → HTML report). Breadth comes later (Epic 4).
 
-- [x] **Data ingestion** wrapper (Pandas/Polars) — e.g. `cm.data.load_csv(...)`.
-- [x] **Cleaning / imputation** wrapper — e.g. `cm.clean.impute_missing(...)`.
-- [x] **Statistical analytics** wrapper (Statsmodels) — e.g. `cm.stats.anova(...)`.
-- [x] **Classical ML** wrapper (Scikit-Learn) — e.g. `cm.ml.train_classifier(...)`.
-- [x] **Automated reporting** wrapper (YData-Profiling / Sweetviz) — e.g. `cm.reports.generate_html_summary(...)`.
+- [x] **Data ingestion** wrapper (Pandas/Polars) — e.g. `ef.data.load_csv(...)`.
+- [x] **Cleaning / imputation** wrapper — e.g. `ef.clean.impute_missing(...)`.
+- [x] **Statistical analytics** wrapper (Statsmodels) — e.g. `ef.stats.anova(...)`.
+- [x] **Classical ML** wrapper (Scikit-Learn) — e.g. `ef.ml.train_classifier(...)`.
+- [x] **Automated reporting** wrapper (YData-Profiling / Sweetviz) — e.g. `ef.reports.generate_html_summary(...)`.
 - [x] Register all of the above as node definitions conforming to Story 3.
 - [x] Author one worked example graph that exercises the full slice end to end.
 

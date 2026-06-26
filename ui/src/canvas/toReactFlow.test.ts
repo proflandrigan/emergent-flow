@@ -13,7 +13,7 @@ describe("toRFEdge", () => {
   test("compatible === false marks the edge incompatible and carries the reason", () => {
     const rfEdge = toRFEdge(edge, false, false, "Expected int, got str");
 
-    expect(rfEdge.type).toBe("cmEdge");
+    expect(rfEdge.type).toBe("efEdge");
     expect(rfEdge.source).toBe("a");
     expect(rfEdge.sourceHandle).toBe("pa");
     expect(rfEdge.target).toBe("b");

@@ -3,14 +3,14 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cm-timeseries"
+name = "ef-timeseries"
 version = "0.1.0"
-description = "Example out-of-core Colony Mind type-token plugin (Epic 3, Story 2)."
+description = "Example out-of-core Emergent Flow type-token plugin (Epic 3, Story 2)."
 requires-python = ">=3.11"
-dependencies = ["colonymind"]
+dependencies = ["emergentflow"]
 
-[project.entry-points."colonymind.types"]
-time_series = "cm_timeseries.types:TIMESERIES"
+[project.entry-points."emergentflow.types"]
+time_series = "ef_timeseries.types:TIMESERIES"
 
 [tool.setuptools.packages.find]
-include = ["cm_timeseries*"]
+include = ["ef_timeseries*"]

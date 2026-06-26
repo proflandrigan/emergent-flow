@@ -1,4 +1,4 @@
-# Colony Mind IR Specification
+# Emergent Flow IR Specification
 
 - **Version:** 1 (matches `CURRENT_SCHEMA_VERSION`)
 - **Status:** Accepted
@@ -8,7 +8,7 @@
 
 ## Overview
 
-The Colony Mind Intermediate Representation (IR) is the canonical, serializable,
+The Emergent Flow Intermediate Representation (IR) is the canonical, serializable,
 declarative graph representation of a pipeline, module, or agent. It is the single
 source of truth for what a graph *is* — exported Python code is a one-way compiled
 artifact and does not sync back (ADR 0001). Execution runs over the IR directly
@@ -26,13 +26,13 @@ Relevant ADRs:
 
 ## Model Reference
 
-All models are defined in `colonymind/ir/` and are Pydantic v2 subclasses of `IRModel`
+All models are defined in `emergentflow/ir/` and are Pydantic v2 subclasses of `IRModel`
 (`extra="forbid"`, `validate_assignment=True`). `IRId` is an opaque `str`; `new_id()`
 generates a UUID4 string.
 
 ### Graph
 
-`colonymind.ir.graph.Graph` — top-level serializable IR object.
+`emergentflow.ir.graph.Graph` — top-level serializable IR object.
 
 | Field | Type | Default | Semantics |
 |---|---|---|---|
@@ -48,7 +48,7 @@ is `IN`; `group_id` references an existing node.
 
 ### Node
 
-`colonymind.ir.node.Node` — the central element of a graph.
+`emergentflow.ir.node.Node` — the central element of a graph.
 
 | Field | Type | Default | Semantics |
 |---|---|---|---|
@@ -64,7 +64,7 @@ is `IN`; `group_id` references an existing node.
 
 ### Position
 
-`colonymind.ir.node.Position` — 2-D canvas coordinates.
+`emergentflow.ir.node.Position` — 2-D canvas coordinates.
 
 | Field | Type | Default | Semantics |
 |---|---|---|---|
@@ -73,19 +73,19 @@ is `IN`; `group_id` references an existing node.
 
 ### Port
 
-`colonymind.ir.port.Port` — a typed connection point on a node.
+`emergentflow.ir.port.Port` — a typed connection point on a node.
 
 | Field | Type | Default | Semantics |
 |---|---|---|---|
 | `id` | `IRId` | `new_id()` | Stable unique identifier (auto-generated). |
 | `name` | `str` | required | Port name, unique within its node. Non-empty. |
 | `direction` | `Direction` | required | `"in"` (incoming edge) or `"out"` (outgoing edge). |
-| `data_type` | `str` | `"any"` | Data-type token; stays a string on the wire but is validated against the type registry and resolved by inference during `cm.validate`. See [type-system-spec.md](./type-system-spec.md). |
+| `data_type` | `str` | `"any"` | Data-type token; stays a string on the wire but is validated against the type registry and resolved by inference during `ef.validate`. See [type-system-spec.md](./type-system-spec.md). |
 | `cardinality` | `Cardinality` | `"one"` | `"one"` = single connection; `"many"` = fan-in/out allowed. |
 
 ### Edge and PortRef
 
-`colonymind.ir.edge.Edge` — connects an OUT port on a source node to an IN port on a
+`emergentflow.ir.edge.Edge` — connects an OUT port on a source node to an IN port on a
 target node.
 
 | Field | Type | Default | Semantics |
@@ -93,9 +93,9 @@ target node.
 | `id` | `IRId` | `new_id()` | Stable unique identifier (auto-generated). |
 | `source` | `PortRef` | required | The OUT-side endpoint (`node_id` + `port_id`). |
 | `target` | `PortRef` | required | The IN-side endpoint (`node_id` + `port_id`). |
-| `type_compatible` | `bool \| None` | `None` | Type-compatibility metadata. `None` = not yet checked / unknown; populated by `cm.apply_type_compatibility` from a `cm.validate` result. |
+| `type_compatible` | `bool \| None` | `None` | Type-compatibility metadata. `None` = not yet checked / unknown; populated by `ef.apply_type_compatibility` from a `ef.validate` result. |
 
-`colonymind.ir.edge.PortRef` — an endpoint reference.
+`emergentflow.ir.edge.PortRef` — an endpoint reference.
 
 | Field | Type | Default | Semantics |
 |---|---|---|---|
@@ -108,7 +108,7 @@ is enforced by `Graph`'s model validator.
 
 ### Param
 
-`colonymind.ir.params.Param` — a single typed, defaulted, serializable parameter on a node.
+`emergentflow.ir.params.Param` — a single typed, defaulted, serializable parameter on a node.
 
 | Field | Type | Default | Semantics |
 |---|---|---|---|
@@ -128,7 +128,7 @@ shape (e.g. `{"uri": "..."}`) is preserved as a mapping, so JSON round-trips are
 
 ### ArtifactRef
 
-`colonymind.ir.common.ArtifactRef` — a pointer to a large artifact stored outside the IR.
+`emergentflow.ir.common.ArtifactRef` — a pointer to a large artifact stored outside the IR.
 
 | Field | Type | Default | Semantics |
 |---|---|---|---|
@@ -192,7 +192,7 @@ set `group_id` to a node in the outer graph. Leaf nodes have `subgraph=None` and
 ## Schema Versioning
 
 Every `Graph` carries `schema_version: int` (current value: `1`, defined as
-`colonymind.ir.graph.CURRENT_SCHEMA_VERSION`). Loaders can inspect this field to detect
+`emergentflow.ir.graph.CURRENT_SCHEMA_VERSION`). Loaders can inspect this field to detect
 stale or future graphs and reject or migrate them accordingly.
 
 The migration framework (load old version → migrate → current, with versioned, ordered
@@ -210,10 +210,10 @@ Key points:
 
 - **Reference serializer:** `Graph.model_dump_json()` (Pydantic v2).
 - **Reference deserializer:** `Graph.model_validate_json()`.
-- **Language-agnostic contract:** `colonymind.ir.schema.ir_json_schema()` (wraps
+- **Language-agnostic contract:** `emergentflow.ir.schema.ir_json_schema()` (wraps
   `Graph.model_json_schema()`) emits a standard JSON Schema document for non-Python
   clients (TypeScript frontend, CI validators, third-party integrations).
-- **File extension:** `.cm.json` for persisted graph files.
+- **File extension:** `.ef.json` for persisted graph files.
 
 ---
 

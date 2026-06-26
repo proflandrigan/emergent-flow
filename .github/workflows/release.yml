@@ -1,7 +1,7 @@
 name: Release
 
 # Scaffold: builds and publishes to PyPI via Trusted Publishing (OIDC) on a v* tag.
-# Trusted Publishing must be configured on PyPI for project "colonymind" before the first
+# Trusted Publishing must be configured on PyPI for project "emergentflow" before the first
 # real release; no API token secret is required. Not exercised until a tag is pushed.
 
 on:
@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/colonymind
+      url: https://pypi.org/p/emergentflow
     permissions:
       id-token: write
     steps:

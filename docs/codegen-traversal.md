@@ -1,7 +1,7 @@
 # Codegen Graph Traversal (Story 2)
 
-The code-generation engine (`colonymind.codegen`, Epic 2) turns a graph IR into either
-runnable Python (`cm.compile_to_code`, Story 5) or executed results (`cm.execute`, Story 6).
+The code-generation engine (`emergentflow.codegen`, Epic 2) turns a graph IR into either
+runnable Python (`ef.compile_to_code`, Story 5) or executed results (`ef.execute`, Story 6).
 Both paths first need to understand the graph's *shape*: in what order do nodes run, and which
 upstream output feeds each node's inputs? Story 2 provides that shared, paradigm-agnostic
 plumbing. It is pure analysis over a single functional-pipeline `Graph` — no code is emitted
@@ -14,18 +14,18 @@ focuses on ordering, cycles, and wiring.
 
 ## Public surface
 
-Both functions are exposed through the lazily-imported `cm.codegen` namespace:
+Both functions are exposed through the lazily-imported `ef.codegen` namespace:
 
 ```python
-import colonymind as cm
+import emergentflow as ef
 
-order = cm.codegen.topological_sort(graph)   # list[node_id]
-wiring = cm.codegen.build_wiring_map(graph)   # WiringMap
+order = ef.codegen.topological_sort(graph)   # list[node_id]
+wiring = ef.codegen.build_wiring_map(graph)   # WiringMap
 ```
 
-The whole-graph verbs `cm.compile_to_code` (Story 5) and `cm.execute` (Story 6) are implemented at the top level
+The whole-graph verbs `ef.compile_to_code` (Story 5) and `ef.execute` (Story 6) are implemented at the top level
 per [ADR 0010](adr/0010-codegen-package-placement.md); the traversal helpers sit under
-`cm.codegen` because they are internal plumbing those verbs compose.
+`ef.codegen` because they are internal plumbing those verbs compose.
 
 ## Deterministic topological order
 
