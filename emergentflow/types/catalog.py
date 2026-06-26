@@ -33,6 +33,7 @@ register_type(
         description="The result table produced by an ANOVA statistical test.",
     )
 )
+register_type(TypeDef(token="TTestResult", description="The result of a two-sample t-test."))
 register_type(TypeDef(token="HTML", description="A rendered HTML document/report fragment."))
 register_type(
     TypeDef(
@@ -42,4 +43,11 @@ register_type(
             "shape inference is deferred to roadmap Epic 10)."
         ),
     )
+)
+register_type(
+    TypeDef(token="Model", description="A fitted machine-learning model (estimator + metadata).")
+)
+register_type(TypeDef(token="Predictions", description="A DataFrame of model predictions."))
+register_type(
+    TypeDef(token="EvaluationResult", description="Evaluation metrics for a fitted model.")
 )

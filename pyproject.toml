@@ -38,6 +38,10 @@ dependencies = [
     # (see docs/licensing-and-dependencies.md).
     "statsmodels>=0.14,<1",
     "scikit-learn>=1.4",
+    # scipy (BSD-3-Clause) backs ef.stats.ttest (scipy.stats.ttest_ind). It is already present
+    # transitively via scikit-learn/statsmodels, but ef.stats imports it directly, so it is
+    # declared explicitly here (see docs/licensing-and-dependencies.md). Not a GPL dep.
+    "scipy>=1.10",
     # pyarrow (Apache-2.0) is the parquet engine backing ef.data.load_parquet.
     # Apache-2.0 is compatible with this SDK's license (see docs/licensing-and-dependencies.md);
     # it is NOT a GPL dep. pandas.read_parquet needs an engine, so this is a hard dependency.
@@ -123,5 +127,5 @@ init_typed = true
 # declarative codegen seam imports it lazily, only when actually running an
 # nn.Module), so it is absent in CI — ignore its missing import.
 [[tool.mypy.overrides]]
-module = ["pandas.*", "statsmodels.*", "ydata_profiling.*", "sklearn.*", "torch.*"]
+module = ["pandas.*", "statsmodels.*", "ydata_profiling.*", "sklearn.*", "scipy.*", "torch.*"]
 ignore_missing_imports = true

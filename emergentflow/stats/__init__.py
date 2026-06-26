@@ -19,11 +19,22 @@ from dataclasses import dataclass
 
 import pandas as pd
 import statsmodels.api as sm
+from scipy.stats import ttest_ind
 from statsmodels.formula.api import ols
 
 from emergentflow.api import public_op
 
-__all__ = ["anova", "AnovaResult"]
+__all__ = [
+    "anova",
+    "AnovaResult",
+    "correlation",
+    "CORR_METHODS",
+    "describe",
+    "ttest",
+    "TTestResult",
+]
+
+CORR_METHODS = ("pearson", "spearman", "kendall")
 
 
 @dataclass
@@ -42,6 +53,72 @@ class AnovaResult:
     p_value: float
     effect_size: float
     summary: pd.DataFrame
+
+
+@dataclass
+class TTestResult:
+    """Structured, inspectable result of a two-sample t-test.
+
+    Fields: t_statistic, p_value, df (degrees of freedom), group_a/group_b (the two group labels,
+    sorted), n_a/n_b (per-group sizes), mean_a/mean_b (per-group means), equal_var (whether a
+    Student's t-test was used vs Welch's).
+    """
+
+    t_statistic: float
+    p_value: float
+    df: float
+    group_a: str
+    group_b: str
+    n_a: int
+    n_b: int
+    mean_a: float
+    mean_b: float
+    equal_var: bool
+
+
+@public_op(name="ef.stats.ttest")
+def ttest(
+    df: pd.DataFrame,
+    *,
+    group_col: str,
+    value_col: str,
+    equal_var: bool = True,
+    alpha: float = 0.05,
+) -> TTestResult:
+    """Two-sample t-test of ``value_col`` between the two groups in ``group_col``.
+
+    Thin wrapper over ``scipy.stats.ttest_ind``. ``group_col`` must contain EXACTLY two distinct
+    groups. ``equal_var=True`` runs Student's t-test; ``False`` runs Welch's. ``alpha`` is recorded
+    for callers but does not change the computation (the raw p-value is reported). Deterministic.
+    """
+    if group_col not in df.columns:
+        raise ValueError(f"unknown group_col {group_col!r}; expected one of {list(df.columns)!r}.")
+    if value_col not in df.columns:
+        raise ValueError(f"unknown value_col {value_col!r}; expected one of {list(df.columns)!r}.")
+    if group_col == value_col:
+        raise ValueError(f"group_col and value_col must differ; both were {group_col!r}.")
+    groups = sorted(str(g) for g in df[group_col].dropna().unique())
+    if len(groups) != 2:
+        raise ValueError(
+            f"two-sample t-test needs exactly 2 distinct groups in {group_col!r}; "
+            f"found {len(groups)}."
+        )
+    a_label, b_label = groups[0], groups[1]
+    a = df.loc[df[group_col].astype(str) == a_label, value_col]
+    b = df.loc[df[group_col].astype(str) == b_label, value_col]
+    res = ttest_ind(a, b, equal_var=equal_var)
+    return TTestResult(
+        t_statistic=float(res.statistic),
+        p_value=float(res.pvalue),
+        df=float(res.df),
+        group_a=a_label,
+        group_b=b_label,
+        n_a=int(a.shape[0]),
+        n_b=int(b.shape[0]),
+        mean_a=float(a.mean()),
+        mean_b=float(b.mean()),
+        equal_var=bool(equal_var),
+    )
 
 
 @public_op(name="ef.stats.anova")
@@ -86,3 +163,48 @@ def anova(
         effect_size=partial_eta_sq,
         summary=table,
     )
+
+
+@public_op(name="ef.stats.describe")
+def describe(df: pd.DataFrame, *, columns: list[str] | None = None) -> pd.DataFrame:
+    """Compute summary statistics for numeric columns, returned as a tidy DataFrame.
+
+    Thin wrapper over ``pandas.DataFrame.describe``. With ``columns`` given, only those
+    columns are described (each must exist). The statistic name (count, mean, std, ...) is
+    moved from the index into a leading ``statistic`` column so the result is tidy/serializable.
+    """
+    if columns is not None:
+        unknown = [c for c in columns if c not in df.columns]
+        if unknown:
+            raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+        target = df[columns]
+    else:
+        target = df
+    result = target.describe().reset_index(names="statistic")
+    return result
+
+
+@public_op(name="ef.stats.correlation")
+def correlation(
+    df: pd.DataFrame,
+    *,
+    method: str = "pearson",
+    columns: list[str] | None = None,
+) -> pd.DataFrame:
+    """Compute a pairwise correlation matrix, returned as a tidy DataFrame.
+
+    Thin wrapper over ``pandas.DataFrame.corr``. ``method`` is one of pearson/spearman/kendall.
+    With ``columns`` given, only those columns are correlated (each must exist). The row labels
+    are moved into a leading ``column`` field so the matrix is tidy/serializable.
+    """
+    if method not in CORR_METHODS:
+        raise ValueError(f"unknown method {method!r}; expected one of {list(CORR_METHODS)!r}.")
+    if columns is not None:
+        unknown = [c for c in columns if c not in df.columns]
+        if unknown:
+            raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+        target = df[columns]
+    else:
+        target = df.select_dtypes(include="number")
+    result = target.corr(method=method).reset_index(names="column")
+    return result
