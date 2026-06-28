@@ -262,6 +262,7 @@ emergent-flow/
   the tag-driven release process.
 - [Architecture Decision Records](./docs/adr/) — the foundational `§A` decisions.
 - [How to Author a Node](./docs/authoring-a-node.md) — the node-definition contract in practice.
+- [The Acceptance Demo](./docs/acceptance-demo.md) — the end-to-end pipeline that shows what the app can do today (supersedes the original 5-node vertical slice).
 
 The SDK uses [`uv`](https://docs.astral.sh/uv/) for reproducible installs (`uv sync`), `ruff`
 for lint + format, and `mypy` for type-checking; CI runs all three plus the test suite on

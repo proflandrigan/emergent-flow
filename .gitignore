@@ -125,6 +125,8 @@ credentials.json
 churn_report.html
 # The vertical-slice demo writes this when run directly; it's a generated artifact.
 examples/vertical_slice/report.html
+# The acceptance-demo writes this when run directly; it's a generated artifact.
+examples/acceptance_demo/report.html
 
 # ─────────────────────────────────────────────────────────────
 # Redis / Celery

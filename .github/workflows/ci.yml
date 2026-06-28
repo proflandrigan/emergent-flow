@@ -46,6 +46,11 @@ jobs:
       - name: Run tests
         run: uv run pytest
 
+      - name: Verify generated UI contracts are up to date
+        run: |
+          uv run python scripts/export_ui_contracts.py
+          git diff --exit-code ui/src/generated/catalog.json ui/src/generated/ir.schema.json
+
       - name: UI boundary check (ui/ must not import emergentflow)
         run: uv run python scripts/check_ui_boundary.py
 

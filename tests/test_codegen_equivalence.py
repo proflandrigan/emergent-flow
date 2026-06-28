@@ -427,6 +427,14 @@ def test_functional_pipeline_equivalence() -> None:
     assert_equivalent(graph, cwd=REPO_ROOT)
 
 
+@pytest.mark.equivalence
+def test_acceptance_demo_equivalence() -> None:
+    """The Story 7 acceptance demo (incl. the Model-bearing train->evaluate edge) is
+    equivalent end to end. Uses the bundled sample dataset, so no cwd/file setup is needed."""
+    graph = load_graph(REPO_ROOT / "examples" / "acceptance_demo" / "pipeline.json")
+    assert_equivalent(graph)
+
+
 def _diamond_graph() -> Graph:
     """A reconverging diamond: src -> {dbl_a, dbl_b} -> join.
 
