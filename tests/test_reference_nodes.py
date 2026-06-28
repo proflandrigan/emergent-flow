@@ -16,15 +16,28 @@ from emergentflow.codegen.wiring import build_wiring_map
 from emergentflow.ir.common import Direction, Paradigm
 from emergentflow.ir.edge import Edge, PortRef
 from emergentflow.ir.graph import Graph
+from emergentflow.ml import train_regressor
 from emergentflow.nodes.examples import (
     Anova,
+    CastTypes,
+    Correlation,
+    Describe,
+    DropMissing,
+    Evaluate,
+    FilterRows,
     GenerateHtmlSummary,
     ImputeMissing,
     LoadCsv,
     LoadJson,
     LoadParquet,
     LoadSample,
+    Predict,
+    SelectColumns,
     TrainClassifier,
+    TrainRandomForest,
+    TrainRegressor,
+    TrainTestSplit,
+    TTest,
 )
 
 
@@ -139,6 +152,104 @@ class TestImputeMissing:
 
 
 # ---------------------------------------------------------------------------
+# clean.drop_missing
+# ---------------------------------------------------------------------------
+
+
+class TestDropMissing:
+    def test_codegen_body_golden(self):
+        defn = DropMissing()
+        node = defn.instantiate(axis="rows", how="any")
+        frag = defn.preview(node)
+        assert frag.imports == ["import emergentflow as ef"]
+        assert (
+            frag.body == "frame = ef.clean.drop_missing(frame, axis='rows', how='any', subset=None)"
+        )
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = DropMissing()
+        df = pd.DataFrame({"a": [1.0, None, 3.0]})
+        node = defn.instantiate(axis="rows", how="any")
+        executed = defn.execute(node, inputs={"frame": df.copy()})
+        scope = {"frame": df.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
+# clean.select_columns
+# ---------------------------------------------------------------------------
+
+
+class TestSelectColumns:
+    def test_codegen_body_golden(self):
+        defn = SelectColumns()
+        node = defn.instantiate(columns=["a"])
+        frag = defn.preview(node)
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == "frame = ef.clean.select_columns(frame, columns=['a'], drop=False)"
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = SelectColumns()
+        df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0], "c": [7.0, 8.0, 9.0]})
+        node = defn.instantiate(columns=["a", "c"])
+        executed = defn.execute(node, inputs={"frame": df.copy()})
+        scope = {"frame": df.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
+# clean.cast_types
+# ---------------------------------------------------------------------------
+
+
+class TestCastTypes:
+    def test_codegen_body_golden(self):
+        defn = CastTypes()
+        node = defn.instantiate(dtypes={"a": "float"})
+        frag = defn.preview(node)
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == "frame = ef.clean.cast_types(frame, dtypes={'a': 'float'})"
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = CastTypes()
+        df = pd.DataFrame({"a": [1, 2, 3]})
+        node = defn.instantiate(dtypes={"a": "float"})
+        executed = defn.execute(node, inputs={"frame": df.copy()})
+        scope = {"frame": df.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
+# clean.filter_rows
+# ---------------------------------------------------------------------------
+
+
+class TestFilterRows:
+    def test_codegen_body_golden(self):
+        defn = FilterRows()
+        node = defn.instantiate(column="a", operator=">", value=1)
+        frag = defn.preview(node)
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == "frame = ef.clean.filter_rows(frame, column='a', operator='>', value=1)"
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = FilterRows()
+        df = pd.DataFrame({"a": [1, 2, 3, 4]})
+        node = defn.instantiate(column="a", operator=">", value=2)
+        executed = defn.execute(node, inputs={"frame": df.copy()})
+        scope = {"frame": df.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
 # stats.anova
 # ---------------------------------------------------------------------------
 
@@ -162,6 +273,95 @@ class TestAnova:
         assert generated.p_value == executed.p_value
         assert generated.effect_size == executed.effect_size
         assert generated.summary.equals(executed.summary)
+
+
+# ---------------------------------------------------------------------------
+# stats.ttest
+# ---------------------------------------------------------------------------
+
+
+class TestTTest:
+    def test_codegen_body_golden(self):
+        defn = TTest()
+        node = defn.instantiate(group_col="grp", value_col="score")
+        frag = defn.preview(node)
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == (
+            "result = ef.stats.ttest(frame, group_col='grp', value_col='score', "
+            "equal_var=True, alpha=0.05)"
+        )
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = TTest()
+        df = pd.DataFrame(
+            {
+                "grp": ["a", "a", "a", "b", "b", "b"],
+                "score": [1.0, 2.0, 3.0, 5.0, 6.0, 7.0],
+            }
+        )
+        node = defn.instantiate(group_col="grp", value_col="score")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+
+        assert generated.t_statistic == executed.t_statistic
+        assert generated.p_value == executed.p_value
+        assert generated.df == executed.df
+        assert generated.group_a == executed.group_a
+        assert generated.group_b == executed.group_b
+        assert generated.n_a == executed.n_a
+        assert generated.n_b == executed.n_b
+        assert generated.mean_a == executed.mean_a
+        assert generated.mean_b == executed.mean_b
+        assert generated.equal_var == executed.equal_var
+        assert generated.alpha == executed.alpha
+
+
+# ---------------------------------------------------------------------------
+# stats.describe
+# ---------------------------------------------------------------------------
+
+
+class TestDescribe:
+    def test_codegen_body_golden(self):
+        defn = Describe()
+        node = defn.instantiate(columns=None)
+        frag = defn.preview(node)
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == "summary = ef.stats.describe(frame, columns=None)"
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Describe()
+        df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
+        node = defn.instantiate()
+        executed = defn.execute(node, inputs={"frame": df.copy()})["summary"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        assert scope["summary"].equals(executed)
+
+
+# ---------------------------------------------------------------------------
+# stats.correlation
+# ---------------------------------------------------------------------------
+
+
+class TestCorrelation:
+    def test_codegen_body_golden(self):
+        defn = Correlation()
+        node = defn.instantiate(method="pearson")
+        frag = defn.preview(node)
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == "matrix = ef.stats.correlation(frame, method='pearson', columns=None)"
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Correlation()
+        df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0]})
+        node = defn.instantiate()
+        executed = defn.execute(node, inputs={"frame": df.copy()})["matrix"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        assert scope["matrix"].equals(executed)
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +391,168 @@ class TestTrainClassifier:
         generated = scope["result"]
 
         assert generated == executed
+
+
+# ---------------------------------------------------------------------------
+# ml.train_regressor
+# ---------------------------------------------------------------------------
+
+
+class TestTrainRegressor:
+    def test_codegen_body_golden(self):
+        defn = TrainRegressor()
+        node = defn.instantiate(target="y")
+        frag = defn.preview(node)
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == "model = ef.ml.train_regressor(frame, target='y', features=None)"
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code.
+
+        LinearRegression is deterministic, so the two paths must yield a FittedModel
+        with identical inspectable metadata and fitted coefficients.
+        """
+        defn = TrainRegressor()
+        df = pd.DataFrame(
+            {
+                "x": [float(i) for i in range(20)],
+                "y": [2.0 * float(i) + 1.0 for i in range(20)],
+            }
+        )
+        node = defn.instantiate(target="y")
+        executed = defn.execute(node, inputs={"frame": df.copy()})
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+
+        assert executed["model"].estimator_type == scope["model"].estimator_type
+        assert executed["model"].task == scope["model"].task
+        assert executed["model"].target == scope["model"].target
+        assert executed["model"].feature_names == scope["model"].feature_names
+        assert executed["model"].estimator.coef_.tolist() == scope["model"].estimator.coef_.tolist()
+
+
+# ---------------------------------------------------------------------------
+# ml.train_random_forest
+# ---------------------------------------------------------------------------
+
+
+class TestTrainRandomForest:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code.
+
+        RandomForestClassifier is deterministic given random_state, so the two paths
+        must yield a FittedModel with identical inspectable metadata and identical
+        predictions on the training feature matrix.
+        """
+        defn = TrainRandomForest()
+        df = pd.DataFrame(
+            {
+                "x1": [float(i) for i in range(20)] + [float(i) for i in range(20)],
+                "x2": [float(i % 5) for i in range(40)],
+                "label": ["low" if i % 2 == 0 else "high" for i in range(40)],
+            }
+        )
+        X = df[["x1", "x2"]]
+        node = defn.instantiate(target="label", random_state=0)
+        executed = defn.execute(node, inputs={"frame": df.copy()})
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+
+        assert executed["model"].estimator_type == scope["model"].estimator_type
+        assert executed["model"].task == scope["model"].task
+        assert executed["model"].target == scope["model"].target
+        assert executed["model"].feature_names == scope["model"].feature_names
+        assert (
+            executed["model"].estimator.predict(X).tolist()
+            == scope["model"].estimator.predict(X).tolist()
+        )
+
+
+# ---------------------------------------------------------------------------
+# ml.train_test_split
+# ---------------------------------------------------------------------------
+
+
+class TestTrainTestSplit:
+    def test_codegen_body_golden(self):
+        defn = TrainTestSplit()
+        node = defn.instantiate(test_size=0.25, random_state=0)
+        frag = defn.preview(node)
+        assert frag.imports == ["import emergentflow as ef"]
+        assert (
+            frag.body
+            == "train, test = ef.ml.train_test_split(frame, test_size=0.25, random_state=0)"
+        )
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code (both OUT ports)."""
+        defn = TrainTestSplit()
+        df = pd.DataFrame(
+            {
+                "a": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+                "b": [8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0],
+            }
+        )
+        node = defn.instantiate(test_size=0.25, random_state=0)
+        executed = defn.execute(node, inputs={"frame": df.copy()})
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        assert scope["train"].equals(executed["train"])
+        assert scope["test"].equals(executed["test"])
+
+
+# ---------------------------------------------------------------------------
+# ml.predict
+# ---------------------------------------------------------------------------
+
+
+class TestPredict:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code.
+
+        The same fitted model object is injected into both the execute inputs dict
+        and the _run_codegen scope so both paths use identical estimator state.
+        """
+        defn = Predict()
+        df = pd.DataFrame(
+            {
+                "x": [float(i) for i in range(20)],
+                "y": [2.0 * float(i) + 1.0 for i in range(20)],
+            }
+        )
+        model = train_regressor(df, target="y")
+        node = defn.instantiate()
+        executed = defn.execute(node, inputs={"model": model, "frame": df.copy()})
+        scope = {"model": model, "frame": df.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["predictions"].equals(executed["predictions"])
+
+
+# ---------------------------------------------------------------------------
+# ml.evaluate
+# ---------------------------------------------------------------------------
+
+
+class TestEvaluate:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code.
+
+        The same fitted model object is injected into both the execute inputs dict
+        and the _run_codegen scope so both paths use identical estimator state.
+        """
+        defn = Evaluate()
+        df = pd.DataFrame(
+            {
+                "x": [float(i) for i in range(20)],
+                "y": [2.0 * float(i) + 1.0 for i in range(20)],
+            }
+        )
+        model = train_regressor(df, target="y")
+        node = defn.instantiate()
+        inputs = {"model": model, "frame": df}
+        executed = defn.execute(node, inputs)
+        scope = {"model": model, "frame": df}
+        _run_codegen(defn, node, scope)
+        assert scope["result"].task == executed["result"].task
+        assert scope["result"].n == executed["result"].n
+        assert scope["result"].metrics == executed["result"].metrics
 
 
 # ---------------------------------------------------------------------------

@@ -15,6 +15,12 @@ re-implementing them inline.
 """
 
 from .anova import Anova
+from .cast_types import CastTypes
+from .correlation import Correlation
+from .describe import Describe
+from .drop_missing import DropMissing
+from .evaluate import Evaluate
+from .filter_rows import FilterRows
 from .impute import ImputeMissing
 from .load_csv import LoadCsv
 from .load_json import LoadJson
@@ -23,19 +29,37 @@ from .load_sample import LoadSample
 from .nn_linear import NnLinear
 from .nn_module import NnModule
 from .nn_relu import NnReLU
+from .predict import Predict
 from .report import GenerateHtmlSummary
+from .select_columns import SelectColumns
 from .train import TrainClassifier
+from .train_random_forest import TrainRandomForest
+from .train_regressor import TrainRegressor
+from .train_test_split import TrainTestSplit
+from .ttest import TTest
 
 __all__ = [
-    "LoadCsv",
-    "LoadParquet",
-    "LoadJson",
-    "LoadSample",
-    "ImputeMissing",
     "Anova",
-    "TrainClassifier",
+    "CastTypes",
+    "Correlation",
+    "Describe",
+    "DropMissing",
+    "Evaluate",
+    "FilterRows",
     "GenerateHtmlSummary",
+    "ImputeMissing",
+    "LoadCsv",
+    "LoadJson",
+    "LoadParquet",
+    "LoadSample",
     "NnLinear",
-    "NnReLU",
     "NnModule",
+    "NnReLU",
+    "Predict",
+    "SelectColumns",
+    "TrainClassifier",
+    "TrainRandomForest",
+    "TrainRegressor",
+    "TrainTestSplit",
+    "TTest",
 ]

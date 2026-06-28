@@ -11,7 +11,11 @@
     "AnovaResult",
     "ClassifierResult",
     "DataFrame",
+    "EvaluationResult",
     "HTML",
+    "Model",
+    "Predictions",
+    "TTestResult",
     "Tensor",
     "any"
   ],

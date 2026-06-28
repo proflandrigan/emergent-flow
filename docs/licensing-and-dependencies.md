@@ -12,6 +12,7 @@ The following table lists the current runtime dependencies and their licenses.
 | pandas | >=2,<3 | BSD-3-Clause | Yes |
 | statsmodels | >=0.14,<1 | BSD-3-Clause | Yes |
 | scikit-learn | >=1.4 | BSD-3-Clause | Yes |
+| scipy | >=1.10 | BSD-3-Clause | Yes |
 | ydata-profiling | >=4 | MIT | Yes |
 | setuptools | >=68,<81 | MIT | Yes |
 
