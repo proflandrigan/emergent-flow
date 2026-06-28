@@ -304,3 +304,19 @@ def test_ttest_deterministic() -> None:
 
     assert first.t_statistic == second.t_statistic
     assert first.p_value == second.p_value
+
+
+def test_ttest_alpha_is_recorded() -> None:
+    df = _two_group_df()
+
+    result = ttest(df, group_col="grp", value_col="score", alpha=0.01)
+
+    assert result.alpha == 0.01
+
+
+def test_ttest_alpha_default_is_stored() -> None:
+    df = _two_group_df()
+
+    result = ttest(df, group_col="grp", value_col="score")
+
+    assert result.alpha == 0.05

@@ -61,7 +61,7 @@ class TTestResult:
 
     Fields: t_statistic, p_value, df (degrees of freedom), group_a/group_b (the two group labels,
     sorted), n_a/n_b (per-group sizes), mean_a/mean_b (per-group means), equal_var (whether a
-    Student's t-test was used vs Welch's).
+    Student's t-test was used vs Welch's), alpha (the caller-supplied significance threshold).
     """
 
     t_statistic: float
@@ -74,6 +74,7 @@ class TTestResult:
     mean_a: float
     mean_b: float
     equal_var: bool
+    alpha: float
 
 
 @public_op(name="ef.stats.ttest")
@@ -118,6 +119,7 @@ def ttest(
         mean_a=float(a.mean()),
         mean_b=float(b.mean()),
         equal_var=bool(equal_var),
+        alpha=float(alpha),
     )
 
 

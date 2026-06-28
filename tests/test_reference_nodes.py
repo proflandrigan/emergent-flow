@@ -281,6 +281,16 @@ class TestAnova:
 
 
 class TestTTest:
+    def test_codegen_body_golden(self):
+        defn = TTest()
+        node = defn.instantiate(group_col="grp", value_col="score")
+        frag = defn.preview(node)
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == (
+            "result = ef.stats.ttest(frame, group_col='grp', value_col='score', "
+            "equal_var=True, alpha=0.05)"
+        )
+
     def test_codegen_matches_execute(self):
         """ADR 0002: execute == result of running the emitted code."""
         defn = TTest()
@@ -305,6 +315,7 @@ class TestTTest:
         assert generated.mean_a == executed.mean_a
         assert generated.mean_b == executed.mean_b
         assert generated.equal_var == executed.equal_var
+        assert generated.alpha == executed.alpha
 
 
 # ---------------------------------------------------------------------------

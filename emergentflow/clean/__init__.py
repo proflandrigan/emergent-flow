@@ -104,6 +104,8 @@ def drop_missing(
     if how not in HOWS:
         raise ValueError(f"unknown how {how!r}; expected one of {list(HOWS)!r}.")
     if subset is not None:
+        if axis == "columns":
+            raise ValueError("subset is only supported when axis='rows'.")
         unknown = [c for c in subset if c not in df.columns]
         if unknown:
             raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
@@ -180,6 +182,11 @@ def filter_rows(
             raise ValueError(f"operator 'isin' requires a list value; got {type(value).__name__}.")
         mask = df[column].isin(list(value))
     elif operator in _COMPARATORS:
+        if value is None:
+            raise ValueError(
+                f"operator {operator!r} requires a non-None value; got None. "
+                "Use drop_missing() to filter on missing values."
+            )
         mask = _COMPARATORS[operator](df[column], value)
     else:
         raise ValueError(f"unknown operator {operator!r}; expected one of {list(OPERATORS)!r}.")

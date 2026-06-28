@@ -231,3 +231,15 @@ def test_filter_rows_does_not_mutate_input() -> None:
     original = df.copy()
     filter_rows(df, column="a", operator=">", value=2)
     pd.testing.assert_frame_equal(df, original)
+
+
+def test_filter_rows_none_value_with_comparator_raises() -> None:
+    df = pd.DataFrame({"a": [1, 2, 3]})
+    with pytest.raises(ValueError, match="requires a non-None value"):
+        filter_rows(df, column="a", operator="==")
+
+
+def test_drop_missing_subset_with_column_axis_raises() -> None:
+    df = pd.DataFrame({"a": [1.0, None, 3.0], "b": [1.0, 2.0, None]})
+    with pytest.raises(ValueError, match="subset is only supported when axis='rows'"):
+        drop_missing(df, axis="columns", subset=["a"])
