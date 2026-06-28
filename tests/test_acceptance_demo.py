@@ -365,6 +365,27 @@ def write_pipeline(graph: Graph) -> pathlib.Path:
 
 
 # ---------------------------------------------------------------------------
+# Drift guard: committed JSON must match what the builder generates
+# ---------------------------------------------------------------------------
+
+
+def test_committed_pipeline_json_is_current() -> None:
+    """Committed pipeline.json must round-trip identically to build_acceptance_demo().
+
+    Runs before TestAcceptanceDemoPipeline so it reads the committed file before
+    the autouse fixture regenerates it. Fails fast if the builder changed without
+    the committed artifact being updated.
+    """
+    committed = Graph.model_validate_json(
+        (ACCEPTANCE_DIR / "pipeline.json").read_text(encoding="utf-8")
+    )
+    assert committed == build_acceptance_demo(), (
+        "examples/acceptance_demo/pipeline.json is stale; run "
+        "'pytest tests/test_acceptance_demo.py::TestAcceptanceDemoPipeline' to regenerate it"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Tests (a): IR graph construction and validation
 # ---------------------------------------------------------------------------
 
@@ -382,8 +403,7 @@ class TestAcceptanceDemoPipeline:
         path = ACCEPTANCE_DIR / "pipeline.json"
         assert path.exists(), "examples/acceptance_demo/pipeline.json was not written"
         raw = path.read_text(encoding="utf-8")
-        graph = Graph.model_validate_json(raw)
-        assert graph is not None
+        Graph.model_validate_json(raw)
 
     def test_pipeline_node_and_edge_counts(self) -> None:
         raw = (ACCEPTANCE_DIR / "pipeline.json").read_text(encoding="utf-8")
@@ -469,25 +489,25 @@ def _load_demo():
     return demo
 
 
+@pytest.fixture(scope="class")
+def _demo_summary(tmp_path_factory: pytest.TempPathFactory) -> dict:
+    """Run the acceptance demo pipeline once; shared across all TestDemoRuns tests."""
+    return _load_demo().run(output_dir=tmp_path_factory.mktemp("demo_out"))
+
+
 class TestDemoRuns:
     """Drive examples/acceptance_demo/demo.py end to end against the bundled diabetes dataset."""
 
-    def test_demo_produces_report(self, tmp_path: pathlib.Path) -> None:
-        demo = _load_demo()
-        summary = demo.run(output_dir=tmp_path)
-        assert summary["report_path"].exists()
-        text = summary["report_path"].read_text(encoding="utf-8")
+    def test_demo_produces_report(self, _demo_summary: dict) -> None:
+        assert _demo_summary["report_path"].exists()
+        text = _demo_summary["report_path"].read_text(encoding="utf-8")
         assert len(text) > 0
         assert "<html" in text.lower()
 
-    def test_demo_metrics_present(self, tmp_path: pathlib.Path) -> None:
-        demo = _load_demo()
-        summary = demo.run(output_dir=tmp_path)
-        assert isinstance(summary["r2"], float)
-        assert summary["mae"] > 0
-        assert summary["n_test"] > 0
+    def test_demo_metrics_present(self, _demo_summary: dict) -> None:
+        assert 0.0 < _demo_summary["r2"] < 1.0
+        assert _demo_summary["mae"] > 0
+        assert _demo_summary["n_test"] > 0
 
-    def test_demo_describe_nonempty(self, tmp_path: pathlib.Path) -> None:
-        demo = _load_demo()
-        summary = demo.run(output_dir=tmp_path)
-        assert summary["describe_rows"] > 0
+    def test_demo_describe_nonempty(self, _demo_summary: dict) -> None:
+        assert _demo_summary["describe_rows"] > 0
