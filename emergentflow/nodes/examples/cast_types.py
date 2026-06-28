@@ -62,7 +62,7 @@ class CastTypes(NodeDefinition):
         ),
     ]
 
-    def _args(self, node: Node) -> dict[str, str] | None:
+    def _args(self, node: Node) -> dict[str, str]:
         values = {p.name: p.value for p in node.params}
         dtypes = cast("dict[str, str]", values.get("dtypes"))
         return dtypes
