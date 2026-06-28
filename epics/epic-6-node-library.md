@@ -31,7 +31,7 @@
 - [ ] A versioned **catalog-as-data** artifact (`ef.export_catalog()` or equivalent) is published for the palette — its own version, decoupled from `Graph.schema_version`, with a golden test.
 - [ ] **Every new node ships a golden + ADR-0002 equivalence test**, not just a unit test (per `CLAUDE.md` / ADR 0002) — `codegen` and `execute` routed through the same `ef.*` wrapper by construction.
 - [ ] New node families reuse the **already-present, permissively-licensed** deps (pandas / scikit-learn / statsmodels; scipy is transitively available) — **no new GPL deps** (see `docs/licensing-and-dependencies.md`; pingouin was already rejected for this reason).
-- [ ] A non-trivial pipeline (beyond the original 5 nodes) builds on the canvas, compiles, and executes end-to-end — the acceptance demo (Story 7).
+- [x] A non-trivial pipeline (beyond the original 5 nodes) builds on the canvas, compiles, and executes end-to-end — the acceptance demo (Story 7).
 - [ ] **Explicitly out of scope:** DL nodes (roadmap Epic 10), GenAI nodes (roadmap Epic 11), credentialed/remote connectors (roadmap Epic 9 — local-file loaders only here), and the raw-code escape-hatch node (decided in Story 1, deferred).
 
 ---
@@ -147,14 +147,14 @@
 > The payoff: the widened catalog actually drives the palette, and a real pipeline runs
 > end-to-end. This is the integration + the demo, not new SDK nodes.
 
-- [ ] The canvas palette (repo Epic 5 Story 3) consumes `ef.export_catalog()`; the config panels
+- [x] The canvas palette (repo Epic 5 Story 3) consumes `ef.export_catalog()`; the config panels
   (repo Epic 5 Story 4) render every new node's defaults/help/hints with **zero per-node UI code**.
-- [ ] Confirm new nodes round-trip canvas → IR → `/compile` → downloadable `.py` and `/execute`
+- [x] Confirm new nodes round-trip canvas → IR → `/compile` → downloadable `.py` and `/execute`
   with per-node status (the repo Epic 5 Story 8 loop) — including a `Model`-bearing edge.
-- [ ] **Acceptance demo:** build a pipeline beyond the original five nodes — e.g.
+- [x] **Acceptance demo:** build a pipeline beyond the original five nodes — e.g.
   `load_sample → drop_missing → select_columns → train_test_split → train_regressor → evaluate`
   alongside a `stats.describe` branch and an HTML report — and run it to results on the canvas.
-- [ ] Document the demo as the "what the app can do today" reference (supersedes the hardcoded
+- [x] Document the demo as the "what the app can do today" reference (supersedes the hardcoded
   5-node slice).
 
 ---
