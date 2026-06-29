@@ -71,19 +71,19 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
     consumes have landed *and* the local server already serves them — this is unblocked and is
     the fastest path to a usable UI. Stories are broken out in [`epics/epic-5-frontend-canvas.md`](../epics/epic-5-frontend-canvas.md).
 
-- [ ] **Step 5 — Roadmap Epic 4: Node Library & Configuration UX** · `ui/` + `emergentflow/` *(split)* · *story-level decomposition: [repo Epic 6](../epics/epic-6-node-library.md)*
+- [x] **Step 5 — Roadmap Epic 4: Node Library & Configuration UX** · `ui/` + `emergentflow/` *(split)* · *story-level decomposition: [repo Epic 6](../epics/epic-6-node-library.md)*
   - Deps: Steps 1–3, 4. The end-to-end vertical slice (load → clean → one stats test → one
     model → HTML report) already exists as the five reference nodes; this step **widens** each
     family by the demo narrative, ships per-node defaults/help/validation hints, and exports a
     versioned **catalog-as-data** artifact for the palette. SDK (`emergentflow/`) owns the node
     catalog/defaults + export; the canvas (`ui/`) renders the palette + config panels it already
     built (repo Epic 5 Stories 3–4). Treat as continuous after the first widening.
-  - Status: **not started — the active frontier.** Story-level plan landed in
-    [repo Epic 6](../epics/epic-6-node-library.md). The execution machinery is already done
-    (`ef.execute` + the local server), so this is purely catalog breadth + metadata — the last
-    piece between the app and real, useful data work. **Out of scope:** DL nodes (Step 12 / Epic
-    10), GenAI nodes (Step 13 / Epic 11), credentialed connectors (Step 10 / Epic 9 — local-file
-    loaders only), and the raw-code escape-hatch node (decided + deferred in repo Epic 6 Story 1).
+  - Status: **done** — [repo Epic 6](../epics/epic-6-node-library.md) Stories 1–7 merged to
+    `main`. Catalog widened across all families (data/clean/stats/ml/report); per-node
+    defaults, help text, and type hints landed; catalog-as-data artifact published and gated in
+    CI; acceptance demo (load → clean → stats → train → evaluate → report) passes end-to-end.
+    **Out of scope (deferred as planned):** DL nodes (Step 12 / Epic 10), GenAI nodes (Step 13 /
+    Epic 11), credentialed connectors (Step 10 / Epic 9), raw-code escape-hatch node.
 
 > **End of Phase 1 milestone:** canvas → valid IR → downloadable, runnable Python, zero
 > backend. The strongest early de-risking demo.
@@ -138,7 +138,7 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
     (local in-process execution); this step's hosted half spins up only when the hosted offering
     starts, then runs continuously through Phase 3.
 
-- [~] **Step 7 — Roadmap Epic 6: Backend Execution Runtime & Sandboxing** · `emergentflow/server/` · *[repo Epic 4](../epics/epic-4-local-server.md)*
+- [~] **Step 7 — Roadmap Epic 6: Backend Execution Runtime & Sandboxing** · `emergentflow/server/` · *[repo Epic 4](../epics/epic-4-local-server.md) v0 done; remaining stories in [repo Epic 7](../epics/epic-7-live-iteration.md)*
   - Deps: Steps 1–2 (wraps the reference executor). **Happy path:** a thin local server
     (`ef lab` / `emergentflow serve`) that calls `ef.execute(ir)` **in-process**. No Celery, no
     broker, **no sandbox** — you run your own code on your own machine, the Jupyter trust model.
@@ -153,7 +153,7 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
     ([ADR 0002](../docs/adr/0002-execute-the-ir-not-the-string.md)) so the hosted tier can wrap
     it later without retrofitting.
 
-- [ ] **Step 8 — Roadmap Epic 7: DAG Caching & Incremental State Management** · `emergentflow/server/`
+- [ ] **Step 8 — Roadmap Epic 7: DAG Caching & Incremental State Management** · `emergentflow/server/` · *story-level decomposition: [repo Epic 7](../epics/epic-7-live-iteration.md) Story 6*
   - Deps: Step 7 (pairs tightly with it). Per-node execution hash (config + upstream hashes +
     SDK version), backward dependency tracing, invalidation. **Happy path:** a simple in-memory +
     **on-disk** cache keyed by that hash (Parquet/safetensors under a project cache dir) — no
@@ -183,7 +183,7 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
     (e.g., a local secrets file / OS keyring). Per-workspace managed secrets and premium
     connectors are **(hosted)**.
 
-- [ ] **Step 11 — Roadmap Epic 8: Result Rendering & In-Node Visualization** · `ui/` + `emergentflow/server/` *(split)*
+- [ ] **Step 11 — Roadmap Epic 8: Result Rendering & In-Node Visualization** · `ui/` + `emergentflow/server/` *(split)* · *partial: figure/HTML/Series payload extensions + Inspector Results tab in [repo Epic 7](../epics/epic-7-live-iteration.md) Stories 1–2; richer charts/profiling HTML deferred here*
   - Deps: Steps 4, 7, 8. Renderable result payloads (server shapes heavy artifacts; client
     renders small/interactive), in-node tables/charts/profiling HTML, truncation/pagination.
 
@@ -256,17 +256,20 @@ trees (and toolchains) within the one repo only when a dependency forces it.*
 
 | Done | In progress | Not started |
 | :-- | :-- | :-- |
-| Roadmap Epics **1, 2, 5, 3** (repo Epics 1–3, 5) | Roadmap Epic **6** (repo Epic 4 — local server **v0 done**, Story 1) | Roadmap Epics **4, 7, 8, 9, 10, 11, 12, 13, 14, 15** |
+| Roadmap Epics **1, 2, 5, 3, 4** (repo Epics 1–3, 5, 6) + local server v0 (repo Epic 4) | — | Roadmap Epics **6 (remaining), 7, 8, 9, 10, 11, 12, 13, 14, 15** |
 
-**4 of 15 epics complete, + a running v0 local server.** The Python package is usable today
-(`ef.compile_to_code`, `ef.execute`, `ef.validate`, `ef.export_script`), there is a literal
-`pip install emergentflow && emergentflow serve` that executes graphs in-process over REST
-([repo Epic 4](../epics/epic-4-local-server.md)), and the **frontend canvas has landed**
-([repo Epic 5](../epics/epic-5-frontend-canvas.md), Stories 1–9) — the Phase-1 milestone
-(canvas → valid IR → downloadable, runnable Python + live execute) is met. Next concrete
-milestone: **Step 5 — the node library** (roadmap Epic 4; story-level plan in
-[repo Epic 6](../epics/epic-6-node-library.md)). The execution machinery is already done, so this
-is catalog breadth + per-node metadata — the last piece between the app and real, useful data work.
+**6 of 15 epics complete (+ local server v0).** The Python package is fully usable today
+(`ef.compile_to_code`, `ef.execute`, `ef.validate`, `ef.export_script`), the local server
+serves `/compile` `/validate` `/execute` in-process, the **frontend canvas** with live
+validation, schema-driven config panels, code view, and in-node result rendering has landed
+([repo Epic 5](../epics/epic-5-frontend-canvas.md)), and the **node catalog** covers the full
+end-to-end DS/ML loop — load/clean/stats/train/evaluate/report
+([repo Epic 6](../epics/epic-6-node-library.md)). The Phase-1 milestone (canvas → valid IR →
+downloadable, runnable Python + live execute + node library) is met. Next concrete milestone:
+**[repo Epic 7](../epics/epic-7-live-iteration.md) — Live Iteration & Visual Results** (Steps
+7, 8, 11 happy-path slices): FastAPI upgrade, streaming progress, DAG caching, figure/HTML
+rendering, Inspector Results tab. This is the gap between "it works" and "I can do real DS/ML
+work here."
 
 ---
 
