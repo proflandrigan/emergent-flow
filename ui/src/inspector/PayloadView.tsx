@@ -20,7 +20,11 @@ const cellStyle: CSSProperties = {
   padding: "0.15rem 0.4rem",
 };
 
-export function PayloadView({ payload }: { payload: Payload }): JSX.Element | null {
+export function PayloadView({
+  payload,
+}: {
+  payload: Payload;
+}): JSX.Element | null {
   switch (payload.kind) {
     case "scalar": {
       const { value } = payload;
@@ -31,7 +35,8 @@ export function PayloadView({ payload }: { payload: Payload }): JSX.Element | nu
           </span>
         );
       }
-      const text = typeof value === "boolean" ? (value ? "true" : "false") : String(value);
+      const text =
+        typeof value === "boolean" ? (value ? "true" : "false") : String(value);
       return <span data-testid="payload-scalar">{text}</span>;
     }
 
@@ -102,6 +107,27 @@ export function PayloadView({ payload }: { payload: Payload }): JSX.Element | nu
         <div data-testid="payload-unsupported" style={mutedStyle}>
           {`<${payload.type}> ${payload.repr}`}
         </div>
+      );
+
+    case "image":
+      return (
+        <img
+          data-testid="payload-image"
+          src={`data:${payload.mime};base64,${payload.data}`}
+          alt="result"
+          style={{ maxWidth: "100%", maxHeight: 300 }}
+        />
+      );
+
+    case "html":
+      return (
+        <iframe
+          data-testid="payload-html"
+          title="report"
+          srcDoc={payload.value}
+          sandbox=""
+          style={{ width: "100%", height: 400, border: "none" }}
+        />
       );
 
     default: {

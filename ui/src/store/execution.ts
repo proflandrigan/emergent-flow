@@ -1,6 +1,8 @@
 export type Payload =
   | { kind: "scalar"; value: string | number | boolean | null }
   | { kind: "text"; value: string; length: number; truncated: boolean }
+  | { kind: "image"; mime: string; data: string; width: number; height: number }
+  | { kind: "html"; value: string; truncated: boolean }
   | {
       kind: "table";
       columns: string[];

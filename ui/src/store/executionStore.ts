@@ -11,6 +11,7 @@ export interface ExecutionStore {
   results: Record<string, Record<string, Payload>>;
   statuses: Record<string, NodeRunStatus>;
   error: string | null;
+  lastRunAt: number | null;
   setRunning: () => void;
   setResult: (res: ExecuteResponse) => void;
   setError: (message: string) => void;
@@ -22,6 +23,7 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
   results: {},
   statuses: {},
   error: null,
+  lastRunAt: null,
 
   setRunning() {
     set({ running: true, error: null });
@@ -33,6 +35,7 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
       statuses: res.statuses,
       running: false,
       error: null,
+      lastRunAt: Date.now(),
     });
   },
 
@@ -41,6 +44,12 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
   },
 
   clear() {
-    set({ running: false, results: {}, statuses: {}, error: null });
+    set({
+      running: false,
+      results: {},
+      statuses: {},
+      error: null,
+      lastRunAt: null,
+    });
   },
 }));

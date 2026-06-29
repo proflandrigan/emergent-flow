@@ -6,9 +6,12 @@ but inspectable is a **superset** of JSON-native: a ``pandas.DataFrame`` or a
 ``to_payload`` is a single pure function that coerces any such artifact into a
 JSON-safe **tagged union** -- a dict with a ``"kind"`` discriminator -- that the
 frontend (roadmap Epic 8) can render without knowing Python types. It has no I/O
-and touches no global state; pandas/pydantic are imported lazily inside the
-function so importing this module stays light and ``torch`` is never imported
+and touches no global state; pandas/pydantic/matplotlib are imported lazily inside
+the function so importing this module stays light and ``torch`` is never imported
 (unsupported objects, including ``torch.nn.Module``, are detected structurally).
+Supported kinds include ``"image"`` (matplotlib figures serialised as base64 PNG
+with a 2 MB cap) and ``"html"`` (HTML-document strings embedded verbatim, no
+truncation).
 """
 
 from __future__ import annotations
@@ -18,9 +21,10 @@ import json
 import math
 from typing import Any
 
-PAYLOAD_CONTRACT_VERSION = 1  # standalone; NOT tied to IR schema_version
+PAYLOAD_CONTRACT_VERSION = 2  # standalone; NOT tied to IR schema_version
 MAX_HEAD_ROWS = 50  # DataFrame rows sampled into `head`
 MAX_TEXT_CHARS = 16384  # cap for long strings / repr fallback
+MAX_IMAGE_BYTES = 2 * 1024 * 1024  # 2 MB cap for base64 image payloads
 
 
 def _sanitize_nonfinite(value: Any) -> Any:
@@ -55,6 +59,9 @@ def to_payload(value: Any) -> dict[str, Any]:
         return {"kind": "scalar", "value": _sanitize_nonfinite(value)}
 
     if isinstance(value, str):
+        lowered = value.lstrip()[:16].lower()
+        if lowered.startswith("<!doctype html") or lowered.startswith("<html"):
+            return {"kind": "html", "value": value, "truncated": False}
         if len(value) <= MAX_TEXT_CHARS:
             return {"kind": "scalar", "value": value}
         return {
@@ -73,6 +80,33 @@ def to_payload(value: Any) -> dict[str, Any]:
     # "scalar" branch with the same NaN/Inf sanitizing.
     if isinstance(value, np.generic):
         return to_payload(value.item())
+
+    try:
+        import matplotlib.figure as _mpl_figure
+
+        if isinstance(value, _mpl_figure.Figure):
+            import base64
+            import io
+
+            buf = io.BytesIO()
+            value.savefig(buf, format="png", bbox_inches="tight")
+            raw = buf.getvalue()
+            if len(raw) > MAX_IMAGE_BYTES:
+                return {
+                    "kind": "unsupported",
+                    "type": type(value).__name__,
+                    "repr": f"<Figure: PNG {len(raw)} bytes exceeds {MAX_IMAGE_BYTES} byte limit>",
+                }
+            width, height = value.canvas.get_width_height()
+            return {
+                "kind": "image",
+                "mime": "image/png",
+                "data": base64.b64encode(raw).decode("ascii"),
+                "width": int(width),
+                "height": int(height),
+            }
+    except ImportError:
+        pass
 
     import pandas as pd
 
@@ -98,6 +132,10 @@ def to_payload(value: Any) -> dict[str, Any]:
             "head": head,
             "truncated": bool(value.shape[0] > MAX_HEAD_ROWS),
         }
+
+    if isinstance(value, pd.Series):
+        df = value.to_frame()
+        return to_payload(df)
 
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         fields = {f.name: to_payload(getattr(value, f.name)) for f in dataclasses.fields(value)}

@@ -189,7 +189,7 @@ def test_execute_graph_runs_in_process_and_is_json_safe() -> None:
     out = execute_graph(_load_csv_graph())
     assert "n-load" in out["results"]
     json.dumps(out)  # DataFrame result must be coerced to JSON-safe data
-    assert out["payload_version"] == 1
+    assert out["payload_version"] == 2
     frame = out["results"]["n-load"]["frame"]
     assert frame["kind"] == "table"
     # the table payload carries the Story 3 contract fields
@@ -206,7 +206,7 @@ def test_execute_graph_reports_per_node_status_ok() -> None:
     assert "n-load" in out["results"]
     assert "n-impute" in out["results"]
     json.dumps(out)  # results + statuses must be JSON-native
-    assert out["payload_version"] == 1
+    assert out["payload_version"] == 2
     assert out["results"]["n-load"]["frame"]["kind"] == "table"
     assert out["results"]["n-impute"]["frame"]["kind"] == "table"
 
@@ -255,7 +255,7 @@ def test_execute_node_runs_single_source_node() -> None:
     out = execute_node({"graph": _load_csv_graph(), "run_node": "n-load"})
     assert out["statuses"]["n-load"]["status"] == "ok"
     assert out["results"]["n-load"]["frame"]["kind"] == "table"
-    assert out["payload_version"] == 1
+    assert out["payload_version"] == 2
     json.dumps(out)  # JSON-native
 
 
@@ -449,7 +449,7 @@ def test_http_compile_and_execute(base_url: str) -> None:
     status, body = _post(base_url, "/execute", _load_csv_graph())
     assert status == 200
     assert "n-load" in body["results"]
-    assert body["payload_version"] == 1
+    assert body["payload_version"] == 2
     assert body["results"]["n-load"]["frame"]["kind"] == "table"
 
 

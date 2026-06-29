@@ -80,4 +80,46 @@ describe("executionStore", () => {
     expect(state.statuses).toEqual({});
     expect(state.error).toBeNull();
   });
+
+  it("setResult sets lastRunAt to a timestamp", () => {
+    expect(useExecutionStore.getState().lastRunAt).toBeNull();
+
+    const response: ExecuteResponse = {
+      payload_version: 1,
+      results: { node1: { output: { kind: "scalar", value: 42 } } },
+      statuses: { node1: { status: "ok" } },
+    };
+
+    useExecutionStore.getState().setResult(response);
+
+    expect(useExecutionStore.getState().lastRunAt).toEqual(expect.any(Number));
+  });
+
+  it("clear resets lastRunAt to null", () => {
+    const response: ExecuteResponse = {
+      payload_version: 1,
+      results: { node1: { output: { kind: "scalar", value: 42 } } },
+      statuses: { node1: { status: "ok" } },
+    };
+
+    useExecutionStore.getState().setResult(response);
+    useExecutionStore.getState().clear();
+
+    expect(useExecutionStore.getState().lastRunAt).toBeNull();
+  });
+
+  it("setError does not clear lastRunAt", () => {
+    const response: ExecuteResponse = {
+      payload_version: 1,
+      results: { node1: { output: { kind: "scalar", value: 42 } } },
+      statuses: { node1: { status: "ok" } },
+    };
+
+    useExecutionStore.getState().setResult(response);
+    const ts = useExecutionStore.getState().lastRunAt;
+
+    useExecutionStore.getState().setError("boom");
+
+    expect(useExecutionStore.getState().lastRunAt).toBe(ts);
+  });
 });
