@@ -31,6 +31,7 @@ generally roadmap-Epic-N.
 | **Epic 4** | [`epic-4-local-server.md`](./epic-4-local-server.md) | **Epic 6** (happy-path sliver) | Local Execution Server (bundled, in-process) | Local server — `emergentflow/server/` |
 | **Epic 5** | [`epic-5-frontend-canvas.md`](./epic-5-frontend-canvas.md) | **Epic 3** | Frontend Canvas Engine | Frontend — `ui/` |
 | **Epic 6** | [`epic-6-node-library.md`](./epic-6-node-library.md) | **Epic 4** | Node Library & Configuration UX | Python SDK (`emergentflow/`) owns the catalog; `ui/` renders palette/panels |
+| **Epic 7** | [`epic-7-live-iteration.md`](./epic-7-live-iteration.md) | **Epics 6 (remaining) + 7 + 8 (partial)** | Live Iteration & Visual Results | `emergentflow/server/` (FastAPI, cache) + `ui/` (streaming, Results tab) |
 
 > **Delivery vs. roadmap order.** Repo Epics 4 (local server) and 5 (canvas) are *planned*
 > (Epic 4's v0 server has shipped; Epic 5 is not started). The server was front-loaded ahead of
@@ -48,9 +49,12 @@ picked up:
   ([`epic-6-node-library.md`](./epic-6-node-library.md)): the SDK (`emergentflow/`) tree owns the
   node catalog/defaults + the catalog-as-data export; the config-panel UI in `ui/` (repo Epic 5
   Stories 3–4) consumes it.
-- **Roadmap Epics 7–15** → the `emergentflow/server/` and/or `ui/` trees (with the heavyweight
-  hosted pieces deferred to the gated hosted product per §A6). The happy-path sliver of roadmap
-  **Epic 6** is already decomposed as **repo Epic 4** above.
+- **Roadmap Epics 6 (remaining) + 7 + 8 (partial)** → now decomposed as **repo Epic 7**
+  ([`epic-7-live-iteration.md`](./epic-7-live-iteration.md)): FastAPI server upgrade,
+  streaming progress, run granularity, DAG caching, figure/HTML payload extensions, and the
+  Inspector Results tab.
+- **Roadmap Epics 9–15** → the `emergentflow/server/` and/or `ui/` trees (with the heavyweight
+  hosted pieces deferred to the gated hosted product per §A6).
 
 ## Reading cross-references
 
