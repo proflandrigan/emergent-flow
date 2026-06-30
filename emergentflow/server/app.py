@@ -26,6 +26,9 @@ import contextlib
 import json
 import mimetypes
 import pathlib
+import socket
+import threading
+import time
 import webbrowser
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -113,6 +116,33 @@ _POST_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
 }
 
 
+def _error_json(status_code: int, message: str) -> JSONResponse:
+    """The project's one error-body shape: ``{"error": <message>}``."""
+    return JSONResponse(status_code=status_code, content={"error": message})
+
+
+async def _run_sync(fn: Callable[[], Any]) -> Any:
+    """Run a zero-arg synchronous callable off the event loop, in a worker thread.
+
+    Every handler below does some blocking work (file I/O, hashing, schema/catalog
+    building); routing it through here keeps the event loop free for concurrent
+    requests -- the whole point of the FastAPI upgrade -- instead of stalling
+    every in-flight request (including ``/healthz``) for the duration of one
+    handler's disk access.
+    """
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, fn)
+
+
+async def _safe_json(fn: Callable[[], dict[str, Any]]) -> Response:
+    """Run *fn* off the event loop; map any exception to the project's 422 contract."""
+    try:
+        result = await _run_sync(fn)
+    except Exception as exc:  # noqa: BLE001 - any ef.* failure -> 422, never crash the server
+        return _error_json(422, f"{type(exc).__name__}: {exc}")
+    return JSONResponse(content=result)
+
+
 async def _read_json_body(request: Request) -> dict[str, Any]:
     """Parse the request body as a JSON dict; an empty body is ``{}``.
 
@@ -136,13 +166,8 @@ async def _dispatch(
     try:
         body = await _read_json_body(request)
     except (ValueError, json.JSONDecodeError) as exc:
-        return JSONResponse(status_code=400, content={"error": f"invalid JSON body: {exc}"})
-    loop = asyncio.get_running_loop()
-    try:
-        result = await loop.run_in_executor(None, service_fn, body)
-    except Exception as exc:  # noqa: BLE001 - any ef.* failure -> 422, never crash the server
-        return JSONResponse(status_code=422, content={"error": f"{type(exc).__name__}: {exc}"})
-    return JSONResponse(content=result)
+        return _error_json(400, f"invalid JSON body: {exc}")
+    return await _safe_json(lambda: service_fn(body))
 
 
 def _make_post_handler(
@@ -164,25 +189,20 @@ def create_app() -> FastAPI:
 
     @application.get("/schema")
     async def schema() -> Response:
-        try:
-            return JSONResponse(content=get_schema())
-        except Exception as exc:  # noqa: BLE001
-            return JSONResponse(status_code=422, content={"error": f"{type(exc).__name__}: {exc}"})
+        return await _safe_json(get_schema)
 
     @application.get("/catalog")
     async def catalog() -> Response:
-        try:
-            return JSONResponse(content=get_catalog())
-        except Exception as exc:  # noqa: BLE001
-            return JSONResponse(status_code=422, content={"error": f"{type(exc).__name__}: {exc}"})
+        return await _safe_json(get_catalog)
 
     @application.get("/reports/{report_hash}")
     async def report(report_hash: str) -> Response:
-        html = get_default_store().get(report_hash)
+        try:
+            html = await _run_sync(lambda: get_default_store().get(report_hash))
+        except Exception as exc:  # noqa: BLE001 - never crash the server on a store failure
+            return _error_json(422, f"{type(exc).__name__}: {exc}")
         if html is None:
-            return JSONResponse(
-                status_code=404, content={"error": f"report not found: {report_hash}"}
-            )
+            return _error_json(404, f"report not found: {report_hash}")
         return HTMLResponse(content=html)
 
     for path, fn in _POST_ROUTES.items():
@@ -193,19 +213,20 @@ def create_app() -> FastAPI:
     @application.get("/{full_path:path}")
     async def static_or_demo(full_path: str, request: Request) -> Response:
         url_path = request.url.path
-        asset = _static_file(url_path)
+        asset = await _run_sync(lambda: _static_file(url_path))
         if asset is not None:
             content_type = mimetypes.guess_type(asset.name)[0] or "application/octet-stream"
-            return Response(content=asset.read_bytes(), media_type=content_type)
+            content = await _run_sync(asset.read_bytes)
+            return Response(content=content, media_type=content_type)
         if url_path in ("/", "/index.html"):
             return HTMLResponse(content=_INDEX_HTML)
-        return JSONResponse(status_code=404, content={"error": f"not found: {url_path}"})
+        return _error_json(404, f"not found: {url_path}")
 
     # Catch-all POST: an unknown POST path is a 404 with the {"error": ...} shape
     # (rather than FastAPI's default {"detail": ...}); keeps the v0 contract.
     @application.post("/{full_path:path}")
     async def post_not_found(full_path: str, request: Request) -> Response:
-        return JSONResponse(status_code=404, content={"error": f"not found: {request.url.path}"})
+        return _error_json(404, f"not found: {request.url.path}")
 
     return application
 
@@ -225,12 +246,32 @@ def _open_browser(url: str) -> None:
         webbrowser.open(url)
 
 
+def _open_browser_when_ready(probe_host: str, port: int, url: str, timeout: float = 10.0) -> None:
+    """Poll *probe_host*:*port* until it accepts connections, then open *url*.
+
+    Uvicorn binds the listening socket only after ``uvicorn.run`` starts (unlike
+    the old stdlib server, which bound synchronously in its constructor before
+    ``serve()`` ever opened a browser tab) -- opening the browser unconditionally
+    races a slow Uvicorn startup and can show "connection refused" instead of the
+    canvas. Runs on a background thread so it never blocks ``uvicorn.run``.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        with (
+            contextlib.suppress(OSError),
+            socket.create_connection((probe_host, port), timeout=0.25),
+        ):
+            break
+        time.sleep(0.05)
+    _open_browser(url)
+
+
 def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True) -> None:
     """Boot the local canvas server on Uvicorn and block until interrupted.
 
     When *open_browser* is true (the default), a browser tab is opened at the served
-    URL before the server starts. ``0.0.0.0`` is shown/opened as ``127.0.0.1`` since
-    a wildcard bind is not a browsable address.
+    URL once the socket is actually accepting connections. ``0.0.0.0`` is shown/opened
+    as ``127.0.0.1`` since a wildcard bind is not a browsable address.
     """
     import uvicorn
 
@@ -238,5 +279,7 @@ def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True) 
     url = f"http://{browse_host}:{port}"
     print(f"Emergent Flow - serving the local canvas at {url}  (Ctrl-C to stop)")
     if open_browser:
-        _open_browser(url)
+        threading.Thread(
+            target=_open_browser_when_ready, args=(browse_host, port, url), daemon=True
+        ).start()
     uvicorn.run(app, host=host, port=port, log_level="warning")

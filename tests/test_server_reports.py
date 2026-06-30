@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import threading
+
+from emergentflow.server import reports as reports_mod
 from emergentflow.server.reports import ReportStore, _hash_html
 
 
@@ -63,3 +66,31 @@ def test_execute_path_leaves_non_html_payloads_unchanged() -> None:
     payload = payloads["n-node"]["out"]
     assert payload["kind"] == "scalar"
     assert "report_hash" not in payload
+
+
+def test_get_default_store_is_thread_safe(monkeypatch) -> None:
+    # Regression test: get_default_store() used a naive check-then-act lazy-init.
+    # Concurrent /execute requests run on separate worker threads (app.py's
+    # run_in_executor dispatch), so two threads racing the very first call could
+    # each construct their own ReportStore -- whichever lost the race to set the
+    # global left its reports unreachable via get_default_store() ever after.
+    monkeypatch.setattr(reports_mod, "_default_store", None)
+    thread_count = 16
+    barrier = threading.Barrier(thread_count)
+    stores: list[ReportStore] = []
+    lock = threading.Lock()
+
+    def worker() -> None:
+        barrier.wait()
+        store = reports_mod.get_default_store()
+        with lock:
+            stores.append(store)
+
+    threads = [threading.Thread(target=worker) for _ in range(thread_count)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(stores) == thread_count
+    assert len({id(s) for s in stores}) == 1

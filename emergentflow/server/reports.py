@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import tempfile
+import threading
 from pathlib import Path
 
 # Reports are keyed by the first 16 hex chars of the sha256 of the UTF-8 bytes.
@@ -76,11 +77,23 @@ class ReportStore:
 # GET /reports/{hash} route (app.py) share one set of report files without an
 # import cycle (both import this accessor, neither imports the other).
 _default_store: ReportStore | None = None
+_default_store_lock = threading.Lock()
 
 
 def get_default_store() -> ReportStore:
-    """Return the lazily-created process-wide default :class:`ReportStore`."""
+    """Return the lazily-created process-wide default :class:`ReportStore`.
+
+    Double-checked locking: ``/execute`` requests run concurrently on the FastAPI
+    server's executor thread pool (``app.py``'s ``_dispatch``), so the naive
+    check-then-act lazy-init would race -- two concurrent first calls could each
+    build a *different* ``ReportStore`` (separate temp dirs), and whichever loses
+    the race to set ``_default_store`` would have its reports become unreachable
+    via this accessor (a later ``GET /reports/{hash}`` 404s on a hash that a
+    successful ``/execute`` response just handed out).
+    """
     global _default_store
     if _default_store is None:
-        _default_store = ReportStore()
+        with _default_store_lock:
+            if _default_store is None:
+                _default_store = ReportStore()
     return _default_store

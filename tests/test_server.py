@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib
 import json
 import pathlib
+import socket
 from collections.abc import Iterator
 
 import pytest
@@ -395,6 +396,43 @@ def test_open_browser_swallows_errors(monkeypatch) -> None:
 
     monkeypatch.setattr(app_mod.webbrowser, "open", boom)
     app_mod._open_browser("http://127.0.0.1:8765")  # must NOT raise
+
+
+def test_open_browser_when_ready_waits_for_listening_socket(monkeypatch) -> None:
+    # Regression test: serve() used to open the browser before uvicorn.run() had
+    # bound the socket, racing a slow startup. _open_browser_when_ready must only
+    # fire once the port is actually accepting connections.
+    app_mod = importlib.import_module("emergentflow.server.app")
+
+    opened: list[str] = []
+    monkeypatch.setattr(app_mod, "_open_browser", opened.append)
+
+    server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_sock.bind(("127.0.0.1", 0))
+    server_sock.listen(1)
+    port = server_sock.getsockname()[1]
+    try:
+        app_mod._open_browser_when_ready("127.0.0.1", port, "http://probe", timeout=2.0)
+    finally:
+        server_sock.close()
+    assert opened == ["http://probe"]
+
+
+def test_open_browser_when_ready_gives_up_after_timeout(monkeypatch) -> None:
+    # Nothing is listening on this port; the poll must not hang forever -- it
+    # opens the browser best-effort once its (short, test-only) timeout elapses.
+    app_mod = importlib.import_module("emergentflow.server.app")
+
+    opened: list[str] = []
+    monkeypatch.setattr(app_mod, "_open_browser", opened.append)
+
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    probe.bind(("127.0.0.1", 0))
+    free_port = probe.getsockname()[1]
+    probe.close()
+
+    app_mod._open_browser_when_ready("127.0.0.1", free_port, "http://probe", timeout=0.3)
+    assert opened == ["http://probe"]
 
 
 def test_http_compile_and_execute(client: TestClient) -> None:
