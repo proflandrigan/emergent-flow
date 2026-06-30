@@ -33,7 +33,7 @@ test("Execute writes results into the store", async () => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(
     new Response(
       JSON.stringify({
-        payload_version: 1,
+        payload_version: 2,
         results: { n1: { out: { kind: "scalar", value: 1 } } },
         statuses: { n1: { status: "ok" } },
       }),

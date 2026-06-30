@@ -60,7 +60,7 @@ describe("loadModel", () => {
     // are preserved across export -> re-import, so without clearing these would be displayed
     // against the freshly loaded graph.
     const fakeRun: ExecuteResponse = {
-      payload_version: 1,
+      payload_version: 2,
       results: { "node:old": { out: { kind: "scalar", value: 1 } } },
       statuses: { "node:old": { status: "ok" } },
     };

@@ -19,6 +19,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import math
+import struct
 from typing import Any
 
 PAYLOAD_CONTRACT_VERSION = 2  # standalone; NOT tied to IR schema_version
@@ -60,7 +61,20 @@ def to_payload(value: Any) -> dict[str, Any]:
 
     if isinstance(value, str):
         lowered = value.lstrip()[:16].lower()
-        if lowered.startswith("<!doctype html") or lowered.startswith("<html"):
+        is_html = (
+            lowered.startswith("<!doctype html")
+            or lowered.startswith("<html>")
+            or lowered.startswith("<html ")
+        )
+        if is_html:
+            if len(value) > MAX_IMAGE_BYTES:
+                return {
+                    "kind": "unsupported",
+                    "type": "str",
+                    "repr": (
+                        f"<HTML document: {len(value)} bytes exceeds {MAX_IMAGE_BYTES} byte limit>"
+                    ),
+                }
             return {"kind": "html", "value": value, "truncated": False}
         if len(value) <= MAX_TEXT_CHARS:
             return {"kind": "scalar", "value": value}
@@ -97,7 +111,10 @@ def to_payload(value: Any) -> dict[str, Any]:
                     "type": type(value).__name__,
                     "repr": f"<Figure: PNG {len(raw)} bytes exceeds {MAX_IMAGE_BYTES} byte limit>",
                 }
-            width, height = value.canvas.get_width_height()
+            # Read actual pixel dimensions from the PNG IHDR chunk (bytes 16–24).
+            # savefig(bbox_inches="tight") can crop the canvas, so the canvas size
+            # and the output PNG size diverge; the IHDR is always authoritative.
+            width, height = struct.unpack(">II", raw[16:24])
             return {
                 "kind": "image",
                 "mime": "image/png",
@@ -105,7 +122,7 @@ def to_payload(value: Any) -> dict[str, Any]:
                 "width": int(width),
                 "height": int(height),
             }
-    except ImportError:
+    except Exception:
         pass
 
     import pandas as pd
@@ -134,7 +151,8 @@ def to_payload(value: Any) -> dict[str, Any]:
         }
 
     if isinstance(value, pd.Series):
-        df = value.to_frame()
+        # Preserve meaningful indexes as a column; skip default RangeIndex (positional only).
+        df = value.reset_index() if not isinstance(value.index, pd.RangeIndex) else value.to_frame()
         return to_payload(df)
 
     if dataclasses.is_dataclass(value) and not isinstance(value, type):

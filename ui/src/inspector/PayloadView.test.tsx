@@ -97,5 +97,5 @@ test("renders an html payload in a sandboxed iframe", () => {
   render(<PayloadView payload={payload} />);
   const frame = screen.getByTestId("payload-html");
   expect(frame).toHaveAttribute("srcdoc", "<html><body>hi</body></html>");
-  expect(frame).toHaveAttribute("sandbox", "");
+  expect(frame).toHaveAttribute("sandbox", "allow-scripts");
 });

@@ -22,6 +22,8 @@ export interface NodeRunStatus {
   error?: string;
 }
 
+export const EXPECTED_PAYLOAD_VERSION = 2;
+
 export interface ExecuteResponse {
   payload_version: number;
   results: Record<string, Record<string, Payload>>;

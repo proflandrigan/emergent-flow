@@ -14,10 +14,12 @@ import { PayloadView } from "./PayloadView";
 
 type InspectorTab = "config" | "code" | "results";
 
-// Renders a past millisecond timestamp as a coarse "Ns ago" relative to now.
 function formatAgo(ms: number): string {
   const secs = Math.max(0, Math.round((Date.now() - ms) / 1000));
-  return `${secs}s ago`;
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.round(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  return `${Math.round(mins / 60)}h ago`;
 }
 
 export function Inspector(): JSX.Element {
@@ -54,7 +56,9 @@ export function Inspector(): JSX.Element {
     if (!nodeResults || Object.keys(nodeResults).length === 0) {
       return (
         <p data-testid="results-empty-no-run" style={{ color: "#666" }}>
-          No results — run the graph first.
+          {lastRunAt !== null
+            ? "No inspectable outputs for this node."
+            : "No results — run the graph first."}
         </p>
       );
     }

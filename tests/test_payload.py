@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from emergentflow.server.payload import MAX_HEAD_ROWS, MAX_TEXT_CHARS, to_payload
+from emergentflow.server.payload import MAX_HEAD_ROWS, MAX_IMAGE_BYTES, MAX_TEXT_CHARS, to_payload
 
 
 def test_scalar_kinds() -> None:
@@ -185,6 +185,16 @@ def test_html_string_becomes_html_payload() -> None:
 def test_non_html_string_is_scalar() -> None:
     assert to_payload("<div>not a doc</div>")["kind"] == "scalar"
     assert to_payload("hello")["kind"] == "scalar"
+    # Must NOT false-positive on strings that merely start with "<html" but are not documents.
+    assert to_payload("<htmlparser>foo</htmlparser>")["kind"] == "scalar"
+    assert to_payload("<html_escape is a PHP function>")["kind"] == "scalar"
+
+
+def test_oversized_html_is_unsupported() -> None:
+    oversized = "<!DOCTYPE html><html>" + "x" * MAX_IMAGE_BYTES
+    out = to_payload(oversized)
+    assert out["kind"] == "unsupported"
+    assert str(MAX_IMAGE_BYTES) in out["repr"]
 
 
 def test_series_becomes_single_column_table() -> None:
@@ -195,6 +205,18 @@ def test_series_becomes_single_column_table() -> None:
     assert out["shape"] == [3, 1]
     assert out["truncated"] is False
     assert len(out["head"]) == 3
+
+
+def test_series_with_named_index_preserves_labels() -> None:
+    s = pd.Series([10, 20, 30], index=["a", "b", "c"], name="value")
+    out = to_payload(s)
+    assert out["kind"] == "table"
+    # The named index must appear as a column so row labels are not silently dropped.
+    assert "index" in out["columns"]
+    assert "value" in out["columns"]
+    # Row labels must survive serialization.
+    labels = [row["index"] for row in out["head"]]
+    assert labels == ["a", "b", "c"]
 
 
 def test_figure_becomes_image_payload() -> None:

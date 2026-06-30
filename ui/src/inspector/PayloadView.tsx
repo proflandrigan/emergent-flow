@@ -125,7 +125,7 @@ export function PayloadView({
           data-testid="payload-html"
           title="report"
           srcDoc={payload.value}
-          sandbox=""
+          sandbox="allow-scripts"
           style={{ width: "100%", height: 400, border: "none" }}
         />
       );

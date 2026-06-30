@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
 import { useExecutionStore } from "./executionStore";
+import { EXPECTED_PAYLOAD_VERSION } from "./execution";
 import type { ExecuteResponse, Payload } from "./execution";
 
 describe("executionStore", () => {
@@ -11,7 +12,7 @@ describe("executionStore", () => {
   it("setResult populates results + statuses and sets running: false", () => {
     const scalarPayload: Payload = { kind: "scalar", value: 42 };
     const response: ExecuteResponse = {
-      payload_version: 1,
+      payload_version: 2,
       results: {
         node1: { output: scalarPayload },
       },
@@ -33,7 +34,7 @@ describe("executionStore", () => {
     // First, set a result
     const scalarPayload: Payload = { kind: "scalar", value: 42 };
     const response: ExecuteResponse = {
-      payload_version: 1,
+      payload_version: 2,
       results: {
         node1: { output: scalarPayload },
       },
@@ -59,7 +60,7 @@ describe("executionStore", () => {
     // Set some data
     const scalarPayload: Payload = { kind: "scalar", value: 42 };
     const response: ExecuteResponse = {
-      payload_version: 1,
+      payload_version: 2,
       results: {
         node1: { output: scalarPayload },
       },
@@ -85,7 +86,7 @@ describe("executionStore", () => {
     expect(useExecutionStore.getState().lastRunAt).toBeNull();
 
     const response: ExecuteResponse = {
-      payload_version: 1,
+      payload_version: 2,
       results: { node1: { output: { kind: "scalar", value: 42 } } },
       statuses: { node1: { status: "ok" } },
     };
@@ -97,7 +98,7 @@ describe("executionStore", () => {
 
   it("clear resets lastRunAt to null", () => {
     const response: ExecuteResponse = {
-      payload_version: 1,
+      payload_version: 2,
       results: { node1: { output: { kind: "scalar", value: 42 } } },
       statuses: { node1: { status: "ok" } },
     };
@@ -108,9 +109,22 @@ describe("executionStore", () => {
     expect(useExecutionStore.getState().lastRunAt).toBeNull();
   });
 
+  it("setResult rejects incompatible payload_version and sets error without touching results", () => {
+    const staleResponse: ExecuteResponse = {
+      payload_version: EXPECTED_PAYLOAD_VERSION - 1,
+      results: { node1: { output: { kind: "scalar", value: 99 } } },
+      statuses: { node1: { status: "ok" } },
+    };
+    useExecutionStore.getState().setResult(staleResponse);
+    const state = useExecutionStore.getState();
+    expect(state.error).toMatch(/incompatible/);
+    expect(state.results).toEqual({});
+    expect(state.running).toBe(false);
+  });
+
   it("setError does not clear lastRunAt", () => {
     const response: ExecuteResponse = {
-      payload_version: 1,
+      payload_version: 2,
       results: { node1: { output: { kind: "scalar", value: 42 } } },
       statuses: { node1: { status: "ok" } },
     };
