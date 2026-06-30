@@ -1,11 +1,18 @@
-// Execution results (last `/execute` payload and node statuses) is the single source of truth
+// Execution results (per-node SSE updates from `/execute/stream`) is the single source of truth
 // for in-node result panels and node status colouring. Status tracks whether execution is in-flight;
-// results and statuses are never cleared on error (a failed run must not wipe the last successful results).
+// results and statuses are never cleared on error (a failed run must not wipe the last successful
+// results). Updated incrementally, one node at a time, as SSE events arrive (Epic 7 Story 4) rather
+// than in one whole-batch write.
 
 import { create } from "zustand";
 
-import { EXPECTED_PAYLOAD_VERSION } from "./execution";
-import type { ExecuteResponse, NodeRunStatus, Payload } from "./execution";
+import type { NodeRunStatus, Payload } from "./execution";
+
+export interface ProgressState {
+  current: number;
+  total: number;
+  label: string;
+}
 
 export interface ExecutionStore {
   running: boolean;
@@ -13,8 +20,13 @@ export interface ExecutionStore {
   statuses: Record<string, NodeRunStatus>;
   error: string | null;
   lastRunAt: number | null;
+  progress: ProgressState | null;
   setRunning: () => void;
-  setResult: (res: ExecuteResponse) => void;
+  setNodeStart: (label: string, current: number, total: number) => void;
+  setNodeResult: (nodeId: string, results: Record<string, Payload>) => void;
+  setNodeError: (nodeId: string, error: string) => void;
+  setNodeSkipped: (nodeId: string) => void;
+  setRunComplete: () => void;
   setError: (message: string) => void;
   clear: () => void;
 }
@@ -25,30 +37,41 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
   statuses: {},
   error: null,
   lastRunAt: null,
+  progress: null,
 
   setRunning() {
-    set({ running: true, error: null });
+    set({ running: true, error: null, progress: null });
   },
 
-  setResult(res) {
-    if (res.payload_version !== EXPECTED_PAYLOAD_VERSION) {
-      set({
-        running: false,
-        error: `Server payload version ${res.payload_version} is incompatible (expected ${EXPECTED_PAYLOAD_VERSION}). Restart the server or refresh the page.`,
-      });
-      return;
-    }
-    set({
-      results: res.results,
-      statuses: res.statuses,
-      running: false,
-      error: null,
-      lastRunAt: Date.now(),
-    });
+  setNodeStart(label, current, total) {
+    set({ progress: { current, total, label } });
+  },
+
+  setNodeResult(nodeId, results) {
+    set((state) => ({
+      results: { ...state.results, [nodeId]: results },
+      statuses: { ...state.statuses, [nodeId]: { status: "ok" } },
+    }));
+  },
+
+  setNodeError(nodeId, error) {
+    set((state) => ({
+      statuses: { ...state.statuses, [nodeId]: { status: "error", error } },
+    }));
+  },
+
+  setNodeSkipped(nodeId) {
+    set((state) => ({
+      statuses: { ...state.statuses, [nodeId]: { status: "skipped" } },
+    }));
+  },
+
+  setRunComplete() {
+    set({ running: false, error: null, lastRunAt: Date.now(), progress: null });
   },
 
   setError(message) {
-    set({ running: false, error: message });
+    set({ running: false, error: message, progress: null });
   },
 
   clear() {
@@ -58,6 +81,7 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
       statuses: {},
       error: null,
       lastRunAt: null,
+      progress: null,
     });
   },
 }));

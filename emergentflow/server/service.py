@@ -14,6 +14,9 @@ already-tested pure functions and JSON-encode their results.
 from __future__ import annotations
 
 import json
+import time
+from collections.abc import Generator, Iterator
+from dataclasses import dataclass
 from typing import Any
 
 from emergentflow import compile_to_code, execute, export_catalog, validate
@@ -100,23 +103,44 @@ def _ancestors(graph: Graph, targets: set[str], wiring_map: WiringMap) -> set[st
     return seen
 
 
-def _execute_functional_with_status(
+@dataclass(frozen=True)
+class _NodeEvent:
+    """One step in a FUNCTIONAL graph's node-by-node walk (Epic 7 Story 4 seam).
+
+    ``phase`` is one of "start" (about to run a non-skipped node), "ok" (ran
+    successfully), "error" (raised), or "skip" (an upstream dependency was not
+    "ok", so this node never ran). A later SSE layer maps every phase to a wire
+    event 1:1 (including "skip" -> ``node_skip``) so the canvas never has to
+    infer a node's status from the absence of an event.
+    ``_execute_functional_with_status`` below consumes every phase, including
+    "skip", to keep its existing ``statuses`` contract.
+    """
+
+    phase: str  # "start" | "ok" | "error" | "skip"
+    node_id: str
+    label: str
+    current: int | None = None  # 1-indexed position in this run's topo order ("start" only)
+    total: int | None = None  # size of this run's topo order ("start" only)
+    elapsed_ms: int | None = None  # "ok" / "error" only
+    results: dict[str, Any] | None = None  # raw OUT-port artifacts, "ok" only
+    error: str | None = None  # "error" only
+
+
+def _execute_functional_stream(
     graph: Graph,
     only: set[str] | None = None,
     wiring_map: WiringMap | None = None,
-) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
-    """Walk a FUNCTIONAL graph node by node, capturing a per-node run status.
+) -> Iterator[_NodeEvent]:
+    """Walk a FUNCTIONAL graph node by node, yielding one lifecycle event per node.
 
-    Mirrors ``emergentflow.codegen.executor.execute``'s FUNCTIONAL walk exactly,
-    except a single node's runtime failure is recorded as that node's "error"
-    status (and downstream nodes as "skipped") instead of aborting the whole
-    run. Graph-level guards (validation gate, paradigm, cycle, unbound input)
-    still raise so the caller can map them to an HTTP 422.
-
-    *wiring_map*, if given, is reused instead of rebuilt (the ``run_to`` caller
-    already built one to resolve ancestors -- building it twice per request
-    would double the wiring-map construction cost on the "fast incremental
-    re-run" path that ``run_to`` exists for).
+    The generator core behind both the synchronous whole-graph execute path
+    (``_execute_functional_with_status``, which drains it into the existing
+    ``(results, statuses)`` shape) and the SSE streaming path (Epic 7 Story 4),
+    so the two stay equivalent by construction instead of by parallel
+    maintenance. Graph-level guards (validation gate, paradigm, cycle, unbound
+    input) still raise immediately -- the caller must map those to an HTTP 4xx
+    *before* consuming this generator, since a streaming HTTP response cannot
+    change its status code after the first byte is sent.
     """
     enforce_validation_gate(graph)
     if graph.paradigm is not Paradigm.FUNCTIONAL:
@@ -129,7 +153,7 @@ def _execute_functional_with_status(
         topo_order_ids = [nid for nid in topo_order_ids if nid in only]
     if wiring_map is None:
         wiring_map = build_wiring_map(graph)
-    # Dangling-input guard (raises UnboundInputError -> 422).
+    # Dangling-input guard (raises UnboundInputError -> 422), same as before.
     for node_id in topo_order_ids:
         node = graph.nodes[node_id]
         for port in node.ports:
@@ -138,12 +162,11 @@ def _execute_functional_with_status(
             if not wiring_map.upstream(node.id, port.id):
                 raise UnboundInputError(f"{node.id}.{port.id} has no upstream source")
 
-    results: dict[str, dict[str, Any]] = {}
-    statuses: dict[str, dict[str, Any]] = {}
-    for node_id in topo_order_ids:
+    total = len(topo_order_ids)
+    node_status: dict[str, str] = {}
+    node_results: dict[str, dict[str, Any]] = {}
+    for index, node_id in enumerate(topo_order_ids, start=1):
         node = graph.nodes[node_id]
-        # If ANY upstream source node is not ok, this node is skipped (no run).
-        # Because we iterate in topo order, every upstream node already has a status.
         inputs: dict[str, Any] = {}
         skipped = False
         for port in node.ports:
@@ -157,24 +180,78 @@ def _execute_functional_with_status(
                     "context."
                 )
             src = sources[0]
-            if statuses[src.node_id]["status"] != _STATUS_OK:
+            if node_status[src.node_id] != _STATUS_OK:
                 skipped = True
                 break
             src_node = graph.nodes[src.node_id]
             src_port_name = next(p.name for p in src_node.ports if p.id == src.port_id)
-            inputs[port.name] = results[src.node_id][src_port_name]
+            inputs[port.name] = node_results[src.node_id][src_port_name]
         if skipped:
-            statuses[node_id] = {"status": _STATUS_SKIPPED}
+            node_status[node_id] = _STATUS_SKIPPED
+            yield _NodeEvent(phase="skip", node_id=node_id, label=node.label or "")
             continue
+        yield _NodeEvent(
+            phase="start", node_id=node_id, label=node.label or "", current=index, total=total
+        )
+        start = time.monotonic()
         try:
             definition = get_node_definition(node.type)()
-            results[node_id] = definition.execute(node, inputs)
-            statuses[node_id] = {"status": _STATUS_OK}
-        except Exception as exc:  # noqa: BLE001 - any node-runtime failure -> error status
-            statuses[node_id] = {
-                "status": _STATUS_ERROR,
-                "error": f"{type(exc).__name__}: {exc}",
-            }
+            outputs = definition.execute(node, inputs)
+            elapsed_ms = int((time.monotonic() - start) * 1000)
+            node_results[node_id] = outputs
+            node_status[node_id] = _STATUS_OK
+            yield _NodeEvent(
+                phase="ok",
+                node_id=node_id,
+                label=node.label or "",
+                elapsed_ms=elapsed_ms,
+                results=outputs,
+            )
+        except Exception as exc:  # noqa: BLE001 - any node-runtime failure -> error event
+            elapsed_ms = int((time.monotonic() - start) * 1000)
+            node_status[node_id] = _STATUS_ERROR
+            yield _NodeEvent(
+                phase="error",
+                node_id=node_id,
+                label=node.label or "",
+                elapsed_ms=elapsed_ms,
+                error=f"{type(exc).__name__}: {exc}",
+            )
+
+
+def _execute_functional_with_status(
+    graph: Graph,
+    only: set[str] | None = None,
+    wiring_map: WiringMap | None = None,
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    """Walk a FUNCTIONAL graph node by node, capturing a per-node run status.
+
+    Mirrors ``emergentflow.codegen.executor.execute``'s FUNCTIONAL walk exactly,
+    except a single node's runtime failure is recorded as that node's "error"
+    status (and downstream nodes as "skipped") instead of aborting the whole
+    run. Graph-level guards (validation gate, paradigm, cycle, unbound input)
+    still raise so the caller can map them to an HTTP 422.
+
+    *wiring_map*, if given, is reused instead of rebuilt (the ``run_to``
+    caller already built one to resolve ancestors -- building it twice per
+    request would double the wiring-map construction cost on the "fast
+    incremental re-run" path that ``run_to`` exists for).
+
+    Drains ``_execute_functional_stream`` (Epic 7 Story 4 seam) rather than
+    walking the graph itself, so this function and the SSE streaming path
+    stay equivalent by construction.
+    """
+    results: dict[str, dict[str, Any]] = {}
+    statuses: dict[str, dict[str, Any]] = {}
+    for event in _execute_functional_stream(graph, only=only, wiring_map=wiring_map):
+        if event.phase == "skip":
+            statuses[event.node_id] = {"status": _STATUS_SKIPPED}
+        elif event.phase == "ok":
+            results[event.node_id] = event.results or {}
+            statuses[event.node_id] = {"status": _STATUS_OK}
+        elif event.phase == "error":
+            statuses[event.node_id] = {"status": _STATUS_ERROR, "error": event.error}
+        # "start" carries no status change; ignore it here.
     return results, statuses
 
 
@@ -214,6 +291,26 @@ def _split_request(payload: dict[str, Any]) -> tuple[dict[str, Any], Any]:
     return payload, None
 
 
+def _resolve_run_to(graph: Graph, run_to: Any) -> tuple[set[str] | None, WiringMap | None]:
+    """Resolve a request's ``run_to`` value into ``(only, wiring_map)`` for a FUNCTIONAL walk.
+
+    Shared by ``execute_graph`` and ``execute_graph_stream`` so the "run to here"
+    target-resolution logic (Epic 4 Story 6 / Epic 7 Story 5) exists in exactly
+    one place. ``run_to is None`` means "run everything" -- returns ``(None,
+    None)``, and the caller builds its own wiring map lazily only if it needs
+    one. An unknown target id raises ``CodegenError`` (-> 422).
+    """
+    if run_to is None:
+        return None, None
+    targets = {run_to} if isinstance(run_to, str) else set(run_to)
+    missing = targets - set(graph.nodes)
+    if missing:
+        raise CodegenError(f"run_to targets not in graph: {sorted(missing)}")
+    wiring_map = build_wiring_map(graph)
+    only = _ancestors(graph, targets, wiring_map)
+    return only, wiring_map
+
+
 def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     """IR graph (as a dict) -> ``{"payload_version", "results", "statuses"}``.
 
@@ -233,15 +330,7 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     graph_payload, run_to = _split_request(payload)
     graph = _to_graph(graph_payload)
     if graph.paradigm is Paradigm.FUNCTIONAL:
-        only: set[str] | None = None
-        wiring_map: WiringMap | None = None
-        if run_to is not None:
-            targets = {run_to} if isinstance(run_to, str) else set(run_to)
-            missing = targets - set(graph.nodes)
-            if missing:
-                raise CodegenError(f"run_to targets not in graph: {sorted(missing)}")
-            wiring_map = build_wiring_map(graph)
-            only = _ancestors(graph, targets, wiring_map)
+        only, wiring_map = _resolve_run_to(graph, run_to)
         results, statuses = _execute_functional_with_status(graph, only=only, wiring_map=wiring_map)
         return {
             "payload_version": PAYLOAD_CONTRACT_VERSION,
@@ -259,6 +348,111 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
         "payload_version": PAYLOAD_CONTRACT_VERSION,
         "results": _results_to_payloads(results),
         "statuses": statuses,
+    }
+
+
+def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], None, None]:
+    """IR graph (as a dict) -> a stream of SSE-ready event dicts (Story 4).
+
+    Mirrors ``execute_graph``'s validation and dispatch (same ``_split_request``
+    envelope, same ``run_to`` ancestor resolution, same DECLARATIVE fallback)
+    but yields one JSON-safe event dict per step instead of collecting a final
+    ``{"results", "statuses"}`` response -- the HTTP layer (``app.py``) formats
+    each as a ``text/event-stream`` frame. Every event dict has a ``"type"``
+    key: ``"node_start"``, ``"node_ok"``, ``"node_error"``, ``"node_skip"``,
+    ``"run_complete"``, or ``"run_error"``, plus a ``"payload_version"`` key
+    (``PAYLOAD_CONTRACT_VERSION``) so the client can detect a stale bundle
+    talking to an incompatible server on the very first event, the same
+    contract ``execute_graph`` stamps once at the top level. All graph-level
+    validation (``enforce_validation_gate``, paradigm/cycle/unbound-input
+    checks, unknown ``run_to`` targets) happens eagerly on the FIRST iteration
+    step, before any event is yielded, so the caller can still raise straight
+    through and map it to a real HTTP 4xx if it chooses to peek the first item
+    before committing to a streaming response. A node-runtime failure
+    (FUNCTIONAL) becomes a ``"node_error"`` event and the walk continues
+    (downstream nodes reported via ``"node_skip"``, mirroring
+    ``execute_graph``'s "skipped" status); a DECLARATIVE-graph failure has no
+    per-node granularity to report, so it becomes a terminal ``"run_error"``
+    event instead.
+    """
+    graph_payload, run_to = _split_request(payload)
+    graph = _to_graph(graph_payload)
+    start_time = time.monotonic()
+    try:
+        if graph.paradigm is Paradigm.FUNCTIONAL:
+            only, wiring_map = _resolve_run_to(graph, run_to)
+            for event in _execute_functional_stream(graph, only=only, wiring_map=wiring_map):
+                if event.phase == "start":
+                    yield {
+                        "type": "node_start",
+                        "node_id": event.node_id,
+                        "label": event.label,
+                        "current": event.current,
+                        "total": event.total,
+                        "payload_version": PAYLOAD_CONTRACT_VERSION,
+                    }
+                elif event.phase == "ok":
+                    yield {
+                        "type": "node_ok",
+                        "node_id": event.node_id,
+                        "elapsed_ms": event.elapsed_ms,
+                        "results": {
+                            port_name: _payload_for(value)
+                            for port_name, value in (event.results or {}).items()
+                        },
+                        "payload_version": PAYLOAD_CONTRACT_VERSION,
+                    }
+                elif event.phase == "error":
+                    yield {
+                        "type": "node_error",
+                        "node_id": event.node_id,
+                        "elapsed_ms": event.elapsed_ms,
+                        "error": event.error,
+                        "payload_version": PAYLOAD_CONTRACT_VERSION,
+                    }
+                elif event.phase == "skip":
+                    yield {
+                        "type": "node_skip",
+                        "node_id": event.node_id,
+                        "payload_version": PAYLOAD_CONTRACT_VERSION,
+                    }
+        elif run_to is not None:
+            raise CodegenError("run_to (run-to-here) is only supported for FUNCTIONAL graphs")
+        else:
+            # DECLARATIVE (and any future paradigm): the reference executor is
+            # all-or-nothing and has no per-node granularity to stream, so emit
+            # one node_start/node_ok pair per produced node (mirrors
+            # execute_graph's all-"ok" statuses on success).
+            results = execute(graph)
+            for node_id, ports in results.items():
+                yield {
+                    "type": "node_start",
+                    "node_id": node_id,
+                    "label": node_id,
+                    "payload_version": PAYLOAD_CONTRACT_VERSION,
+                }
+                yield {
+                    "type": "node_ok",
+                    "node_id": node_id,
+                    "elapsed_ms": int((time.monotonic() - start_time) * 1000),
+                    "results": {
+                        port_name: _payload_for(value) for port_name, value in ports.items()
+                    },
+                    "payload_version": PAYLOAD_CONTRACT_VERSION,
+                }
+    except CodegenError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - any failure mid-stream -> a terminal event, not a crash
+        yield {
+            "type": "run_error",
+            "error": f"{type(exc).__name__}: {exc}",
+            "payload_version": PAYLOAD_CONTRACT_VERSION,
+        }
+        return
+    yield {
+        "type": "run_complete",
+        "total_ms": int((time.monotonic() - start_time) * 1000),
+        "payload_version": PAYLOAD_CONTRACT_VERSION,
     }
 
 

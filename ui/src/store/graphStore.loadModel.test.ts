@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from "vitest";
 
 import type { CatalogNode } from "../catalog/types";
 import { generateLargeGraph } from "../dev/generateLargeGraph";
-import type { ExecuteResponse } from "./execution";
 import { useExecutionStore } from "./executionStore";
 import { useGraphStore } from "./graphStore";
 import { useValidationStore } from "./validationStore";
@@ -59,12 +58,11 @@ describe("loadModel", () => {
     // Seed both derived stores as if a prior graph had been run/validated. Node and edge ids
     // are preserved across export -> re-import, so without clearing these would be displayed
     // against the freshly loaded graph.
-    const fakeRun: ExecuteResponse = {
-      payload_version: 2,
+    useExecutionStore.setState({
       results: { "node:old": { out: { kind: "scalar", value: 1 } } },
       statuses: { "node:old": { status: "ok" } },
-    };
-    useExecutionStore.getState().setResult(fakeRun);
+      lastRunAt: Date.now(),
+    });
     useValidationStore.getState().setResult({
       diagnostics: [{ severity: "error", code: "type_incompatible", message: "x", edge_id: "e:old" }],
       edge_compatibility: { "e:old": false },

@@ -14,17 +14,20 @@ import {
   type EdgeChange,
   type EdgeTypes,
   type NodeChange,
+  type NodeMouseHandler,
   type NodeTypes,
 } from "@xyflow/react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
 import { useLiveValidation } from "../store/useLiveValidation";
 import { useValidationStore } from "../store/validationStore";
+import { runGraph } from "../exec/runGraph";
 import { EfEdge } from "./edges/EfEdge";
 import { EfNode } from "./nodes/EfNode";
+import { NodeContextMenu } from "./NodeContextMenu";
 import { toRFEdge, toRFNode } from "./toReactFlow";
 
 const nodeTypes: NodeTypes = { efNode: EfNode };
@@ -121,6 +124,32 @@ export function Canvas(): JSX.Element {
     [connect],
   );
 
+  const [contextMenu, setContextMenu] = useState<{
+    nodeId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
+  const onNodeContextMenu: NodeMouseHandler = useCallback((event, node) => {
+    event.preventDefault();
+    setContextMenu({ nodeId: node.id, x: event.clientX, y: event.clientY });
+  }, []);
+
+  useEffect(() => {
+    if (!contextMenu) return undefined;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") closeContextMenu();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("click", closeContextMenu);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("click", closeContextMenu);
+    };
+  }, [contextMenu, closeContextMenu]);
+
   return (
     <div style={{ width: "100%", height: "100%" }}>
       <ReactFlow
@@ -132,6 +161,7 @@ export function Canvas(): JSX.Element {
         onNodeDragStop={endNodeDrag}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeContextMenu={onNodeContextMenu}
         selectionOnDrag
         multiSelectionKeyCode="Shift"
         deleteKeyCode={["Backspace", "Delete"]}
@@ -141,6 +171,16 @@ export function Canvas(): JSX.Element {
         <Background />
         <Controls />
       </ReactFlow>
+      {contextMenu && (
+        <NodeContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onRunToHere={() => {
+            void runGraph({ runTo: contextMenu.nodeId });
+          }}
+          onClose={closeContextMenu}
+        />
+      )}
     </div>
   );
 }
