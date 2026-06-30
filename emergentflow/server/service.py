@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from typing import Any
 
@@ -109,9 +109,9 @@ class _NodeEvent:
 
     ``phase`` is one of "start" (about to run a non-skipped node), "ok" (ran
     successfully), "error" (raised), or "skip" (an upstream dependency was not
-    "ok", so this node never ran). A later SSE layer maps "start"/"ok"/"error"
-    to wire events 1:1 and drops "skip" silently -- there is no wire event for
-    it; the canvas infers a skipped node from the absence of any event for it.
+    "ok", so this node never ran). A later SSE layer maps every phase to a wire
+    event 1:1 (including "skip" -> ``node_skip``) so the canvas never has to
+    infer a node's status from the absence of an event.
     ``_execute_functional_with_status`` below consumes every phase, including
     "skip", to keep its existing ``statuses`` contract.
     """
@@ -351,7 +351,7 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def execute_graph_stream(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
+def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], None, None]:
     """IR graph (as a dict) -> a stream of SSE-ready event dicts (Story 4).
 
     Mirrors ``execute_graph``'s validation and dispatch (same ``_split_request``
@@ -359,16 +359,21 @@ def execute_graph_stream(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
     but yields one JSON-safe event dict per step instead of collecting a final
     ``{"results", "statuses"}`` response -- the HTTP layer (``app.py``) formats
     each as a ``text/event-stream`` frame. Every event dict has a ``"type"``
-    key: ``"node_start"``, ``"node_ok"``, ``"node_error"``, ``"run_complete"``,
-    or ``"run_error"``. All graph-level validation (``enforce_validation_gate``,
-    paradigm/cycle/unbound-input checks, unknown ``run_to`` targets) happens
-    eagerly on the FIRST iteration step, before any event is yielded, so the
-    caller can still raise straight through and map it to a real HTTP 4xx if it
-    chooses to peek the first item before committing to a streaming response.
-    A node-runtime failure (FUNCTIONAL) becomes a ``"node_error"`` event and the
-    walk continues (downstream nodes silently skipped, mirroring
-    ``execute_graph``); a DECLARATIVE-graph failure has no per-node granularity
-    to report, so it becomes a terminal ``"run_error"`` event instead.
+    key: ``"node_start"``, ``"node_ok"``, ``"node_error"``, ``"node_skip"``,
+    ``"run_complete"``, or ``"run_error"``, plus a ``"payload_version"`` key
+    (``PAYLOAD_CONTRACT_VERSION``) so the client can detect a stale bundle
+    talking to an incompatible server on the very first event, the same
+    contract ``execute_graph`` stamps once at the top level. All graph-level
+    validation (``enforce_validation_gate``, paradigm/cycle/unbound-input
+    checks, unknown ``run_to`` targets) happens eagerly on the FIRST iteration
+    step, before any event is yielded, so the caller can still raise straight
+    through and map it to a real HTTP 4xx if it chooses to peek the first item
+    before committing to a streaming response. A node-runtime failure
+    (FUNCTIONAL) becomes a ``"node_error"`` event and the walk continues
+    (downstream nodes reported via ``"node_skip"``, mirroring
+    ``execute_graph``'s "skipped" status); a DECLARATIVE-graph failure has no
+    per-node granularity to report, so it becomes a terminal ``"run_error"``
+    event instead.
     """
     graph_payload, run_to = _split_request(payload)
     graph = _to_graph(graph_payload)
@@ -384,6 +389,7 @@ def execute_graph_stream(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
                         "label": event.label,
                         "current": event.current,
                         "total": event.total,
+                        "payload_version": PAYLOAD_CONTRACT_VERSION,
                     }
                 elif event.phase == "ok":
                     yield {
@@ -394,6 +400,7 @@ def execute_graph_stream(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
                             port_name: _payload_for(value)
                             for port_name, value in (event.results or {}).items()
                         },
+                        "payload_version": PAYLOAD_CONTRACT_VERSION,
                     }
                 elif event.phase == "error":
                     yield {
@@ -401,9 +408,14 @@ def execute_graph_stream(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
                         "node_id": event.node_id,
                         "elapsed_ms": event.elapsed_ms,
                         "error": event.error,
+                        "payload_version": PAYLOAD_CONTRACT_VERSION,
                     }
-                # "skip" carries no wire event -- the canvas infers a skipped
-                # node from the absence of any event for it.
+                elif event.phase == "skip":
+                    yield {
+                        "type": "node_skip",
+                        "node_id": event.node_id,
+                        "payload_version": PAYLOAD_CONTRACT_VERSION,
+                    }
         elif run_to is not None:
             raise CodegenError("run_to (run-to-here) is only supported for FUNCTIONAL graphs")
         else:
@@ -413,7 +425,12 @@ def execute_graph_stream(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
             # execute_graph's all-"ok" statuses on success).
             results = execute(graph)
             for node_id, ports in results.items():
-                yield {"type": "node_start", "node_id": node_id, "label": node_id}
+                yield {
+                    "type": "node_start",
+                    "node_id": node_id,
+                    "label": node_id,
+                    "payload_version": PAYLOAD_CONTRACT_VERSION,
+                }
                 yield {
                     "type": "node_ok",
                     "node_id": node_id,
@@ -421,13 +438,22 @@ def execute_graph_stream(payload: dict[str, Any]) -> Iterator[dict[str, Any]]:
                     "results": {
                         port_name: _payload_for(value) for port_name, value in ports.items()
                     },
+                    "payload_version": PAYLOAD_CONTRACT_VERSION,
                 }
     except CodegenError:
         raise
     except Exception as exc:  # noqa: BLE001 - any failure mid-stream -> a terminal event, not a crash
-        yield {"type": "run_error", "error": f"{type(exc).__name__}: {exc}"}
+        yield {
+            "type": "run_error",
+            "error": f"{type(exc).__name__}: {exc}",
+            "payload_version": PAYLOAD_CONTRACT_VERSION,
+        }
         return
-    yield {"type": "run_complete", "total_ms": int((time.monotonic() - start_time) * 1000)}
+    yield {
+        "type": "run_complete",
+        "total_ms": int((time.monotonic() - start_time) * 1000),
+        "payload_version": PAYLOAD_CONTRACT_VERSION,
+    }
 
 
 def execute_node(payload: dict[str, Any]) -> dict[str, Any]:

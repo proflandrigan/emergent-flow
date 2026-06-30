@@ -32,7 +32,7 @@ import socket
 import threading
 import time
 import webbrowser
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Generator
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -151,7 +151,11 @@ def _sse_frame(event: dict[str, Any]) -> bytes:
     return f"data: {json.dumps(event)}\n\n".encode()
 
 
-def _bridge_to_queue(events: Iterator[dict[str, Any]], q: queue.SimpleQueue[bytes | None]) -> None:
+def _bridge_to_queue(
+    events: Generator[dict[str, Any], None, None],
+    q: queue.SimpleQueue[bytes | None],
+    cancel: threading.Event,
+) -> None:
     """Drain a sync event generator into *q* (a thread-safe queue), sentinel ``None`` last.
 
     Runs on a background thread (started by the route handler below) so the
@@ -162,10 +166,24 @@ def _bridge_to_queue(events: Iterator[dict[str, Any]], q: queue.SimpleQueue[byte
     become available rather than waiting for the whole walk to finish, hence
     the producer-thread + queue bridge instead of a single
     ``run_in_executor`` call.
+
+    Checks *cancel* between node events and closes *events* (stopping the
+    graph walk before its next node) once it's set -- the route handler below
+    sets it when the client disconnects, so an abandoned request doesn't run
+    the rest of a possibly-large graph for nobody. Any exception escaping the
+    walk (including one raised by ``_sse_frame`` itself, e.g. a non-JSON-safe
+    value) becomes a terminal ``run_error`` frame instead of silently ending
+    the stream -- a generator failure that gets swallowed here is otherwise
+    indistinguishable, on the wire, from a normal successful close.
     """
     try:
         for event in events:
+            if cancel.is_set():
+                events.close()
+                break
             q.put(_sse_frame(event))
+    except Exception as exc:  # noqa: BLE001 - any failure draining/framing -> a terminal event
+        q.put(_sse_frame({"type": "run_error", "error": f"{type(exc).__name__}: {exc}"}))
     finally:
         q.put(None)
 
@@ -190,15 +208,22 @@ async def _execute_stream_response(payload: dict[str, Any]) -> Response:
     q: queue.SimpleQueue[bytes | None] = queue.SimpleQueue()
     if first_event is not None:
         q.put(_sse_frame(first_event))
-    threading.Thread(target=_bridge_to_queue, args=(events, q), daemon=True).start()
+    cancel = threading.Event()
+    threading.Thread(target=_bridge_to_queue, args=(events, q, cancel), daemon=True).start()
 
     async def body() -> AsyncIterator[bytes]:
         loop = asyncio.get_running_loop()
-        while True:
-            chunk = await loop.run_in_executor(None, q.get)
-            if chunk is None:
-                break
-            yield chunk
+        try:
+            while True:
+                chunk = await loop.run_in_executor(None, q.get)
+                if chunk is None:
+                    break
+                yield chunk
+        finally:
+            # Runs on a client disconnect too (Starlette closes this async
+            # generator), not just on a clean finish -- signals the producer
+            # thread to stop rather than walking the rest of the graph.
+            cancel.set()
 
     return StreamingResponse(body(), media_type="text/event-stream")
 

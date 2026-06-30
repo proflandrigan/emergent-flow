@@ -5,12 +5,35 @@
 
 import type { Payload } from "../store/execution";
 
+// `payload_version` is optional in the type (even though the real server always sends it) so
+// that a frame missing it is simply not version-checked rather than failing to parse -- see
+// `runGraph.ts`'s tolerant comparison.
 export type StreamEvent =
-  | { type: "node_start"; node_id: string; label: string; current: number; total: number }
-  | { type: "node_ok"; node_id: string; elapsed_ms: number; results: Record<string, Payload> }
-  | { type: "node_error"; node_id: string; elapsed_ms: number; error: string }
-  | { type: "run_complete"; total_ms: number }
-  | { type: "run_error"; error: string };
+  | {
+      type: "node_start";
+      node_id: string;
+      label: string;
+      current: number;
+      total: number;
+      payload_version?: number;
+    }
+  | {
+      type: "node_ok";
+      node_id: string;
+      elapsed_ms: number;
+      results: Record<string, Payload>;
+      payload_version?: number;
+    }
+  | {
+      type: "node_error";
+      node_id: string;
+      elapsed_ms: number;
+      error: string;
+      payload_version?: number;
+    }
+  | { type: "node_skip"; node_id: string; payload_version?: number }
+  | { type: "run_complete"; total_ms: number; payload_version?: number }
+  | { type: "run_error"; error: string; payload_version?: number };
 
 function parseFrame(frame: string): StreamEvent | null {
   for (const line of frame.split("\n")) {

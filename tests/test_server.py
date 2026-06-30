@@ -39,6 +39,7 @@ from emergentflow.server import (
     get_schema,
     validate_graph,
 )
+from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION
 from emergentflow.server.service import (
     _execute_functional_stream,
     _to_graph,
@@ -538,6 +539,7 @@ def test_http_execute_stream_two_node_graph(client: TestClient) -> None:
     assert events[0]["node_id"] == "n-load"
     assert events[2]["node_id"] == "n-impute"
     assert "total_ms" in events[-1]
+    assert all(e["payload_version"] == PAYLOAD_CONTRACT_VERSION for e in events)
 
 
 def test_http_execute_stream_node_error_skips_downstream(client: TestClient) -> None:
@@ -546,7 +548,8 @@ def test_http_execute_stream_node_error_skips_downstream(client: TestClient) -> 
     assert resp.headers["content-type"].startswith("text/event-stream")
     events = _parse_sse_events(resp.text)
     types = [e["type"] for e in events]
-    assert types == ["node_start", "node_error", "run_complete"]
+    assert types == ["node_start", "node_error", "node_skip", "run_complete"]
+    assert events[2]["node_id"] == "n-impute"
 
 
 def test_http_execute_stream_run_to_prunes_subgraph(client: TestClient) -> None:
@@ -556,6 +559,12 @@ def test_http_execute_stream_run_to_prunes_subgraph(client: TestClient) -> None:
     all_ids = {e["node_id"] for e in events if "node_id" in e}
     assert "n-impute-c" not in all_ids
     assert "n-impute-b" in all_ids
+
+
+def test_http_execute_stream_run_to_unknown_target_is_422(client: TestClient) -> None:
+    resp = client.post("/execute/stream", json={"graph": _fanout_graph(), "run_to": "n-nope"})
+    assert resp.status_code == 422
+    assert "error" in resp.json()
 
 
 def test_http_execute_stream_bad_json_is_400(client: TestClient) -> None:

@@ -57,6 +57,16 @@ describe("executionStore", () => {
     });
   });
 
+  it("setNodeSkipped sets that node's status to skipped without touching others", () => {
+    useExecutionStore.getState().setNodeResult("node1", { out: { kind: "scalar", value: 1 } });
+    useExecutionStore.getState().setNodeSkipped("node2");
+    const state = useExecutionStore.getState();
+    expect(state.statuses).toEqual({
+      node1: { status: "ok" },
+      node2: { status: "skipped" },
+    });
+  });
+
   it("setRunComplete sets running: false and lastRunAt to a timestamp, clears progress", () => {
     useExecutionStore.getState().setRunning();
     useExecutionStore.getState().setNodeStart("L", 1, 1);

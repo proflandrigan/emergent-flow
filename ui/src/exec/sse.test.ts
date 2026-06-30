@@ -92,4 +92,11 @@ describe("sse", () => {
     expect(events).toHaveLength(1);
     expect(events[0]).toEqual({ type: "run_complete", total_ms: 1 });
   });
+
+  test("parses a node_skip frame", async () => {
+    const stream = streamOf(['data: {"type":"node_skip","node_id":"n2"}\n\n']);
+    const events = await collect(stream);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({ type: "node_skip", node_id: "n2" });
+  });
 });

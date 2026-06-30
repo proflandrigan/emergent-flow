@@ -25,6 +25,7 @@ export interface ExecutionStore {
   setNodeStart: (label: string, current: number, total: number) => void;
   setNodeResult: (nodeId: string, results: Record<string, Payload>) => void;
   setNodeError: (nodeId: string, error: string) => void;
+  setNodeSkipped: (nodeId: string) => void;
   setRunComplete: () => void;
   setError: (message: string) => void;
   clear: () => void;
@@ -56,6 +57,12 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
   setNodeError(nodeId, error) {
     set((state) => ({
       statuses: { ...state.statuses, [nodeId]: { status: "error", error } },
+    }));
+  },
+
+  setNodeSkipped(nodeId) {
+    set((state) => ({
+      statuses: { ...state.statuses, [nodeId]: { status: "skipped" } },
     }));
   },
 
