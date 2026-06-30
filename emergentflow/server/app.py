@@ -1,33 +1,39 @@
-"""Thin local HTTP server for the bundled app (ADR 0013 Decision 2, §A6).
+"""FastAPI local server for the bundled app (ADR 0013 Decision 2, §A6).
 
-Zero-dependency v0: the Python **stdlib** ``http.server`` exposing the in-process
-service functions over localhost. No auth, no sandbox, no async -- the JupyterLab
-trust model (you run your own code on your own machine). The FastAPI / WebSocket
-streaming upgrade is the documented Phase-2 step; this v0 deliberately keeps the
-bundled install lean and fully CI-testable.
+Phase-2 "Living Bridge": the stdlib ``http.server`` v0 is replaced by FastAPI +
+Uvicorn so a long ``/execute`` no longer blocks ``/healthz`` and so the SSE
+streaming endpoint (Epic 7 Story 4) has an async host. The URL paths and JSON
+shapes are byte-for-byte the same as the v0 server, so the canvas (a pure HTTP
+consumer, ADR 0013 Decision 3) needs no change. ``fastapi``/``uvicorn`` ship in
+the optional ``server`` extra; importing this module requires them.
 
 Routes:
-- ``GET  /``          -- serves ``_static/index.html`` when present, else the demo page
-- ``GET  /healthz``   -- ``{"status": "ok"}``
-- ``GET  /schema``    -- the IR JSON Schema
-- ``GET  /catalog``   -- ``{"catalog_version": <int>, "nodes": [<NodeSpec>, ...]}`` (ADR 0015)
-- ``POST /compile``   -- IR JSON -> ``{"code": ...}``
-- ``POST /execute``   -- IR JSON -> ``{"results": ..., "statuses": ...}``
-- ``POST /execute_node`` -- ``{"graph", "run_node", "inputs"}`` -> single-node run
-- ``POST /validate``  -- IR JSON -> ``{"diagnostics": ...}``
+- ``GET  /``                 -- ``_static/index.html`` when present, else the demo page
+- ``GET  /healthz``          -- ``{"status": "ok"}``
+- ``GET  /schema``           -- the IR JSON Schema
+- ``GET  /catalog``          -- ``{"catalog_version": <int>, "nodes": [...]}`` (ADR 0015)
+- ``GET  /reports/{hash}``   -- a stored HTML report blob (Epic 7 Story 3)
+- ``POST /compile``          -- IR JSON -> ``{"code": ...}``
+- ``POST /execute``          -- IR JSON -> ``{"payload_version", "results", "statuses"}``
+- ``POST /execute_node``     -- ``{"graph", "run_node", "inputs"}`` -> single-node run
+- ``POST /validate``         -- IR JSON -> ``{"diagnostics": ...}``
 """
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import mimetypes
 import pathlib
 import webbrowser
-from collections.abc import Callable
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from collections.abc import Awaitable, Callable
 from typing import Any
 
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse, Response
+
+from emergentflow.server.reports import get_default_store
 from emergentflow.server.service import (
     compile_graph,
     execute_graph,
@@ -36,18 +42,6 @@ from emergentflow.server.service import (
     get_schema,
     validate_graph,
 )
-
-_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
-    "/compile": compile_graph,
-    "/execute": execute_graph,
-    "/execute_node": execute_node,
-    "/validate": validate_graph,
-}
-
-_GET_ROUTES: dict[str, Callable[[], dict[str, Any]]] = {
-    "/schema": get_schema,
-    "/catalog": get_catalog,
-}
 
 # The built UI is bundled into emergentflow/_static/ by the package build hook
 # (ADR 0013 Decision 1). It is absent in a source checkout / before `vite build`,
@@ -108,64 +102,116 @@ _INDEX_HTML = """<!doctype html>
 </html>
 """
 
+# Service functions keyed by POST path. Each maps a JSON dict to a JSON dict and
+# is CPU-bound (it runs node code), so handlers off-load it to a worker thread to
+# keep the event loop responsive (the whole point of the FastAPI upgrade).
+_POST_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
+    "/compile": compile_graph,
+    "/execute": execute_graph,
+    "/execute_node": execute_node,
+    "/validate": validate_graph,
+}
 
-class _Handler(BaseHTTPRequestHandler):
-    server_version = "emergentflow-serve/0"
 
-    def _send_json(self, status: int, body: dict[str, Any]) -> None:
-        self._send(status, "application/json", json.dumps(body).encode())
+async def _read_json_body(request: Request) -> dict[str, Any]:
+    """Parse the request body as a JSON dict; an empty body is ``{}``.
 
-    def _send(self, status: int, content_type: str, data: bytes) -> None:
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
+    Raises ``json.JSONDecodeError``/``ValueError`` on malformed JSON so the caller
+    can map it to HTTP 400 -- matching the v0 stdlib server's contract exactly.
+    """
+    raw = await request.body()
+    if not raw:
+        return {}
+    return json.loads(raw)
 
-    def do_GET(self) -> None:
-        if self.path == "/healthz":
-            self._send_json(200, {"status": "ok"})
-            return
-        url_path = self.path.split("?", 1)[0]  # ignore any query string
-        get_handler = _GET_ROUTES.get(url_path)
-        if get_handler is not None:
-            try:
-                self._send_json(200, get_handler())
-            except Exception as exc:
-                self._send_json(422, {"error": f"{type(exc).__name__}: {exc}"})
-            return
+
+async def _dispatch(
+    service_fn: Callable[[dict[str, Any]], dict[str, Any]], request: Request
+) -> Response:
+    """Run *service_fn* on the parsed body in a worker thread; map errors to JSON.
+
+    400 = bad JSON body, 422 = any service-level failure (bad graph, etc.),
+    200 = the function's JSON dict. Mirrors the v0 server's status codes.
+    """
+    try:
+        body = await _read_json_body(request)
+    except (ValueError, json.JSONDecodeError) as exc:
+        return JSONResponse(status_code=400, content={"error": f"invalid JSON body: {exc}"})
+    loop = asyncio.get_running_loop()
+    try:
+        result = await loop.run_in_executor(None, service_fn, body)
+    except Exception as exc:  # noqa: BLE001 - any ef.* failure -> 422, never crash the server
+        return JSONResponse(status_code=422, content={"error": f"{type(exc).__name__}: {exc}"})
+    return JSONResponse(content=result)
+
+
+def _make_post_handler(
+    service_fn: Callable[[dict[str, Any]], dict[str, Any]],
+) -> Callable[[Request], Awaitable[Response]]:
+    async def handler(request: Request) -> Response:
+        return await _dispatch(service_fn, request)
+
+    return handler
+
+
+def create_app() -> FastAPI:
+    """Build the FastAPI application (one instance per process; see ``app`` below)."""
+    application = FastAPI(title="Emergent Flow - local", docs_url=None, redoc_url=None)
+
+    @application.get("/healthz")
+    async def healthz() -> JSONResponse:
+        return JSONResponse(content={"status": "ok"})
+
+    @application.get("/schema")
+    async def schema() -> Response:
+        try:
+            return JSONResponse(content=get_schema())
+        except Exception as exc:  # noqa: BLE001
+            return JSONResponse(status_code=422, content={"error": f"{type(exc).__name__}: {exc}"})
+
+    @application.get("/catalog")
+    async def catalog() -> Response:
+        try:
+            return JSONResponse(content=get_catalog())
+        except Exception as exc:  # noqa: BLE001
+            return JSONResponse(status_code=422, content={"error": f"{type(exc).__name__}: {exc}"})
+
+    @application.get("/reports/{report_hash}")
+    async def report(report_hash: str) -> Response:
+        html = get_default_store().get(report_hash)
+        if html is None:
+            return JSONResponse(
+                status_code=404, content={"error": f"report not found: {report_hash}"}
+            )
+        return HTMLResponse(content=html)
+
+    for path, fn in _POST_ROUTES.items():
+        application.add_api_route(path, _make_post_handler(fn), methods=["POST"])
+
+    # Catch-all GET: static asset -> demo page (for "/" and "/index.html") -> 404.
+    # Declared last so the explicit GET routes above take precedence.
+    @application.get("/{full_path:path}")
+    async def static_or_demo(full_path: str, request: Request) -> Response:
+        url_path = request.url.path
         asset = _static_file(url_path)
         if asset is not None:
             content_type = mimetypes.guess_type(asset.name)[0] or "application/octet-stream"
-            self._send(200, content_type, asset.read_bytes())
-            return
+            return Response(content=asset.read_bytes(), media_type=content_type)
         if url_path in ("/", "/index.html"):
-            # No bundled UI present -- fall back to the throwaway v0 demo page.
-            self._send(200, "text/html; charset=utf-8", _INDEX_HTML.encode())
-            return
-        self._send_json(404, {"error": f"not found: {self.path}"})
+            return HTMLResponse(content=_INDEX_HTML)
+        return JSONResponse(status_code=404, content={"error": f"not found: {url_path}"})
 
-    def do_POST(self) -> None:
-        handler = _ROUTES.get(self.path)
-        if handler is None:
-            self._send_json(404, {"error": f"not found: {self.path}"})
-            return
-        try:
-            length = int(self.headers.get("Content-Length", 0) or 0)
-            payload = json.loads(self.rfile.read(length) or b"{}")
-        except (ValueError, json.JSONDecodeError) as exc:
-            self._send_json(400, {"error": f"invalid JSON body: {exc}"})
-            return
-        try:
-            self._send_json(200, handler(payload))
-        except Exception as exc:
-            # Report any ef.* failure as JSON; the local dev server must never
-            # crash on a bad graph -- it just hands the error back to the canvas.
-            self._send_json(422, {"error": f"{type(exc).__name__}: {exc}"})
+    # Catch-all POST: an unknown POST path is a 404 with the {"error": ...} shape
+    # (rather than FastAPI's default {"detail": ...}); keeps the v0 contract.
+    @application.post("/{full_path:path}")
+    async def post_not_found(full_path: str, request: Request) -> Response:
+        return JSONResponse(status_code=404, content={"error": f"not found: {request.url.path}"})
 
-    def log_message(self, format: str, *args: Any) -> None:
-        # Quiet by default; a v0 local server need not spam stderr per request.
-        return
+    return application
+
+
+# One application instance for Uvicorn to serve (cheap to build at import time).
+app = create_app()
 
 
 def _open_browser(url: str) -> None:
@@ -179,27 +225,18 @@ def _open_browser(url: str) -> None:
         webbrowser.open(url)
 
 
-def make_server(host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
-    """Build (but do not start) the local HTTP server."""
-    return ThreadingHTTPServer((host, port), _Handler)
-
-
 def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True) -> None:
-    """Boot the local canvas server and block until interrupted.
+    """Boot the local canvas server on Uvicorn and block until interrupted.
 
     When *open_browser* is true (the default), a browser tab is opened at the served
-    URL once the socket is listening. ``0.0.0.0`` is shown/opened as ``127.0.0.1`` since
+    URL before the server starts. ``0.0.0.0`` is shown/opened as ``127.0.0.1`` since
     a wildcard bind is not a browsable address.
     """
-    httpd = make_server(host, port)
+    import uvicorn
+
     browse_host = "127.0.0.1" if host == "0.0.0.0" else host  # noqa: S104
     url = f"http://{browse_host}:{port}"
     print(f"Emergent Flow - serving the local canvas at {url}  (Ctrl-C to stop)")
     if open_browser:
         _open_browser(url)
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        print("\nshutting down")
-    finally:
-        httpd.server_close()
+    uvicorn.run(app, host=host, port=port, log_level="warning")

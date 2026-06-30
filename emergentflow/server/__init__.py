@@ -8,7 +8,7 @@ light per ADR 0007's portability guarantee.
 
 from __future__ import annotations
 
-from emergentflow.server.app import make_server, serve
+from emergentflow.server.app import app, create_app, serve
 from emergentflow.server.service import (
     compile_graph,
     execute_graph,
@@ -19,7 +19,8 @@ from emergentflow.server.service import (
 )
 
 __all__ = [
-    "make_server",
+    "app",
+    "create_app",
     "serve",
     "compile_graph",
     "execute_graph",

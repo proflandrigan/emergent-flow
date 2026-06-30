@@ -9,15 +9,13 @@ No torch, no network, no fixtures beyond the bundled sample CSV.
 
 from __future__ import annotations
 
-import contextlib
+import importlib
 import json
 import pathlib
-import threading
-import urllib.error
-import urllib.request
 from collections.abc import Iterator
 
 import pytest
+from fastapi.testclient import TestClient
 
 from emergentflow.ir import (
     Direction,
@@ -32,12 +30,12 @@ from emergentflow.ir.edge import Edge, PortRef
 from emergentflow.ir.schema import ir_json_schema
 from emergentflow.ir.serialize import serialize_graph
 from emergentflow.server import (
+    app,
     compile_graph,
     execute_graph,
     execute_node,
     get_catalog,
     get_schema,
-    make_server,
     validate_graph,
 )
 
@@ -309,107 +307,65 @@ def test_get_catalog_lists_registered_nodes() -> None:
 
 
 # ---------------------------------------------------------------------------
-# HTTP layer (stdlib server on an ephemeral port)
+# HTTP layer (FastAPI TestClient)
 # ---------------------------------------------------------------------------
 
 
-@contextlib.contextmanager
-def _running(httpd) -> Iterator[str]:
-    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{httpd.server_address[1]}"
-    finally:
-        httpd.shutdown()
-        httpd.server_close()
-        thread.join()
-
-
 @pytest.fixture
-def base_url() -> Iterator[str]:
-    httpd = make_server("127.0.0.1", 0)
-    port = httpd.server_address[1]
-    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{port}"
-    finally:
-        httpd.shutdown()
-        httpd.server_close()
-        thread.join()
+def client() -> Iterator[TestClient]:
+    """A FastAPI test client over the module-level ``app`` (no real socket)."""
+    with TestClient(app) as test_client:
+        yield test_client
 
 
-def _post(base: str, path: str, payload: dict) -> tuple[int, dict]:
-    req = urllib.request.Request(
-        base + path,
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req) as resp:  # noqa: S310 - localhost test client
-            return resp.status, json.loads(resp.read())
-    except urllib.error.HTTPError as exc:
-        return exc.code, json.loads(exc.read())
+def test_healthz(client: TestClient) -> None:
+    resp = client.get("/healthz")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
 
 
-def test_healthz(base_url: str) -> None:
-    with urllib.request.urlopen(base_url + "/healthz") as resp:  # noqa: S310
-        assert resp.status == 200
-        assert json.loads(resp.read()) == {"status": "ok"}
+def test_index_page_served(client: TestClient) -> None:
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert b"Emergent Flow" in resp.content
 
 
-def test_index_page_served(base_url: str) -> None:
-    with urllib.request.urlopen(base_url + "/") as resp:  # noqa: S310
-        assert resp.status == 200
-        assert b"Emergent Flow" in resp.read()
-
-
-def test_static_index_served_when_present(tmp_path, monkeypatch) -> None:
-    import emergentflow.server.app as app_mod
+def test_static_index_served_when_present(tmp_path, monkeypatch, client: TestClient) -> None:
+    app_mod = importlib.import_module("emergentflow.server.app")
 
     static_dir = tmp_path / "_static"
     static_dir.mkdir()
     (static_dir / "index.html").write_text("<html><body>BUNDLED CANVAS</body></html>")
     monkeypatch.setattr(app_mod, "_STATIC_DIR", static_dir.resolve())
-    with (
-        _running(make_server("127.0.0.1", 0)) as base,
-        urllib.request.urlopen(base + "/") as resp,  # noqa: S310
-    ):
-        assert resp.status == 200
-        assert b"BUNDLED CANVAS" in resp.read()
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert b"BUNDLED CANVAS" in resp.content
 
 
-def test_static_asset_served_with_content_type(tmp_path, monkeypatch) -> None:
-    import emergentflow.server.app as app_mod
+def test_static_asset_served_with_content_type(tmp_path, monkeypatch, client: TestClient) -> None:
+    app_mod = importlib.import_module("emergentflow.server.app")
 
     static_dir = tmp_path / "_static"
     (static_dir / "assets").mkdir(parents=True)
     (static_dir / "assets" / "app.js").write_text("console.log('hi');")
     monkeypatch.setattr(app_mod, "_STATIC_DIR", static_dir.resolve())
-    with (
-        _running(make_server("127.0.0.1", 0)) as base,
-        urllib.request.urlopen(base + "/assets/app.js") as resp,  # noqa: S310
-    ):
-        assert resp.status == 200
-        assert "javascript" in resp.headers["Content-Type"]
-        assert b"console.log" in resp.read()
+    resp = client.get("/assets/app.js")
+    assert resp.status_code == 200
+    assert "javascript" in resp.headers["content-type"]
+    assert b"console.log" in resp.content
 
 
-def test_demo_page_when_static_absent(tmp_path, monkeypatch) -> None:
-    import emergentflow.server.app as app_mod
+def test_demo_page_when_static_absent(tmp_path, monkeypatch, client: TestClient) -> None:
+    app_mod = importlib.import_module("emergentflow.server.app")
 
     monkeypatch.setattr(app_mod, "_STATIC_DIR", (tmp_path / "_static").resolve())
-    with (
-        _running(make_server("127.0.0.1", 0)) as base,
-        urllib.request.urlopen(base + "/") as resp,  # noqa: S310
-    ):
-        assert resp.status == 200
-        assert b"Emergent Flow" in resp.read()
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert b"Emergent Flow" in resp.content
 
 
 def test_static_file_blocks_directory_traversal(tmp_path, monkeypatch) -> None:
-    import emergentflow.server.app as app_mod
+    app_mod = importlib.import_module("emergentflow.server.app")
 
     static_dir = tmp_path / "_static"
     static_dir.mkdir()
@@ -423,7 +379,7 @@ def test_static_file_blocks_directory_traversal(tmp_path, monkeypatch) -> None:
 
 
 def test_open_browser_invokes_webbrowser(monkeypatch) -> None:
-    import emergentflow.server.app as app_mod
+    app_mod = importlib.import_module("emergentflow.server.app")
 
     opened: list[str] = []
     monkeypatch.setattr(app_mod.webbrowser, "open", lambda url, *a, **k: opened.append(url))
@@ -432,7 +388,7 @@ def test_open_browser_invokes_webbrowser(monkeypatch) -> None:
 
 
 def test_open_browser_swallows_errors(monkeypatch) -> None:
-    import emergentflow.server.app as app_mod
+    app_mod = importlib.import_module("emergentflow.server.app")
 
     def boom(url, *a, **k):
         raise RuntimeError("no browser on this host")
@@ -441,59 +397,83 @@ def test_open_browser_swallows_errors(monkeypatch) -> None:
     app_mod._open_browser("http://127.0.0.1:8765")  # must NOT raise
 
 
-def test_http_compile_and_execute(base_url: str) -> None:
-    status, body = _post(base_url, "/compile", _load_csv_graph())
-    assert status == 200
-    assert "import emergentflow as ef" in body["code"]
+def test_http_compile_and_execute(client: TestClient) -> None:
+    resp = client.post("/compile", json=_load_csv_graph())
+    assert resp.status_code == 200
+    assert "import emergentflow as ef" in resp.json()["code"]
 
-    status, body = _post(base_url, "/execute", _load_csv_graph())
-    assert status == 200
+    resp = client.post("/execute", json=_load_csv_graph())
+    assert resp.status_code == 200
+    body = resp.json()
     assert "n-load" in body["results"]
     assert body["payload_version"] == 2
     assert body["results"]["n-load"]["frame"]["kind"] == "table"
 
 
-def test_http_execute_node(base_url: str) -> None:
-    status, body = _post(
-        base_url, "/execute_node", {"graph": _load_csv_graph(), "run_node": "n-load"}
-    )
-    assert status == 200
+def test_http_execute_node(client: TestClient) -> None:
+    resp = client.post("/execute_node", json={"graph": _load_csv_graph(), "run_node": "n-load"})
+    assert resp.status_code == 200
+    body = resp.json()
     assert body["statuses"]["n-load"]["status"] == "ok"
     assert body["results"]["n-load"]["frame"]["kind"] == "table"
 
 
-def test_http_execute_node_error_reports_per_node_status(base_url: str) -> None:
+def test_http_execute_node_error_reports_per_node_status(client: TestClient) -> None:
     # A node-runtime failure (bad CSV path) is reported per-node at HTTP 200 so the
     # canvas can colour just that node red -- the server never crashes.
-    status, body = _post(base_url, "/execute", _load_csv_graph(path="/no/such/file.csv"))
-    assert status == 200
+    resp = client.post("/execute", json=_load_csv_graph(path="/no/such/file.csv"))
+    assert resp.status_code == 200
+    body = resp.json()
     assert body["statuses"]["n-load"]["status"] == "error"
     assert "n-load" not in body["results"]
 
 
-def test_http_execute_unconnected_input_is_422(base_url: str) -> None:
+def test_http_execute_unconnected_input_is_422(client: TestClient) -> None:
     payload = _chain_graph()
     payload["edges"] = {}
     payload["nodes"] = {k: v for k, v in payload["nodes"].items() if k == "n-impute"}
-    status, body = _post(base_url, "/execute", payload)
-    assert status == 422
-    assert "error" in body
+    resp = client.post("/execute", json=payload)
+    assert resp.status_code == 422
+    assert "error" in resp.json()
 
 
-def test_http_unknown_route_is_404(base_url: str) -> None:
-    status, body = _post(base_url, "/nope", {})
-    assert status == 404
-    assert "error" in body
+def test_http_invalid_json_body_is_400(client: TestClient) -> None:
+    resp = client.post("/compile", content="not json", headers={"Content-Type": "application/json"})
+    assert resp.status_code == 400
+    assert "error" in resp.json()
 
 
-def test_http_get_schema(base_url: str) -> None:
-    with urllib.request.urlopen(base_url + "/schema") as resp:  # noqa: S310
-        assert resp.status == 200
-        assert json.loads(resp.read()) == get_schema()
+def test_http_unknown_route_is_404(client: TestClient) -> None:
+    resp = client.post("/nope", json={})
+    assert resp.status_code == 404
+    assert "error" in resp.json()
 
 
-def test_http_get_catalog(base_url: str) -> None:
-    with urllib.request.urlopen(base_url + "/catalog") as resp:  # noqa: S310
-        assert resp.status == 200
-        body = json.loads(resp.read())
-        assert "data.load_csv" in {spec["type"] for spec in body["nodes"]}
+def test_http_get_schema(client: TestClient) -> None:
+    resp = client.get("/schema")
+    assert resp.status_code == 200
+    assert resp.json() == get_schema()
+
+
+def test_http_get_catalog(client: TestClient) -> None:
+    resp = client.get("/catalog")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "data.load_csv" in {spec["type"] for spec in body["nodes"]}
+
+
+def test_http_reports_round_trip(client: TestClient) -> None:
+    from emergentflow.server.reports import get_default_store
+
+    html = "<!DOCTYPE html><html><body>profile</body></html>"
+    report_hash = get_default_store().put(html)
+    resp = client.get(f"/reports/{report_hash}")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    assert resp.text == html
+
+
+def test_http_reports_unknown_hash_is_404(client: TestClient) -> None:
+    resp = client.get("/reports/deadbeefdeadbeef")
+    assert resp.status_code == 404
+    assert "error" in resp.json()

@@ -11,6 +11,7 @@ inside ``main`` so ``import emergentflow.cli`` stays cheap.
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Sequence
 
 
@@ -36,7 +37,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     if args.command in ("serve", "lab"):
-        from emergentflow.server import serve
+        try:
+            from emergentflow.server import serve
+        except ModuleNotFoundError as exc:
+            # fastapi/uvicorn ship in the optional `server` extra (Epic 7 Story 3).
+            # A bare `pip install emergentflow` omits them; guide the user rather
+            # than surfacing a raw ModuleNotFoundError traceback.
+            print(
+                f"`emergentflow {args.command}` needs the server extra "
+                f"(missing dependency: {exc.name}).\n"
+                "Install it with:  pip install 'emergentflow[server]'",
+                file=sys.stderr,
+            )
+            return 1
 
         serve(host=args.host, port=args.port, open_browser=not args.no_browser)
         return 0

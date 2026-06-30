@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 from typing import Any
 
 from emergentflow.cli import main
@@ -40,5 +41,25 @@ def test_lab_alias_also_serves(monkeypatch) -> None:
     assert calls["open_browser"] is True
 
 
-def test_no_command_prints_help_and_returns_1() -> None:
+def test_serve_without_extra_prints_hint(monkeypatch, capsys) -> None:
+    # fastapi/uvicorn live in the optional `server` extra (Epic 7 Story 3); a bare
+    # install must surface an install hint, not a raw ModuleNotFoundError traceback.
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "emergentflow.server" or name.startswith("emergentflow.server"):
+            raise ModuleNotFoundError("No module named 'fastapi'", name="fastapi")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    rc = main(["serve"])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "emergentflow[server]" in err
+    assert "fastapi" in err
+
+
+def test_no_command_prints_help_and_returns_1(capsys) -> None:
     assert main([]) == 1
+    out = capsys.readouterr().out
+    assert "usage" in out.lower()
