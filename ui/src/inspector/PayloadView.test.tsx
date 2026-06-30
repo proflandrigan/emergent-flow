@@ -74,3 +74,28 @@ test("renders unsupported", () => {
   expect(el).toHaveTextContent("ndarray");
   expect(el).toHaveTextContent("array([1, 2, 3])");
 });
+
+test("renders an image payload as a data-url img", () => {
+  const payload: Payload = {
+    kind: "image",
+    mime: "image/png",
+    data: "QUJD", // base64 of "ABC"
+    width: 4,
+    height: 4,
+  };
+  render(<PayloadView payload={payload} />);
+  const img = screen.getByTestId("payload-image");
+  expect(img).toHaveAttribute("src", "data:image/png;base64,QUJD");
+});
+
+test("renders an html payload in a sandboxed iframe", () => {
+  const payload: Payload = {
+    kind: "html",
+    value: "<html><body>hi</body></html>",
+    truncated: false,
+  };
+  render(<PayloadView payload={payload} />);
+  const frame = screen.getByTestId("payload-html");
+  expect(frame).toHaveAttribute("srcdoc", "<html><body>hi</body></html>");
+  expect(frame).toHaveAttribute("sandbox", "allow-scripts");
+});

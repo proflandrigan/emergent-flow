@@ -15,8 +15,9 @@ import math
 
 import numpy as np
 import pandas as pd
+import pytest
 
-from emergentflow.server.payload import MAX_HEAD_ROWS, MAX_TEXT_CHARS, to_payload
+from emergentflow.server.payload import MAX_HEAD_ROWS, MAX_IMAGE_BYTES, MAX_TEXT_CHARS, to_payload
 
 
 def test_scalar_kinds() -> None:
@@ -166,3 +167,101 @@ def test_numpy_nonfinite_scalar_is_nulled() -> None:
     payload = to_payload(np.float32("nan"))
     assert payload == {"kind": "scalar", "value": None}
     assert "NaN" not in json.dumps(payload)
+
+
+def test_html_string_becomes_html_payload() -> None:
+    out = to_payload("<!DOCTYPE html><html><body>hi</body></html>")
+    assert out["kind"] == "html"
+    assert out["truncated"] is False
+    assert out["value"] == "<!DOCTYPE html><html><body>hi</body></html>"
+
+    # case-insensitive match
+    assert to_payload("<HTML>x</HTML>")["kind"] == "html"
+
+    # leading whitespace tolerated
+    assert to_payload("\n  <html></html>")["kind"] == "html"
+
+
+def test_non_html_string_is_scalar() -> None:
+    assert to_payload("<div>not a doc</div>")["kind"] == "scalar"
+    assert to_payload("hello")["kind"] == "scalar"
+    # Must NOT false-positive on strings that merely start with "<html" but are not documents.
+    assert to_payload("<htmlparser>foo</htmlparser>")["kind"] == "scalar"
+    assert to_payload("<html_escape is a PHP function>")["kind"] == "scalar"
+
+
+def test_oversized_html_is_unsupported() -> None:
+    oversized = "<!DOCTYPE html><html>" + "x" * MAX_IMAGE_BYTES
+    out = to_payload(oversized)
+    assert out["kind"] == "unsupported"
+    assert str(MAX_IMAGE_BYTES) in out["repr"]
+
+
+def test_series_becomes_single_column_table() -> None:
+    s = pd.Series([1, 2, 3], name="x")
+    out = to_payload(s)
+    assert out["kind"] == "table"
+    assert out["columns"] == ["x"]
+    assert out["shape"] == [3, 1]
+    assert out["truncated"] is False
+    assert len(out["head"]) == 3
+
+
+def test_series_with_named_index_preserves_labels() -> None:
+    s = pd.Series([10, 20, 30], index=["a", "b", "c"], name="value")
+    out = to_payload(s)
+    assert out["kind"] == "table"
+    # The named index must appear as a column so row labels are not silently dropped.
+    assert "index" in out["columns"]
+    assert "value" in out["columns"]
+    # Row labels must survive serialization.
+    labels = [row["index"] for row in out["head"]]
+    assert labels == ["a", "b", "c"]
+
+
+def test_figure_becomes_image_payload() -> None:
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")  # headless backend; no display needed
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots()
+    ax.plot([1, 2, 3], [1, 4, 9])
+    try:
+        out = to_payload(fig)
+    finally:
+        plt.close(fig)  # the test owns the figure; to_payload must NOT close it
+    assert out["kind"] == "image"
+    assert out["mime"] == "image/png"
+    assert isinstance(out["data"], str) and len(out["data"]) > 0
+    assert isinstance(out["width"], int) and out["width"] > 0
+    assert isinstance(out["height"], int) and out["height"] > 0
+    # data must be valid base64
+    import base64
+
+    base64.b64decode(out["data"])  # raises if invalid
+
+
+def test_oversized_figure_is_unsupported(monkeypatch: pytest.MonkeyPatch) -> None:
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    import emergentflow.server.payload as payload_mod
+
+    monkeypatch.setattr(payload_mod, "MAX_IMAGE_BYTES", 10)  # any real PNG exceeds 10 bytes
+    fig, ax = plt.subplots()
+    ax.plot([1, 2, 3])
+    try:
+        out = payload_mod.to_payload(fig)
+    finally:
+        plt.close(fig)
+    assert out["kind"] == "unsupported"
+
+
+def test_new_payload_kinds_are_json_serializable() -> None:
+    html_out = to_payload("<!DOCTYPE html><html><body>hello</body></html>")
+    json.dumps(html_out)
+
+    s = pd.Series([10, 20, 30], name="val")
+    series_out = to_payload(s)
+    json.dumps(series_out)

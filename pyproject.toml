@@ -127,5 +127,5 @@ init_typed = true
 # declarative codegen seam imports it lazily, only when actually running an
 # nn.Module), so it is absent in CI — ignore its missing import.
 [[tool.mypy.overrides]]
-module = ["pandas.*", "statsmodels.*", "ydata_profiling.*", "sklearn.*", "scipy.*", "torch.*"]
+module = ["pandas.*", "statsmodels.*", "ydata_profiling.*", "sklearn.*", "scipy.*", "torch.*", "matplotlib.*"]
 ignore_missing_imports = true
