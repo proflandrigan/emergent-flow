@@ -26,6 +26,7 @@ from emergentflow.ir.schema import ir_json_schema
 from emergentflow.ir.serialize import deserialize_graph
 from emergentflow.nodes import get as get_node_definition
 from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
+from emergentflow.server.reports import get_default_store
 
 # Per-node execution status reported to the canvas (Epic 4 Story 2). A node is
 # "ok" if it ran, "error" if its execute() raised, "skipped" if an upstream node
@@ -177,12 +178,27 @@ def _execute_functional_with_status(
     return results, statuses
 
 
+def _payload_for(value: Any) -> dict[str, Any]:
+    """``to_payload`` for *value*, registering any HTML report for ``/reports``.
+
+    ``to_payload`` stays pure (no I/O); the side effect of persisting the report
+    blob lives here in the execute path. An ``"html"`` payload gains a
+    ``"report_hash"`` (additive -- existing fields are untouched) so the canvas
+    can load large reports via ``GET /reports/{hash}`` instead of a multi-MB
+    ``srcdoc``. Non-HTML payloads pass through unchanged.
+    """
+    payload = to_payload(value)
+    if payload.get("kind") == "html":
+        payload["report_hash"] = get_default_store().put(payload["value"])
+    return payload
+
+
 def _results_to_payloads(
     results: dict[str, dict[str, Any]],
 ) -> dict[str, dict[str, dict[str, Any]]]:
     """Map each OUT-port artifact to its typed result payload (Story 3)."""
     return {
-        node_id: {port_name: to_payload(value) for port_name, value in ports.items()}
+        node_id: {port_name: _payload_for(value) for port_name, value in ports.items()}
         for node_id, ports in results.items()
     }
 
