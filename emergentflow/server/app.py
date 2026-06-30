@@ -15,6 +15,7 @@ Routes:
 - ``GET  /reports/{hash}``   -- a stored HTML report blob (Epic 7 Story 3)
 - ``POST /compile``          -- IR JSON -> ``{"code": ...}``
 - ``POST /execute``          -- IR JSON -> ``{"payload_version", "results", "statuses"}``
+- ``POST /execute/stream``    -- IR JSON -> Server-Sent Events of per-node progress
 - ``POST /execute_node``     -- ``{"graph", "run_node", "inputs"}`` -> single-node run
 - ``POST /validate``         -- IR JSON -> ``{"diagnostics": ...}``
 """
@@ -26,20 +27,22 @@ import contextlib
 import json
 import mimetypes
 import pathlib
+import queue
 import socket
 import threading
 import time
 import webbrowser
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from typing import Any
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
 from emergentflow.server.reports import get_default_store
 from emergentflow.server.service import (
     compile_graph,
     execute_graph,
+    execute_graph_stream,
     execute_node,
     get_catalog,
     get_schema,
@@ -143,6 +146,63 @@ async def _safe_json(fn: Callable[[], dict[str, Any]]) -> Response:
     return JSONResponse(content=result)
 
 
+def _sse_frame(event: dict[str, Any]) -> bytes:
+    """One ``data: <json>\n\n`` SSE frame for *event* (the project's one event shape)."""
+    return f"data: {json.dumps(event)}\n\n".encode()
+
+
+def _bridge_to_queue(events: Iterator[dict[str, Any]], q: queue.SimpleQueue[bytes | None]) -> None:
+    """Drain a sync event generator into *q* (a thread-safe queue), sentinel ``None`` last.
+
+    Runs on a background thread (started by the route handler below) so the
+    blocking, CPU-bound node-by-node walk never runs on the asyncio event
+    loop -- the same reason every other handler in this module offloads
+    blocking work via ``_run_sync``/``run_in_executor``. Unlike those
+    one-shot handlers, this one must hand back partial results as they
+    become available rather than waiting for the whole walk to finish, hence
+    the producer-thread + queue bridge instead of a single
+    ``run_in_executor`` call.
+    """
+    try:
+        for event in events:
+            q.put(_sse_frame(event))
+    finally:
+        q.put(None)
+
+
+async def _execute_stream_response(payload: dict[str, Any]) -> Response:
+    """Build the ``/execute/stream`` response: a real 4xx for upfront failures, else SSE.
+
+    Forces the first step of ``execute_graph_stream`` (graph parsing, the
+    validation gate, paradigm/cycle/unbound-input checks, unknown ``run_to``
+    targets) to run -- and raise, if it's going to -- BEFORE any bytes are
+    sent, so those failures still map to the project's normal 422 contract
+    exactly like ``/execute`` does. Only once that first event is in hand do
+    we commit to a ``text/event-stream`` response and start draining the rest
+    on a background thread.
+    """
+    events = execute_graph_stream(payload)
+    try:
+        first_event = await _run_sync(lambda: next(events, None))
+    except Exception as exc:  # noqa: BLE001 - any ef.* failure -> 422, never crash the server
+        return _error_json(422, f"{type(exc).__name__}: {exc}")
+
+    q: queue.SimpleQueue[bytes | None] = queue.SimpleQueue()
+    if first_event is not None:
+        q.put(_sse_frame(first_event))
+    threading.Thread(target=_bridge_to_queue, args=(events, q), daemon=True).start()
+
+    async def body() -> AsyncIterator[bytes]:
+        loop = asyncio.get_running_loop()
+        while True:
+            chunk = await loop.run_in_executor(None, q.get)
+            if chunk is None:
+                break
+            yield chunk
+
+    return StreamingResponse(body(), media_type="text/event-stream")
+
+
 async def _read_json_body(request: Request) -> dict[str, Any]:
     """Parse the request body as a JSON dict; an empty body is ``{}``.
 
@@ -204,6 +264,14 @@ def create_app() -> FastAPI:
         if html is None:
             return _error_json(404, f"report not found: {report_hash}")
         return HTMLResponse(content=html)
+
+    @application.post("/execute/stream")
+    async def execute_stream(request: Request) -> Response:
+        try:
+            body_dict = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+        return await _execute_stream_response(body_dict)
 
     for path, fn in _POST_ROUTES.items():
         application.add_api_route(path, _make_post_handler(fn), methods=["POST"])

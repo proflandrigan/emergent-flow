@@ -63,10 +63,10 @@ test("Results tab with a selected node but no results shows the run-first empty 
 test("Results tab renders the selected node's OUT-port payloads", () => {
   const id = useGraphStore.getState().addNodeFromSpec(fakeSpec, { x: 0, y: 0 });
   useSelectionStore.getState().setNodeSelected(id, true);
-  useExecutionStore.getState().setResult({
-    payload_version: 2,
+  useExecutionStore.setState({
     results: { [id]: { out: { kind: "scalar", value: 42 } } },
     statuses: { [id]: { status: "ok" } },
+    lastRunAt: Date.now(),
   });
 
   render(<Inspector />);
@@ -79,10 +79,10 @@ test("Results tab renders the selected node's OUT-port payloads", () => {
 test("Results tab shows the error string when the node errored", () => {
   const id = useGraphStore.getState().addNodeFromSpec(fakeSpec, { x: 0, y: 0 });
   useSelectionStore.getState().setNodeSelected(id, true);
-  useExecutionStore.getState().setResult({
-    payload_version: 2,
+  useExecutionStore.setState({
     results: {},
     statuses: { [id]: { status: "error", error: "boom" } },
+    lastRunAt: Date.now(),
   });
 
   render(<Inspector />);

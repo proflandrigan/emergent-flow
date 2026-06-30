@@ -39,6 +39,10 @@ from emergentflow.server import (
     get_schema,
     validate_graph,
 )
+from emergentflow.server.service import (
+    _execute_functional_stream,
+    _to_graph,
+)
 
 SAMPLE_CSV = (
     pathlib.Path(__file__).resolve().parents[1] / "examples" / "vertical_slice" / "sample.csv"
@@ -247,6 +251,42 @@ def test_execute_graph_bare_body_still_runs_whole_graph() -> None:
 def test_execute_graph_run_to_unknown_target_raises() -> None:
     with pytest.raises(Exception):  # noqa: B017,PT011
         execute_graph({"graph": _fanout_graph(), "run_to": "n-nope"})
+
+
+def test_execute_functional_stream_emits_start_then_ok_for_two_node_chain() -> None:
+    events = list(_execute_functional_stream(_to_graph(_chain_graph())))
+    assert len(events) == 4
+    # n-load: start, ok
+    assert events[0].phase == "start"
+    assert events[0].node_id == "n-load"
+    assert events[0].current == 1
+    assert events[0].total == 2
+    assert events[1].phase == "ok"
+    assert events[1].node_id == "n-load"
+    assert events[1].elapsed_ms is not None
+    assert events[1].elapsed_ms >= 0
+    assert events[1].results is not None
+    # n-impute: start, ok
+    assert events[2].phase == "start"
+    assert events[2].node_id == "n-impute"
+    assert events[2].current == 2
+    assert events[2].total == 2
+    assert events[3].phase == "ok"
+    assert events[3].node_id == "n-impute"
+    assert events[3].elapsed_ms is not None
+    assert events[3].elapsed_ms >= 0
+    assert events[3].results is not None
+
+
+def test_execute_functional_stream_emits_skip_for_downstream_of_error() -> None:
+    events = list(_execute_functional_stream(_to_graph(_chain_graph(path="/no/such/file.csv"))))
+    # n-load yields start then error; n-impute yields skip.
+    assert events[0].phase == "start"
+    assert events[0].node_id == "n-load"
+    assert events[1].phase == "error"
+    assert events[1].node_id == "n-load"
+    assert events[2].phase == "skip"
+    assert events[2].node_id == "n-impute"
 
 
 def test_execute_node_runs_single_source_node() -> None:
@@ -471,6 +511,69 @@ def test_http_execute_unconnected_input_is_422(client: TestClient) -> None:
     payload["edges"] = {}
     payload["nodes"] = {k: v for k, v in payload["nodes"].items() if k == "n-impute"}
     resp = client.post("/execute", json=payload)
+    assert resp.status_code == 422
+    assert "error" in resp.json()
+
+
+# ---------------------------------------------------------------------------
+# SSE streaming (/execute/stream)
+# ---------------------------------------------------------------------------
+
+
+def _parse_sse_events(text: str) -> list[dict]:
+    events = []
+    for line in text.splitlines():
+        if line.startswith("data: "):
+            events.append(json.loads(line[len("data: ") :]))
+    return events
+
+
+def test_http_execute_stream_two_node_graph(client: TestClient) -> None:
+    resp = client.post("/execute/stream", json=_chain_graph())
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/event-stream")
+    events = _parse_sse_events(resp.text)
+    types = [e["type"] for e in events]
+    assert types == ["node_start", "node_ok", "node_start", "node_ok", "run_complete"]
+    assert events[0]["node_id"] == "n-load"
+    assert events[2]["node_id"] == "n-impute"
+    assert "total_ms" in events[-1]
+
+
+def test_http_execute_stream_node_error_skips_downstream(client: TestClient) -> None:
+    resp = client.post("/execute/stream", json=_chain_graph(path="/no/such/file.csv"))
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/event-stream")
+    events = _parse_sse_events(resp.text)
+    types = [e["type"] for e in events]
+    assert types == ["node_start", "node_error", "run_complete"]
+
+
+def test_http_execute_stream_run_to_prunes_subgraph(client: TestClient) -> None:
+    resp = client.post("/execute/stream", json={"graph": _fanout_graph(), "run_to": "n-impute-b"})
+    assert resp.status_code == 200
+    events = _parse_sse_events(resp.text)
+    all_ids = {e["node_id"] for e in events if "node_id" in e}
+    assert "n-impute-c" not in all_ids
+    assert "n-impute-b" in all_ids
+
+
+def test_http_execute_stream_bad_json_is_400(client: TestClient) -> None:
+    resp = client.post(
+        "/execute/stream", content=b"{not json", headers={"Content-Type": "application/json"}
+    )
+    assert resp.status_code == 400
+    assert resp.headers["content-type"] == "application/json"
+    body = resp.json()
+    assert "error" in body
+    assert "invalid JSON body" in body["error"]
+
+
+def test_http_execute_stream_unconnected_input_is_422(client: TestClient) -> None:
+    payload = _chain_graph()
+    payload["edges"] = {}
+    payload["nodes"] = {k: v for k, v in payload["nodes"].items() if k == "n-impute"}
+    resp = client.post("/execute/stream", json=payload)
     assert resp.status_code == 422
     assert "error" in resp.json()
 

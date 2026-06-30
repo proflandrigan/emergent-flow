@@ -1,16 +1,18 @@
-// Header controls for running the current graph (Story 8). "Download .py" POSTs the IR to
-// `/compile` and saves the returned code as a file; "Execute" POSTs the IR to `/execute` and
-// writes the response into `executionStore` for Task 07 to render. This component only
-// triggers the run + stores the response -- it does not render results itself.
+// Header controls for running the current graph. "Download .py" POSTs the IR to `/compile` and
+// saves the returned code as a file; "Execute" POSTs the IR to `/execute/stream` and applies each
+// SSE event to `executionStore` incrementally as it arrives, so node status/results update in
+// real time instead of waiting for the whole graph to finish (Epic 7 Story 4).
 
 import { useState } from "react";
 
 import { useGraphStore } from "../store/graphStore";
 import { useExecutionStore } from "../store/executionStore";
+import { runGraph } from "./runGraph";
 
 export function ExecutionToolbar(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const running = useExecutionStore((s) => s.running);
+  const progress = useExecutionStore((s) => s.progress);
 
   async function handleDownload() {
     const graph = useGraphStore.getState().toIR();
@@ -51,29 +53,8 @@ export function ExecutionToolbar(): JSX.Element {
       setError("Add nodes before executing.");
       return;
     }
-    useExecutionStore.getState().setRunning();
-    try {
-      const res = await fetch("/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(graph),
-      });
-      const body = await res.json();
-      if (!res.ok || body.error) {
-        const msg = body.error ?? `Server error ${res.status}`;
-        useExecutionStore.getState().setError(msg);
-        setError(msg);
-        return;
-      }
-      useExecutionStore.getState().setResult(body);
-      setError(null);
-    } catch (err) {
-      const msg =
-        "Could not reach server: " +
-        (err instanceof Error ? err.message : String(err));
-      useExecutionStore.getState().setError(msg);
-      setError(msg);
-    }
+    setError(null);
+    await runGraph({ onError: setError });
   }
 
   return (
@@ -101,6 +82,11 @@ export function ExecutionToolbar(): JSX.Element {
           {running ? "Running…" : "Execute"}
         </button>
       </div>
+      {progress && (
+        <div data-testid="exec-progress" style={{ fontSize: 12, color: "#555" }}>
+          Running node {progress.current} of {progress.total} ({progress.label}…)
+        </div>
+      )}
       {error && (
         <div role="alert" data-testid="exec-error" style={{ color: "#c00" }}>
           {error}
