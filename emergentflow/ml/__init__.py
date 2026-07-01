@@ -419,9 +419,10 @@ def apply_estimator(
     * ``"score_samples"`` works on either wrapper's live object and adds a ``score`` column.
 
     Validates that every ``model.feature_names`` column is present in ``df``, that ``op`` is
-    one of the three supported ops, and that the underlying fitted object actually supports
-    the requested op (e.g. calling ``"transform"`` against a :class:`FittedModel` -- a
-    predictor, not a transformer -- raises ``ValueError``).
+    one of the three supported ops, that the underlying fitted object actually supports the
+    requested op (e.g. calling ``"transform"`` against a :class:`FittedModel` -- a predictor,
+    not a transformer -- raises ``ValueError``), and that the output column(s) the op would
+    add do not already exist in ``df`` (to avoid silently overwriting real data).
     """
     if op not in ("predict", "transform", "score_samples"):
         raise ValueError(
@@ -439,6 +440,8 @@ def apply_estimator(
             raise ValueError("predict requires a fitted Model (fit/cluster_detect archetype).")
         if not hasattr(model.estimator, "predict"):
             raise ValueError(f"{model.estimator_type} does not support predict.")
+        if "prediction" in df.columns:
+            raise ValueError("df already has a 'prediction' column; rename it before predicting.")
         result["prediction"] = model.estimator.predict(X)
         return result
 
@@ -449,6 +452,11 @@ def apply_estimator(
             raise ValueError(f"{model.estimator_type} does not support transform.")
         transformed = model.transformer.transform(X)
         component_cols = [f"component_{i}" for i in range(transformed.shape[1])]
+        collisions = [c for c in component_cols if c in df.columns]
+        if collisions:
+            raise ValueError(
+                f"df already has columns {collisions!r}; rename them before transforming."
+            )
         result[component_cols] = transformed
         return result
 
@@ -456,6 +464,8 @@ def apply_estimator(
     live = model.estimator if isinstance(model, FittedModel) else model.transformer
     if not hasattr(live, "score_samples"):
         raise ValueError(f"{model.estimator_type} does not support score_samples.")
+    if "score" in df.columns:
+        raise ValueError("df already has a 'score' column; rename it before scoring.")
     result["score"] = live.score_samples(X)
     return result
 

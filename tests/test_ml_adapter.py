@@ -283,3 +283,34 @@ def test_apply_estimator_unknown_op_raises() -> None:
     model = fit_estimator(df, estimator="LogisticRegression", target="label")
     with pytest.raises(ValueError):
         apply_estimator(model, df, op="bogus")
+
+
+# ---------------------------------------------------------------------------
+# apply_estimator -- output column collision
+# ---------------------------------------------------------------------------
+
+
+def test_apply_estimator_predict_raises_on_existing_prediction_column() -> None:
+    df = _make_classification_df()
+    df["prediction"] = "should-not-be-overwritten"
+    model = fit_estimator(df, estimator="LogisticRegression", target="label", features=["x1", "x2"])
+    with pytest.raises(ValueError):
+        apply_estimator(model, df, op="predict")
+
+
+def test_apply_estimator_transform_raises_on_existing_component_column() -> None:
+    df = _make_unsupervised_df()
+    df["component_0"] = "should-not-be-overwritten"
+    transformer = fit_estimator(df, estimator="StandardScaler", features=["x1", "x2"])
+    with pytest.raises(ValueError):
+        apply_estimator(transformer, df, op="transform")
+
+
+def test_apply_estimator_score_samples_raises_on_existing_score_column() -> None:
+    df = _make_unsupervised_df()
+    df["score"] = "should-not-be-overwritten"
+    model = fit_estimator(
+        df, estimator="GaussianMixture", params={"n_components": 1}, features=["x1", "x2"]
+    )
+    with pytest.raises(ValueError):
+        apply_estimator(model, df, op="score_samples")
