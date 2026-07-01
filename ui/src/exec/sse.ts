@@ -22,6 +22,7 @@ export type StreamEvent =
       node_id: string;
       elapsed_ms: number;
       results: Record<string, Payload>;
+      cached: boolean;
       payload_version?: number;
     }
   | {

@@ -78,4 +78,33 @@ describe("EfNode", () => {
     expect(screen.getByText("input")).toHaveStyle({ visibility: "visible" });
     expect(screen.getByTestId("node-results-toggle")).toBeInTheDocument();
   });
+
+  test("cached status renders a teal border and the cached badge", () => {
+    const data: EfNodeData = {
+      label: "Load CSV",
+      ports: [],
+      status: "cached",
+      results: null,
+    };
+
+    renderEfNode(data);
+
+    expect(screen.getByTestId("ef-node").getAttribute("style")).toContain(
+      "rgb(2, 136, 209)",
+    );
+    expect(screen.getByTestId("node-cached-badge")).toBeInTheDocument();
+  });
+
+  test("ok status does not render the cached badge", () => {
+    const data: EfNodeData = {
+      label: "Load CSV",
+      ports: [],
+      status: "ok",
+      results: null,
+    };
+
+    renderEfNode(data);
+
+    expect(screen.queryByTestId("node-cached-badge")).not.toBeInTheDocument();
+  });
 });

@@ -13,6 +13,7 @@ Routes:
 - ``GET  /schema``           -- the IR JSON Schema
 - ``GET  /catalog``          -- ``{"catalog_version": <int>, "nodes": [...]}`` (ADR 0015)
 - ``GET  /reports/{hash}``   -- a stored HTML report blob (Epic 7 Story 3)
+- ``POST /cache/clear``      -- ``{"status": "ok"}``
 - ``POST /compile``          -- IR JSON -> ``{"code": ...}``
 - ``POST /execute``          -- IR JSON -> ``{"payload_version", "results", "statuses"}``
 - ``POST /execute/stream``    -- IR JSON -> Server-Sent Events of per-node progress
@@ -38,8 +39,10 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
+from emergentflow.server.cache import DEFAULT_CACHE_DIRNAME, DEFAULT_CACHE_MAX_MB, configure_cache
 from emergentflow.server.reports import get_default_store
 from emergentflow.server.service import (
+    clear_cache,
     compile_graph,
     execute_graph,
     execute_graph_stream,
@@ -112,6 +115,7 @@ _INDEX_HTML = """<!doctype html>
 # is CPU-bound (it runs node code), so handlers off-load it to a worker thread to
 # keep the event loop responsive (the whole point of the FastAPI upgrade).
 _POST_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
+    "/cache/clear": clear_cache,
     "/compile": compile_graph,
     "/execute": execute_graph,
     "/execute_node": execute_node,
@@ -359,14 +363,37 @@ def _open_browser_when_ready(probe_host: str, port: int, url: str, timeout: floa
     _open_browser(url)
 
 
-def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True) -> None:
+def serve(
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    open_browser: bool = True,
+    cache_dir: str | None = None,
+    cache_max_mb: float | None = None,
+) -> None:
     """Boot the local canvas server on Uvicorn and block until interrupted.
 
     When *open_browser* is true (the default), a browser tab is opened at the served
     URL once the socket is actually accepting connections. ``0.0.0.0`` is shown/opened
     as ``127.0.0.1`` since a wildcard bind is not a browsable address.
+
+    *cache_dir* and *cache_max_mb* configure the on-disk execution cache
+    (Epic 7 Story 6) via ``configure_cache`` -- this MUST run before
+    ``uvicorn.run`` starts accepting requests, since a first request would
+    otherwise create the default cache singleton before it's configured, and
+    ``configure_cache`` raises if called after that singleton already
+    exists. ``None`` for either parameter means "use the built-in default"
+    (``DEFAULT_CACHE_DIRNAME`` resolved under the current working directory,
+    ``DEFAULT_CACHE_MAX_MB``).
     """
     import uvicorn
+
+    cache_root = (
+        pathlib.Path(cache_dir)
+        if cache_dir is not None
+        else pathlib.Path.cwd() / DEFAULT_CACHE_DIRNAME
+    )
+    resolved_max_mb = cache_max_mb if cache_max_mb is not None else DEFAULT_CACHE_MAX_MB
+    configure_cache(cache_root, max_mb=resolved_max_mb)
 
     browse_host = "127.0.0.1" if host == "0.0.0.0" else host  # noqa: S104
     url = f"http://{browse_host}:{port}"

@@ -161,3 +161,6 @@ temp/
 
 # Bundled UI build artifact (vite build ui/ -> emergentflow/_static/, ADR 0013)
 /emergentflow/_static/
+
+# On-disk DAG execution cache (emergentflow serve, Epic 7 Story 6)
+/.ef-cache/

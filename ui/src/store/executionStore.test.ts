@@ -47,8 +47,31 @@ describe("executionStore", () => {
     });
   });
 
+  it("setNodeCached merges into results and sets status cached", () => {
+    const payload: Payload = { kind: "scalar", value: 42 };
+    useExecutionStore.getState().setNodeCached("node1", { output: payload });
+    const state = useExecutionStore.getState();
+    expect(state.results).toEqual({ node1: { output: payload } });
+    expect(state.statuses).toEqual({ node1: { status: "cached" } });
+  });
+
+  it("setNodeCached preserves other nodes' existing results", () => {
+    const p1: Payload = { kind: "scalar", value: 1 };
+    const p2: Payload = { kind: "scalar", value: 2 };
+    useExecutionStore.getState().setNodeResult("node1", { out: p1 });
+    useExecutionStore.getState().setNodeCached("node2", { out: p2 });
+    const state = useExecutionStore.getState();
+    expect(state.results).toEqual({ node1: { out: p1 }, node2: { out: p2 } });
+    expect(state.statuses).toEqual({
+      node1: { status: "ok" },
+      node2: { status: "cached" },
+    });
+  });
+
   it("setNodeError sets that node's status to error without touching others", () => {
-    useExecutionStore.getState().setNodeResult("node1", { out: { kind: "scalar", value: 1 } });
+    useExecutionStore
+      .getState()
+      .setNodeResult("node1", { out: { kind: "scalar", value: 1 } });
     useExecutionStore.getState().setNodeError("node2", "boom");
     const state = useExecutionStore.getState();
     expect(state.statuses).toEqual({
@@ -58,7 +81,9 @@ describe("executionStore", () => {
   });
 
   it("setNodeSkipped sets that node's status to skipped without touching others", () => {
-    useExecutionStore.getState().setNodeResult("node1", { out: { kind: "scalar", value: 1 } });
+    useExecutionStore
+      .getState()
+      .setNodeResult("node1", { out: { kind: "scalar", value: 1 } });
     useExecutionStore.getState().setNodeSkipped("node2");
     const state = useExecutionStore.getState();
     expect(state.statuses).toEqual({
@@ -78,12 +103,16 @@ describe("executionStore", () => {
   });
 
   it("setError sets error and running: false but does NOT clear previously-set results", () => {
-    useExecutionStore.getState().setNodeResult("node1", { out: { kind: "scalar", value: 42 } });
+    useExecutionStore
+      .getState()
+      .setNodeResult("node1", { out: { kind: "scalar", value: 42 } });
     useExecutionStore.getState().setError("Connection failed");
     const state = useExecutionStore.getState();
     expect(state.error).toBe("Connection failed");
     expect(state.running).toBe(false);
-    expect(state.results).toEqual({ node1: { out: { kind: "scalar", value: 42 } } });
+    expect(state.results).toEqual({
+      node1: { out: { kind: "scalar", value: 42 } },
+    });
   });
 
   it("setError clears progress", () => {
@@ -93,7 +122,9 @@ describe("executionStore", () => {
   });
 
   it("clear resets to defaults", () => {
-    useExecutionStore.getState().setNodeResult("node1", { out: { kind: "scalar", value: 42 } });
+    useExecutionStore
+      .getState()
+      .setNodeResult("node1", { out: { kind: "scalar", value: 42 } });
     useExecutionStore.getState().setError("Some error");
     useExecutionStore.getState().clear();
     const state = useExecutionStore.getState();

@@ -27,7 +27,9 @@ async function collect(stream: ReadableStream<Uint8Array>) {
 
 describe("sse", () => {
   test("parses a single complete SSE frame", async () => {
-    const stream = streamOf(['data: {"type":"run_complete","total_ms":42}\n\n']);
+    const stream = streamOf([
+      'data: {"type":"run_complete","total_ms":42}\n\n',
+    ]);
     const events = await collect(stream);
     expect(events).toHaveLength(1);
     expect(events[0]).toEqual({ type: "run_complete", total_ms: 42 });
@@ -91,6 +93,21 @@ describe("sse", () => {
     const events = await collect(stream);
     expect(events).toHaveLength(1);
     expect(events[0]).toEqual({ type: "run_complete", total_ms: 1 });
+  });
+
+  test("parses a node_ok frame with a cached flag", async () => {
+    const stream = streamOf([
+      'data: {"type":"node_ok","node_id":"n1","elapsed_ms":10,"results":{},"cached":true}\n\n',
+    ]);
+    const events = await collect(stream);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({
+      type: "node_ok",
+      node_id: "n1",
+      elapsed_ms: 10,
+      results: {},
+      cached: true,
+    });
   });
 
   test("parses a node_skip frame", async () => {

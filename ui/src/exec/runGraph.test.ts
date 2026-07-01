@@ -25,7 +25,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function sseResponse(events: Record<string, unknown>[], status = 200): Response {
+function sseResponse(
+  events: Record<string, unknown>[],
+  status = 200,
+): Response {
   const body = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join("");
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -52,12 +55,16 @@ test("a node_skip event marks that node's status as skipped", async () => {
 
   await runGraph();
 
-  expect(useExecutionStore.getState().statuses.n2).toEqual({ status: "skipped" });
+  expect(useExecutionStore.getState().statuses.n2).toEqual({
+    status: "skipped",
+  });
 });
 
 test("a stream that ends without run_complete/run_error surfaces an error instead of leaving running stuck", async () => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(
-    sseResponse([{ type: "node_start", node_id: "n1", label: "L", current: 1, total: 1 }]),
+    sseResponse([
+      { type: "node_start", node_id: "n1", label: "L", current: 1, total: 1 },
+    ]),
   );
 
   await runGraph();
@@ -69,8 +76,21 @@ test("a stream that ends without run_complete/run_error surfaces an error instea
 test("a mismatched payload_version on the first event fails the run before applying it", async () => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(
     sseResponse([
-      { type: "node_start", node_id: "n1", label: "L", current: 1, total: 1, payload_version: 999 },
-      { type: "node_ok", node_id: "n1", elapsed_ms: 1, results: {}, payload_version: 999 },
+      {
+        type: "node_start",
+        node_id: "n1",
+        label: "L",
+        current: 1,
+        total: 1,
+        payload_version: 999,
+      },
+      {
+        type: "node_ok",
+        node_id: "n1",
+        elapsed_ms: 1,
+        results: {},
+        payload_version: 999,
+      },
       { type: "run_complete", total_ms: 1, payload_version: 999 },
     ]),
   );
@@ -85,8 +105,21 @@ test("a mismatched payload_version on the first event fails the run before apply
 test("a matching payload_version on events does not block the run", async () => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(
     sseResponse([
-      { type: "node_start", node_id: "n1", label: "L", current: 1, total: 1, payload_version: 2 },
-      { type: "node_ok", node_id: "n1", elapsed_ms: 1, results: {}, payload_version: 2 },
+      {
+        type: "node_start",
+        node_id: "n1",
+        label: "L",
+        current: 1,
+        total: 1,
+        payload_version: 2,
+      },
+      {
+        type: "node_ok",
+        node_id: "n1",
+        elapsed_ms: 1,
+        results: {},
+        payload_version: 2,
+      },
       { type: "run_complete", total_ms: 1, payload_version: 2 },
     ]),
   );
@@ -94,6 +127,48 @@ test("a matching payload_version on events does not block the run", async () => 
   await runGraph();
 
   expect(useExecutionStore.getState().error).toBeNull();
+  expect(useExecutionStore.getState().statuses.n1).toEqual({ status: "ok" });
+});
+
+test("a node_ok event with cached: true sets that node's status to cached", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    sseResponse([
+      { type: "node_start", node_id: "n1", label: "L", current: 1, total: 1 },
+      {
+        type: "node_ok",
+        node_id: "n1",
+        elapsed_ms: 1,
+        results: {},
+        cached: true,
+      },
+      { type: "run_complete", total_ms: 1 },
+    ]),
+  );
+
+  await runGraph();
+
+  expect(useExecutionStore.getState().statuses.n1).toEqual({
+    status: "cached",
+  });
+});
+
+test("a node_ok event with cached: false sets that node's status to ok", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    sseResponse([
+      { type: "node_start", node_id: "n1", label: "L", current: 1, total: 1 },
+      {
+        type: "node_ok",
+        node_id: "n1",
+        elapsed_ms: 1,
+        results: {},
+        cached: false,
+      },
+      { type: "run_complete", total_ms: 1 },
+    ]),
+  );
+
+  await runGraph();
+
   expect(useExecutionStore.getState().statuses.n1).toEqual({ status: "ok" });
 });
 

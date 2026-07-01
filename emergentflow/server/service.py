@@ -13,30 +13,36 @@ already-tested pure functions and JSON-encode their results.
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
 import json
 import time
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from typing import Any
 
-from emergentflow import compile_to_code, execute, export_catalog, validate
+from emergentflow import __version__, compile_to_code, execute, export_catalog, validate
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
 from emergentflow.codegen.traversal import topological_sort
 from emergentflow.codegen.validation import enforce_validation_gate
 from emergentflow.codegen.wiring import WiringMap, build_wiring_map
-from emergentflow.ir import Direction, Graph, Paradigm
+from emergentflow.ir import Direction, Graph, Node, Paradigm
 from emergentflow.ir.schema import ir_json_schema
 from emergentflow.ir.serialize import deserialize_graph
 from emergentflow.nodes import get as get_node_definition
+from emergentflow.server.cache import get_default_cache
 from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
 from emergentflow.server.reports import get_default_store
 
 # Per-node execution status reported to the canvas (Epic 4 Story 2). A node is
 # "ok" if it ran, "error" if its execute() raised, "skipped" if an upstream node
-# did not produce its inputs (error or skipped). Consumed by repo Epic 5 Story 8.
+# did not produce its inputs (error or skipped), "cached" if its outputs were
+# served from the on-disk execution cache instead of being re-executed (Epic 7
+# Story 6). Consumed by repo Epic 5 Story 8.
 _STATUS_OK = "ok"
 _STATUS_ERROR = "error"
 _STATUS_SKIPPED = "skipped"
+_STATUS_CACHED = "cached"
 
 
 def _to_graph(payload: dict[str, Any]) -> Graph:
@@ -78,6 +84,19 @@ def get_catalog() -> dict[str, Any]:
     return export_catalog()
 
 
+def clear_cache(payload: dict[str, Any]) -> dict[str, Any]:
+    """Remove every entry from the on-disk execution cache (POST /cache/clear).
+
+    ``payload`` is unused -- this endpoint takes no request body -- but the
+    parameter is required to match the ``(payload) -> dict`` shape every
+    function in ``app.py``'s ``_POST_ROUTES`` dict must have, so it can be
+    dispatched through the same uniform routing/error-handling machinery as
+    ``/compile``, ``/execute``, etc. instead of needing bespoke route code.
+    """
+    get_default_cache().clear()
+    return {"status": "ok"}
+
+
 def _ancestors(graph: Graph, targets: set[str], wiring_map: WiringMap) -> set[str]:
     """Return *targets* plus every node that transitively feeds their IN ports.
 
@@ -103,6 +122,32 @@ def _ancestors(graph: Graph, targets: set[str], wiring_map: WiringMap) -> set[st
     return seen
 
 
+def _node_hash(node: Node, upstream_hashes: list[str]) -> str:
+    """This node's cache key: sha256(node type + canonical params + upstream hashes + sdk version).
+
+    Recursive by construction: *upstream_hashes* are themselves node hashes
+    (each already folding in ITS OWN upstream hashes via a prior call to this
+    function), so folding them into this node's hash transitively covers the
+    entire upstream chain -- any ancestor's param change changes every
+    descendant's hash. The caller (``_execute_functional_stream``) is
+    responsible for only calling this when every upstream hash is known
+    (non-``None``) and this node is itself ``cacheable`` -- see that
+    function's docstring for why a node with a non-cacheable ancestor never
+    gets a defined hash.
+
+    ``node.type`` is included so two different node types with coincidentally
+    identical params/upstream hashes never collide on the same key, and
+    *upstream_hashes* is folded in caller-supplied order (one hash per IN
+    port, in port-declaration order) rather than sorted, so a node whose
+    upstream wiring is swapped across two non-commutative ports produces a
+    different key even though the *set* of upstream hashes is unchanged.
+    """
+    params_json_safe = {p.name: p.model_dump(mode="json")["value"] for p in node.params}
+    canonical_params = json.dumps(params_json_safe, sort_keys=True, separators=(",", ":"))
+    payload = node.type + canonical_params + "".join(upstream_hashes) + __version__
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 @dataclass(frozen=True)
 class _NodeEvent:
     """One step in a FUNCTIONAL graph's node-by-node walk (Epic 7 Story 4 seam).
@@ -123,6 +168,7 @@ class _NodeEvent:
     total: int | None = None  # size of this run's topo order ("start" only)
     elapsed_ms: int | None = None  # "ok" / "error" only
     results: dict[str, Any] | None = None  # raw OUT-port artifacts, "ok" only
+    cached: bool = False  # "ok" only; True when served from the execution cache
     error: str | None = None  # "error" only
 
 
@@ -141,6 +187,15 @@ def _execute_functional_stream(
     input) still raise immediately -- the caller must map those to an HTTP 4xx
     *before* consuming this generator, since a streaming HTTP response cannot
     change its status code after the first byte is sent.
+
+    Caching (Epic 7 Story 6): when a node is ``cacheable`` and every upstream
+    node has a defined (non-``None``) hash, the node's hash is computed via
+    ``_node_hash`` and used to check the on-disk ``ExecutionCache`` before
+    executing. A cache hit skips ``definition.execute(...)`` and yields the
+    cached outputs instead; the event's ``cached`` field is ``True``. A node
+    with a non-cacheable ancestor never gets a defined hash (``None``) and is
+    never looked up or written to the cache -- see ``_node_hash``'s docstring
+    for the hash/propagation rule.
     """
     enforce_validation_gate(graph)
     if graph.paradigm is not Paradigm.FUNCTIONAL:
@@ -165,9 +220,12 @@ def _execute_functional_stream(
     total = len(topo_order_ids)
     node_status: dict[str, str] = {}
     node_results: dict[str, dict[str, Any]] = {}
+    node_hashes: dict[str, str | None] = {}
+    cache = get_default_cache()
     for index, node_id in enumerate(topo_order_ids, start=1):
         node = graph.nodes[node_id]
         inputs: dict[str, Any] = {}
+        upstream_hashes: list[str | None] = []
         skipped = False
         for port in node.ports:
             if port.direction != Direction.IN:
@@ -180,12 +238,13 @@ def _execute_functional_stream(
                     "context."
                 )
             src = sources[0]
-            if node_status[src.node_id] != _STATUS_OK:
+            if node_status[src.node_id] not in (_STATUS_OK, _STATUS_CACHED):
                 skipped = True
                 break
             src_node = graph.nodes[src.node_id]
             src_port_name = next(p.name for p in src_node.ports if p.id == src.port_id)
             inputs[port.name] = node_results[src.node_id][src_port_name]
+            upstream_hashes.append(node_hashes[src.node_id])
         if skipped:
             node_status[node_id] = _STATUS_SKIPPED
             yield _NodeEvent(phase="skip", node_id=node_id, label=node.label or "")
@@ -196,20 +255,39 @@ def _execute_functional_stream(
         start = time.monotonic()
         try:
             definition = get_node_definition(node.type)()
-            outputs = definition.execute(node, inputs)
+            cache_hash: str | None = None
+            if definition.cacheable and all(h is not None for h in upstream_hashes):
+                cache_hash = _node_hash(node, [h for h in upstream_hashes if h is not None])
+            cached_outputs = cache.get(cache_hash) if cache_hash is not None else None
+            is_cache_hit = cached_outputs is not None
+            if is_cache_hit:
+                assert cached_outputs is not None  # mypy: narrowed by is_cache_hit above
+                outputs = cached_outputs
+            else:
+                outputs = definition.execute(node, inputs)
+                if cache_hash is not None:
+                    # A cache-write failure (e.g. an unpicklable output, a full
+                    # disk) must not turn a successful execute() into a
+                    # reported node "error" -- caching is an optimization, not
+                    # part of the node's correctness contract.
+                    with contextlib.suppress(Exception):
+                        cache.put(cache_hash, outputs, node_id=node.id, label=node.label or "")
             elapsed_ms = int((time.monotonic() - start) * 1000)
             node_results[node_id] = outputs
-            node_status[node_id] = _STATUS_OK
+            node_status[node_id] = _STATUS_CACHED if is_cache_hit else _STATUS_OK
+            node_hashes[node_id] = cache_hash
             yield _NodeEvent(
                 phase="ok",
                 node_id=node_id,
                 label=node.label or "",
                 elapsed_ms=elapsed_ms,
                 results=outputs,
+                cached=is_cache_hit,
             )
         except Exception as exc:  # noqa: BLE001 - any node-runtime failure -> error event
             elapsed_ms = int((time.monotonic() - start) * 1000)
             node_status[node_id] = _STATUS_ERROR
+            node_hashes[node_id] = None
             yield _NodeEvent(
                 phase="error",
                 node_id=node_id,
@@ -248,7 +326,7 @@ def _execute_functional_with_status(
             statuses[event.node_id] = {"status": _STATUS_SKIPPED}
         elif event.phase == "ok":
             results[event.node_id] = event.results or {}
-            statuses[event.node_id] = {"status": _STATUS_OK}
+            statuses[event.node_id] = {"status": _STATUS_CACHED if event.cached else _STATUS_OK}
         elif event.phase == "error":
             statuses[event.node_id] = {"status": _STATUS_ERROR, "error": event.error}
         # "start" carries no status change; ignore it here.
@@ -319,7 +397,9 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     ``error`` status (downstream nodes ``skipped``) at HTTP 200, rather than
     aborting the whole run -- the canvas colours nodes from ``statuses``. Graph-LEVEL
     rejections (validation gate, cycle, unbound input, wrong paradigm) still raise
-    and surface as the server's 422. No caching yet (roadmap Epic 7 seam). Each
+    and surface as the server's 422. FUNCTIONAL graphs are cached per-node via
+    ``ExecutionCache`` (see ``_execute_functional_stream``'s docstring for the
+    hash/propagation rule). Each
     OUT port in ``results`` is a typed result payload (Story 3), not a raw
     artifact; ``payload_version`` stamps the contract once at the top level.
 
@@ -400,6 +480,7 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
                             port_name: _payload_for(value)
                             for port_name, value in (event.results or {}).items()
                         },
+                        "cached": event.cached,
                         "payload_version": PAYLOAD_CONTRACT_VERSION,
                     }
                 elif event.phase == "error":
@@ -438,6 +519,11 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
                     "results": {
                         port_name: _payload_for(value) for port_name, value in ports.items()
                     },
+                    # DECLARATIVE graphs are never cached (Epic 7 Story 6 only
+                    # caches the FUNCTIONAL per-node walk); always False rather
+                    # than omitted so every node_ok frame satisfies the same
+                    # StreamEvent shape (ui/src/exec/sse.ts).
+                    "cached": False,
                     "payload_version": PAYLOAD_CONTRACT_VERSION,
                 }
     except CodegenError:
@@ -462,9 +548,9 @@ def execute_node(payload: dict[str, Any]) -> dict[str, Any]:
     Envelope body: ``{"graph": <ir>, "run_node": <node id>, "inputs": {<IN-port name>: value}}``.
     Runs only that node's ``execute()`` with caller-supplied upstream inputs and returns
     the same ``{"payload_version", "results", "statuses"}`` shape as ``execute_graph`` --
-    but for the single node. The server is stateless (no cache yet -- roadmap Epic 7), so
-    inputs come from the caller; rich inputs (DataFrames) round-trip faithfully only once
-    the on-disk cache lands. A node-runtime failure is reported as that node's ``error``
+    but for the single node. This path bypasses ``ExecutionCache`` entirely (it has no
+    upstream chain to hash and the caller already supplies fresh inputs directly), so a
+    node-runtime failure is reported as that node's ``error``
     status at HTTP 200 (mirroring run-all); a bad envelope, unknown node id, or non-FUNCTIONAL
     node RAISES (-> the server's 422). DECLARATIVE nodes (e.g. ``nn.linear``) are rejected
     rather than run standalone: their ``execute()`` returns the bare layer object for the

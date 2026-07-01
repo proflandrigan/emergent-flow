@@ -11,6 +11,7 @@ import { runGraph } from "./runGraph";
 
 export function ExecutionToolbar(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
+  const [clearingCache, setClearingCache] = useState(false);
   const running = useExecutionStore((s) => s.running);
   const progress = useExecutionStore((s) => s.progress);
 
@@ -57,6 +58,26 @@ export function ExecutionToolbar(): JSX.Element {
     await runGraph({ onError: setError });
   }
 
+  async function handleClearCache() {
+    setClearingCache(true);
+    try {
+      const res = await fetch("/cache/clear", { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error ?? `Server error ${res.status}`);
+        return;
+      }
+      setError(null);
+    } catch (err) {
+      setError(
+        "Could not reach server: " +
+          (err instanceof Error ? err.message : String(err)),
+      );
+    } finally {
+      setClearingCache(false);
+    }
+  }
+
   return (
     <div
       style={{
@@ -76,15 +97,27 @@ export function ExecutionToolbar(): JSX.Element {
         <button
           type="button"
           data-testid="exec-run"
-          disabled={running}
+          disabled={running || clearingCache}
           onClick={handleExecute}
         >
           {running ? "Running…" : "Execute"}
         </button>
+        <button
+          type="button"
+          data-testid="exec-clear-cache"
+          disabled={running || clearingCache}
+          onClick={handleClearCache}
+        >
+          {clearingCache ? "Clearing…" : "Clear cache"}
+        </button>
       </div>
       {progress && (
-        <div data-testid="exec-progress" style={{ fontSize: 12, color: "#555" }}>
-          Running node {progress.current} of {progress.total} ({progress.label}…)
+        <div
+          data-testid="exec-progress"
+          style={{ fontSize: 12, color: "#555" }}
+        >
+          Running node {progress.current} of {progress.total} ({progress.label}
+          …)
         </div>
       )}
       {error && (

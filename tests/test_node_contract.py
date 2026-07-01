@@ -182,6 +182,40 @@ class TestPreview:
         assert _Demo().preview(node).render() == "import os\n\nout1 = in1"
 
 
+class _NonCacheableDemo(NodeDefinition):
+    type = "demo.noncacheable"
+    version = 1
+    family = "demo"
+    label = "Non-cacheable Demo"
+    cacheable = False
+
+    def codegen(self, node, ctx):
+        return CodeFragment(body="pass")
+
+    def execute(self, node, inputs):
+        return {}
+
+
+class TestCacheableFlag:
+    def test_default_is_cacheable(self):
+        assert _Demo.cacheable is True
+
+    def test_can_opt_out(self):
+        assert _NonCacheableDemo.cacheable is False
+
+    def test_file_reading_source_nodes_opt_out(self):
+        """load_csv/load_parquet/load_json read external file content the
+        cache key can't see (only the ``path`` param is hashed), so a stale
+        on-disk edit would otherwise be served from the cache forever."""
+        from emergentflow.nodes.examples.load_csv import LoadCsv
+        from emergentflow.nodes.examples.load_json import LoadJson
+        from emergentflow.nodes.examples.load_parquet import LoadParquet
+
+        assert LoadCsv.cacheable is False
+        assert LoadParquet.cacheable is False
+        assert LoadJson.cacheable is False
+
+
 class TestAbstractEnforcement:
     def test_cannot_instantiate_incomplete_definition(self):
         class Bad(NodeDefinition):

@@ -15,7 +15,7 @@ export type Payload =
   | { kind: "json"; value: unknown }
   | { kind: "unsupported"; type: string; repr: string };
 
-export type NodeStatus = "ok" | "error" | "skipped";
+export type NodeStatus = "ok" | "error" | "skipped" | "cached";
 
 export interface NodeRunStatus {
   status: NodeStatus;

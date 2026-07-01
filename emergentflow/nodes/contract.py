@@ -111,6 +111,13 @@ class NodeDefinition(ABC):
         One-line description shown in the palette / tooltips.
     paradigm:
         Execution paradigm (ADR 0003); default FUNCTIONAL.
+    cacheable:
+        Whether this node's outputs may be served from the on-disk execution
+        cache instead of re-running ``execute``. Default ``True``. Set
+        ``False`` for nodes whose ``execute`` is not a pure function of its
+        params and inputs (e.g. non-deterministic LLM nodes, deferred to a
+        later epic) — a cache hit for such a node would silently serve a
+        stale/wrong result.
     ports:
         Declared :class:`PortSpec` list.
     params:
@@ -124,6 +131,7 @@ class NodeDefinition(ABC):
     category: ClassVar[str] = ""
     description: ClassVar[str] = ""
     paradigm: ClassVar[Paradigm] = Paradigm.FUNCTIONAL
+    cacheable: ClassVar[bool] = True
     ports: ClassVar[list[PortSpec]] = []
     params: ClassVar[list[ParamSpec]] = []
 
