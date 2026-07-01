@@ -1,0 +1,66 @@
+.ef-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1, 4px);
+  height: 32px;
+  padding: 0 var(--space-3, 12px);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
+  user-select: none;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.ef-button--primary {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+
+.ef-button--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 85%, white);
+}
+
+.ef-button--secondary {
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+}
+
+.ef-button--secondary:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+.ef-button--ghost {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.ef-button--ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.ef-button--icon {
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+}
+
+.ef-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: 2px;
+}
+
+.ef-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

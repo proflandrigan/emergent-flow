@@ -1,0 +1,37 @@
+.ef-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.ef-toast--error {
+  border-left: 3px solid var(--danger);
+}
+
+.ef-toast__message {
+  flex: 1;
+}
+
+.ef-toast__dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-md);
+  line-height: 1;
+}
+
+.ef-toast__dismiss:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
