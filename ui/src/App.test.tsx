@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import { App } from "./App";
@@ -48,4 +48,23 @@ test("shows unreachable when the health request fails", async () => {
       "unreachable",
     ),
   );
+});
+
+test("the overflow menu closes on outside click and on Escape", () => {
+  mockHealth("ok");
+  render(<App />);
+
+  const toggle = screen.getByRole("button", { name: "More actions" });
+
+  fireEvent.click(toggle);
+  expect(screen.getByRole("menu")).toBeInTheDocument();
+
+  fireEvent.click(document.body);
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+  fireEvent.click(toggle);
+  expect(screen.getByRole("menu")).toBeInTheDocument();
+
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 });

@@ -92,6 +92,22 @@ export function App(): JSX.Element {
   }, [inspectorCollapsed]);
 
   useEffect(() => {
+    if (!menuOpen) return undefined;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
+    function onClick() {
+      setMenuOpen(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("click", onClick);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("click", onClick);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
     let cancelled = false;
     fetch("/healthz")
       .then((res) => res.json() as Promise<HealthResponse>)

@@ -67,6 +67,13 @@ test("node row has a title attribute equal to its type", () => {
   expect(btn.getAttribute("title")).toBe("data.load_csv");
 });
 
+test("node row has an accessible name carrying both label and type", () => {
+  render(<Palette />);
+  expect(
+    screen.getByRole("button", { name: "Load CSV (data.load_csv)" }),
+  ).toBeInTheDocument();
+});
+
 test("searching for a term matching only one family hides other section headers", () => {
   render(<Palette />);
   fireEvent.change(screen.getByTestId("palette-search"), {

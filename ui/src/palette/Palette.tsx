@@ -95,10 +95,14 @@ export function Palette(): JSX.Element {
   );
 
   useEffect(() => {
-    localStorage.setItem(
-      COLLAPSE_STORAGE_KEY,
-      JSON.stringify([...collapsedFamilies]),
-    );
+    try {
+      localStorage.setItem(
+        COLLAPSE_STORAGE_KEY,
+        JSON.stringify([...collapsedFamilies]),
+      );
+    } catch {
+      // ignore write errors
+    }
   }, [collapsedFamilies]);
 
   const toggleFamily = (family: string) => {
@@ -216,6 +220,7 @@ export function Palette(): JSX.Element {
                           key={node.type}
                           type="button"
                           title={node.type}
+                          aria-label={`${node.label} (${node.type})`}
                           onMouseEnter={() => setHoveredType(node.type)}
                           onMouseLeave={() =>
                             setHoveredType((prev) =>

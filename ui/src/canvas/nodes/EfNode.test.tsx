@@ -90,7 +90,9 @@ describe("EfNode", () => {
     renderEfNode(data);
 
     expect(screen.getByTestId("node-cached-badge")).toBeInTheDocument();
-    expect(screen.getByTestId("ef-node").style.boxShadow).toContain("#0288d1");
+    expect(screen.getByTestId("ef-node").style.boxShadow).toContain(
+      "var(--info)",
+    );
   });
 
   test("ok status does not render the cached badge", () => {
@@ -106,6 +108,21 @@ describe("EfNode", () => {
     expect(screen.queryByTestId("node-cached-badge")).not.toBeInTheDocument();
   });
 
+  test("ok status renders a distinguishing success border", () => {
+    const data: EfNodeData = {
+      label: "Load CSV",
+      ports: [],
+      status: "ok",
+      results: null,
+    };
+
+    renderEfNode(data);
+
+    expect(screen.getByTestId("ef-node").style.border).toContain(
+      "var(--success)",
+    );
+  });
+
   test("error status renders a red ring with glow", () => {
     const data: EfNodeData = {
       label: "Load CSV",
@@ -116,7 +133,9 @@ describe("EfNode", () => {
 
     renderEfNode(data);
 
-    expect(screen.getByTestId("ef-node").style.boxShadow).toContain("#c00");
+    expect(screen.getByTestId("ef-node").style.boxShadow).toContain(
+      "var(--danger)",
+    );
   });
 
   test("skipped status applies reduced opacity", () => {

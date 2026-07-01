@@ -75,15 +75,15 @@ const cachedBadgeStyle: CSSProperties = {
 function borderColorFor(status: NodeStatus | null | undefined): string {
   switch (status) {
     case "ok":
-      return "#2e7d32";
+      return "var(--success)";
     case "cached":
-      return "#0288d1";
+      return "var(--info)";
     case "error":
-      return "#c00";
+      return "var(--danger)";
     case "skipped":
-      return "#bbb";
+      return "var(--border-strong)";
     default:
-      return "#888";
+      return "var(--border-subtle)";
   }
 }
 
@@ -104,7 +104,7 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
 
   const boxStyle: CSSProperties = {
     ...boxStyleBase,
-    border: "1px solid var(--border-subtle)",
+    border: `1px solid ${borderColorFor(data.status)}`,
   };
 
   switch (data.status) {
@@ -112,7 +112,7 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
       boxStyle.boxShadow = `var(--shadow-2), 0 0 0 3px ${borderColorFor("cached")}`;
       break;
     case "error":
-      boxStyle.boxShadow = `var(--shadow-2), 0 0 0 3px ${borderColorFor("error")}, 0 0 12px 2px rgba(204, 0, 0, 0.35)`;
+      boxStyle.boxShadow = `var(--shadow-2), 0 0 0 3px ${borderColorFor("error")}, 0 0 12px 2px var(--danger-soft)`;
       break;
     case "skipped":
       boxStyle.opacity = 0.6;

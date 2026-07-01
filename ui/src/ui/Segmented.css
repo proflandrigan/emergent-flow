@@ -18,6 +18,7 @@
   color: var(--text-secondary);
   font-family: var(--font-ui);
   font-size: var(--text-sm);
+  font-weight: 400;
   cursor: pointer;
   white-space: nowrap;
   transition:
@@ -28,6 +29,7 @@
 .ef-segmented__option--active {
   background: var(--surface-3);
   color: var(--text-primary);
+  font-weight: 600;
 }
 
 .ef-segmented__option:focus-visible {
