@@ -32,6 +32,7 @@ generally roadmap-Epic-N.
 | **Epic 5** | [`epic-5-frontend-canvas.md`](./epic-5-frontend-canvas.md) | **Epic 3** | Frontend Canvas Engine | Frontend — `ui/` |
 | **Epic 6** | [`epic-6-node-library.md`](./epic-6-node-library.md) | **Epic 4** | Node Library & Configuration UX | Python SDK (`emergentflow/`) owns the catalog; `ui/` renders palette/panels |
 | **Epic 7** | [`epic-7-live-iteration.md`](./epic-7-live-iteration.md) | **Epics 6 (remaining) + 7 + 8 (partial)** | Live Iteration & Visual Results | `emergentflow/server/` (FastAPI, cache) + `ui/` (streaming, Results tab) |
+| **Epic 8** | [`epic-8-scikit-learn-support.md`](./epic-8-scikit-learn-support.md) | **Epic 4** (deep ML build-out) | Complete scikit-learn Support (Supervised & Unsupervised) | Python SDK — `emergentflow/` (estimator adapter, node archetypes, generated catalog) |
 
 > **Delivery vs. roadmap order.** Repo Epics 4 (local server) and 5 (canvas) are *planned*
 > (Epic 4's v0 server has shipped; Epic 5 is not started). The server was front-loaded ahead of
