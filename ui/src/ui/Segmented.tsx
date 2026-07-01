@@ -4,6 +4,7 @@ import "./Segmented.css";
 export interface SegmentedOption<T extends string = string> {
   value: T;
   label: string;
+  testId?: string;
 }
 
 export interface SegmentedProps<T extends string = string> {
@@ -32,6 +33,7 @@ export function Segmented<T extends string = string>({
             .filter(Boolean)
             .join(" ")}
           aria-pressed={option.value === value}
+          data-testid={option.testId}
           onClick={() => onChange(option.value)}
         >
           {option.label}

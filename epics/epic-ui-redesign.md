@@ -94,11 +94,11 @@
 
 > Spec §6.3, Phase 4.
 
-- [ ] `Inspector.tsx`: glass panel floating right (`width: 320px`); header shows the selected node's family icon + label in the family hue.
-- [ ] Restyle the Config/Code/Results tabs as a segmented control (pill track `--surface-2`, active `--surface-3` + `--text-primary`, inactive `--text-secondary`). **Preserve `inspector-tab-config|code|results` testids** and the active/`fontWeight` semantics.
-- [ ] `ConfigForm.tsx`: replace raw browser inputs/selects with the `src/ui` token form controls (§6.5) — this is where most of the "dated" feel lives.
-- [ ] `CodePanel.tsx`: monospace on `--surface-1`/`--font-mono`; keep `highlight.js` but swap in a dark theme that harmonizes with the palette.
-- [ ] `PayloadView.tsx` / Results + empty states: swap `#666`/`#b00` literals for `--text-secondary` / a semantic error token. **Preserve `inspector`, `inspector-empty`, `results-empty-no-selection|no-run`, `results-error`, `results-list`, `results-last-run` testids.**
+- [x] `Inspector.tsx`: glass panel floating right (`width: 320px`); header shows the selected node's family icon + label in the family hue.
+- [x] Restyle the Config/Code/Results tabs as a segmented control (pill track `--surface-2`, active `--surface-3` + `--text-primary`, inactive `--text-secondary`). **Preserve `inspector-tab-config|code|results` testids** and the active/`fontWeight` semantics.
+- [x] `ConfigForm.tsx`: replace raw browser inputs/selects with the `src/ui` token form controls (§6.5) — this is where most of the "dated" feel lives.
+- [x] `CodePanel.tsx`: monospace on `--surface-1`/`--font-mono`; keep `highlight.js` but swap in a dark theme that harmonizes with the palette.
+- [x] `PayloadView.tsx` / Results + empty states: swap `#666`/`#b00` literals for `--text-secondary` / a semantic error token. **Preserve `inspector`, `inspector-empty`, `results-empty-no-selection|no-run`, `results-error`, `results-list`, `results-last-run` testids.**
 
 ---
 

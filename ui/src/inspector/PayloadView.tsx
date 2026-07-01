@@ -6,7 +6,7 @@ import type { CSSProperties } from "react";
 
 import type { Payload } from "../store/execution";
 
-const mutedStyle: CSSProperties = { color: "#666" };
+const mutedStyle: CSSProperties = { color: "var(--text-secondary)" };
 
 const preStyle: CSSProperties = { whiteSpace: "pre-wrap", margin: 0 };
 
@@ -16,7 +16,7 @@ const tableStyle: CSSProperties = {
 };
 
 const cellStyle: CSSProperties = {
-  border: "1px solid #ccc",
+  border: "1px solid var(--border-subtle)",
   padding: "0.15rem 0.4rem",
 };
 
