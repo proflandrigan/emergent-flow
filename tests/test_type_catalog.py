@@ -15,7 +15,16 @@ from ef_timeseries.types import TIMESERIES  # noqa: E402
 
 class TestBuiltinCatalog:
     def test_builtin_tokens_registered(self):
-        tokens = {"any", "DataFrame", "ClassifierResult", "AnovaResult", "HTML", "Tensor"}
+        tokens = {
+            "any",
+            "DataFrame",
+            "ClassifierResult",
+            "AnovaResult",
+            "HTML",
+            "Tensor",
+            "Model",
+            "Transformer",
+        }
         for token in tokens:
             assert registry.is_registered(token)
 
@@ -26,9 +35,15 @@ class TestBuiltinCatalog:
             "AnovaResult",
             "HTML",
             "Tensor",
+            "Model",
+            "Transformer",
         }
         for token in builtin_tokens:
             assert registry.is_subtype(token, TOP_TYPE)
+
+    def test_builtins_not_subtypes_of_each_other(self):
+        assert not registry.is_subtype("Transformer", "Model")
+        assert not registry.is_subtype("Model", "Transformer")
 
     def test_builtin_catalog_is_flat(self):
         type_dict = registry.to_dict()

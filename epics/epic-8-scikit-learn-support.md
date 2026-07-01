@@ -139,17 +139,23 @@ export path this epic scopes but defers).
 > Structural validation and rendering both key off type tokens + the shape of the summary. Register
 > them before the catalog widens so every generated node validates and renders for free.
 
-- [ ] Register `Transformer` (fitted preprocessing/decomposition state) and confirm/rename the
+- [x] Register `Transformer` (fitted preprocessing/decomposition state) and confirm/rename the
   `Model` token so ports distinguish "predictor" from "transformer" from "clusterer" (Epic 3
   rules-as-data; add compatibility rows to `docs/type-system-spec.md`).
-- [ ] **Inspectable summary builders** per family, all JSON-native / tidy-DataFrame:
+- [x] **Inspectable summary builders** per family, all JSON-native / tidy-DataFrame:
   - classifier: accuracy/report, classes, feature importances or coefficients.
   - regressor: r²/mae/rmse, coefficients or importances.
   - decomposition/PCA: explained variance ratio, components, n_components.
   - clustering: cluster sizes, inertia/silhouette (where defined), n_clusters, labels frame.
   - outlier/novelty: contamination, score distribution summary.
   - preprocessing: fitted stats (means/scales/categories) as a tidy frame.
-- [ ] Extend `ef.ml.evaluate` metric coverage to be **task-aware** (multiclass classification
+
+  Shipped as `emergentflow/ml/summaries.py` + `ef.ml.summarize`, wired onto every registered
+  estimator. The clustering/outlier builders surface `cluster_sizes`/`inertia` and
+  `contamination`/`offset` respectively (structural, data-free signals) rather than a full
+  labels frame or score distribution, since a builder only receives the fitted estimator, not
+  the input frame — a reasonable scope call, revisit if the richer shape is needed later.
+- [x] Extend `ef.ml.evaluate` metric coverage to be **task-aware** (multiclass classification
   report, ROC-AUC where binary+proba available; regression already covered) — still returning the
   `EvaluationResult` inspectable shape.
 
@@ -160,16 +166,37 @@ export path this epic scopes but defers).
 > The largest, highest-value family. Delivered by the fit archetype + generated catalog entries — no
 > new node files per estimator.
 
-- [ ] Curate the supervised allow-list into the registry: linear
+- [x] Curate the supervised allow-list into the registry: linear
   (Logistic/Ridge/Lasso/ElasticNet/SGD/LinearSVC/SVR), tree & ensemble
   (DecisionTree, RandomForest, ExtraTrees, GradientBoosting, HistGradientBoosting, AdaBoost, Bagging),
   neighbors (KNeighbors), naive Bayes (Gaussian/Multinomial), SVM (SVC/SVR), plus discriminant
   analysis — each with curated common kwargs + `advanced_params` passthrough.
-- [ ] Generate their catalog entries (label/category/description/param schema) from Story 6's
+
+  29 `fit`-archetype estimators now registered in `emergentflow/ml/catalog.py`, each with
+  curated common kwargs and a wired summary builder. Shipped via the `ml.fit_estimator` /
+  `ml.apply_estimator` archetype nodes (a Story 1/2 prerequisite that hadn't been built yet) —
+  those route through a single generic `params: dict` passthrough rather than a separate
+  curated-common-fields/`advanced_params` config-panel split; that split is a Story 10
+  UI-authoring concern, deferred there.
+- [x] Generate their catalog entries (label/category/description/param schema) from Story 6's
   generator; they light up the palette with zero per-estimator UI.
-- [ ] Golden-code test on a **representative subset** (one per estimator kind) + the parametrized
+
+  A minimal pure generator (`emergentflow/ml/generator.py`) maps the registry to catalog
+  entries (label/category/description via docstring introspection/import-path/humanized key,
+  param schema from `accepted_kwargs`), wired into `ef.export_catalog()` (bumped to v2, new
+  `"estimators"` key). This is a scoped-down stand-in for Story 7's full generator (curated,
+  reviewed descriptions vs. this task's raw-docstring-first-line simplification) — sufficient
+  to unblock this story, not a substitute for Story 7. Actual canvas palette rendering of the
+  new `"estimators"` catalog data is Story 10, not yet built.
+- [x] Golden-code test on a **representative subset** (one per estimator kind) + the parametrized
   equivalence harness (Story 9) covering the whole allow-list. **Deferred:** hyperparameter search
   (Story 8), calibration, class-imbalance tooling.
+
+  `tests/test_ml_supervised_catalog.py`: golden `ast.parse` + `ruff check` on 8 representative
+  estimators (one per family) via a real `LoadSample -> FitEstimator -> ApplyEstimator` graph,
+  plus an ADR-0002 equivalence matrix computed dynamically over all 29 `archetype="fit"` keys
+  (not hardcoded — grows automatically as the allow-list widens). This is a scoped slice of
+  Story 9's full harness (limited to the fit archetype/Story 4's estimators), not Story 9 itself.
 
 ---
 

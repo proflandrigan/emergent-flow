@@ -19,12 +19,14 @@ from emergentflow.ir.graph import Graph
 from emergentflow.ml import train_regressor
 from emergentflow.nodes.examples import (
     Anova,
+    ApplyEstimator,
     CastTypes,
     Correlation,
     Describe,
     DropMissing,
     Evaluate,
     FilterRows,
+    FitEstimator,
     GenerateHtmlSummary,
     ImputeMissing,
     LoadCsv,
@@ -749,3 +751,86 @@ class TestLoadSample:
         executed = defn.execute(node, inputs={})
         scope = _run_codegen(defn, node, {})
         assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
+# ml.fit_estimator
+# ---------------------------------------------------------------------------
+
+
+class TestFitEstimator:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = FitEstimator()
+        df = pd.DataFrame(
+            {
+                "x1": [float(i) for i in range(20)] + [float(i) for i in range(20)],
+                "x2": [float(i % 5) for i in range(40)],
+                "label": ["low" if i % 2 == 0 else "high" for i in range(40)],
+            }
+        )
+        X = df[["x1", "x2"]]
+        node = defn.instantiate(estimator="LogisticRegression", target="label")
+        executed = defn.execute(node, inputs={"frame": df.copy()})
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+
+        assert executed["model"].estimator_type == scope["model"].estimator_type
+        assert executed["model"].task == scope["model"].task
+        assert executed["model"].target == scope["model"].target
+        assert executed["model"].feature_names == scope["model"].feature_names
+        assert (
+            executed["model"].estimator.predict(X).tolist()
+            == scope["model"].estimator.predict(X).tolist()
+        )
+
+    def test_estimator_choices_include_fit_archetype_only(self):
+        spec = FitEstimator().to_spec()
+        estimator_param = next(p for p in spec.params if p.name == "estimator")
+        assert "LogisticRegression" in estimator_param.hints.choices
+        assert "StandardScaler" not in estimator_param.hints.choices  # fit_transform, not fit
+        assert "KMeans" not in estimator_param.hints.choices  # cluster_detect, not fit
+
+
+# ---------------------------------------------------------------------------
+# ml.apply_estimator
+# ---------------------------------------------------------------------------
+
+
+class TestApplyEstimator:
+    def test_codegen_matches_execute_predict(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        fit_defn = FitEstimator()
+        df = pd.DataFrame(
+            {
+                "x1": [float(i) for i in range(20)] + [float(i) for i in range(20)],
+                "x2": [float(i % 5) for i in range(40)],
+                "label": ["low" if i % 2 == 0 else "high" for i in range(40)],
+            }
+        )
+        fit_node = fit_defn.instantiate(estimator="LogisticRegression", target="label")
+        model = fit_defn.execute(fit_node, inputs={"frame": df.copy()})["model"]
+
+        apply_defn = ApplyEstimator()
+        apply_node = apply_defn.instantiate(op="predict")
+        executed = apply_defn.execute(apply_node, inputs={"model": model, "frame": df.copy()})
+        scope = _run_codegen(apply_defn, apply_node, {"model": model, "frame": df.copy()})
+
+        assert executed["result"]["prediction"].tolist() == scope["result"]["prediction"].tolist()
+
+    def test_apply_estimator_does_not_mutate_input_frame(self):
+        fit_defn = FitEstimator()
+        df = pd.DataFrame(
+            {
+                "x1": [float(i) for i in range(20)] + [float(i) for i in range(20)],
+                "x2": [float(i % 5) for i in range(40)],
+                "label": ["low" if i % 2 == 0 else "high" for i in range(40)],
+            }
+        )
+        fit_node = fit_defn.instantiate(estimator="LogisticRegression", target="label")
+        model = fit_defn.execute(fit_node, inputs={"frame": df.copy()})["model"]
+
+        apply_defn = ApplyEstimator()
+        apply_node = apply_defn.instantiate(op="predict")
+        frame_copy = df.copy()
+        apply_defn.execute(apply_node, inputs={"model": model, "frame": frame_copy})
+        assert frame_copy.equals(df)

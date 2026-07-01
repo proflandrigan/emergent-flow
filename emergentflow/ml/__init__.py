@@ -19,17 +19,28 @@ See ``docs/public-api-conventions.md`` and ``docs/sdk-design-philosophy.md``.
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.metrics import accuracy_score, mean_absolute_error, mean_squared_error, r2_score
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    f1_score,
+    mean_absolute_error,
+    mean_squared_error,
+    precision_score,
+    r2_score,
+    recall_score,
+    roc_auc_score,
+)
 from sklearn.model_selection import train_test_split as _sk_split
 
 from emergentflow.api import public_op
-from emergentflow.ml.errors import InvalidEstimatorParamsError
+from emergentflow.ml.errors import InvalidEstimatorParamsError, UnknownEstimatorError
 from emergentflow.ml.registry import get_estimator_spec
 
 __all__ = [
@@ -38,6 +49,7 @@ __all__ = [
     "evaluate",
     "fit_estimator",
     "predict",
+    "summarize",
     "train_classifier",
     "train_random_forest",
     "train_regressor",
@@ -124,7 +136,10 @@ class EvaluationResult:
 def evaluate(model: FittedModel, df: pd.DataFrame) -> EvaluationResult:
     """Score a fitted model against the true ``model.target`` in ``df``.
 
-    Regression metrics: ``r2``, ``mae``, ``rmse``. Classification metric: ``accuracy``. Validates
+    Regression metrics: ``r2``, ``mae``, ``rmse``. Classification metrics: ``accuracy`` always,
+    plus ``precision``/``recall``/``f1`` (binary) or their ``_macro``/``_weighted`` variants
+    (multiclass, via ``sklearn.metrics.classification_report``), plus ``roc_auc`` when the task is
+    binary and the estimator exposes ``predict_proba``. Validates
     that the target and feature columns are present. Never mutates ``df``.
     """
     if model.target not in df.columns:
@@ -143,7 +158,49 @@ def evaluate(model: FittedModel, df: pd.DataFrame) -> EvaluationResult:
         }
     else:  # classification
         metrics = {"accuracy": float(accuracy_score(y_true, y_pred))}
+        classes = getattr(model.estimator, "classes_", None)
+        n_classes = len(classes) if classes is not None else len(set(y_true))
+        if n_classes > 2:
+            report = classification_report(y_true, y_pred, output_dict=True, zero_division=0)
+            metrics["precision_macro"] = float(report["macro avg"]["precision"])
+            metrics["recall_macro"] = float(report["macro avg"]["recall"])
+            metrics["f1_macro"] = float(report["macro avg"]["f1-score"])
+            metrics["precision_weighted"] = float(report["weighted avg"]["precision"])
+            metrics["recall_weighted"] = float(report["weighted avg"]["recall"])
+            metrics["f1_weighted"] = float(report["weighted avg"]["f1-score"])
+        else:
+            pos_label = classes[1] if classes is not None else 1
+            metrics["precision"] = float(
+                precision_score(y_true, y_pred, zero_division=0, pos_label=pos_label)
+            )
+            metrics["recall"] = float(
+                recall_score(y_true, y_pred, zero_division=0, pos_label=pos_label)
+            )
+            metrics["f1"] = float(f1_score(y_true, y_pred, zero_division=0, pos_label=pos_label))
+            if n_classes == 2 and hasattr(model.estimator, "predict_proba"):
+                proba = model.estimator.predict_proba(df[model.feature_names])
+                with contextlib.suppress(ValueError):
+                    metrics["roc_auc"] = float(roc_auc_score(y_true, proba[:, 1]))
     return EvaluationResult(task=model.task, n=int(df.shape[0]), metrics=metrics)
+
+
+@public_op(name="ef.ml.summarize")
+def summarize(model: FittedModel | FittedTransformer) -> dict[str, Any]:
+    """Return a structural, inspectable summary of a fitted model/transformer.
+
+    Looks up the estimator's registered ``summary_builder`` (Epic 8, Story 3) via
+    ``get_estimator_spec(model.estimator_type)`` and calls it with the live fitted object.
+    Returns ``{"kind": "unsupported"}`` if no summary builder is registered for this
+    estimator, so a live estimator never has to be inspected directly.
+    """
+    try:
+        spec = get_estimator_spec(model.estimator_type)
+    except UnknownEstimatorError:
+        return {"kind": "unsupported"}
+    if spec.summary_builder is None:
+        return {"kind": "unsupported"}
+    live = model.estimator if isinstance(model, FittedModel) else model.transformer
+    return spec.summary_builder(live)
 
 
 @public_op(name="ef.ml.train_classifier")

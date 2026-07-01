@@ -1,5 +1,901 @@
 {
-  "catalog_version": 1,
+  "catalog_version": 2,
+  "estimators": [
+    {
+      "archetype": "fit",
+      "category": "Ensemble",
+      "description": "An AdaBoost classifier.",
+      "import_path": "sklearn.ensemble.AdaBoostClassifier",
+      "key": "AdaBoostClassifier",
+      "label": "Ada Boost Classifier",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 1.0,
+          "help": "Shrinks each estimator's contribution.",
+          "name": "learning_rate",
+          "type": "float"
+        },
+        {
+          "default": 50,
+          "help": "Maximum number of estimators.",
+          "name": "n_estimators",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Ensemble",
+      "description": "An AdaBoost regressor.",
+      "import_path": "sklearn.ensemble.AdaBoostRegressor",
+      "key": "AdaBoostRegressor",
+      "label": "Ada Boost Regressor",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 1.0,
+          "help": "Shrinks each estimator's contribution.",
+          "name": "learning_rate",
+          "type": "float"
+        },
+        {
+          "default": 50,
+          "help": "Maximum number of estimators.",
+          "name": "n_estimators",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "regression"
+    },
+    {
+      "archetype": "fit",
+      "category": "Ensemble",
+      "description": "A Bagging classifier.",
+      "import_path": "sklearn.ensemble.BaggingClassifier",
+      "key": "BaggingClassifier",
+      "label": "Bagging Classifier",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 10,
+          "help": "Number of base estimators in the ensemble.",
+          "name": "n_estimators",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Ensemble",
+      "description": "A Bagging regressor.",
+      "import_path": "sklearn.ensemble.BaggingRegressor",
+      "key": "BaggingRegressor",
+      "label": "Bagging Regressor",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 10,
+          "help": "Number of base estimators in the ensemble.",
+          "name": "n_estimators",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "regression"
+    },
+    {
+      "archetype": "fit",
+      "category": "Tree",
+      "description": "A decision tree classifier.",
+      "import_path": "sklearn.tree.DecisionTreeClassifier",
+      "key": "DecisionTreeClassifier",
+      "label": "Decision Tree Classifier",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": null,
+          "help": "Maximum tree depth (None = unlimited).",
+          "name": "max_depth",
+          "type": "any"
+        },
+        {
+          "default": 2,
+          "help": "Minimum samples to split a node.",
+          "name": "min_samples_split",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Tree",
+      "description": "A decision tree regressor.",
+      "import_path": "sklearn.tree.DecisionTreeRegressor",
+      "key": "DecisionTreeRegressor",
+      "label": "Decision Tree Regressor",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": null,
+          "help": "Maximum tree depth (None = unlimited).",
+          "name": "max_depth",
+          "type": "any"
+        },
+        {
+          "default": 2,
+          "help": "Minimum samples to split a node.",
+          "name": "min_samples_split",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "regression"
+    },
+    {
+      "archetype": "fit",
+      "category": "Linear Model",
+      "description": "Linear regression with combined L1 and L2 priors as regularizer.",
+      "import_path": "sklearn.linear_model.ElasticNet",
+      "key": "ElasticNet",
+      "label": "Elastic Net",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 1.0,
+          "help": "Regularization strength.",
+          "name": "alpha",
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "Mixing ratio between L1 and L2 penalty.",
+          "name": "l1_ratio",
+          "type": "float"
+        },
+        {
+          "default": 1000,
+          "help": "Maximum solver iterations.",
+          "name": "max_iter",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "regression"
+    },
+    {
+      "archetype": "fit",
+      "category": "Ensemble",
+      "description": "An extra-trees classifier.",
+      "import_path": "sklearn.ensemble.ExtraTreesClassifier",
+      "key": "ExtraTreesClassifier",
+      "label": "Extra Trees Classifier",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": null,
+          "help": "Maximum tree depth (None = unlimited).",
+          "name": "max_depth",
+          "type": "any"
+        },
+        {
+          "default": 100,
+          "help": "Number of trees in the forest.",
+          "name": "n_estimators",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Ensemble",
+      "description": "An extra-trees regressor.",
+      "import_path": "sklearn.ensemble.ExtraTreesRegressor",
+      "key": "ExtraTreesRegressor",
+      "label": "Extra Trees Regressor",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": null,
+          "help": "Maximum tree depth (None = unlimited).",
+          "name": "max_depth",
+          "type": "any"
+        },
+        {
+          "default": 100,
+          "help": "Number of trees in the forest.",
+          "name": "n_estimators",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "regression"
+    },
+    {
+      "archetype": "cluster_detect",
+      "category": "Mixture",
+      "description": "Gaussian Mixture.",
+      "import_path": "sklearn.mixture.GaussianMixture",
+      "key": "GaussianMixture",
+      "label": "Gaussian Mixture",
+      "node_type": "ml.cluster_detect",
+      "params": [
+        {
+          "default": 1,
+          "help": "Number of mixture components.",
+          "name": "n_components",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit",
+      "category": "Naive Bayes",
+      "description": "Gaussian Naive Bayes (GaussianNB).",
+      "import_path": "sklearn.naive_bayes.GaussianNB",
+      "key": "GaussianNB",
+      "label": "Gaussian N B",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 1e-09,
+          "help": "Portion of the largest variance added for calculation stability.",
+          "name": "var_smoothing",
+          "type": "float"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Ensemble",
+      "description": "Gradient Boosting for classification.",
+      "import_path": "sklearn.ensemble.GradientBoostingClassifier",
+      "key": "GradientBoostingClassifier",
+      "label": "Gradient Boosting Classifier",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 0.1,
+          "help": "Shrinks each tree's contribution.",
+          "name": "learning_rate",
+          "type": "float"
+        },
+        {
+          "default": 3,
+          "help": "Maximum depth of each tree.",
+          "name": "max_depth",
+          "type": "int"
+        },
+        {
+          "default": 100,
+          "help": "Number of boosting stages.",
+          "name": "n_estimators",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Ensemble",
+      "description": "Gradient Boosting for regression.",
+      "import_path": "sklearn.ensemble.GradientBoostingRegressor",
+      "key": "GradientBoostingRegressor",
+      "label": "Gradient Boosting Regressor",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 0.1,
+          "help": "Shrinks each tree's contribution.",
+          "name": "learning_rate",
+          "type": "float"
+        },
+        {
+          "default": 3,
+          "help": "Maximum depth of each tree.",
+          "name": "max_depth",
+          "type": "int"
+        },
+        {
+          "default": 100,
+          "help": "Number of boosting stages.",
+          "name": "n_estimators",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "regression"
+    },
+    {
+      "archetype": "fit",
+      "category": "Ensemble",
+      "description": "Histogram-based Gradient Boosting Classification Tree.",
+      "import_path": "sklearn.ensemble.HistGradientBoostingClassifier",
+      "key": "HistGradientBoostingClassifier",
+      "label": "Hist Gradient Boosting Classifier",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 0.1,
+          "help": "Shrinks each tree's contribution.",
+          "name": "learning_rate",
+          "type": "float"
+        },
+        {
+          "default": 100,
+          "help": "Maximum number of boosting iterations.",
+          "name": "max_iter",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Ensemble",
+      "description": "Histogram-based Gradient Boosting Regression Tree.",
+      "import_path": "sklearn.ensemble.HistGradientBoostingRegressor",
+      "key": "HistGradientBoostingRegressor",
+      "label": "Hist Gradient Boosting Regressor",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 0.1,
+          "help": "Shrinks each tree's contribution.",
+          "name": "learning_rate",
+          "type": "float"
+        },
+        {
+          "default": 100,
+          "help": "Maximum number of boosting iterations.",
+          "name": "max_iter",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "regression"
+    },
+    {
+      "archetype": "cluster_detect",
+      "category": "Cluster",
+      "description": "K-Means clustering.",
+      "import_path": "sklearn.cluster.KMeans",
+      "key": "KMeans",
+      "label": "K Means",
+      "node_type": "ml.cluster_detect",
+      "params": [
+        {
+          "default": 8,
+          "help": "Number of clusters to form.",
+          "name": "n_clusters",
+          "type": "int"
+        },
+        {
+          "default": 10,
+          "help": "Number of centroid-seed runs.",
+          "name": "n_init",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit",
+      "category": "Neighbors",
+      "description": "Classifier implementing the k-nearest neighbors vote.",
+      "import_path": "sklearn.neighbors.KNeighborsClassifier",
+      "key": "KNeighborsClassifier",
+      "label": "K Neighbors Classifier",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 5,
+          "help": "Number of neighbors to use.",
+          "name": "n_neighbors",
+          "type": "int"
+        },
+        {
+          "default": "uniform",
+          "help": "Weight function ('uniform'/'distance').",
+          "name": "weights",
+          "type": "str"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Neighbors",
+      "description": "Regression based on k-nearest neighbors.",
+      "import_path": "sklearn.neighbors.KNeighborsRegressor",
+      "key": "KNeighborsRegressor",
+      "label": "K Neighbors Regressor",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 5,
+          "help": "Number of neighbors to use.",
+          "name": "n_neighbors",
+          "type": "int"
+        },
+        {
+          "default": "uniform",
+          "help": "Weight function ('uniform'/'distance').",
+          "name": "weights",
+          "type": "str"
+        }
+      ],
+      "task": "regression"
+    },
+    {
+      "archetype": "fit",
+      "category": "Linear Model",
+      "description": "Linear Model trained with L1 prior as regularizer (aka the Lasso).",
+      "import_path": "sklearn.linear_model.Lasso",
+      "key": "Lasso",
+      "label": "Lasso",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 1.0,
+          "help": "Regularization strength.",
+          "name": "alpha",
+          "type": "float"
+        },
+        {
+          "default": 1000,
+          "help": "Maximum solver iterations.",
+          "name": "max_iter",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "regression"
+    },
+    {
+      "archetype": "fit",
+      "category": "Discriminant Analysis",
+      "description": "Linear Discriminant Analysis.",
+      "import_path": "sklearn.discriminant_analysis.LinearDiscriminantAnalysis",
+      "key": "LinearDiscriminantAnalysis",
+      "label": "Linear Discriminant Analysis",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": "svd",
+          "help": "Solver ('svd'/'lsqr'/'eigen').",
+          "name": "solver",
+          "type": "str"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Svm",
+      "description": "Linear Support Vector Classification.",
+      "import_path": "sklearn.svm.LinearSVC",
+      "key": "LinearSVC",
+      "label": "Linear S V C",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 1.0,
+          "help": "Regularization strength (inverse).",
+          "name": "C",
+          "type": "float"
+        },
+        {
+          "default": 1000,
+          "help": "Maximum solver iterations.",
+          "name": "max_iter",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Linear Model",
+      "description": "Logistic Regression (aka logit, MaxEnt) classifier.",
+      "import_path": "sklearn.linear_model.LogisticRegression",
+      "key": "LogisticRegression",
+      "label": "Logistic Regression",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 1.0,
+          "help": "Inverse of regularization strength.",
+          "name": "C",
+          "type": "float"
+        },
+        {
+          "default": 1000,
+          "help": "Maximum solver iterations.",
+          "name": "max_iter",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Naive Bayes",
+      "description": "Naive Bayes classifier for multinomial models.",
+      "import_path": "sklearn.naive_bayes.MultinomialNB",
+      "key": "MultinomialNB",
+      "label": "Multinomial N B",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 1.0,
+          "help": "Additive (Laplace/Lidstone) smoothing parameter.",
+          "name": "alpha",
+          "type": "float"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Discriminant Analysis",
+      "description": "Quadratic Discriminant Analysis.",
+      "import_path": "sklearn.discriminant_analysis.QuadraticDiscriminantAnalysis",
+      "key": "QuadraticDiscriminantAnalysis",
+      "label": "Quadratic Discriminant Analysis",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 0.0,
+          "help": "Regularization of the covariance estimate.",
+          "name": "reg_param",
+          "type": "float"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Ensemble",
+      "description": "A random forest classifier.",
+      "import_path": "sklearn.ensemble.RandomForestClassifier",
+      "key": "RandomForestClassifier",
+      "label": "Random Forest Classifier",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": null,
+          "help": "Maximum tree depth (None = unlimited).",
+          "name": "max_depth",
+          "type": "any"
+        },
+        {
+          "default": 100,
+          "help": "Number of trees in the forest.",
+          "name": "n_estimators",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Ensemble",
+      "description": "A random forest regressor.",
+      "import_path": "sklearn.ensemble.RandomForestRegressor",
+      "key": "RandomForestRegressor",
+      "label": "Random Forest Regressor",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": null,
+          "help": "Maximum tree depth (None = unlimited).",
+          "name": "max_depth",
+          "type": "any"
+        },
+        {
+          "default": 100,
+          "help": "Number of trees in the forest.",
+          "name": "n_estimators",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "regression"
+    },
+    {
+      "archetype": "fit",
+      "category": "Linear Model",
+      "description": "Linear least squares with l2 regularization.",
+      "import_path": "sklearn.linear_model.Ridge",
+      "key": "Ridge",
+      "label": "Ridge",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 1.0,
+          "help": "Regularization strength.",
+          "name": "alpha",
+          "type": "float"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "regression"
+    },
+    {
+      "archetype": "fit",
+      "category": "Linear Model",
+      "description": "Linear classifiers (SVM, logistic regression, etc.) with SGD training.",
+      "import_path": "sklearn.linear_model.SGDClassifier",
+      "key": "SGDClassifier",
+      "label": "S G D Classifier",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 0.0001,
+          "help": "Regularization strength.",
+          "name": "alpha",
+          "type": "float"
+        },
+        {
+          "default": "hinge",
+          "help": "Loss function to optimize.",
+          "name": "loss",
+          "type": "str"
+        },
+        {
+          "default": 1000,
+          "help": "Maximum passes over the training data.",
+          "name": "max_iter",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Linear Model",
+      "description": "Linear model fitted by minimizing a regularized empirical loss with SGD.",
+      "import_path": "sklearn.linear_model.SGDRegressor",
+      "key": "SGDRegressor",
+      "label": "S G D Regressor",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 0.0001,
+          "help": "Regularization strength.",
+          "name": "alpha",
+          "type": "float"
+        },
+        {
+          "default": "squared_error",
+          "help": "Loss function to optimize.",
+          "name": "loss",
+          "type": "str"
+        },
+        {
+          "default": 1000,
+          "help": "Maximum passes over the training data.",
+          "name": "max_iter",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "regression"
+    },
+    {
+      "archetype": "fit",
+      "category": "Svm",
+      "description": "C-Support Vector Classification.",
+      "import_path": "sklearn.svm.SVC",
+      "key": "SVC",
+      "label": "S V C",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 1.0,
+          "help": "Regularization strength (inverse).",
+          "name": "C",
+          "type": "float"
+        },
+        {
+          "default": "rbf",
+          "help": "Kernel type ('linear'/'poly'/'rbf'/'sigmoid').",
+          "name": "kernel",
+          "type": "str"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": "classification"
+    },
+    {
+      "archetype": "fit",
+      "category": "Svm",
+      "description": "Epsilon-Support Vector Regression.",
+      "import_path": "sklearn.svm.SVR",
+      "key": "SVR",
+      "label": "S V R",
+      "node_type": "ml.fit_estimator",
+      "params": [
+        {
+          "default": 1.0,
+          "help": "Regularization strength (inverse).",
+          "name": "C",
+          "type": "float"
+        },
+        {
+          "default": "rbf",
+          "help": "Kernel type ('linear'/'poly'/'rbf'/'sigmoid').",
+          "name": "kernel",
+          "type": "str"
+        }
+      ],
+      "task": "regression"
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Standardize features by removing the mean and scaling to unit variance.",
+      "import_path": "sklearn.preprocessing.StandardScaler",
+      "key": "StandardScaler",
+      "label": "Standard Scaler",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": true,
+          "help": "Center the data before scaling.",
+          "name": "with_mean",
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "Scale the data to unit variance.",
+          "name": "with_std",
+          "type": "bool"
+        }
+      ],
+      "task": null
+    }
+  ],
   "nodes": [
     {
       "category": "Transform",
@@ -574,6 +1470,67 @@
     },
     {
       "category": "Machine Learning",
+      "description": "Apply a fitted Model to data via predict or score_samples.",
+      "family": "ml",
+      "label": "Apply Estimator",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "predict",
+          "help": "Which operation to apply: predict adds a 'prediction' column, score_samples adds a 'score' column.",
+          "hints": {
+            "choices": [
+              "predict",
+              "score_samples"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Operation",
+          "name": "op",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted model to apply.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The data to apply the model to.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Input rows plus the op's output column.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "ml.apply_estimator",
+      "version": 1
+    },
+    {
+      "category": "Machine Learning",
       "description": "Score a fitted model against labeled data.",
       "family": "ml",
       "label": "Evaluate",
@@ -609,6 +1566,112 @@
         }
       ],
       "type": "ml.evaluate",
+      "version": 1
+    },
+    {
+      "category": "Machine Learning",
+      "description": "Fit a curated, allow-listed sklearn classifier or regressor.",
+      "family": "ml",
+      "label": "Fit Estimator",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which allow-listed sklearn classifier/regressor to fit.",
+          "hints": {
+            "choices": [
+              "AdaBoostClassifier",
+              "AdaBoostRegressor",
+              "BaggingClassifier",
+              "BaggingRegressor",
+              "DecisionTreeClassifier",
+              "DecisionTreeRegressor",
+              "ElasticNet",
+              "ExtraTreesClassifier",
+              "ExtraTreesRegressor",
+              "GaussianNB",
+              "GradientBoostingClassifier",
+              "GradientBoostingRegressor",
+              "HistGradientBoostingClassifier",
+              "HistGradientBoostingRegressor",
+              "KNeighborsClassifier",
+              "KNeighborsRegressor",
+              "Lasso",
+              "LinearDiscriminantAnalysis",
+              "LinearSVC",
+              "LogisticRegression",
+              "MultinomialNB",
+              "QuadraticDiscriminantAnalysis",
+              "RandomForestClassifier",
+              "RandomForestRegressor",
+              "Ridge",
+              "SGDClassifier",
+              "SGDRegressor",
+              "SVC",
+              "SVR"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Estimator",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": null,
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to use as features; empty/unset uses every other column.",
+          "hints": null,
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": {},
+          "help": "Constructor kwargs for the chosen estimator (allow-listed per estimator).",
+          "hints": null,
+          "label": "Estimator params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing features and the target column.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "out",
+          "help": "The fitted model.",
+          "label": null,
+          "name": "model",
+          "required": true
+        }
+      ],
+      "type": "ml.fit_estimator",
       "version": 1
     },
     {

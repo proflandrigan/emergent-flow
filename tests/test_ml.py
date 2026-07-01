@@ -380,8 +380,41 @@ def test_evaluate_classification_returns_accuracy() -> None:
     result = evaluate(model, df)
     assert isinstance(result, EvaluationResult)
     assert result.task == "classification"
-    assert set(result.metrics.keys()) == {"accuracy"}
+    assert set(result.metrics.keys()) == {"accuracy", "precision", "recall", "f1", "roc_auc"}
     assert 0.0 <= result.metrics["accuracy"] <= 1.0
+    assert 0.0 <= result.metrics["precision"] <= 1.0
+    assert 0.0 <= result.metrics["recall"] <= 1.0
+    assert 0.0 <= result.metrics["f1"] <= 1.0
+    assert 0.0 <= result.metrics["roc_auc"] <= 1.0
+
+
+def _make_3class_df() -> pd.DataFrame:
+    """A small 3-class dataset (30 rows, 10 per class) for multiclass evaluation tests."""
+    x1 = [float(i) for i in range(15)] * 2
+    x2 = [float(i % 5) for i in range(30)]
+    label = ["low" if a < 5 else "mid" if a < 10 else "high" for a in x1]
+    return pd.DataFrame({"x1": x1, "x2": x2, "label": label})
+
+
+def test_evaluate_multiclass_returns_task_aware_metrics() -> None:
+    df = _make_3class_df()
+    model = train_random_forest(df, target="label", task="classification", random_state=0)
+    result = evaluate(model, df)
+    assert isinstance(result, EvaluationResult)
+    assert result.task == "classification"
+    expected_keys = {
+        "accuracy",
+        "precision_macro",
+        "recall_macro",
+        "f1_macro",
+        "precision_weighted",
+        "recall_weighted",
+        "f1_weighted",
+    }
+    assert set(result.metrics.keys()) == expected_keys
+    for v in result.metrics.values():
+        assert type(v) is float
+        assert 0.0 <= v <= 1.0
 
 
 def test_evaluate_n_equals_row_count() -> None:
