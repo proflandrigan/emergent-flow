@@ -3,7 +3,7 @@
 // needed). Currently a single item, "Run to here" (Epic 7 Story 5); deliberately not a generic
 // menu framework -- add items here directly if/when more are needed.
 
-import type { CSSProperties } from "react";
+import { Menu } from "../ui/Menu";
 
 export interface NodeContextMenuProps {
   x: number;
@@ -12,27 +12,6 @@ export interface NodeContextMenuProps {
   onClose: () => void;
 }
 
-const menuStyle: CSSProperties = {
-  position: "fixed",
-  zIndex: 1000,
-  background: "#fff",
-  border: "1px solid #ccc",
-  borderRadius: 4,
-  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-  padding: "0.25rem 0",
-  fontSize: 13,
-};
-
-const itemStyle: CSSProperties = {
-  display: "block",
-  width: "100%",
-  textAlign: "left",
-  padding: "0.35rem 0.75rem",
-  background: "none",
-  border: "none",
-  cursor: "pointer",
-};
-
 export function NodeContextMenu({
   x,
   y,
@@ -40,18 +19,25 @@ export function NodeContextMenu({
   onClose,
 }: NodeContextMenuProps): JSX.Element {
   return (
-    <div data-testid="node-context-menu" style={{ ...menuStyle, left: x, top: y }}>
-      <button
-        type="button"
-        data-testid="node-context-menu-run-to-here"
-        style={itemStyle}
-        onClick={() => {
-          onRunToHere();
-          onClose();
-        }}
-      >
-        Run to here ▸
-      </button>
+    <div
+      data-testid="node-context-menu"
+      style={{ position: "fixed", zIndex: 1000, left: x, top: y }}
+    >
+      <Menu
+        items={[
+          {
+            label: "Run to here ▸",
+            testId: "node-context-menu-run-to-here",
+            onSelect: () => {
+              onRunToHere();
+              onClose();
+            },
+          },
+        ]}
+        aria-label="Node context menu"
+      />
     </div>
   );
 }
+
+export default NodeContextMenu;

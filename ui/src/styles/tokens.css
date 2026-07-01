@@ -75,6 +75,7 @@
 
   /* Product accent (distinct from family hues) */
   --accent: #6366f1;
+  --accent-soft: rgba(99, 102, 241, 0.12);
 
   /* Semantic danger/error */
   --danger: #ef4444;

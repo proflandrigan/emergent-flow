@@ -79,14 +79,14 @@
 
 > Spec §6.2, §7, Phase 3. Solid cards with family accent + status ring; edge/minimap theming.
 
-- [ ] Thread `family` through `toReactFlow.ts` into `EfNodeData` (currently passes `label`/`ports`/`status`/`results` — **add `family`**). This is the only canvas data-plumbing change.
-- [ ] `EfNode.tsx`: solid `--surface-1` card, `--radius-md`, `--shadow-2`, `1px --border-subtle`, `width: 176`. Header = family-tinted bar with the family icon + label — use treatment **(b)** (soft fill + 3px `--fam-*` accent stripe + primary text) consistently.
-- [ ] Move execution status off the 1px border onto an **outer ring/glow** so family color owns the border: `ok` = no ring, `cached` = blue ring + keep 💾 badge, `error` = red ring + subtle red glow, `skipped` = 60% dimmed, `running` = animated accent-ring pulse (reduced-motion aware). Keep the existing `borderColorFor` semantic colors.
-- [ ] Restyle ports: `@xyflow` `Handle`s unchanged in behavior/ids; dot → 8px, filled with the family hue, `--border-strong` ring. **Keep the LOD `detailed` label-visibility logic exactly as-is.**
-- [ ] Retoken the results toggle / panel / cached badge (💾 may become a lucide glyph — low priority). **Preserve `ef-node`, `node-results-toggle`, `node-results`, `node-cached-badge` testids and their behavior.**
-- [ ] `EfEdge.tsx`: `--border-strong` default; on hover/selection tint toward the **source node's family** hue; 1.5–2px smooth bezier. (Animated flow on edges feeding a running node = nice-to-have, reduced-motion aware.)
-- [ ] `Canvas.tsx`: `<Background variant="dots">` uses `--grid-dot` over the radial gradient; reskin `<Controls>`/`<MiniMap>` (if present) to glass, minimap node color = family hue; selection box in `--accent` low alpha.
-- [ ] `NodeContextMenu.tsx`: reskin to a glass-strong popover with token menu items (keep its testids).
+- [x] Thread `family` through `toReactFlow.ts` into `EfNodeData` (currently passes `label`/`ports`/`status`/`results` — **add `family`**). This is the only canvas data-plumbing change.
+- [x] `EfNode.tsx`: solid `--surface-1` card, `--radius-md`, `--shadow-2`, `1px --border-subtle`, `width: 176`. Header = family-tinted bar with the family icon + label — use treatment **(b)** (soft fill + 3px `--fam-*` accent stripe + primary text) consistently.
+- [x] Move execution status off the 1px border onto an **outer ring/glow** so family color owns the border: `ok` = no ring, `cached` = blue ring + keep 💾 badge, `error` = red ring + subtle red glow, `skipped` = 60% dimmed, `running` = animated accent-ring pulse (reduced-motion aware). Keep the existing `borderColorFor` semantic colors.
+- [x] Restyle ports: `@xyflow` `Handle`s unchanged in behavior/ids; dot → 8px, filled with the family hue, `--border-strong` ring. **Keep the LOD `detailed` label-visibility logic exactly as-is.**
+- [x] Retoken the results toggle / panel / cached badge (💾 may become a lucide glyph — low priority). **Preserve `ef-node`, `node-results-toggle`, `node-results`, `node-cached-badge` testids and their behavior.**
+- [x] `EfEdge.tsx`: `--border-strong` default; on hover/selection tint toward the **source node's family** hue; 1.5–2px smooth bezier. (Animated flow on edges feeding a running node = nice-to-have, reduced-motion aware.)
+- [x] `Canvas.tsx`: `<Background variant="dots">` uses `--grid-dot` over the radial gradient; reskin `<Controls>`/`<MiniMap>` (if present) to glass, minimap node color = family hue; selection box in `--accent` low alpha.
+- [x] `NodeContextMenu.tsx`: reskin to a glass-strong popover with token menu items (keep its testids).
 
 ---
 

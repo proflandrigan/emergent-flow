@@ -79,7 +79,7 @@ describe("EfNode", () => {
     expect(screen.getByTestId("node-results-toggle")).toBeInTheDocument();
   });
 
-  test("cached status renders a teal border and the cached badge", () => {
+  test("cached status renders a blue ring and the cached badge", () => {
     const data: EfNodeData = {
       label: "Load CSV",
       ports: [],
@@ -89,10 +89,8 @@ describe("EfNode", () => {
 
     renderEfNode(data);
 
-    expect(screen.getByTestId("ef-node").getAttribute("style")).toContain(
-      "rgb(2, 136, 209)",
-    );
     expect(screen.getByTestId("node-cached-badge")).toBeInTheDocument();
+    expect(screen.getByTestId("ef-node").style.boxShadow).toContain("#0288d1");
   });
 
   test("ok status does not render the cached badge", () => {
@@ -106,5 +104,44 @@ describe("EfNode", () => {
     renderEfNode(data);
 
     expect(screen.queryByTestId("node-cached-badge")).not.toBeInTheDocument();
+  });
+
+  test("error status renders a red ring with glow", () => {
+    const data: EfNodeData = {
+      label: "Load CSV",
+      ports: [],
+      status: "error",
+      results: null,
+    };
+
+    renderEfNode(data);
+
+    expect(screen.getByTestId("ef-node").style.boxShadow).toContain("#c00");
+  });
+
+  test("skipped status applies reduced opacity", () => {
+    const data: EfNodeData = {
+      label: "Load CSV",
+      ports: [],
+      status: "skipped",
+      results: null,
+    };
+
+    renderEfNode(data);
+
+    expect(screen.getByTestId("ef-node")).toHaveStyle({ opacity: 0.6 });
+  });
+
+  test("running status applies the ef-node--running class", () => {
+    const data: EfNodeData = {
+      label: "Load CSV",
+      ports: [],
+      status: "running",
+      results: null,
+    };
+
+    renderEfNode(data);
+
+    expect(screen.getByTestId("ef-node")).toHaveClass("ef-node--running");
   });
 });

@@ -1,0 +1,12 @@
+@keyframes ef-node-pulse {
+  0%, 100% {
+    box-shadow: var(--shadow-2), 0 0 0 2px var(--accent);
+  }
+  50% {
+    box-shadow: var(--shadow-2), 0 0 0 5px var(--accent);
+  }
+}
+
+.ef-node--running {
+  animation: ef-node-pulse 1.6s var(--motion-ease, ease-in-out) infinite;
+}
