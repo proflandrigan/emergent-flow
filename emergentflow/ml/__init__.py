@@ -29,10 +29,14 @@ from sklearn.metrics import accuracy_score, mean_absolute_error, mean_squared_er
 from sklearn.model_selection import train_test_split as _sk_split
 
 from emergentflow.api import public_op
+from emergentflow.ml.errors import InvalidEstimatorParamsError
+from emergentflow.ml.registry import get_estimator_spec
 
 __all__ = [
     "FOREST_TASKS",
+    "apply_estimator",
     "evaluate",
+    "fit_estimator",
     "predict",
     "train_classifier",
     "train_random_forest",
@@ -41,6 +45,7 @@ __all__ = [
     "ClassifierResult",
     "EvaluationResult",
     "FittedModel",
+    "FittedTransformer",
 ]
 
 FOREST_TASKS = ("classification", "regression")
@@ -78,13 +83,32 @@ class FittedModel:
     in-memory (execute) and as a plain variable (compiled code). The dataclass is inspectable by the
     ``@public_op`` contract; when surfaced to the result-payload contract the ``estimator`` field
     simply degrades to ``{"kind": "unsupported"}`` (it is never meant to be rendered).
+
+    ``target`` is ``None`` for the ``cluster_detect`` archetype (Epic 8, Story 2), which has no
+    target column; every other producer of ``FittedModel`` sets it to the trained target column.
     """
 
     estimator_type: str  # e.g. "LinearRegression", "RandomForestClassifier"
-    task: str  # "classification" | "regression"
+    task: str  # "classification" | "regression" | "clustering"
     feature_names: list[str]
-    target: str
+    target: str | None
     estimator: Any  # live sklearn estimator; not JSON-serialized
+
+
+@dataclass
+class FittedTransformer:
+    """A fitted unsupervised transformer plus inspectable metadata (Epic 8, Story 2).
+
+    The ``fit_transform`` archetype's model representation, mirroring :class:`FittedModel`: the
+    live sklearn ``transformer`` rides in a field so it can flow fit -> transform in-memory
+    (execute) and as a plain variable (compiled code). Inspectable under the ``@public_op``
+    contract; the ``transformer`` field degrades to ``{"kind": "unsupported"}`` on the
+    result-payload contract, exactly like ``FittedModel.estimator``.
+    """
+
+    estimator_type: str  # e.g. "StandardScaler", "PCA"
+    feature_names: list[str]
+    transformer: Any  # live sklearn transformer; not JSON-serialized
 
 
 @dataclass
@@ -277,3 +301,178 @@ def train_test_split(
         raise ValueError(f"test_size must be in (0, 1); got {test_size!r}.")
     train_df, test_df = _sk_split(df, test_size=test_size, random_state=random_state)
     return train_df.reset_index(drop=True), test_df.reset_index(drop=True)
+
+
+def _resolve_features_for_fit(
+    df: pd.DataFrame, features: list[str] | None, *, target: str | None
+) -> list[str]:
+    """Resolve the feature-column list for a fit call, mirroring the train_* validation above.
+
+    Defaults to every column except ``target`` when ``features`` is not given. Validates that
+    every named feature exists in ``df`` and that ``target`` (if given) is not also a feature.
+    """
+    feature_names = features if features is not None else [c for c in df.columns if c != target]
+    unknown = [c for c in feature_names if c not in df.columns]
+    if unknown:
+        raise ValueError(f"unknown features {unknown!r}; expected one of {list(df.columns)!r}.")
+    if target is not None and target in feature_names:
+        raise ValueError(f"target {target!r} must not also appear in features {feature_names!r}.")
+    return feature_names
+
+
+@public_op(name="ef.ml.fit_estimator")
+def fit_estimator(
+    df: pd.DataFrame,
+    *,
+    estimator: str,
+    target: str | None = None,
+    features: list[str] | None = None,
+    params: dict[str, Any] | None = None,
+) -> FittedModel | FittedTransformer:
+    """Fit a curated, allow-listed sklearn estimator and return an inspectable fitted wrapper.
+
+    The single adapter every archetype node routes through (Epic 8, Story 2 / ADR 0016).
+    ``estimator`` is validated against the allow-list registry
+    (:func:`emergentflow.ml.registry.get_estimator_spec`, which raises
+    :class:`~emergentflow.ml.errors.UnknownEstimatorError` for an unregistered key); ``params``
+    keys are validated against that estimator's accepted-kwargs allow-list, raising
+    :class:`~emergentflow.ml.errors.InvalidEstimatorParamsError` for unknown keys.
+
+    Dispatches on the estimator's registered archetype (ADR 0016 subsection 3):
+
+    * ``"fit"`` (supervised) requires ``target`` and returns a :class:`FittedModel` with
+      ``task`` taken from the registry entry (``"classification"`` or ``"regression"``).
+    * ``"cluster_detect"`` (unsupervised label/score) ignores ``target`` and returns a
+      :class:`FittedModel` with ``task="clustering"`` and ``target=None``.
+    * ``"fit_transform"`` (unsupervised transformer) ignores ``target`` and returns a
+      :class:`FittedTransformer`.
+
+    Deterministic given a ``random_state`` kwarg where the underlying estimator accepts one.
+    Never mutates ``df``.
+    """
+    spec = get_estimator_spec(estimator)
+
+    provided_params = params or {}
+    unknown_params = [k for k in provided_params if k not in spec.accepted_kwargs]
+    if unknown_params:
+        raise InvalidEstimatorParamsError(
+            f"unknown params {unknown_params!r} for estimator {estimator!r}; "
+            f"expected one of {sorted(spec.accepted_kwargs)!r}."
+        )
+    kwargs = {name: kwarg_spec.default for name, kwarg_spec in spec.accepted_kwargs.items()}
+    kwargs.update(provided_params)
+
+    if spec.archetype == "fit":
+        if target is None:
+            raise ValueError(f"estimator {estimator!r} requires a target column.")
+        if target not in df.columns:
+            raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+        feature_names = _resolve_features_for_fit(df, features, target=target)
+        est = spec.sklearn_class(**kwargs).fit(df[feature_names], df[target])
+        return FittedModel(
+            estimator_type=spec.key,
+            task=spec.task or "classification",
+            feature_names=list(feature_names),
+            target=target,
+            estimator=est,
+        )
+
+    if spec.archetype == "cluster_detect":
+        feature_names = _resolve_features_for_fit(df, features, target=None)
+        est = spec.sklearn_class(**kwargs).fit(df[feature_names])
+        return FittedModel(
+            estimator_type=spec.key,
+            task=spec.task or "clustering",
+            feature_names=list(feature_names),
+            target=None,
+            estimator=est,
+        )
+
+    # spec.archetype == "fit_transform"
+    feature_names = _resolve_features_for_fit(df, features, target=None)
+    est = spec.sklearn_class(**kwargs).fit(df[feature_names])
+    return FittedTransformer(
+        estimator_type=spec.key,
+        feature_names=list(feature_names),
+        transformer=est,
+    )
+
+
+@public_op(name="ef.ml.apply_estimator")
+def apply_estimator(
+    model: FittedModel | FittedTransformer,
+    df: pd.DataFrame,
+    *,
+    op: str,
+) -> pd.DataFrame:
+    """Apply a fitted model/transformer to ``df``, returning a NEW frame. Never mutates ``df``.
+
+    The apply archetype's backend (Epic 8, Story 2 / ADR 0016): every archetype's "consume a
+    fitted Model/Transformer + a DataFrame" step routes through this one function, covering
+    three ops:
+
+    * ``"predict"`` requires a :class:`FittedModel` (``fit`` or ``cluster_detect`` archetype)
+      and adds a ``prediction`` column, mirroring :func:`predict`.
+    * ``"transform"`` requires a :class:`FittedTransformer` (``fit_transform`` archetype) and
+      adds ``component_0``, ``component_1``, ... columns, one per output column of
+      ``transformer.transform(...)``.
+    * ``"score_samples"`` works on either wrapper's live object and adds a ``score`` column.
+
+    Validates that every ``model.feature_names`` column is present in ``df``, that ``op`` is
+    one of the three supported ops, that the underlying fitted object actually supports the
+    requested op (e.g. calling ``"transform"`` against a :class:`FittedModel` -- a predictor,
+    not a transformer -- raises ``ValueError``), and that the output column(s) the op would
+    add do not already exist in ``df`` (to avoid silently overwriting real data).
+    """
+    if op not in ("predict", "transform", "score_samples"):
+        raise ValueError(
+            f"unknown op {op!r}; expected one of ('predict', 'transform', 'score_samples')."
+        )
+    missing = [c for c in model.feature_names if c not in df.columns]
+    if missing:
+        raise ValueError(f"missing feature columns {missing!r}; expected {model.feature_names!r}.")
+
+    X = df[model.feature_names]
+    result = df.copy()
+
+    if op == "predict":
+        if not isinstance(model, FittedModel):
+            raise ValueError("predict requires a fitted Model (fit/cluster_detect archetype).")
+        if not hasattr(model.estimator, "predict"):
+            raise ValueError(f"{model.estimator_type} does not support predict.")
+        if "prediction" in df.columns:
+            raise ValueError("df already has a 'prediction' column; rename it before predicting.")
+        result["prediction"] = model.estimator.predict(X)
+        return result
+
+    if op == "transform":
+        if not isinstance(model, FittedTransformer):
+            raise ValueError("transform requires a fitted Transformer (fit_transform archetype).")
+        if not hasattr(model.transformer, "transform"):
+            raise ValueError(f"{model.estimator_type} does not support transform.")
+        transformed = model.transformer.transform(X)
+        component_cols = [f"component_{i}" for i in range(transformed.shape[1])]
+        collisions = [c for c in component_cols if c in df.columns]
+        if collisions:
+            raise ValueError(
+                f"df already has columns {collisions!r}; rename them before transforming."
+            )
+        result[component_cols] = transformed
+        return result
+
+    # op == "score_samples"
+    live = model.estimator if isinstance(model, FittedModel) else model.transformer
+    if not hasattr(live, "score_samples"):
+        raise ValueError(f"{model.estimator_type} does not support score_samples.")
+    if "score" in df.columns:
+        raise ValueError("df already has a 'score' column; rename it before scoring.")
+    result["score"] = live.score_samples(X)
+    return result
+
+
+# Importing the seed catalog registers its estimator allow-list entries (LogisticRegression,
+# StandardScaler, KMeans, GaussianMixture) into the registry the moment ``emergentflow.ml`` is
+# imported — the same import-for-side-effect pattern ``emergentflow.types`` uses for its type
+# catalog. Kept last so ``fit_estimator``/``get_estimator_spec`` are fully defined first. The
+# lint suppression marks it as not-at-top (E402) and unused-but-intentional (F401).
+from emergentflow.ml import catalog  # noqa: E402, F401
