@@ -47,3 +47,29 @@ All three are implemented up front because they are cheap, structural, and requi
 ## Decision
 
 Virtualization, LOD, and default-collapsed heavy views form a three-layer defense against canvas bloat. They are structural optimizations that cost little to implement and deliver immediate wins on responsiveness. If a real graph later misses the budget (measured in production use), the next phase can add canvas-level culling, web-worker layout, or edge rendering optimizations — but premature optimization of those edge cases is deferred.
+
+## backdrop-filter cost (UI redesign epic, Story 5)
+
+The floating glass chrome (command bar, palette, inspector) uses
+`backdrop-filter: blur(...) saturate(...)` (`src/styles/glass.css`).
+`backdrop-filter` is a relatively expensive compositing effect, and this
+codebase already has a synthetic stress-test path (dev-only "Load 1000
+nodes", `src/dev/DevControls.tsx`) for canvas perf validation.
+
+**Preemptive safeguard implemented:** `Canvas.tsx`'s `onMoveStart`/`onMoveEnd`
+toggle a `body.ef-panning` class; `glass.css` has a matching rule that drops
+`backdrop-filter` to `none` (falling back to the same opaque
+`--glass-fill-strong` fill used for browsers without `backdrop-filter`
+support) while that class is present, restoring blur once panning/zooming
+stops. This was added defensively, following the same reasoning as the
+1,000-node virtualization/LOD strategy above (cheap, structural, no user
+intervention) — **not** because a measurement proved blur was the bottleneck.
+
+**Still TBD (manual verification):** as with the FPS numbers in the table
+above, actually confirming whether `backdrop-filter` measurably affects pan
+frame rate at 500–1,000 nodes requires a real browser DevTools Performance
+recording (jsdom cannot measure compositing cost). To verify: load the stress
+graph, record a Performance profile while panning, and compare frame times
+with `body.ef-panning`'s rule commented out vs. active. If the safeguard
+turns out to make no measurable difference, it can be removed in a later
+pass — but it is low-risk to keep given its minimal implementation cost.

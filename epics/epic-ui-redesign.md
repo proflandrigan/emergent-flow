@@ -106,13 +106,13 @@
 
 > Spec §5 (collapse rails), §8 Phase 5, §9 constraints.
 
-- [ ] Motion pass: apply `--motion-fast`/`--motion-med`/`--motion-ease` to hover/panel-open/selection transitions — calm, never bouncy/slow.
-- [ ] Reduced-motion audit: confirm every animation/transition is disabled under `prefers-reduced-motion`.
-- [ ] `backdrop-filter` fallback audit: every glass surface reads correctly in the `@supports not` branch (no unblurred transparent text backgrounds).
-- [ ] Light-theme QA pass across all panels/nodes/edges.
-- [ ] Contrast audit (§4): all 6 family bases ≥ ~4.5:1 as text on dark surfaces; header-bar-as-background labels use `--text-on-accent`/white per contrast.
-- [ ] Panel collapse: chevron to collapse palette/inspector to a thin icon-only rail (spec §5 — first-pass optional; at minimum leave the hook; confirm v1 scope per §10).
-- [ ] Performance: validate `backdrop-filter` on the 500-node stress graph (`dev/generateLargeGraph.ts`); if panning frame-rate suffers, disable panel blur while the canvas pans. Record the result in `ui/PERF.md`.
+- [x] Motion pass: apply `--motion-fast`/`--motion-med`/`--motion-ease` to hover/panel-open/selection transitions — calm, never bouncy/slow.
+- [x] Reduced-motion audit: confirm every animation/transition is disabled under `prefers-reduced-motion`.
+- [x] `backdrop-filter` fallback audit: every glass surface reads correctly in the `@supports not` branch (no unblurred transparent text backgrounds).
+- [x] Light-theme QA pass across all panels/nodes/edges.
+- [x] Contrast audit (§4): all 6 family bases ≥ ~4.5:1 as text on dark surfaces; header-bar-as-background labels use `--text-on-accent`/white per contrast.
+- [x] Panel collapse: chevron to collapse palette/inspector to a thin icon-only rail (spec §5 — first-pass optional; at minimum leave the hook; confirm v1 scope per §10).
+- [x] Performance: validate `backdrop-filter` on the 500-node stress graph (`dev/generateLargeGraph.ts`); if panning frame-rate suffers, disable panel blur while the canvas pans. Record the result in `ui/PERF.md`.
 - [ ] Final screenshot review (dark + light) against the spec mockups (§5, §6.1, §6.2).
 
 ---

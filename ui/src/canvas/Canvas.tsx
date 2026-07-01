@@ -131,6 +131,14 @@ export function Canvas(): JSX.Element {
     [connect],
   );
 
+  const handleMoveStart = useCallback(() => {
+    document.body.classList.add("ef-panning");
+  }, []);
+
+  const handleMoveEnd = useCallback(() => {
+    document.body.classList.remove("ef-panning");
+  }, []);
+
   const [contextMenu, setContextMenu] = useState<{
     nodeId: string;
     x: number;
@@ -165,6 +173,8 @@ export function Canvas(): JSX.Element {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
+        onMoveStart={handleMoveStart}
+        onMoveEnd={handleMoveEnd}
         onNodeDragStop={endNodeDrag}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}

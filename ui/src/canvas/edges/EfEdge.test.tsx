@@ -59,7 +59,7 @@ describe("EfEdge", () => {
     expect(path!.getAttribute("style")).toContain("var(--fam-data)");
   });
 
-  test("incompatible edge renders #c00, strokeWidth 2, and title tooltip regardless of selection", () => {
+  test("incompatible edge renders var(--danger), strokeWidth 2, and title tooltip regardless of selection", () => {
     mockUseNodesData.mockReturnValue({
       id: "a",
       type: "efNode",
@@ -74,7 +74,7 @@ describe("EfEdge", () => {
 
     const path = container.querySelector(".react-flow__edge-path");
     expect(path).toBeTruthy();
-    expect(path!.getAttribute("style")).toContain("#c00");
+    expect(path!.getAttribute("style")).toContain("var(--danger)");
     expect(path!.getAttribute("style")).toContain("2");
 
     const title = container.querySelector("title");

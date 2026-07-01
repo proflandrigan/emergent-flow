@@ -52,7 +52,7 @@ export function EfEdge(props: EdgeProps<EfEdgeType>): JSX.Element {
 
   const incompatible = props.data?.incompatible ?? false;
   const strokeColor = incompatible
-    ? "#c00"
+    ? "var(--danger)"
     : props.selected || hovered
       ? meta.color
       : "var(--border-strong)";

@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
-import { MoreHorizontal, Redo2, Undo2 } from "lucide-react";
+import {
+  MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  Redo2,
+  Undo2,
+} from "lucide-react";
 
 import { Canvas } from "./canvas/Canvas";
 import { getDevMenuItems } from "./dev/DevControls";
@@ -50,6 +58,38 @@ export function App(): JSX.Element {
   const canUndo = past.length > 0;
   const canRedo = future.length > 0;
   const { theme, toggleTheme } = useTheme();
+
+  const [paletteCollapsed, setPaletteCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("ef-panel-palette-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const [inspectorCollapsed, setInspectorCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("ef-panel-inspector-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("ef-panel-palette-collapsed", String(paletteCollapsed));
+    } catch {
+      // ignore write errors
+    }
+  }, [paletteCollapsed]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("ef-panel-inspector-collapsed", String(inspectorCollapsed));
+    } catch {
+      // ignore write errors
+    }
+  }, [inspectorCollapsed]);
 
   useEffect(() => {
     let cancelled = false;
@@ -244,12 +284,38 @@ export function App(): JSX.Element {
           top: COMMAND_BAR_CLEARANCE,
           bottom: "var(--space-4)",
           left: "var(--space-4)",
-          width: 264,
+          width: paletteCollapsed ? 48 : 264,
           zIndex: 10,
           overflow: "auto",
+          transition: "width var(--motion-fast) var(--motion-ease)",
         }}
       >
-        <Palette />
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            padding: "var(--space-1)",
+          }}
+        >
+          <Tooltip
+            label={paletteCollapsed ? "Expand palette" : "Collapse palette"}
+          >
+            <IconButton
+              aria-label={
+                paletteCollapsed ? "Expand palette" : "Collapse palette"
+              }
+              data-testid="palette-collapse-toggle"
+              onClick={() => setPaletteCollapsed((c) => !c)}
+            >
+              {paletteCollapsed ? (
+                <PanelLeftOpen size={16} />
+              ) : (
+                <PanelLeftClose size={16} />
+              )}
+            </IconButton>
+          </Tooltip>
+        </div>
+        {!paletteCollapsed && <Palette />}
       </div>
 
       <div
@@ -259,12 +325,40 @@ export function App(): JSX.Element {
           top: COMMAND_BAR_CLEARANCE,
           bottom: "var(--space-4)",
           right: "var(--space-4)",
-          width: 320,
+          width: inspectorCollapsed ? 48 : 320,
           zIndex: 10,
           overflow: "auto",
+          transition: "width var(--motion-fast) var(--motion-ease)",
         }}
       >
-        <Inspector />
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            padding: "var(--space-1)",
+          }}
+        >
+          <Tooltip
+            label={
+              inspectorCollapsed ? "Expand inspector" : "Collapse inspector"
+            }
+          >
+            <IconButton
+              aria-label={
+                inspectorCollapsed ? "Expand inspector" : "Collapse inspector"
+              }
+              data-testid="inspector-collapse-toggle"
+              onClick={() => setInspectorCollapsed((c) => !c)}
+            >
+              {inspectorCollapsed ? (
+                <PanelRightOpen size={16} />
+              ) : (
+                <PanelRightClose size={16} />
+              )}
+            </IconButton>
+          </Tooltip>
+        </div>
+        {!inspectorCollapsed && <Inspector />}
       </div>
     </div>
   );

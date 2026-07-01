@@ -234,10 +234,12 @@ export function Palette(): JSX.Element {
                             padding: "0.4rem 0.5rem",
                             borderTop: "none",
                             borderRight: "none",
-                            borderBottom: "1px solid #eee",
+                            borderBottom: "1px solid var(--border-subtle)",
                             borderLeft: `2px solid ${isHovered ? meta.color : "transparent"}`,
                             background: isHovered ? meta.soft : "none",
                             cursor: "pointer",
+                            transition:
+                              "background var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease)",
                           }}
                         >
                           <div>{node.label}</div>
