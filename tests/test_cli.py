@@ -13,8 +13,20 @@ def _patch_serve(monkeypatch) -> dict[str, Any]:
 
     calls: dict[str, Any] = {}
 
-    def fake_serve(host: str, port: int, open_browser: bool = True) -> None:
-        calls.update(host=host, port=port, open_browser=open_browser)
+    def fake_serve(
+        host: str,
+        port: int,
+        open_browser: bool = True,
+        cache_dir: str | None = None,
+        cache_max_mb: float | None = None,
+    ) -> None:
+        calls.update(
+            host=host,
+            port=port,
+            open_browser=open_browser,
+            cache_dir=cache_dir,
+            cache_max_mb=cache_max_mb,
+        )
 
     monkeypatch.setattr(server_pkg, "serve", fake_serve)
     return calls
@@ -63,3 +75,23 @@ def test_no_command_prints_help_and_returns_1(capsys) -> None:
     assert main([]) == 1
     out = capsys.readouterr().out
     assert "usage" in out.lower()
+
+
+def test_serve_cache_flags_default_to_none(monkeypatch) -> None:
+    calls = _patch_serve(monkeypatch)
+    assert main(["serve"]) == 0
+    assert calls["cache_dir"] is None
+    assert calls["cache_max_mb"] is None
+
+
+def test_serve_cache_flags_are_forwarded(monkeypatch) -> None:
+    calls = _patch_serve(monkeypatch)
+    assert main(["serve", "--cache-dir", "/tmp/mycache", "--cache-max-mb", "250"]) == 0
+    assert calls["cache_dir"] == "/tmp/mycache"
+    assert calls["cache_max_mb"] == 250.0
+
+
+def test_lab_cache_flags_are_forwarded(monkeypatch) -> None:
+    calls = _patch_serve(monkeypatch)
+    assert main(["lab", "--cache-dir", "/tmp/labcache"]) == 0
+    assert calls["cache_dir"] == "/tmp/labcache"

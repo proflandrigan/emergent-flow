@@ -2,7 +2,8 @@
 // for in-node result panels and node status colouring. Status tracks whether execution is in-flight;
 // results and statuses are never cleared on error (a failed run must not wipe the last successful
 // results). Updated incrementally, one node at a time, as SSE events arrive (Epic 7 Story 4) rather
-// than in one whole-batch write.
+// than in one whole-batch write. A cache hit updates results the same way a fresh execution does,
+// just with a different status.
 
 import { create } from "zustand";
 
@@ -24,6 +25,7 @@ export interface ExecutionStore {
   setRunning: () => void;
   setNodeStart: (label: string, current: number, total: number) => void;
   setNodeResult: (nodeId: string, results: Record<string, Payload>) => void;
+  setNodeCached: (nodeId: string, results: Record<string, Payload>) => void;
   setNodeError: (nodeId: string, error: string) => void;
   setNodeSkipped: (nodeId: string) => void;
   setRunComplete: () => void;
@@ -51,6 +53,13 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
     set((state) => ({
       results: { ...state.results, [nodeId]: results },
       statuses: { ...state.statuses, [nodeId]: { status: "ok" } },
+    }));
+  },
+
+  setNodeCached(nodeId, results) {
+    set((state) => ({
+      results: { ...state.results, [nodeId]: results },
+      statuses: { ...state.statuses, [nodeId]: { status: "cached" } },
     }));
   },
 

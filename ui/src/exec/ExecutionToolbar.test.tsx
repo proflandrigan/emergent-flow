@@ -29,7 +29,10 @@ function addNode() {
   );
 }
 
-function sseResponse(events: Record<string, unknown>[], status = 200): Response {
+function sseResponse(
+  events: Record<string, unknown>[],
+  status = 200,
+): Response {
   const body = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join("");
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -48,7 +51,12 @@ test("Execute posts to /execute/stream and writes per-node results into the stor
   const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(
     sseResponse([
       { type: "node_start", node_id: "n1", label: "L", current: 1, total: 1 },
-      { type: "node_ok", node_id: "n1", elapsed_ms: 5, results: { out: { kind: "scalar", value: 1 } } },
+      {
+        type: "node_ok",
+        node_id: "n1",
+        elapsed_ms: 5,
+        results: { out: { kind: "scalar", value: 1 } },
+      },
       { type: "run_complete", total_ms: 5 },
     ]),
   );
@@ -87,10 +95,10 @@ test("Execute on empty graph shows a banner and never fetches", async () => {
 
 test("Execute surfaces a 422 error from the eager-validation path (non-stream JSON body)", async () => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(
-    new Response(
-      JSON.stringify({ error: "GraphValidationError: bad" }),
-      { status: 422, headers: { "Content-Type": "application/json" } },
-    ),
+    new Response(JSON.stringify({ error: "GraphValidationError: bad" }), {
+      status: 422,
+      headers: { "Content-Type": "application/json" },
+    }),
   );
 
   addNode();
@@ -108,7 +116,12 @@ test("Execute surfaces a node_error event without aborting the run", async () =>
   vi.spyOn(globalThis, "fetch").mockResolvedValue(
     sseResponse([
       { type: "node_start", node_id: "n1", label: "L", current: 1, total: 1 },
-      { type: "node_error", node_id: "n1", elapsed_ms: 5, error: "ValueError: boom" },
+      {
+        type: "node_error",
+        node_id: "n1",
+        elapsed_ms: 5,
+        error: "ValueError: boom",
+      },
       { type: "run_complete", total_ms: 5 },
     ]),
   );
@@ -141,9 +154,13 @@ test("Execute surfaces a run_error event", async () => {
   fireEvent.click(screen.getByTestId("exec-run"));
 
   await waitFor(() =>
-    expect(screen.getByTestId("exec-error")).toHaveTextContent("declarative graph blew up"),
+    expect(screen.getByTestId("exec-error")).toHaveTextContent(
+      "declarative graph blew up",
+    ),
   );
-  expect(useExecutionStore.getState().error).toMatch(/declarative graph blew up/);
+  expect(useExecutionStore.getState().error).toMatch(
+    /declarative graph blew up/,
+  );
 });
 
 test("Download on empty graph shows a banner and never fetches", async () => {
@@ -179,5 +196,72 @@ test("Download posts the graph to /compile", async () => {
 
   fireEvent.click(screen.getByTestId("exec-download"));
 
-  await waitFor(() => expect(f).toHaveBeenCalledWith("/compile", expect.anything()));
+  await waitFor(() =>
+    expect(f).toHaveBeenCalledWith("/compile", expect.anything()),
+  );
+});
+
+test("Clear cache posts to /cache/clear", async () => {
+  const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify({ status: "ok" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+
+  render(<ExecutionToolbar />);
+
+  fireEvent.click(screen.getByTestId("exec-clear-cache"));
+
+  await waitFor(() =>
+    expect(f).toHaveBeenCalledWith(
+      "/cache/clear",
+      expect.objectContaining({ method: "POST" }),
+    ),
+  );
+});
+
+test("Clear cache surfaces a server error via the shared error banner", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify({ error: "boom" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+
+  render(<ExecutionToolbar />);
+
+  fireEvent.click(screen.getByTestId("exec-clear-cache"));
+
+  await waitFor(() =>
+    expect(screen.getByTestId("exec-error")).toHaveTextContent("boom"),
+  );
+});
+
+test("Clear cache disables itself and Execute while in flight, then re-enables both", async () => {
+  let resolveFetch!: (res: Response) => void;
+  vi.spyOn(globalThis, "fetch").mockReturnValue(
+    new Promise<Response>((resolve) => {
+      resolveFetch = resolve;
+    }),
+  );
+
+  render(<ExecutionToolbar />);
+
+  fireEvent.click(screen.getByTestId("exec-clear-cache"));
+
+  expect(screen.getByTestId("exec-clear-cache")).toBeDisabled();
+  expect(screen.getByTestId("exec-run")).toBeDisabled();
+
+  resolveFetch(
+    new Response(JSON.stringify({ status: "ok" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+
+  await waitFor(() =>
+    expect(screen.getByTestId("exec-clear-cache")).not.toBeDisabled(),
+  );
+  expect(screen.getByTestId("exec-run")).not.toBeDisabled();
 });

@@ -30,6 +30,20 @@ def _build_parser() -> argparse.ArgumentParser:
             action="store_true",
             help="Do not open a browser tab on launch.",
         )
+        p.add_argument(
+            "--cache-dir",
+            default=None,
+            help=(
+                "On-disk execution cache directory (Epic 7 Story 6). "
+                "Default: .ef-cache under the current working directory."
+            ),
+        )
+        p.add_argument(
+            "--cache-max-mb",
+            type=float,
+            default=None,
+            help="Execution cache size cap in MB, LRU-evicted above this. Default: 500.",
+        )
     return parser
 
 
@@ -51,7 +65,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return 1
 
-        serve(host=args.host, port=args.port, open_browser=not args.no_browser)
+        serve(
+            host=args.host,
+            port=args.port,
+            open_browser=not args.no_browser,
+            cache_dir=args.cache_dir,
+            cache_max_mb=args.cache_max_mb,
+        )
         return 0
     parser.print_help()
     return 1

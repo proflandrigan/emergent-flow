@@ -3,7 +3,13 @@
 // sources on the right). The store stays the source of truth for IR data; this component only
 // reflects `data` that `toReactFlow.ts` derived from a `NodeModel`.
 
-import { Handle, Position, useStore, type Node, type NodeProps } from "@xyflow/react";
+import {
+  Handle,
+  Position,
+  useStore,
+  type Node,
+  type NodeProps,
+} from "@xyflow/react";
 import { useState, type CSSProperties } from "react";
 
 import { PayloadView } from "../../inspector/PayloadView";
@@ -27,6 +33,7 @@ const boxStyleBase: CSSProperties = {
   fontSize: 12,
   padding: "0.5rem",
   boxSizing: "border-box",
+  position: "relative",
 };
 
 const portRowStyle: CSSProperties = {
@@ -52,10 +59,20 @@ const resultsPanelStyle: CSSProperties = {
   fontSize: 11,
 };
 
+const cachedBadgeStyle: CSSProperties = {
+  position: "absolute",
+  bottom: -6,
+  right: -6,
+  fontSize: 11,
+  lineHeight: 1,
+};
+
 function borderColorFor(status: NodeStatus | null | undefined): string {
   switch (status) {
     case "ok":
       return "#2e7d32";
+    case "cached":
+      return "#0288d1";
     case "error":
       return "#c00";
     case "skipped":
@@ -84,7 +101,7 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
   };
 
   return (
-    <div style={boxStyle}>
+    <div style={boxStyle} data-testid="ef-node">
       <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>
         {data.label}
       </div>
@@ -97,12 +114,16 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
               id={port.id}
               style={{ left: -4 }}
             />
-            <span style={{ visibility: detailed ? "visible" : "hidden" }}>{port.name}</span>
+            <span style={{ visibility: detailed ? "visible" : "hidden" }}>
+              {port.name}
+            </span>
           </div>
         ))}
         {outPorts.map((port) => (
           <div key={port.id} style={{ ...portRowStyle, textAlign: "right" }}>
-            <span style={{ visibility: detailed ? "visible" : "hidden" }}>{port.name}</span>
+            <span style={{ visibility: detailed ? "visible" : "hidden" }}>
+              {port.name}
+            </span>
             <Handle
               type="source"
               position={Position.Right}
@@ -124,7 +145,11 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
             {open ? "▾" : "▸"} results
           </button>
           {open ? (
-            <div className="nodrag" data-testid="node-results" style={resultsPanelStyle}>
+            <div
+              className="nodrag"
+              data-testid="node-results"
+              style={resultsPanelStyle}
+            >
               {resultEntries.map(([portName, payload]) => (
                 <div key={portName}>
                   <span style={{ fontWeight: 600 }}>{portName}</span>
@@ -134,6 +159,15 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
             </div>
           ) : null}
         </>
+      ) : null}
+      {data.status === "cached" ? (
+        <span
+          data-testid="node-cached-badge"
+          title="Served from the execution cache"
+          style={cachedBadgeStyle}
+        >
+          💾
+        </span>
       ) : null}
     </div>
   );

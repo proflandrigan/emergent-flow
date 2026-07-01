@@ -39,11 +39,25 @@ from emergentflow.server import (
     get_schema,
     validate_graph,
 )
+from emergentflow.server import cache as cache_mod
 from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION
 from emergentflow.server.service import (
     _execute_functional_stream,
     _to_graph,
 )
+
+
+@pytest.fixture(autouse=True)
+def _fresh_default_cache(tmp_path: pathlib.Path) -> Iterator[None]:
+    """Isolate the on-disk execution cache per test so cached outputs from one
+    test don't produce false cache hits in another."""
+    from emergentflow.server.cache import ExecutionCache
+
+    old = cache_mod._default_cache
+    cache_mod._default_cache = ExecutionCache(root=tmp_path / ".ef-cache")
+    yield
+    cache_mod._default_cache = old
+
 
 SAMPLE_CSV = (
     pathlib.Path(__file__).resolve().parents[1] / "examples" / "vertical_slice" / "sample.csv"
@@ -476,6 +490,42 @@ def test_open_browser_when_ready_gives_up_after_timeout(monkeypatch) -> None:
     assert opened == ["http://probe"]
 
 
+def test_serve_configures_cache_before_starting_uvicorn(monkeypatch) -> None:
+    app_mod = importlib.import_module("emergentflow.server.app")
+    calls = {}
+
+    def fake_configure_cache(root, max_mb):
+        calls["root"] = root
+        calls["max_mb"] = max_mb
+
+    def fake_uvicorn_run(*args, **kwargs):
+        calls["ran"] = True
+
+    monkeypatch.setattr(app_mod, "configure_cache", fake_configure_cache)
+    monkeypatch.setattr("uvicorn.run", fake_uvicorn_run)
+    app_mod.serve(open_browser=False, cache_dir="/tmp/xyz", cache_max_mb=42.0)
+    assert calls == {"root": pathlib.Path("/tmp/xyz"), "max_mb": 42.0, "ran": True}
+
+
+def test_serve_defaults_cache_dir_to_cwd_ef_cache(monkeypatch, tmp_path) -> None:
+    app_mod = importlib.import_module("emergentflow.server.app")
+    calls = {}
+
+    def fake_configure_cache(root, max_mb):
+        calls["root"] = root
+        calls["max_mb"] = max_mb
+
+    def fake_uvicorn_run(*args, **kwargs):
+        pass
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(app_mod, "configure_cache", fake_configure_cache)
+    monkeypatch.setattr("uvicorn.run", fake_uvicorn_run)
+    app_mod.serve(open_browser=False)
+    assert calls["root"] == tmp_path / ".ef-cache"
+    assert calls["max_mb"] == app_mod.DEFAULT_CACHE_MAX_MB
+
+
 def test_http_compile_and_execute(client: TestClient) -> None:
     resp = client.post("/compile", json=_load_csv_graph())
     assert resp.status_code == 200
@@ -627,3 +677,23 @@ def test_http_reports_unknown_hash_is_404(client: TestClient) -> None:
     resp = client.get("/reports/deadbeefdeadbeef")
     assert resp.status_code == 404
     assert "error" in resp.json()
+
+
+def test_http_cache_clear(client: TestClient) -> None:
+    resp = client.post("/cache/clear")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
+
+
+def test_http_cache_clear_empties_cache_used_by_execute(client: TestClient) -> None:
+    graph = _load_csv_graph()
+    first = execute_graph(graph)
+    assert first["statuses"]["n-load"]["status"] == "ok"
+    second = execute_graph(graph)
+    assert second["statuses"]["n-load"]["status"] == "cached"
+
+    resp = client.post("/cache/clear")
+    assert resp.status_code == 200
+
+    third = execute_graph(graph)
+    assert third["statuses"]["n-load"]["status"] == "ok"

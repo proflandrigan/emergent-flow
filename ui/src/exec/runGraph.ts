@@ -69,10 +69,20 @@ export async function runGraph(options: RunGraphOptions = {}): Promise<void> {
       }
       switch (event.type) {
         case "node_start":
-          useExecutionStore.getState().setNodeStart(event.label, event.current, event.total);
+          useExecutionStore
+            .getState()
+            .setNodeStart(event.label, event.current, event.total);
           break;
         case "node_ok":
-          useExecutionStore.getState().setNodeResult(event.node_id, event.results);
+          if (event.cached) {
+            useExecutionStore
+              .getState()
+              .setNodeCached(event.node_id, event.results);
+          } else {
+            useExecutionStore
+              .getState()
+              .setNodeResult(event.node_id, event.results);
+          }
           break;
         case "node_error":
           useExecutionStore.getState().setNodeError(event.node_id, event.error);
@@ -96,6 +106,9 @@ export async function runGraph(options: RunGraphOptions = {}): Promise<void> {
       fail("Connection to the server was lost before the run finished.");
     }
   } catch (err) {
-    fail("Could not reach server: " + (err instanceof Error ? err.message : String(err)));
+    fail(
+      "Could not reach server: " +
+        (err instanceof Error ? err.message : String(err)),
+    );
   }
 }

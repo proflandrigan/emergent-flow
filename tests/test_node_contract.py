@@ -182,6 +182,28 @@ class TestPreview:
         assert _Demo().preview(node).render() == "import os\n\nout1 = in1"
 
 
+class _NonCacheableDemo(NodeDefinition):
+    type = "demo.noncacheable"
+    version = 1
+    family = "demo"
+    label = "Non-cacheable Demo"
+    cacheable = False
+
+    def codegen(self, node, ctx):
+        return CodeFragment(body="pass")
+
+    def execute(self, node, inputs):
+        return {}
+
+
+class TestCacheableFlag:
+    def test_default_is_cacheable(self):
+        assert _Demo.cacheable is True
+
+    def test_can_opt_out(self):
+        assert _NonCacheableDemo.cacheable is False
+
+
 class TestAbstractEnforcement:
     def test_cannot_instantiate_incomplete_definition(self):
         class Bad(NodeDefinition):
