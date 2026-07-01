@@ -67,11 +67,11 @@
 
 > Spec §6.1, Phase 2. The highest user-visible payoff. Replace the flat alphabetical list.
 
-- [ ] Add the static `SECTIONS` config (Data & Prep = `[data, clean]`; Analysis = `[stats, reports]`; Modeling = `[ml, nn]`) and group `catalog.nodes` by `family`; render sections in order, with any unlisted family falling into a trailing "More" section (future-proofing).
-- [ ] Render 3 super-section headers (uppercase, tertiary text, light dividers; default expanded) containing **family sub-groups** — each `familyMeta(family)` → color dot + icon + display label + node count. Family sub-groups are the collapsible unit; persist expand/collapse to `localStorage`.
-- [ ] Node rows: show `label`; on hover, `--fam-*-soft` background + 2px left accent in `--fam-*`. Keep click-to-add unchanged (`addNodeFromSpec`, same positioning). Keep `title`/`aria-label` carrying the node `type` (the inline `family · type` subtitle is dropped — grouping conveys family).
-- [ ] Restyle the search box as a glass pill with a leading `Search` icon. Search filters across all groups, auto-expands groups with matches, and hides empty groups/sections; match on `label` + `type` as today. (Substring highlight is a nice-to-have, not v1.)
-- [ ] **Preserve `palette-search` and `palette-list` testids** (search input; scroll container).
+- [x] Add the static `SECTIONS` config (Data & Prep = `[data, clean]`; Analysis = `[stats, reports]`; Modeling = `[ml, nn]`) and group `catalog.nodes` by `family`; render sections in order, with any unlisted family falling into a trailing "More" section (future-proofing).
+- [x] Render 3 super-section headers (uppercase, tertiary text, light dividers; default expanded) containing **family sub-groups** — each `familyMeta(family)` → color dot + icon + display label + node count. Family sub-groups are the collapsible unit; persist expand/collapse to `localStorage`.
+- [x] Node rows: show `label`; on hover, `--fam-*-soft` background + 2px left accent in `--fam-*`. Keep click-to-add unchanged (`addNodeFromSpec`, same positioning). Keep `title`/`aria-label` carrying the node `type` (the inline `family · type` subtitle is dropped — grouping conveys family).
+- [x] Restyle the search box as a glass pill with a leading `Search` icon. Search filters across all groups, auto-expands groups with matches, and hides empty groups/sections; match on `label` + `type` as today. (Substring highlight is a nice-to-have, not v1.)
+- [x] **Preserve `palette-search` and `palette-list` testids** (search input; scroll container).
 
 ---
 
