@@ -6,6 +6,8 @@ import { useRef, useState } from "react";
 
 import { useGraphStore } from "../store/graphStore";
 import { parseImport, serializeIR } from "./irFile";
+import { Button } from "../ui/Button";
+import { IconButton } from "../ui/IconButton";
 
 // Read a File's text via FileReader rather than file.text(): the latter is unimplemented in
 // jsdom (the test env), while FileReader works in jsdom and every browser.
@@ -68,20 +70,20 @@ export function IRToolbar(): JSX.Element {
       style={{
         display: "inline-flex",
         flexDirection: "column",
-        gap: "0.25rem",
+        gap: "var(--space-1)",
       }}
     >
-      <div style={{ display: "inline-flex", gap: "0.5rem" }}>
-        <button type="button" data-testid="ir-export" onClick={handleExport}>
+      <div style={{ display: "inline-flex", gap: "var(--space-2)" }}>
+        <Button variant="ghost" data-testid="ir-export" onClick={handleExport}>
           Export
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="ghost"
           data-testid="ir-import"
           onClick={handleImportClick}
         >
           Import
-        </button>
+        </Button>
         <input
           ref={fileInputRef}
           type="file"
@@ -92,11 +94,25 @@ export function IRToolbar(): JSX.Element {
         />
       </div>
       {error && (
-        <div role="alert" data-testid="ir-error" style={{ color: "#c00" }}>
-          {error}
-          <button type="button" onClick={() => setError(null)}>
+        <div
+          role="alert"
+          data-testid="ir-error"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            padding: "var(--space-2) var(--space-3)",
+            borderRadius: "var(--radius-sm)",
+            background: "var(--danger-soft)",
+            border: "1px solid var(--danger)",
+            color: "var(--danger)",
+            fontSize: "var(--text-sm)",
+          }}
+        >
+          <span>{error}</span>
+          <IconButton aria-label="Dismiss" onClick={() => setError(null)}>
             ×
-          </button>
+          </IconButton>
         </div>
       )}
     </div>

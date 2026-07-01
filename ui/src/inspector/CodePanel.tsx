@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import hljs from "highlight.js/lib/core";
 import python from "highlight.js/lib/languages/python";
-import "highlight.js/styles/github.css";
+import "highlight.js/styles/atom-one-dark.css";
 
 import { useGraphStore } from "../store/graphStore";
 
@@ -77,7 +77,7 @@ export function CodePanel({ debounceMs = 400 }: CodePanelProps): JSX.Element {
   // below (rather than misleadingly telling the user to add nodes).
   if (Object.keys(nodes).length === 0) {
     return (
-      <p data-testid="code-empty" style={{ color: "#666" }}>
+      <p data-testid="code-empty" style={{ color: "var(--text-secondary)" }}>
         Add nodes to see generated code.
       </p>
     );
@@ -86,19 +86,36 @@ export function CodePanel({ debounceMs = 400 }: CodePanelProps): JSX.Element {
   return (
     <div>
       {loading && !error ? (
-        <p data-testid="code-loading" style={{ color: "#666" }}>
+        <p data-testid="code-loading" style={{ color: "var(--text-secondary)" }}>
           Compiling...
         </p>
       ) : null}
       {error ? (
         <pre
           data-testid="code-error"
-          style={{ color: "#c00", whiteSpace: "pre-wrap" }}
+          style={{
+            color: "var(--danger)",
+            whiteSpace: "pre-wrap",
+            background: "var(--surface-1)",
+            fontFamily: "var(--font-mono)",
+            padding: "var(--space-2)",
+            borderRadius: "var(--radius-sm)",
+          }}
         >
           {error}
         </pre>
       ) : (
-        <pre data-testid="code-output" style={{ margin: 0, overflow: "auto" }}>
+        <pre
+          data-testid="code-output"
+          style={{
+            margin: 0,
+            overflow: "auto",
+            background: "var(--surface-1)",
+            fontFamily: "var(--font-mono)",
+            padding: "var(--space-2)",
+            borderRadius: "var(--radius-sm)",
+          }}
+        >
           <code
             className="hljs language-python"
             dangerouslySetInnerHTML={{

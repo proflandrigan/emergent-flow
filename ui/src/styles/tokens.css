@@ -1,0 +1,121 @@
+:root {
+  color-scheme: dark;
+
+  /* Backdrop — the canvas gradient sits behind everything */
+  --bg-canvas-0: #0b0f17;
+  --bg-canvas-1: #111725;
+  --grid-dot: rgba(255, 255, 255, 0.05);
+
+  /* Text */
+  --text-primary: rgba(255, 255, 255, 0.92);
+  --text-secondary: rgba(255, 255, 255, 0.62);
+  --text-tertiary: rgba(255, 255, 255, 0.4);
+  --text-on-accent: #0b0f17;
+
+  /* Solid content surfaces (node cards, code, menus) */
+  --surface-1: #161c28;
+  --surface-2: #1d2534;
+  --surface-3: #263047;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  /* Glass tokens (the liquid-glass layer) */
+  --glass-fill: rgba(22, 28, 40, 0.55);
+  --glass-fill-strong: rgba(22, 28, 40, 0.72);
+  --glass-blur: 20px;
+  --glass-saturate: 140%;
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-highlight: rgba(255, 255, 255, 0.22);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --glass-radius: 16px;
+
+  /* Radius / spacing / elevation / typography / motion */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-3: 0 8px 32px rgba(0, 0, 0, 0.45);
+
+  --font-ui:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-lg: 15px;
+  --text-xl: 18px;
+
+  --motion-fast: 120ms;
+  --motion-med: 200ms;
+  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Family hues + soft fills */
+  --fam-data: #3b82f6;
+  --fam-data-soft: rgba(59, 130, 246, 0.14);
+  --fam-clean: #14b8a6;
+  --fam-clean-soft: rgba(20, 184, 166, 0.14);
+  --fam-stats: #a78bfa;
+  --fam-stats-soft: rgba(167, 139, 250, 0.14);
+  --fam-ml: #f59e0b;
+  --fam-ml-soft: rgba(245, 158, 11, 0.14);
+  --fam-nn: #ec4899;
+  --fam-nn-soft: rgba(236, 72, 153, 0.14);
+  --fam-reports: #10b981;
+  --fam-reports-soft: rgba(16, 185, 129, 0.14);
+
+  /* Product accent (distinct from family hues) */
+  --accent: #6366f1;
+  --accent-soft: rgba(99, 102, 241, 0.12);
+
+  /* Semantic danger/error */
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.14);
+
+  /* Semantic success/warning (status dot: ok/connecting) */
+  --success: #22c55e;
+  --success-soft: rgba(34, 197, 94, 0.14);
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.14);
+
+  /* Semantic info (status dot: cached) */
+  --info: #0288d1;
+  --info-soft: rgba(2, 136, 209, 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg-canvas-0: #eef1f6;
+  --bg-canvas-1: #f7f9fc;
+  --grid-dot: rgba(0, 0, 0, 0.06);
+  --text-primary: rgba(17, 24, 39, 0.92);
+  --text-secondary: rgba(17, 24, 39, 0.6);
+  --text-tertiary: rgba(17, 24, 39, 0.4);
+  --text-on-accent: #ffffff;
+  --surface-1: #ffffff;
+  --surface-2: #f3f5f9;
+  --surface-3: #e7ebf2;
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.14);
+  --glass-fill: rgba(255, 255, 255, 0.55);
+  --glass-fill-strong: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-highlight: rgba(255, 255, 255, 0.9);
+  --glass-shadow: 0 8px 32px rgba(31, 41, 55, 0.16);
+}

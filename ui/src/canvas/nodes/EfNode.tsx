@@ -11,74 +11,79 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import { useState, type CSSProperties } from "react";
+import { Save } from "lucide-react";
 
+import "./EfNode.css";
 import { PayloadView } from "../../inspector/PayloadView";
 import type { NodeStatus, Payload } from "../../store/execution";
 import { isDetailed } from "./lod";
+import { familyMeta } from "../../theme/family";
 
 // React Flow v12 constrains node `data` to `Record<string, unknown>`, so the data interface
 // must carry an index signature; extending Record satisfies that without weakening the named
 // fields (the index's `unknown` value type accepts anything).
 export interface EfNodeData extends Record<string, unknown> {
   label: string;
+  family?: string | null;
   ports: { id: string; name: string; direction: "in" | "out" }[];
   status?: NodeStatus | null; // from /execute statuses
   results?: Record<string, Payload> | null; // outPortName -> payload
 }
 
 const boxStyleBase: CSSProperties = {
-  width: 160,
-  borderRadius: 6,
-  background: "#fff",
+  width: 176,
+  borderRadius: "var(--radius-md)",
+  background: "var(--surface-1)",
   fontSize: 12,
   padding: "0.5rem",
   boxSizing: "border-box",
   position: "relative",
+  boxShadow: "var(--shadow-2)",
 };
 
 const portRowStyle: CSSProperties = {
   position: "relative",
   padding: "0.15rem 0.5rem",
-  color: "#444",
+  color: "var(--text-secondary)",
 };
 
 const resultsToggleStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   marginTop: "0.25rem",
   background: "none",
   border: "none",
   padding: 0,
   cursor: "pointer",
-  color: "#444",
+  color: "var(--text-secondary)",
 };
 
 const resultsPanelStyle: CSSProperties = {
   marginTop: "0.25rem",
   maxHeight: 160,
   overflow: "auto",
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
 };
 
 const cachedBadgeStyle: CSSProperties = {
   position: "absolute",
   bottom: -6,
   right: -6,
-  fontSize: 11,
+  fontSize: "var(--text-xs)",
   lineHeight: 1,
 };
 
 function borderColorFor(status: NodeStatus | null | undefined): string {
   switch (status) {
     case "ok":
-      return "#2e7d32";
+      return "var(--success)";
     case "cached":
-      return "#0288d1";
+      return "var(--info)";
     case "error":
-      return "#c00";
+      return "var(--danger)";
     case "skipped":
-      return "#bbb";
+      return "var(--border-strong)";
     default:
-      return "#888";
+      return "var(--border-subtle)";
   }
 }
 
@@ -88,22 +93,59 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
   const [open, setOpen] = useState(false);
   const detailed = useStore((s) => isDetailed(s.transform[2]));
 
+  const meta = familyMeta(data.family ?? "");
+  const FamIcon = meta.Icon;
+
   const inPorts = data.ports.filter((port) => port.direction === "in");
   const outPorts = data.ports.filter((port) => port.direction === "out");
 
   const resultEntries = data.results ? Object.entries(data.results) : [];
   const hasResults = resultEntries.length > 0;
 
-  const borderColor = borderColorFor(data.status);
   const boxStyle: CSSProperties = {
     ...boxStyleBase,
-    border: `1px solid ${borderColor}`,
+    border: `1px solid ${borderColorFor(data.status)}`,
   };
 
+  switch (data.status) {
+    case "cached":
+      boxStyle.boxShadow = `var(--shadow-2), 0 0 0 3px ${borderColorFor("cached")}`;
+      break;
+    case "error":
+      boxStyle.boxShadow = `var(--shadow-2), 0 0 0 3px ${borderColorFor("error")}, 0 0 12px 2px var(--danger-soft)`;
+      break;
+    case "skipped":
+      boxStyle.opacity = 0.6;
+      break;
+  }
+
   return (
-    <div style={boxStyle} data-testid="ef-node">
-      <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>
-        {data.label}
+    <div
+      style={boxStyle}
+      data-testid="ef-node"
+      className={data.status === "running" ? "ef-node--running" : undefined}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-2)",
+          marginLeft: "calc(-1 * var(--space-2))",
+          marginRight: "calc(-1 * var(--space-2))",
+          marginTop: "calc(-1 * var(--space-2))",
+          marginBottom: "var(--space-2)",
+          padding: "var(--space-2) var(--space-3)",
+          borderTopLeftRadius: "var(--radius-md)",
+          borderTopRightRadius: "var(--radius-md)",
+          background: meta.soft,
+          borderLeft: `3px solid ${meta.color}`,
+          fontWeight: 600,
+          color: "var(--text-primary)",
+          fontSize: "var(--text-sm)",
+        }}
+      >
+        <FamIcon size={14} style={{ color: meta.color, flexShrink: 0 }} />
+        <span>{data.label}</span>
       </div>
       <div>
         {inPorts.map((port) => (
@@ -112,7 +154,14 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
               type="target"
               position={Position.Left}
               id={port.id}
-              style={{ left: -4 }}
+              style={{
+                left: -4,
+                width: 8,
+                height: 8,
+                background: meta.color,
+                border: "2px solid var(--border-strong)",
+                borderRadius: "50%",
+              }}
             />
             <span style={{ visibility: detailed ? "visible" : "hidden" }}>
               {port.name}
@@ -128,7 +177,14 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
               type="source"
               position={Position.Right}
               id={port.id}
-              style={{ right: -4 }}
+              style={{
+                right: -4,
+                width: 8,
+                height: 8,
+                background: meta.color,
+                border: "2px solid var(--border-strong)",
+                borderRadius: "50%",
+              }}
             />
           </div>
         ))}
@@ -166,7 +222,7 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
           title="Served from the execution cache"
           style={cachedBadgeStyle}
         >
-          💾
+          <Save size={12} style={{ color: "var(--text-secondary)", display: "block" }} />
         </span>
       ) : null}
     </div>

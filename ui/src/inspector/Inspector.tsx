@@ -5,9 +5,12 @@
 
 import { useState } from "react";
 
+import { useCatalog } from "../catalog/useCatalog";
+import { familyMeta } from "../theme/family";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
 import { selectedNodeId, useSelectionStore } from "../store/selectionStore";
+import { Segmented } from "../ui/Segmented";
 import { CodePanel } from "./CodePanel";
 import { ConfigForm } from "./ConfigForm";
 import { PayloadView } from "./PayloadView";
@@ -28,6 +31,10 @@ export function Inspector(): JSX.Element {
   const nodes = useGraphStore((s) => s.nodes);
   const nodeId = selectedNodeId({ nodes: selNodes });
   const node = nodeId ? nodes[nodeId] : null;
+  const catalog = useCatalog();
+  const spec = node ? catalog.nodes.find((n) => n.type === node.type) : undefined;
+  const meta = familyMeta(spec?.family ?? "");
+  const FamIcon = meta.Icon;
 
   const results = useExecutionStore((s) => s.results);
   const statuses = useExecutionStore((s) => s.statuses);
@@ -36,7 +43,7 @@ export function Inspector(): JSX.Element {
   function renderResults(): JSX.Element {
     if (!nodeId) {
       return (
-        <p data-testid="results-empty-no-selection" style={{ color: "#666" }}>
+        <p data-testid="results-empty-no-selection" style={{ color: "var(--text-secondary)" }}>
           Select a node to see its results.
         </p>
       );
@@ -46,7 +53,7 @@ export function Inspector(): JSX.Element {
       return (
         <div
           data-testid="results-error"
-          style={{ color: "#b00", whiteSpace: "pre-wrap" }}
+          style={{ color: "var(--danger)", whiteSpace: "pre-wrap" }}
         >
           {status.error ?? "Execution failed."}
         </div>
@@ -55,7 +62,7 @@ export function Inspector(): JSX.Element {
     const nodeResults = results[nodeId];
     if (!nodeResults || Object.keys(nodeResults).length === 0) {
       return (
-        <p data-testid="results-empty-no-run" style={{ color: "#666" }}>
+        <p data-testid="results-empty-no-run" style={{ color: "var(--text-secondary)" }}>
           {lastRunAt !== null
             ? "No inspectable outputs for this node."
             : "No results — run the graph first."}
@@ -67,7 +74,7 @@ export function Inspector(): JSX.Element {
         {lastRunAt !== null ? (
           <div
             data-testid="results-last-run"
-            style={{ color: "#666", fontSize: 11, marginBottom: "0.5rem" }}
+            style={{ color: "var(--text-secondary)", fontSize: 11, marginBottom: "0.5rem" }}
           >
             last run: {formatAgo(lastRunAt)}
           </div>
@@ -86,66 +93,41 @@ export function Inspector(): JSX.Element {
     <aside
       data-testid="inspector"
       style={{
-        width: 300,
-        flexShrink: 0,
         display: "flex",
         flexDirection: "column",
-        borderLeft: "1px solid #ddd",
         height: "100%",
       }}
     >
-      <div style={{ display: "flex", borderBottom: "1px solid #ddd" }}>
-        <button
-          type="button"
-          data-testid="inspector-tab-config"
-          onClick={() => setTab("config")}
+      {node ? (
+        <div
           style={{
-            flex: 1,
-            padding: "0.5rem",
-            border: "none",
-            background: "none",
-            cursor: "pointer",
-            fontWeight: tab === "config" ? 600 : 400,
-            borderBottom:
-              tab === "config" ? "2px solid #333" : "2px solid transparent",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            padding: "var(--space-2) var(--space-3)",
+            marginBottom: "var(--space-2)",
+            background: meta.soft,
+            borderLeft: `3px solid ${meta.color}`,
+            fontWeight: 600,
+            color: "var(--text-primary)",
+            fontSize: "var(--text-sm)",
           }}
         >
-          Config
-        </button>
-        <button
-          type="button"
-          data-testid="inspector-tab-code"
-          onClick={() => setTab("code")}
-          style={{
-            flex: 1,
-            padding: "0.5rem",
-            border: "none",
-            background: "none",
-            cursor: "pointer",
-            fontWeight: tab === "code" ? 600 : 400,
-            borderBottom:
-              tab === "code" ? "2px solid #333" : "2px solid transparent",
-          }}
-        >
-          Code
-        </button>
-        <button
-          type="button"
-          data-testid="inspector-tab-results"
-          onClick={() => setTab("results")}
-          style={{
-            flex: 1,
-            padding: "0.5rem",
-            border: "none",
-            background: "none",
-            cursor: "pointer",
-            fontWeight: tab === "results" ? 600 : 400,
-            borderBottom:
-              tab === "results" ? "2px solid #333" : "2px solid transparent",
-          }}
-        >
-          Results
-        </button>
+          <FamIcon size={16} style={{ color: meta.color, flexShrink: 0 }} />
+          <span>{spec?.label ?? node.type}</span>
+        </div>
+      ) : null}
+      <div style={{ padding: "var(--space-2) var(--space-3)" }}>
+        <Segmented
+          options={[
+            { value: "config", label: "Config", testId: "inspector-tab-config" },
+            { value: "code", label: "Code", testId: "inspector-tab-code" },
+            { value: "results", label: "Results", testId: "inspector-tab-results" },
+          ]}
+          value={tab}
+          onChange={setTab}
+          aria-label="Inspector tabs"
+        />
       </div>
       <div
         style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0.5rem" }}
@@ -154,7 +136,7 @@ export function Inspector(): JSX.Element {
           node ? (
             <ConfigForm node={node} />
           ) : (
-            <p data-testid="inspector-empty" style={{ color: "#666" }}>
+            <p data-testid="inspector-empty" style={{ color: "var(--text-secondary)" }}>
               Select a node to edit its parameters.
             </p>
           )

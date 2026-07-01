@@ -104,7 +104,7 @@ describe("Canvas", () => {
       );
     });
 
-    const callArgs = fetchSpy.mock.calls[0];
+    const callArgs = fetchSpy.mock.calls.find((call) => call[0] === "/execute/stream")!;
     const init = callArgs[1] as { body: string };
     const parsedBody = JSON.parse(init.body);
     expect(parsedBody).toEqual({

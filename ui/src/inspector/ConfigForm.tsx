@@ -13,6 +13,8 @@ import {
   validateValue,
   widgetForParam,
 } from "./widgets";
+import { Input } from "../ui/Input";
+import { Select } from "../ui/Select";
 
 function resolveCatalogParam(
   meta: CatalogParam | undefined,
@@ -42,7 +44,7 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
   if (kind === "select") {
     const choices = catalogParam.hints?.choices ?? [];
     widget = (
-      <select
+      <Select
         data-testid={testId}
         value={formatValue(catalogParam, param.value)}
         onChange={(e) =>
@@ -59,7 +61,7 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
             {choice}
           </option>
         ))}
-      </select>
+      </Select>
     );
   } else if (kind === "checkbox") {
     widget = (
@@ -73,7 +75,7 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
   } else if (kind === "number") {
     const hints = catalogParam.hints;
     widget = (
-      <input
+      <Input
         type="number"
         data-testid={testId}
         value={formatValue(catalogParam, param.value)}
@@ -93,7 +95,7 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
     // text + list both edit as a plain text input; `parseValue` splits a list on commas, and
     // the "comma-separated" hint below is rendered only for the list kind.
     widget = (
-      <input
+      <Input
         type="text"
         data-testid={testId}
         value={formatValue(catalogParam, param.value)}
@@ -118,15 +120,15 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
       </label>
       {widget}
       {kind === "list" ? (
-        <div style={{ fontSize: "0.75rem", color: "#666" }}>
+        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
           comma-separated
         </div>
       ) : null}
       {meta?.help ? (
-        <div style={{ fontSize: "0.75rem", color: "#666" }}>{meta.help}</div>
+        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{meta.help}</div>
       ) : null}
       {error ? (
-        <span data-testid={`error-${param.name}`} style={{ color: "#c00" }}>
+        <span data-testid={`error-${param.name}`} style={{ color: "var(--danger)" }}>
           {error}
         </span>
       ) : null}
@@ -141,7 +143,7 @@ export function ConfigForm({ node }: { node: NodeModel }): JSX.Element {
   if (node.params.length === 0) {
     return (
       <div data-testid="config-form">
-        <p data-testid="config-no-params" style={{ color: "#666" }}>
+        <p data-testid="config-no-params" style={{ color: "var(--text-secondary)" }}>
           This node has no parameters.
         </p>
       </div>

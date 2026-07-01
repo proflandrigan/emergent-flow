@@ -17,8 +17,9 @@ import {
   type NodeMouseHandler,
   type NodeTypes,
 } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 
+import { useCatalog } from "../catalog/useCatalog";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
@@ -35,6 +36,7 @@ const edgeTypes: EdgeTypes = { efEdge: EfEdge };
 
 export function Canvas(): JSX.Element {
   useLiveValidation();
+  const catalog = useCatalog();
 
   const nodes = useGraphStore((s) => s.nodes);
   const edges = useGraphStore((s) => s.edges);
@@ -55,6 +57,11 @@ export function Canvas(): JSX.Element {
   const statuses = useExecutionStore((s) => s.statuses);
   const results = useExecutionStore((s) => s.results);
 
+  const familyByType = useMemo(
+    () => Object.fromEntries(catalog.nodes.map((n) => [n.type, n.family])),
+    [catalog],
+  );
+
   const reasons = useMemo(() => {
     const m: Record<string, string> = {};
     for (const d of diagnostics) {
@@ -68,9 +75,9 @@ export function Canvas(): JSX.Element {
   const rfNodes = useMemo(
     () =>
       Object.values(nodes).map((n) =>
-        toRFNode(n, !!selNodes[n.id], statuses[n.id]?.status, results[n.id]),
+        toRFNode(n, !!selNodes[n.id], statuses[n.id]?.status, results[n.id], familyByType[n.type] ?? null),
       ),
-    [nodes, selNodes, statuses, results],
+    [nodes, selNodes, statuses, results, familyByType],
   );
   const rfEdges = useMemo(
     () =>
@@ -124,6 +131,14 @@ export function Canvas(): JSX.Element {
     [connect],
   );
 
+  const handleMoveStart = useCallback(() => {
+    document.body.classList.add("ef-panning");
+  }, []);
+
+  const handleMoveEnd = useCallback(() => {
+    document.body.classList.remove("ef-panning");
+  }, []);
+
   const [contextMenu, setContextMenu] = useState<{
     nodeId: string;
     x: number;
@@ -158,6 +173,8 @@ export function Canvas(): JSX.Element {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
+        onMoveStart={handleMoveStart}
+        onMoveEnd={handleMoveEnd}
         onNodeDragStop={endNodeDrag}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
@@ -167,9 +184,26 @@ export function Canvas(): JSX.Element {
         deleteKeyCode={["Backspace", "Delete"]}
         fitView
         onlyRenderVisibleElements
+        style={
+          {
+            "--xy-selection-background-color": "var(--accent-soft)",
+            "--xy-selection-border": "1px dotted var(--accent)",
+          } as CSSProperties
+        }
       >
-        <Background />
-        <Controls />
+        <Background color="var(--grid-dot)" />
+        <Controls
+          className="glass"
+          style={
+            {
+              "--xy-controls-button-background-color": "transparent",
+              "--xy-controls-button-background-color-hover": "var(--surface-2)",
+              "--xy-controls-button-color": "var(--text-secondary)",
+              "--xy-controls-button-color-hover": "var(--text-primary)",
+              "--xy-controls-button-border-color": "var(--border-subtle)",
+            } as CSSProperties
+          }
+        />
       </ReactFlow>
       {contextMenu && (
         <NodeContextMenu

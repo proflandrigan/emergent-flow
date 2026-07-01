@@ -4,12 +4,16 @@
 // The edge is ALWAYS drawn -- this component only colours an existing connection, it never
 // decides whether one is allowed (the store is the single source of truth for IR data).
 
+import { useState } from "react";
 import {
   BaseEdge,
   getBezierPath,
+  useNodesData,
   type Edge,
   type EdgeProps,
 } from "@xyflow/react";
+import { familyMeta } from "../../theme/family";
+import type { EfNodeData } from "../nodes/EfNode";
 
 // React Flow v12 constrains edge `data` to `Record<string, unknown>`, so the data interface
 // must carry an index signature; extending Record satisfies that without weakening the named
@@ -40,14 +44,26 @@ export function EfEdge(props: EdgeProps<EfEdgeType>): JSX.Element {
     targetPosition,
   });
 
+  const [hovered, setHovered] = useState(false);
+
+  const sourceNode = useNodesData(props.source);
+  const sourceFamily = (sourceNode?.data as EfNodeData | undefined)?.family ?? undefined;
+  const meta = familyMeta(sourceFamily ?? "");
+
   const incompatible = props.data?.incompatible ?? false;
+  const strokeColor = incompatible
+    ? "var(--danger)"
+    : props.selected || hovered
+      ? meta.color
+      : "var(--border-strong)";
   const style = {
     ...props.style,
-    ...(incompatible ? { stroke: "#c00", strokeWidth: 2 } : {}),
+    stroke: strokeColor,
+    strokeWidth: incompatible ? 2 : 1.5,
   };
 
   return (
-    <g>
+    <g onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
       {incompatible && props.data?.reason ? <title>{props.data.reason}</title> : null}
       <BaseEdge id={props.id} path={edgePath} style={style} markerEnd={props.markerEnd} />
     </g>

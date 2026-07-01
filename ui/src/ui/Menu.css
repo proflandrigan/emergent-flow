@@ -1,0 +1,35 @@
+.ef-menu {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1);
+  min-width: 160px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+}
+
+.ef-menu__item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  line-height: 1.4;
+  transition: background var(--motion-fast) var(--motion-ease);
+}
+
+.ef-menu__item:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+
+.ef-menu__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

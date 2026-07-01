@@ -14,6 +14,7 @@ export function toRFNode(
   selected: boolean,
   status: NodeStatus | null | undefined,
   results: Record<string, Payload> | null | undefined,
+  family: string | null | undefined,
 ): RFNode<EfNodeData> {
   return {
     id: node.id,
@@ -22,6 +23,7 @@ export function toRFNode(
     selected,
     data: {
       label: node.label ?? node.type,
+      family: family ?? null,
       ports: node.ports.map((port) => ({
         id: port.id,
         name: port.name,
