@@ -7,7 +7,6 @@ tests that wire caching into the FUNCTIONAL execute path (service.py).
 from __future__ import annotations
 
 import json
-import pathlib
 import threading
 
 import pytest
@@ -57,6 +56,35 @@ class _NonCacheableSource(NodeDefinition):
         return {"out": None}
 
 
+class _CacheableSource(NodeDefinition):
+    """A deterministic, cacheable source node standing in for ``data.load_csv``.
+
+    ``data.load_csv`` (and the other file-reading source nodes) are
+    intentionally ``cacheable = False`` -- their ``execute()`` reads external
+    file content the cache key can't see, so a cache hit would silently
+    return stale data (Epic 7 Story 6 review). These cache-behavior tests
+    need an actually-cacheable source node instead, so they exercise the
+    caching contract itself rather than that unrelated staleness gap.
+    """
+
+    type = "test.cacheable_source"
+    version = 1
+    family = "test"
+    label = "Cacheable Source"
+    ports = [
+        PortSpec(name="out", direction=Direction.OUT, data_type="Any"),
+    ]
+    params = [
+        ParamSpec(name="value", type_token="str", default="x"),
+    ]
+
+    def codegen(self, node, ctx):
+        return CodeFragment(body=f"{ctx.out_var('out')} = None")
+
+    def execute(self, node, inputs):
+        return {"out": None}
+
+
 class _CacheablePassthrough(NodeDefinition):
     type = "test.cacheable_passthrough"
     version = 1
@@ -78,23 +106,20 @@ class _CacheablePassthrough(NodeDefinition):
 
 
 register_node(_NonCacheableSource)
+register_node(_CacheableSource)
 register_node(_CacheablePassthrough)
 
-SAMPLE_CSV = str(
-    pathlib.Path(__file__).resolve().parents[1] / "examples" / "vertical_slice" / "sample.csv"
-)
 
-
-def _load_graph(path: str | None = None) -> dict:
-    """Minimal one-node load_csv graph -- same shape as test_server._load_csv_graph."""
+def _load_graph(value: str | None = None) -> dict:
+    """Minimal one-node cacheable-source graph -- shape mirrors a real source node."""
     node = Node(
         id="n-load",
-        type="data.load_csv",
-        label="Load CSV",
+        type="test.cacheable_source",
+        label="Cacheable Source",
         paradigm=Paradigm.FUNCTIONAL,
-        params=[Param(name="path", type_token="str", value=path or SAMPLE_CSV)],
+        params=[Param(name="value", type_token="str", value=value or "x")],
         ports=[
-            Port(id="p-load-frame", name="frame", direction=Direction.OUT, data_type="DataFrame"),
+            Port(id="p-load-out", name="out", direction=Direction.OUT, data_type="Any"),
         ],
         position=Position(x=0.0, y=0.0),
     )
@@ -107,34 +132,34 @@ def _load_graph(path: str | None = None) -> dict:
     return json.loads(serialize_graph(graph))
 
 
-def _chain_graph(path: str | None = None) -> dict:
-    """Two-node load_csv -> impute_missing chain -- same as test_server._chain_graph."""
+def _chain_graph(value: str | None = None) -> dict:
+    """Two-node cacheable-source -> passthrough chain -- same shape as test_server._chain_graph."""
     load = Node(
         id="n-load",
-        type="data.load_csv",
-        label="Load CSV",
+        type="test.cacheable_source",
+        label="Cacheable Source",
         paradigm=Paradigm.FUNCTIONAL,
-        params=[Param(name="path", type_token="str", value=path or SAMPLE_CSV)],
+        params=[Param(name="value", type_token="str", value=value or "x")],
         ports=[
-            Port(id="p-load-frame", name="frame", direction=Direction.OUT, data_type="DataFrame"),
+            Port(id="p-load-out", name="out", direction=Direction.OUT, data_type="Any"),
         ],
         position=Position(x=0.0, y=0.0),
     )
     impute = Node(
         id="n-impute",
-        type="clean.impute_missing",
-        label="Impute Missing",
+        type="test.cacheable_passthrough",
+        label="Cacheable Pass-Through",
         paradigm=Paradigm.FUNCTIONAL,
-        params=[Param(name="strategy", type_token="str", value="mean")],
+        params=[Param(name="dummy", type_token="str", value="mean")],
         ports=[
-            Port(id="p-imp-in", name="frame", direction=Direction.IN, data_type="DataFrame"),
-            Port(id="p-imp-out", name="frame", direction=Direction.OUT, data_type="DataFrame"),
+            Port(id="p-imp-in", name="in", direction=Direction.IN, data_type="Any"),
+            Port(id="p-imp-out", name="out", direction=Direction.OUT, data_type="Any"),
         ],
         position=Position(x=1.0, y=0.0),
     )
     edge = Edge(
         id="e-load-impute",
-        source=PortRef(node_id="n-load", port_id="p-load-frame"),
+        source=PortRef(node_id="n-load", port_id="p-load-out"),
         target=PortRef(node_id="n-impute", port_id="p-imp-in"),
     )
     graph = Graph(

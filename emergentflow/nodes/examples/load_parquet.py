@@ -34,6 +34,10 @@ class LoadParquet(NodeDefinition):
     label = "Load Parquet"
     category = "Ingest"
     description = "Load a Parquet file into a pandas DataFrame."
+    # execute() re-reads the file at `path` on every call; the file's content can
+    # change without the `path` param changing, so this is not a pure function of
+    # its declared params (see NodeDefinition.cacheable's docstring).
+    cacheable = False
 
     ports = [
         PortSpec(

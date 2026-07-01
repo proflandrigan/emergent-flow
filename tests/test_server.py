@@ -685,8 +685,50 @@ def test_http_cache_clear(client: TestClient) -> None:
     assert resp.json() == {"status": "ok"}
 
 
+def _sample_chain_graph() -> dict:
+    """load_sample -> impute_missing: unlike load_csv, load_sample reads a bundled,
+    immutable dataset (no external file content the cache key can't see), so it is
+    actually cacheable -- used here instead of ``_chain_graph``'s load_csv to
+    exercise the cache-clear behavior itself, not the load_csv staleness gap."""
+    load = Node(
+        id="n-load",
+        type="data.load_sample",
+        label="Load Sample",
+        paradigm=Paradigm.FUNCTIONAL,
+        params=[Param(name="name", type_token="str", value="iris")],
+        ports=[
+            Port(id="p-load-frame", name="frame", direction=Direction.OUT, data_type="DataFrame"),
+        ],
+        position=Position(x=0.0, y=0.0),
+    )
+    impute = Node(
+        id="n-impute",
+        type="clean.impute_missing",
+        label="Impute Missing",
+        paradigm=Paradigm.FUNCTIONAL,
+        params=[Param(name="strategy", type_token="str", value="mean")],
+        ports=[
+            Port(id="p-imp-in", name="frame", direction=Direction.IN, data_type="DataFrame"),
+            Port(id="p-imp-out", name="frame", direction=Direction.OUT, data_type="DataFrame"),
+        ],
+        position=Position(x=1.0, y=0.0),
+    )
+    edge = Edge(
+        id="e-load-impute",
+        source=PortRef(node_id="n-load", port_id="p-load-frame"),
+        target=PortRef(node_id="n-impute", port_id="p-imp-in"),
+    )
+    graph = Graph(
+        paradigm=Paradigm.FUNCTIONAL,
+        name="server-test-sample-chain",
+        nodes={load.id: load, impute.id: impute},
+        edges={edge.id: edge},
+    )
+    return json.loads(serialize_graph(graph))
+
+
 def test_http_cache_clear_empties_cache_used_by_execute(client: TestClient) -> None:
-    graph = _load_csv_graph()
+    graph = _sample_chain_graph()
     first = execute_graph(graph)
     assert first["statuses"]["n-load"]["status"] == "ok"
     second = execute_graph(graph)

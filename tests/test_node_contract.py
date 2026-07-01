@@ -203,6 +203,18 @@ class TestCacheableFlag:
     def test_can_opt_out(self):
         assert _NonCacheableDemo.cacheable is False
 
+    def test_file_reading_source_nodes_opt_out(self):
+        """load_csv/load_parquet/load_json read external file content the
+        cache key can't see (only the ``path`` param is hashed), so a stale
+        on-disk edit would otherwise be served from the cache forever."""
+        from emergentflow.nodes.examples.load_csv import LoadCsv
+        from emergentflow.nodes.examples.load_json import LoadJson
+        from emergentflow.nodes.examples.load_parquet import LoadParquet
+
+        assert LoadCsv.cacheable is False
+        assert LoadParquet.cacheable is False
+        assert LoadJson.cacheable is False
+
 
 class TestAbstractEnforcement:
     def test_cannot_instantiate_incomplete_definition(self):

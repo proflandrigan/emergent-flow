@@ -13,6 +13,7 @@ already-tested pure functions and JSON-encode their results.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import time
@@ -122,7 +123,7 @@ def _ancestors(graph: Graph, targets: set[str], wiring_map: WiringMap) -> set[st
 
 
 def _node_hash(node: Node, upstream_hashes: list[str]) -> str:
-    """This node's cache key: sha256(canonical params json + sorted upstream hashes + sdk version).
+    """This node's cache key: sha256(node type + canonical params + upstream hashes + sdk version).
 
     Recursive by construction: *upstream_hashes* are themselves node hashes
     (each already folding in ITS OWN upstream hashes via a prior call to this
@@ -133,10 +134,17 @@ def _node_hash(node: Node, upstream_hashes: list[str]) -> str:
     (non-``None``) and this node is itself ``cacheable`` -- see that
     function's docstring for why a node with a non-cacheable ancestor never
     gets a defined hash.
+
+    ``node.type`` is included so two different node types with coincidentally
+    identical params/upstream hashes never collide on the same key, and
+    *upstream_hashes* is folded in caller-supplied order (one hash per IN
+    port, in port-declaration order) rather than sorted, so a node whose
+    upstream wiring is swapped across two non-commutative ports produces a
+    different key even though the *set* of upstream hashes is unchanged.
     """
     params_json_safe = {p.name: p.model_dump(mode="json")["value"] for p in node.params}
     canonical_params = json.dumps(params_json_safe, sort_keys=True, separators=(",", ":"))
-    payload = canonical_params + "".join(sorted(upstream_hashes)) + __version__
+    payload = node.type + canonical_params + "".join(upstream_hashes) + __version__
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -258,7 +266,12 @@ def _execute_functional_stream(
             else:
                 outputs = definition.execute(node, inputs)
                 if cache_hash is not None:
-                    cache.put(cache_hash, outputs, node_id=node.id, label=node.label or "")
+                    # A cache-write failure (e.g. an unpicklable output, a full
+                    # disk) must not turn a successful execute() into a
+                    # reported node "error" -- caching is an optimization, not
+                    # part of the node's correctness contract.
+                    with contextlib.suppress(Exception):
+                        cache.put(cache_hash, outputs, node_id=node.id, label=node.label or "")
             elapsed_ms = int((time.monotonic() - start) * 1000)
             node_results[node_id] = outputs
             node_status[node_id] = _STATUS_CACHED if is_cache_hit else _STATUS_OK
@@ -506,6 +519,11 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
                     "results": {
                         port_name: _payload_for(value) for port_name, value in ports.items()
                     },
+                    # DECLARATIVE graphs are never cached (Epic 7 Story 6 only
+                    # caches the FUNCTIONAL per-node walk); always False rather
+                    # than omitted so every node_ok frame satisfies the same
+                    # StreamEvent shape (ui/src/exec/sse.ts).
+                    "cached": False,
                     "payload_version": PAYLOAD_CONTRACT_VERSION,
                 }
     except CodegenError:
@@ -530,9 +548,9 @@ def execute_node(payload: dict[str, Any]) -> dict[str, Any]:
     Envelope body: ``{"graph": <ir>, "run_node": <node id>, "inputs": {<IN-port name>: value}}``.
     Runs only that node's ``execute()`` with caller-supplied upstream inputs and returns
     the same ``{"payload_version", "results", "statuses"}`` shape as ``execute_graph`` --
-    but for the single node. The server is stateless (no cache yet -- roadmap Epic 7), so
-    inputs come from the caller; rich inputs (DataFrames) round-trip faithfully only once
-    the on-disk cache lands. A node-runtime failure is reported as that node's ``error``
+    but for the single node. This path bypasses ``ExecutionCache`` entirely (it has no
+    upstream chain to hash and the caller already supplies fresh inputs directly), so a
+    node-runtime failure is reported as that node's ``error``
     status at HTTP 200 (mirroring run-all); a bad envelope, unknown node id, or non-FUNCTIONAL
     node RAISES (-> the server's 422). DECLARATIVE nodes (e.g. ``nn.linear``) are rejected
     rather than run standalone: their ``execute()`` returns the bare layer object for the

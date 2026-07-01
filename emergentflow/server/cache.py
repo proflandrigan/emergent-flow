@@ -71,21 +71,25 @@ class ExecutionCache:
         A hit refreshes the entry's mtime (LRU recency) so it survives future
         evictions longer. Any read/unpickle failure (corrupt file, e.g. from
         a concurrent eviction) is treated as a miss rather than raised --
-        a cache read must never crash a graph run.
+        a cache read must never crash a graph run. Takes ``self._lock`` for
+        the whole read (not just the unpickle) so it can't race a concurrent
+        ``put()``'s eviction pass unlinking this same file between the read
+        and the recency-refreshing ``os.utime`` calls below.
         """
         pkl_path = self._pkl_path(cache_hash)
-        if not pkl_path.is_file():
-            return None
-        try:
-            with pkl_path.open("rb") as f:
-                outputs = pickle.load(f)
-        except Exception:
-            return None
-        now = time.time()
-        os.utime(pkl_path, (now, now))
-        meta_path = self._meta_path(cache_hash)
-        if meta_path.is_file():
-            os.utime(meta_path, (now, now))
+        with self._lock:
+            if not pkl_path.is_file():
+                return None
+            try:
+                with pkl_path.open("rb") as f:
+                    outputs = pickle.load(f)
+            except Exception:
+                return None
+            now = time.time()
+            os.utime(pkl_path, (now, now))
+            meta_path = self._meta_path(cache_hash)
+            if meta_path.is_file():
+                os.utime(meta_path, (now, now))
         return outputs
 
     def put(self, cache_hash: str, outputs: dict[str, Any], *, node_id: str, label: str) -> None:
