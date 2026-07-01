@@ -117,19 +117,19 @@ export path this epic scopes but defers).
 > Build the single wrapper that every archetype node routes through. This is the load-bearing seam:
 > get it right and the whole catalog inherits ADR-0002 equivalence and the inspectable contract.
 
-- [ ] Define an **estimator registry**: `{estimator_key -> EstimatorSpec}` where `EstimatorSpec`
+- [x] Define an **estimator registry**: `{estimator_key -> EstimatorSpec}` where `EstimatorSpec`
   carries import path, sklearn class, archetype (fit/transform/cluster), accepted kwargs (with
   defaults + hints scraped/curated from the class), and the produced inspectable-summary builder.
-- [ ] `ef.ml.fit_estimator(frame, *, estimator, target=None, features=None, params={}) -> FittedModel`
+- [x] `ef.ml.fit_estimator(frame, *, estimator, target=None, features=None, params={}) -> FittedModel`
   — validates the estimator key + kwargs against the registry, resolves features/target the same way
   the existing `train_*` wrappers do, fits, and wraps the live estimator in `FittedModel`
   (extend/reuse the Epic 6 dataclass; add a `FittedTransformer` sibling for the transform archetype).
-- [ ] `ef.ml.apply_estimator(model, frame, *, op)` covering `predict` / `transform` /
+- [x] `ef.ml.apply_estimator(model, frame, *, op)` covering `predict` / `transform` /
   `score_samples`, returning a **new** frame (never mutate input) — the apply archetype's backend.
-- [ ] Every wrapper is a `@public_op` returning an **inspectable** value (metrics dataclass /
+- [x] Every wrapper is a `@public_op` returning an **inspectable** value (metrics dataclass /
   tidy DataFrame / the `FittedModel` dataclass). Confirm the live-estimator field degrades correctly
   under the result-payload contract (Epic 6 Story 6 precedent).
-- [ ] Unit tests on the adapter itself: unknown estimator key → typed error; bad kwargs → typed
+- [x] Unit tests on the adapter itself: unknown estimator key → typed error; bad kwargs → typed
   error; determinism given `random_state`; no input mutation.
 
 ---
