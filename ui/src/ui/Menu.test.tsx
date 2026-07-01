@@ -57,3 +57,19 @@ test("forwards aria-label to the menu container", () => {
   );
   expect(screen.getByRole("menu", { name: "Actions" })).toBeInTheDocument();
 });
+
+test("forwards testId to the item as data-testid", () => {
+  render(
+    <Menu
+      items={[{ label: "Item", onSelect: () => {}, testId: "my-item" }]}
+    />,
+  );
+  expect(screen.getByTestId("my-item")).toBeInTheDocument();
+});
+
+test("renders no data-testid attribute when testId is omitted", () => {
+  render(<Menu items={[{ label: "Item", onSelect: () => {} }]} />);
+  expect(screen.getByRole("menuitem", { name: "Item" })).not.toHaveAttribute(
+    "data-testid",
+  );
+});

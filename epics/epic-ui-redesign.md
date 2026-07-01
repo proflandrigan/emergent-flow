@@ -53,13 +53,13 @@
 > Spec §5, §6.4, Phase 1. Restructure the layout and collapse the header button-soup into the
 > floating command bar; migrate the three toolbars onto the new primitives.
 
-- [ ] Restructure `App.tsx`: root `position: relative; height: 100vh`; the Canvas fills the root (absolute inset 0, z-0); panels become `position: absolute`, z-10, `.glass`, with a `--space-4` gutter from viewport edges.
-- [ ] Replace `<header>` with a floating glass command bar (top gutter): left = product mark "Emergent Flow" + server-status dot; center/right = grouped action clusters separated by thin dividers. Reserve left/right insets equal to panel width + gutter (or center it in the canvas region) so it never overlaps palette/inspector.
-- [ ] Migrate `IRToolbar.tsx` (File/IR: import/export), `ExecutionToolbar.tsx` (Run: Execute ▶ / Download `.py` / Clear cache), Undo/Redo (History icon buttons), and `DevControls.tsx` (de-emphasized / behind a `⋯` menu) onto `src/ui` primitives, grouped into clusters.
-- [ ] Make **Execute** the single primary (accent-fill) action; everything else ghost/secondary.
-- [ ] Replace the `server: ok` text with a colored status dot + tooltip (green/amber/red = ok/connecting/unreachable). **Keep the `server-status` testid** on the element.
-- [ ] Restyle exec progress as a slim determinate bar (`current/total`) and errors as a glass toast with the semantic error color. **Keep all `exec-*` regions/testids** (`exec-download`/`exec-run`/`exec-clear-cache`/`exec-progress`/`exec-error`).
-- [ ] Add the theme toggle (placement per open question §10 — command-bar overflow menu acceptable for v1).
+- [x] Restructure `App.tsx`: root `position: relative; height: 100vh`; the Canvas fills the root (absolute inset 0, z-0); panels become `position: absolute`, z-10, `.glass`, with a `--space-4` gutter from viewport edges.
+- [x] Replace `<header>` with a floating glass command bar (top gutter): left = product mark "Emergent Flow" + server-status dot; center/right = grouped action clusters separated by thin dividers. Reserve left/right insets equal to panel width + gutter (or center it in the canvas region) so it never overlaps palette/inspector.
+- [x] Migrate `IRToolbar.tsx` (File/IR: import/export), `ExecutionToolbar.tsx` (Run: Execute ▶ / Download `.py` / Clear cache), Undo/Redo (History icon buttons), and `DevControls.tsx` (de-emphasized / behind a `⋯` menu) onto `src/ui` primitives, grouped into clusters.
+- [x] Make **Execute** the single primary (accent-fill) action; everything else ghost/secondary.
+- [x] Replace the `server: ok` text with a colored status dot + tooltip (green/amber/red = ok/connecting/unreachable). **Keep the `server-status` testid** on the element.
+- [x] Restyle exec progress as a slim determinate bar (`current/total`) and errors as a glass toast with the semantic error color. **Keep all `exec-*` regions/testids** (`exec-download`/`exec-run`/`exec-clear-cache`/`exec-progress`/`exec-error`).
+- [x] Add the theme toggle (placement per open question §10 — command-bar overflow menu acceptable for v1).
 
 ---
 

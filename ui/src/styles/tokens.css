@@ -79,6 +79,12 @@
   /* Semantic danger/error */
   --danger: #ef4444;
   --danger-soft: rgba(239, 68, 68, 0.14);
+
+  /* Semantic success/warning (status dot: ok/connecting) */
+  --success: #22c55e;
+  --success-soft: rgba(34, 197, 94, 0.14);
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.14);
 }
 
 @media (prefers-reduced-motion: reduce) {

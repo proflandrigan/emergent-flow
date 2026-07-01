@@ -8,6 +8,8 @@ import { useState } from "react";
 import { useGraphStore } from "../store/graphStore";
 import { useExecutionStore } from "../store/executionStore";
 import { runGraph } from "./runGraph";
+import { Button } from "../ui/Button";
+import { IconButton } from "../ui/IconButton";
 
 export function ExecutionToolbar(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
@@ -83,49 +85,86 @@ export function ExecutionToolbar(): JSX.Element {
       style={{
         display: "inline-flex",
         flexDirection: "column",
-        gap: "0.25rem",
+        gap: "var(--space-1)",
       }}
     >
-      <div style={{ display: "inline-flex", gap: "0.5rem" }}>
-        <button
-          type="button"
-          data-testid="exec-download"
-          onClick={handleDownload}
-        >
+      <div style={{ display: "inline-flex", gap: "var(--space-2)" }}>
+        <Button variant="ghost" data-testid="exec-download" onClick={handleDownload}>
           Download .py
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="primary"
           data-testid="exec-run"
           disabled={running || clearingCache}
           onClick={handleExecute}
         >
           {running ? "Running…" : "Execute"}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="ghost"
           data-testid="exec-clear-cache"
           disabled={running || clearingCache}
           onClick={handleClearCache}
         >
           {clearingCache ? "Clearing…" : "Clear cache"}
-        </button>
+        </Button>
       </div>
       {progress && (
         <div
           data-testid="exec-progress"
-          style={{ fontSize: 12, color: "#555" }}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-1)",
+          }}
         >
-          Running node {progress.current} of {progress.total} ({progress.label}
-          …)
+          <div
+            role="progressbar"
+            aria-valuenow={progress.current}
+            aria-valuemin={0}
+            aria-valuemax={progress.total}
+            style={{
+              height: 4,
+              borderRadius: "var(--radius-pill)",
+              background: "var(--surface-2)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${(progress.current / progress.total) * 100}%`,
+                background: "var(--accent)",
+                borderRadius: "var(--radius-pill)",
+              }}
+            />
+          </div>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)" }}>
+            Running node {progress.current} of {progress.total} ({progress.label}
+            …)
+          </span>
         </div>
       )}
       {error && (
-        <div role="alert" data-testid="exec-error" style={{ color: "#c00" }}>
-          {error}
-          <button type="button" onClick={() => setError(null)}>
+        <div
+          role="alert"
+          data-testid="exec-error"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+            padding: "var(--space-2) var(--space-3)",
+            borderRadius: "var(--radius-sm)",
+            background: "var(--danger-soft)",
+            border: "1px solid var(--danger)",
+            color: "var(--danger)",
+            fontSize: "var(--text-sm)",
+          }}
+        >
+          <span>{error}</span>
+          <IconButton aria-label="Dismiss" onClick={() => setError(null)}>
             ×
-          </button>
+          </IconButton>
         </div>
       )}
     </div>

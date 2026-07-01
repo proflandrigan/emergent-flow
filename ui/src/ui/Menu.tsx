@@ -5,6 +5,7 @@ export interface MenuItem {
   label: string;
   onSelect: () => void;
   disabled?: boolean;
+  testId?: string;
 }
 
 export interface MenuProps {
@@ -24,6 +25,7 @@ export function Menu({
           className="ef-menu__item"
           role="menuitem"
           disabled={item.disabled}
+          data-testid={item.testId}
           onClick={() => item.onSelect()}
           type="button"
         >

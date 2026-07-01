@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
+import { MoreHorizontal, Redo2, Undo2 } from "lucide-react";
 
 import { Canvas } from "./canvas/Canvas";
+import { getDevMenuItems } from "./dev/DevControls";
 import { ExecutionToolbar } from "./exec/ExecutionToolbar";
 import { Inspector } from "./inspector/Inspector";
 import { IRToolbar } from "./io/IRToolbar";
 import { Palette } from "./palette/Palette";
 import { useGraphStore } from "./store/graphStore";
-import { DevControls } from "./dev/DevControls";
+import { useTheme } from "./theme/useTheme";
+import { IconButton } from "./ui/IconButton";
+import { Menu, type MenuItem } from "./ui/Menu";
+import { Tooltip } from "./ui/Tooltip";
 
 type ServerStatus = "connecting" | "ok" | "unreachable";
 
@@ -14,12 +19,37 @@ interface HealthResponse {
   status: string;
 }
 
+const STATUS_COLOR: Record<ServerStatus, string> = {
+  ok: "var(--success)",
+  connecting: "var(--warning)",
+  unreachable: "var(--danger)",
+};
+
+// Estimated single-row height of the floating command bar (32px button row + --space-2
+// vertical padding on each side); panels below it use this to clear the bar with a gutter
+// gap, per spec `calc(100vh - 2*gutter - commandbar)`.
+const COMMAND_BAR_CLEARANCE = "calc(var(--space-4) * 2 + 56px)";
+
+function Divider(): JSX.Element {
+  return (
+    <div
+      style={{
+        width: 1,
+        alignSelf: "stretch",
+        background: "var(--border-subtle)",
+      }}
+    />
+  );
+}
+
 export function App(): JSX.Element {
   const [status, setStatus] = useState<ServerStatus>("connecting");
+  const [menuOpen, setMenuOpen] = useState(false);
   const past = useGraphStore((s) => s.past);
   const future = useGraphStore((s) => s.future);
   const canUndo = past.length > 0;
   const canRedo = future.length > 0;
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     let cancelled = false;
@@ -79,48 +109,161 @@ export function App(): JSX.Element {
     };
   }, []);
 
+  const overflowItems: MenuItem[] = [
+    {
+      label:
+        theme === "dark" ? "Switch to light theme" : "Switch to dark theme",
+      onSelect: () => {
+        toggleTheme();
+        setMenuOpen(false);
+      },
+    },
+    ...getDevMenuItems().map((item) => ({
+      ...item,
+      onSelect: () => {
+        item.onSelect();
+        setMenuOpen(false);
+      },
+    })),
+  ];
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      <header
+    <div style={{ position: "relative", height: "100vh", overflow: "hidden" }}>
+      <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
+        <Canvas />
+      </div>
+
+      <div
+        className="glass"
         style={{
+          position: "absolute",
+          top: "var(--space-4)",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 10,
           display: "flex",
           alignItems: "center",
-          padding: "0.5rem 1rem",
-          borderBottom: "1px solid #ddd",
+          gap: "var(--space-3)",
+          padding: "var(--space-2) var(--space-3)",
         }}
       >
-        <h1 style={{ fontSize: "1rem", margin: 0 }}>Emergent Flow — canvas</h1>
-        <span
-          data-testid="server-status"
-          style={{ marginLeft: "1rem", color: "#666" }}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+          }}
         >
-          server: {status}
-        </span>
-        <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem" }}>
-          <IRToolbar />
-          <ExecutionToolbar />
-          <DevControls />
-          <button
-            type="button"
+          <h1
+            style={{
+              fontSize: "var(--text-lg)",
+              fontWeight: 600,
+              margin: 0,
+              color: "var(--text-primary)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Emergent Flow
+          </h1>
+          <Tooltip label={`Server: ${status}`}>
+            <span
+              data-testid="server-status"
+              style={{ display: "inline-flex", alignItems: "center" }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: STATUS_COLOR[status],
+                  display: "inline-block",
+                }}
+              />
+              <span className="sr-only">{status}</span>
+            </span>
+          </Tooltip>
+        </div>
+
+        <Divider />
+
+        <IRToolbar />
+
+        <Divider />
+
+        <ExecutionToolbar />
+
+        <Divider />
+
+        <div style={{ display: "inline-flex", gap: "var(--space-2)" }}>
+          <IconButton
+            aria-label="Undo"
             disabled={!canUndo}
             onClick={() => useGraphStore.getState().undo()}
           >
-            Undo
-          </button>
-          <button
-            type="button"
+            <Undo2 size={16} />
+          </IconButton>
+          <IconButton
+            aria-label="Redo"
             disabled={!canRedo}
             onClick={() => useGraphStore.getState().redo()}
           >
-            Redo
-          </button>
+            <Redo2 size={16} />
+          </IconButton>
         </div>
-      </header>
-      <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+
+        <Divider />
+
+        <div style={{ position: "relative" }}>
+          <IconButton
+            aria-label="More actions"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <MoreHorizontal size={16} />
+          </IconButton>
+          {menuOpen && (
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                right: 0,
+                marginTop: "var(--space-1)",
+                zIndex: 20,
+              }}
+            >
+              <Menu items={overflowItems} aria-label="More actions" />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div
+        className="glass"
+        style={{
+          position: "absolute",
+          top: COMMAND_BAR_CLEARANCE,
+          bottom: "var(--space-4)",
+          left: "var(--space-4)",
+          width: 264,
+          zIndex: 10,
+          overflow: "auto",
+        }}
+      >
         <Palette />
-        <div style={{ flex: 1, minHeight: 0 }}>
-          <Canvas />
-        </div>
+      </div>
+
+      <div
+        className="glass"
+        style={{
+          position: "absolute",
+          top: COMMAND_BAR_CLEARANCE,
+          bottom: "var(--space-4)",
+          right: "var(--space-4)",
+          width: 320,
+          zIndex: 10,
+          overflow: "auto",
+        }}
+      >
         <Inspector />
       </div>
     </div>
