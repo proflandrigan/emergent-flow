@@ -21,7 +21,7 @@ from emergentflow.ir.common import Direction
 from emergentflow.ir.node import Node
 from emergentflow.ir.params import ParamValue
 from emergentflow.ml import cross_validate
-from emergentflow.ml.registry import get_estimator_spec, known_estimator_keys
+from emergentflow.ml.registry import keys_for_archetype
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
@@ -29,11 +29,6 @@ from ..spec import ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
-
-
-def _fit_archetype_keys() -> list[str]:
-    """Every registered estimator key whose archetype is "fit" (supervised), sorted."""
-    return sorted(k for k in known_estimator_keys() if get_estimator_spec(k).archetype == "fit")
 
 
 @register
@@ -69,7 +64,7 @@ class CrossValidate(NodeDefinition):
             label="Estimator",
             help="Which allow-listed sklearn classifier/regressor to cross-validate.",
             hints=ValidationHints(
-                choices=cast("list[ParamValue]", _fit_archetype_keys()), widget="select"
+                choices=cast("list[ParamValue]", keys_for_archetype("fit")), widget="select"
             ),
         ),
         ParamSpec(

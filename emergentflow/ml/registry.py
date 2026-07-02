@@ -32,6 +32,7 @@ __all__ = [
     "register_estimator",
     "get_estimator_spec",
     "known_estimator_keys",
+    "keys_for_archetype",
 ]
 
 #: The three fixed adapter shapes locked by ADR 0016 subsection 3. ("apply" is not an
@@ -128,3 +129,12 @@ def get_estimator_spec(key: str) -> EstimatorSpec:
 def known_estimator_keys() -> list[str]:
     """Return every registered estimator key, sorted for deterministic output."""
     return sorted(_REGISTRY)
+
+
+def keys_for_archetype(archetype: Archetype) -> list[str]:
+    """Every registered estimator key whose archetype is *archetype*, sorted.
+
+    Shared by every archetype node's ``estimator`` dropdown (``choices=`` hint), so the
+    fit/fit_transform/cluster_detect filter logic has exactly one implementation.
+    """
+    return sorted(k for k, spec in _REGISTRY.items() if spec.archetype == archetype)
