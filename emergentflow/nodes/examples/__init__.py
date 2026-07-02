@@ -17,12 +17,14 @@ re-implementing them inline.
 from .anova import Anova
 from .apply_estimator import ApplyEstimator
 from .cast_types import CastTypes
+from .cluster_detect import ClusterDetect
 from .correlation import Correlation
 from .describe import Describe
 from .drop_missing import DropMissing
 from .evaluate import Evaluate
 from .filter_rows import FilterRows
 from .fit_estimator import FitEstimator
+from .fit_transform import FitTransform
 from .impute import ImputeMissing
 from .load_csv import LoadCsv
 from .load_json import LoadJson
@@ -38,18 +40,21 @@ from .train import TrainClassifier
 from .train_random_forest import TrainRandomForest
 from .train_regressor import TrainRegressor
 from .train_test_split import TrainTestSplit
+from .transform import Transform
 from .ttest import TTest
 
 __all__ = [
     "Anova",
     "ApplyEstimator",
     "CastTypes",
+    "ClusterDetect",
     "Correlation",
     "Describe",
     "DropMissing",
     "Evaluate",
     "FilterRows",
     "FitEstimator",
+    "FitTransform",
     "GenerateHtmlSummary",
     "ImputeMissing",
     "LoadCsv",
@@ -65,5 +70,6 @@ __all__ = [
     "TrainRandomForest",
     "TrainRegressor",
     "TrainTestSplit",
+    "Transform",
     "TTest",
 ]

@@ -62,6 +62,30 @@
       "task": "regression"
     },
     {
+      "archetype": "cluster_detect",
+      "category": "Cluster",
+      "description": "Agglomerative Clustering.",
+      "import_path": "sklearn.cluster.AgglomerativeClustering",
+      "key": "AgglomerativeClustering",
+      "label": "Agglomerative Clustering",
+      "node_type": "ml.cluster_detect",
+      "params": [
+        {
+          "default": "ward",
+          "help": "Linkage criterion ('ward'/'complete'/'average'/'single').",
+          "name": "linkage",
+          "type": "str"
+        },
+        {
+          "default": 2,
+          "help": "Number of clusters to find.",
+          "name": "n_clusters",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
       "archetype": "fit",
       "category": "Ensemble",
       "description": "A Bagging classifier.",
@@ -108,6 +132,78 @@
         }
       ],
       "task": "regression"
+    },
+    {
+      "archetype": "cluster_detect",
+      "category": "Mixture",
+      "description": "Variational Bayesian estimation of a Gaussian mixture.",
+      "import_path": "sklearn.mixture.BayesianGaussianMixture",
+      "key": "BayesianGaussianMixture",
+      "label": "Bayesian Gaussian Mixture",
+      "node_type": "ml.cluster_detect",
+      "params": [
+        {
+          "default": 1,
+          "help": "Maximum number of mixture components.",
+          "name": "n_components",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "cluster_detect",
+      "category": "Cluster",
+      "description": "Implements the BIRCH clustering algorithm.",
+      "import_path": "sklearn.cluster.Birch",
+      "key": "Birch",
+      "label": "Birch",
+      "node_type": "ml.cluster_detect",
+      "params": [
+        {
+          "default": 3,
+          "help": "Number of clusters after the final clustering step.",
+          "name": "n_clusters",
+          "type": "int"
+        },
+        {
+          "default": 0.5,
+          "help": "Radius threshold for a new subcluster to be started.",
+          "name": "threshold",
+          "type": "float"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "cluster_detect",
+      "category": "Cluster",
+      "description": "Perform DBSCAN clustering from vector array or distance matrix.",
+      "import_path": "sklearn.cluster.DBSCAN",
+      "key": "DBSCAN",
+      "label": "DBSCAN",
+      "node_type": "ml.cluster_detect",
+      "params": [
+        {
+          "default": 0.5,
+          "help": "Maximum distance between two samples for one to be considered a neighbor of the other.",
+          "name": "eps",
+          "type": "float"
+        },
+        {
+          "default": 5,
+          "help": "Number of samples in a neighborhood for a point to be considered a core point.",
+          "name": "min_samples",
+          "type": "int"
+        }
+      ],
+      "task": null
     },
     {
       "archetype": "fit",
@@ -206,6 +302,30 @@
       "task": "regression"
     },
     {
+      "archetype": "cluster_detect",
+      "category": "Covariance",
+      "description": "An object for detecting outliers in a Gaussian distributed dataset.",
+      "import_path": "sklearn.covariance.EllipticEnvelope",
+      "key": "EllipticEnvelope",
+      "label": "Elliptic Envelope",
+      "node_type": "ml.cluster_detect",
+      "params": [
+        {
+          "default": 0.1,
+          "help": "Expected proportion of outliers in the data.",
+          "name": "contamination",
+          "type": "float"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
       "archetype": "fit",
       "category": "Ensemble",
       "description": "An extra-trees classifier.",
@@ -264,6 +384,54 @@
         }
       ],
       "task": "regression"
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Decomposition",
+      "description": "Factor Analysis (FA).",
+      "import_path": "sklearn.decomposition.FactorAnalysis",
+      "key": "FactorAnalysis",
+      "label": "Factor Analysis",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": 2,
+          "help": "Number of latent factors (dimensionality of the state space).",
+          "name": "n_components",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Decomposition",
+      "description": "FastICA: a fast algorithm for Independent Component Analysis.",
+      "import_path": "sklearn.decomposition.FastICA",
+      "key": "FastICA",
+      "label": "Fast ICA",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": 2,
+          "help": "Number of components to use.",
+          "name": "n_components",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": null
     },
     {
       "archetype": "cluster_detect",
@@ -441,6 +609,60 @@
     },
     {
       "archetype": "cluster_detect",
+      "category": "Ensemble",
+      "description": "Isolation Forest Algorithm.",
+      "import_path": "sklearn.ensemble.IsolationForest",
+      "key": "IsolationForest",
+      "label": "Isolation Forest",
+      "node_type": "ml.cluster_detect",
+      "params": [
+        {
+          "default": "auto",
+          "help": "Expected proportion of outliers in the data.",
+          "name": "contamination",
+          "type": "str"
+        },
+        {
+          "default": 100,
+          "help": "Number of base estimators.",
+          "name": "n_estimators",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Manifold",
+      "description": "Isomap Embedding.",
+      "import_path": "sklearn.manifold.Isomap",
+      "key": "Isomap",
+      "label": "Isomap",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": 2,
+          "help": "Number of coordinates for the manifold.",
+          "name": "n_components",
+          "type": "int"
+        },
+        {
+          "default": 5,
+          "help": "Number of neighbors to consider for each point.",
+          "name": "n_neighbors",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "cluster_detect",
       "category": "Cluster",
       "description": "K-Means clustering.",
       "import_path": "sklearn.cluster.KMeans",
@@ -596,6 +818,36 @@
       "task": "classification"
     },
     {
+      "archetype": "cluster_detect",
+      "category": "Neighbors",
+      "description": "Unsupervised Outlier Detection using the Local Outlier Factor (LOF).",
+      "import_path": "sklearn.neighbors.LocalOutlierFactor",
+      "key": "LocalOutlierFactor",
+      "label": "Local Outlier Factor",
+      "node_type": "ml.cluster_detect",
+      "params": [
+        {
+          "default": "auto",
+          "help": "Expected proportion of outliers in the data.",
+          "name": "contamination",
+          "type": "str"
+        },
+        {
+          "default": 20,
+          "help": "Number of neighbors to use.",
+          "name": "n_neighbors",
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "Must be True to support predicting on data after a separate fit().",
+          "name": "novelty",
+          "type": "bool"
+        }
+      ],
+      "task": null
+    },
+    {
       "archetype": "fit",
       "category": "Linear Model",
       "description": "Logistic Regression (aka logit, MaxEnt) classifier.",
@@ -626,6 +878,81 @@
       "task": "classification"
     },
     {
+      "archetype": "cluster_detect",
+      "category": "Cluster",
+      "description": "Mean shift clustering using a flat kernel.",
+      "import_path": "sklearn.cluster.MeanShift",
+      "key": "MeanShift",
+      "label": "Mean Shift",
+      "node_type": "ml.cluster_detect",
+      "params": [
+        {
+          "default": null,
+          "help": "Kernel bandwidth (None = auto-estimated).",
+          "name": "bandwidth",
+          "type": "any"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Transform features by scaling each feature to a given range.",
+      "import_path": "sklearn.preprocessing.MinMaxScaler",
+      "key": "MinMaxScaler",
+      "label": "Min Max Scaler",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": false,
+          "help": "Clip transformed values to feature_range.",
+          "name": "clip",
+          "type": "bool"
+        },
+        {
+          "default": [
+            0,
+            1
+          ],
+          "help": "Desired range of transformed data (min, max).",
+          "name": "feature_range",
+          "type": "any"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "cluster_detect",
+      "category": "Cluster",
+      "description": "Mini-Batch K-Means clustering.",
+      "import_path": "sklearn.cluster.MiniBatchKMeans",
+      "key": "MiniBatchKMeans",
+      "label": "Mini Batch K Means",
+      "node_type": "ml.cluster_detect",
+      "params": [
+        {
+          "default": 1024,
+          "help": "Size of the mini batches.",
+          "name": "batch_size",
+          "type": "int"
+        },
+        {
+          "default": 8,
+          "help": "Number of clusters to form.",
+          "name": "n_clusters",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
       "archetype": "fit",
       "category": "Naive Bayes",
       "description": "Naive Bayes classifier for multinomial models.",
@@ -642,6 +969,168 @@
         }
       ],
       "task": "classification"
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Decomposition",
+      "description": "Non-Negative Matrix Factorization (NMF).",
+      "import_path": "sklearn.decomposition.NMF",
+      "key": "NMF",
+      "label": "NMF",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": 200,
+          "help": "Maximum number of iterations.",
+          "name": "max_iter",
+          "type": "int"
+        },
+        {
+          "default": 2,
+          "help": "Number of components.",
+          "name": "n_components",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Normalize samples individually to unit norm.",
+      "import_path": "sklearn.preprocessing.Normalizer",
+      "key": "Normalizer",
+      "label": "Normalizer",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": "l2",
+          "help": "Norm to use ('l1'/'l2'/'max').",
+          "name": "norm",
+          "type": "str"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "cluster_detect",
+      "category": "SVM",
+      "description": "Unsupervised Outlier Detection.",
+      "import_path": "sklearn.svm.OneClassSVM",
+      "key": "OneClassSVM",
+      "label": "One Class SVM",
+      "node_type": "ml.cluster_detect",
+      "params": [
+        {
+          "default": "rbf",
+          "help": "Kernel type ('linear'/'poly'/'rbf'/'sigmoid').",
+          "name": "kernel",
+          "type": "str"
+        },
+        {
+          "default": 0.5,
+          "help": "Upper bound on the fraction of training errors.",
+          "name": "nu",
+          "type": "float"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Encode categorical features as a one-hot numeric array.",
+      "import_path": "sklearn.preprocessing.OneHotEncoder",
+      "key": "OneHotEncoder",
+      "label": "One Hot Encoder",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": "error",
+          "help": "How to handle unknown categories at transform time.",
+          "name": "handle_unknown",
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "Return a dense array instead of a sparse matrix.",
+          "name": "sparse_output",
+          "type": "bool"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Encode categorical features as an integer array.",
+      "import_path": "sklearn.preprocessing.OrdinalEncoder",
+      "key": "OrdinalEncoder",
+      "label": "Ordinal Encoder",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": "error",
+          "help": "How to handle unknown categories at transform time.",
+          "name": "handle_unknown",
+          "type": "str"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Decomposition",
+      "description": "Principal component analysis (PCA).",
+      "import_path": "sklearn.decomposition.PCA",
+      "key": "PCA",
+      "label": "PCA",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": 2,
+          "help": "Number of components to keep.",
+          "name": "n_components",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Generate polynomial and interaction features.",
+      "import_path": "sklearn.preprocessing.PolynomialFeatures",
+      "key": "PolynomialFeatures",
+      "label": "Polynomial Features",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": 2,
+          "help": "The degree of the polynomial features.",
+          "name": "degree",
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "Include a bias (intercept) column of all ones.",
+          "name": "include_bias",
+          "type": "bool"
+        }
+      ],
+      "task": null
     },
     {
       "archetype": "fit",
@@ -744,6 +1233,30 @@
         }
       ],
       "task": "regression"
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Scale features using statistics that are robust to outliers.",
+      "import_path": "sklearn.preprocessing.RobustScaler",
+      "key": "RobustScaler",
+      "label": "Robust Scaler",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": true,
+          "help": "Center the data before scaling.",
+          "name": "with_centering",
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "Scale the data to the IQR.",
+          "name": "with_scaling",
+          "type": "bool"
+        }
+      ],
+      "task": null
     },
     {
       "archetype": "fit",
@@ -873,6 +1386,48 @@
     },
     {
       "archetype": "fit_transform",
+      "category": "Feature Selection",
+      "description": "Select features according to the k highest scores.",
+      "import_path": "sklearn.feature_selection.SelectKBest",
+      "key": "SelectKBest",
+      "label": "Select K Best",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": 10,
+          "help": "Number of top features to select.",
+          "name": "k",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "cluster_detect",
+      "category": "Cluster",
+      "description": "Apply clustering to a projection of the normalized Laplacian.",
+      "import_path": "sklearn.cluster.SpectralClustering",
+      "key": "SpectralClustering",
+      "label": "Spectral Clustering",
+      "node_type": "ml.cluster_detect",
+      "params": [
+        {
+          "default": 8,
+          "help": "Number of clusters to find.",
+          "name": "n_clusters",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
       "category": "Preprocessing",
       "description": "Standardize features by removing the mean and scaling to unit variance.",
       "import_path": "sklearn.preprocessing.StandardScaler",
@@ -891,6 +1446,78 @@
           "help": "Scale the data to unit variance.",
           "name": "with_std",
           "type": "bool"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Manifold",
+      "description": "T-distributed Stochastic Neighbor Embedding.",
+      "import_path": "sklearn.manifold.TSNE",
+      "key": "TSNE",
+      "label": "TSNE",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": 2,
+          "help": "Dimension of the embedded space.",
+          "name": "n_components",
+          "type": "int"
+        },
+        {
+          "default": 30.0,
+          "help": "Related to the number of nearest neighbors used in other manifold learning algorithms.",
+          "name": "perplexity",
+          "type": "float"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Decomposition",
+      "description": "Dimensionality reduction using truncated SVD (aka LSA).",
+      "import_path": "sklearn.decomposition.TruncatedSVD",
+      "key": "TruncatedSVD",
+      "label": "Truncated SVD",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": 2,
+          "help": "Desired dimensionality of output data.",
+          "name": "n_components",
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Feature Selection",
+      "description": "Feature selector that removes all low-variance features.",
+      "import_path": "sklearn.feature_selection.VarianceThreshold",
+      "key": "VarianceThreshold",
+      "label": "Variance Threshold",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "default": 0.0,
+          "help": "Features with variance below this are removed.",
+          "name": "threshold",
+          "type": "float"
         }
       ],
       "task": null
@@ -1531,6 +2158,96 @@
     },
     {
       "category": "Machine Learning",
+      "description": "Fit a curated, allow-listed sklearn clustering/mixture/outlier-detection estimator.",
+      "family": "ml",
+      "label": "Cluster / Detect",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which allow-listed sklearn clustering/mixture/outlier-detection estimator to fit.",
+          "hints": {
+            "choices": [
+              "AgglomerativeClustering",
+              "BayesianGaussianMixture",
+              "Birch",
+              "DBSCAN",
+              "EllipticEnvelope",
+              "GaussianMixture",
+              "IsolationForest",
+              "KMeans",
+              "LocalOutlierFactor",
+              "MeanShift",
+              "MiniBatchKMeans",
+              "OneClassSVM",
+              "SpectralClustering"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Estimator",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to use as features; empty/unset uses every column.",
+          "hints": null,
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": {},
+          "help": "Constructor kwargs for the chosen estimator (allow-listed per estimator).",
+          "hints": null,
+          "label": "Estimator params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing features.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "out",
+          "help": "The fitted model.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input frame with an added 'cluster' column.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "ml.cluster_detect",
+      "version": 1
+    },
+    {
+      "category": "Machine Learning",
       "description": "Score a fitted model against labeled data.",
       "family": "ml",
       "label": "Evaluate",
@@ -1672,6 +2389,108 @@
         }
       ],
       "type": "ml.fit_estimator",
+      "version": 1
+    },
+    {
+      "category": "Machine Learning",
+      "description": "Fit a curated, allow-listed sklearn unsupervised transformer.",
+      "family": "ml",
+      "label": "Fit Transform",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which allow-listed sklearn transformer to fit.",
+          "hints": {
+            "choices": [
+              "FactorAnalysis",
+              "FastICA",
+              "Isomap",
+              "MinMaxScaler",
+              "NMF",
+              "Normalizer",
+              "OneHotEncoder",
+              "OrdinalEncoder",
+              "PCA",
+              "PolynomialFeatures",
+              "RobustScaler",
+              "SelectKBest",
+              "StandardScaler",
+              "TSNE",
+              "TruncatedSVD",
+              "VarianceThreshold"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Estimator",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Only needed for supervised feature selectors (e.g. SelectKBest); leave unset for unsupervised transformers.",
+          "hints": null,
+          "label": "Target column",
+          "name": "target",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to use as features; empty/unset uses every other column (excluding the target column, if given).",
+          "hints": null,
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": {},
+          "help": "Constructor kwargs for the chosen estimator (allow-listed per estimator).",
+          "hints": null,
+          "label": "Estimator params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing features (and, for supervised feature selectors, the target column).",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Transformer",
+          "direction": "out",
+          "help": "The fitted transformer.",
+          "label": null,
+          "name": "transformer",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input frame transformed by the fitted transformer.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "ml.fit_transform",
       "version": 1
     },
     {
@@ -2027,6 +2846,67 @@
         }
       ],
       "type": "ml.train_test_split",
+      "version": 1
+    },
+    {
+      "category": "Machine Learning",
+      "description": "Apply a fitted Transformer to data via transform or score_samples.",
+      "family": "ml",
+      "label": "Transform",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "transform",
+          "help": "Which operation to apply: transform adds 'component_N' columns, score_samples adds a 'score' column.",
+          "hints": {
+            "choices": [
+              "transform",
+              "score_samples"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Operation",
+          "name": "op",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Transformer",
+          "direction": "in",
+          "help": "The fitted transformer to apply.",
+          "label": null,
+          "name": "transformer",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The data to apply the transformer to.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Input rows plus the op's output column(s).",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "ml.transform",
       "version": 1
     },
     {

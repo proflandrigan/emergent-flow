@@ -47,7 +47,9 @@ __all__ = [
     "FOREST_TASKS",
     "apply_estimator",
     "evaluate",
+    "fit_and_label",
     "fit_estimator",
+    "fit_transform",
     "predict",
     "summarize",
     "train_classifier",
@@ -382,6 +384,28 @@ def _resolve_features_for_fit(
     return feature_names
 
 
+def _resolve_estimator_and_kwargs(
+    estimator: str, params: dict[str, Any] | None
+) -> tuple[Any, dict[str, Any]]:
+    """Look up *estimator* in the allow-list registry and merge curated defaults with *params*.
+
+    Shared by every ``ef.ml.*`` adapter entry point that constructs a curated estimator, so the
+    unknown-estimator/unknown-params validation stays identical across the ``fit``,
+    ``fit_transform``, and ``cluster_detect`` archetypes. Returns ``(spec, kwargs)``.
+    """
+    spec = get_estimator_spec(estimator)
+    provided_params = params or {}
+    unknown_params = [k for k in provided_params if k not in spec.accepted_kwargs]
+    if unknown_params:
+        raise InvalidEstimatorParamsError(
+            f"unknown params {unknown_params!r} for estimator {estimator!r}; "
+            f"expected one of {sorted(spec.accepted_kwargs)!r}."
+        )
+    kwargs = {name: kwarg_spec.default for name, kwarg_spec in spec.accepted_kwargs.items()}
+    kwargs.update(provided_params)
+    return spec, kwargs
+
+
 @public_op(name="ef.ml.fit_estimator")
 def fit_estimator(
     df: pd.DataFrame,
@@ -406,23 +430,19 @@ def fit_estimator(
       ``task`` taken from the registry entry (``"classification"`` or ``"regression"``).
     * ``"cluster_detect"`` (unsupervised label/score) ignores ``target`` and returns a
       :class:`FittedModel` with ``task="clustering"`` and ``target=None``.
-    * ``"fit_transform"`` (unsupervised transformer) ignores ``target`` and returns a
+    * ``"fit_transform"`` (unsupervised transformer) returns a :class:`FittedTransformer`.
+      ``target`` is optional here: most transformers (scalers, decomposition, manifold) fit
+      unsupervised on features alone, but a curated few (e.g. ``SelectKBest``, ``RFE``,
+      ``SelectFromModel``) are supervised feature selectors that need ``y`` to score/rank
+      features. When ``target`` is given it is excluded from the resolved feature columns and
+      passed as ``y`` to ``.fit``; the fitted transformer itself never needs ``y`` again (its
+      later ``.transform(X)`` calls take features only), so ``target`` is not recorded on
       :class:`FittedTransformer`.
 
     Deterministic given a ``random_state`` kwarg where the underlying estimator accepts one.
     Never mutates ``df``.
     """
-    spec = get_estimator_spec(estimator)
-
-    provided_params = params or {}
-    unknown_params = [k for k in provided_params if k not in spec.accepted_kwargs]
-    if unknown_params:
-        raise InvalidEstimatorParamsError(
-            f"unknown params {unknown_params!r} for estimator {estimator!r}; "
-            f"expected one of {sorted(spec.accepted_kwargs)!r}."
-        )
-    kwargs = {name: kwarg_spec.default for name, kwarg_spec in spec.accepted_kwargs.items()}
-    kwargs.update(provided_params)
+    spec, kwargs = _resolve_estimator_and_kwargs(estimator, params)
 
     if spec.archetype == "fit":
         if target is None:
@@ -451,13 +471,75 @@ def fit_estimator(
         )
 
     # spec.archetype == "fit_transform"
-    feature_names = _resolve_features_for_fit(df, features, target=None)
-    est = spec.sklearn_class(**kwargs).fit(df[feature_names])
+    feature_names = _resolve_features_for_fit(df, features, target=target)
+    if target is not None:
+        if target not in df.columns:
+            raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+        est = spec.sklearn_class(**kwargs).fit(df[feature_names], df[target])
+    else:
+        est = spec.sklearn_class(**kwargs).fit(df[feature_names])
     return FittedTransformer(
         estimator_type=spec.key,
         feature_names=list(feature_names),
         transformer=est,
     )
+
+
+@public_op(name="ef.ml.fit_transform")
+def fit_transform(
+    df: pd.DataFrame,
+    *,
+    estimator: str,
+    target: str | None = None,
+    features: list[str] | None = None,
+    params: dict[str, Any] | None = None,
+) -> tuple[FittedTransformer, pd.DataFrame]:
+    """Fit a curated ``fit_transform``-archetype estimator and transform the SAME frame it fit on.
+
+    The ``ml.fit_transform`` archetype node's backend (Epic 8, Story 5 / ADR 0016). Unlike
+    :func:`fit_estimator`'s ``fit_transform`` branch (fit-only), this function calls the
+    underlying sklearn transformer's own ``.fit_transform(X[, y])`` in a single step. This
+    matters because a few curated transformers (e.g. ``TSNE``) implement ``.fit_transform()``
+    but have NO separate ``.transform()`` method at all -- calling ``.fit(X)`` then
+    ``.transform(X)`` (what :func:`apply_estimator` does) raises for those even on the training
+    data itself. ``.fit_transform()`` is universally supported by every curated transformer (the
+    baseline scikit-learn ``TransformerMixin`` contract), so this is the robust way to get both
+    the fitted transformer AND its output on one frame in a single node.
+
+    Returns ``(transformer, result)`` where ``result`` is a NEW frame (``df`` is never mutated)
+    with added ``component_0``, ``component_1``, ... columns, mirroring
+    :func:`apply_estimator`'s ``"transform"`` op column-naming convention. Raises
+    :class:`~emergentflow.ml.errors.UnknownEstimatorError` /
+    :class:`~emergentflow.ml.errors.InvalidEstimatorParamsError` exactly like
+    :func:`fit_estimator`, plus ``ValueError`` if *estimator* is not a ``fit_transform``-
+    archetype estimator, or if ``df`` already has any of the output column names.
+    """
+    spec, kwargs = _resolve_estimator_and_kwargs(estimator, params)
+    if spec.archetype != "fit_transform":
+        raise ValueError(f"{estimator!r} is not a fit_transform-archetype estimator.")
+
+    feature_names = _resolve_features_for_fit(df, features, target=target)
+    est = spec.sklearn_class(**kwargs)
+    if target is not None:
+        if target not in df.columns:
+            raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+        transformed = est.fit_transform(df[feature_names], df[target])
+    else:
+        transformed = est.fit_transform(df[feature_names])
+
+    component_cols = [f"component_{i}" for i in range(transformed.shape[1])]
+    collisions = [c for c in component_cols if c in df.columns]
+    if collisions:
+        raise ValueError(f"df already has columns {collisions!r}; rename them before transforming.")
+
+    result = df.copy()
+    result[component_cols] = transformed
+    transformer = FittedTransformer(
+        estimator_type=spec.key,
+        feature_names=list(feature_names),
+        transformer=est,
+    )
+    return transformer, result
 
 
 @public_op(name="ef.ml.apply_estimator")
@@ -530,6 +612,58 @@ def apply_estimator(
         raise ValueError("df already has a 'score' column; rename it before scoring.")
     result["score"] = live.score_samples(X)
     return result
+
+
+@public_op(name="ef.ml.fit_and_label")
+def fit_and_label(
+    df: pd.DataFrame,
+    *,
+    estimator: str,
+    features: list[str] | None = None,
+    params: dict[str, Any] | None = None,
+) -> tuple[FittedModel, pd.DataFrame]:
+    """Fit a curated ``cluster_detect``-archetype estimator and label the SAME frame it fit on.
+
+    The ``cluster_detect`` archetype's backend (Epic 8, Story 6 / ADR 0016): unlike the ``fit``
+    archetype (fit now, predict on new data later via a separate ``ml.apply_estimator`` node),
+    clustering/mixture/outlier estimators produce their labels/scores as part of fitting itself,
+    and some (``DBSCAN``, ``AgglomerativeClustering``, ``SpectralClustering``) never support
+    predicting on new data at all -- sklearn only ever gives you ``.labels_`` computed at fit
+    time for those. So this function fits via :func:`fit_estimator` and immediately labels the
+    *same* input frame, preferring the fitted ``.labels_`` attribute (present for every true
+    clustering estimator) and falling back to ``.predict(X)`` on the training data itself
+    (mixture models and outlier/novelty detectors, which don't set ``.labels_``).
+
+    Deliberately does NOT fall back to ``.labels_`` inside ``ml.apply_estimator``'s existing
+    ``"predict"`` op: that op is used to predict on a *different*, later frame, and replaying
+    stale training-time labels there regardless of the new frame's rows would be a silent
+    correctness bug, not a graceful fallback. A ``labels_``-only estimator (e.g. ``DBSCAN``)
+    correctly still raises ``ValueError`` there ("does not support predict") -- the disabled-not-
+    surprising behavior the archetype requires for estimators with no reusable predictor.
+
+    Returns ``(model, labeled_df)`` where ``labeled_df`` is a NEW frame (``df`` is never
+    mutated) with an added ``"cluster"`` column (used uniformly for clustering, mixture, and
+    outlier/novelty families alike -- continuous anomaly scores remain available separately via
+    the existing ``ml.apply_estimator`` node's ``"score_samples"`` op for estimators that support
+    it). Raises ``ValueError`` if the fitted estimator exposes neither ``.labels_`` nor
+    ``.predict`` (not expected for any curated allow-list entry) or if ``df`` already has a
+    ``"cluster"`` column.
+    """
+    model = fit_estimator(df, estimator=estimator, features=features, params=params)
+    if not isinstance(model, FittedModel):
+        raise ValueError(f"{estimator!r} is not a cluster_detect-archetype estimator.")
+    if "cluster" in df.columns:
+        raise ValueError("df already has a 'cluster' column; rename it before labeling.")
+    est = model.estimator
+    if hasattr(est, "labels_"):
+        labels = est.labels_
+    elif hasattr(est, "predict"):
+        labels = est.predict(df[model.feature_names])
+    else:
+        raise ValueError(f"{model.estimator_type} exposes neither labels_ nor predict.")
+    result = df.copy()
+    result["cluster"] = labels
+    return model, result
 
 
 # Importing the seed catalog registers its estimator allow-list entries (LogisticRegression,
