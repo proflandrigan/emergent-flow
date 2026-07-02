@@ -109,8 +109,10 @@ def generate_estimator_catalog_entries(specs: list[EstimatorSpec]) -> list[dict[
 
     Pure: output depends only on *specs*. Each entry has keys ``key``, ``node_type``,
     ``archetype``, ``task``, ``label``, ``category``, ``description``, ``import_path``, and
-    ``params`` (a list of ``{"name", "type", "default", "help"}`` dicts, one per curated
-    ``accepted_kwargs`` entry, sorted by kwarg name).
+    ``params`` (a list of ``{"name", "type", "default", "help", "choices"}`` dicts, one per
+    curated ``accepted_kwargs`` entry, sorted by kwarg name). ``choices`` is the sorted list of
+    ``KwargSpec.choices`` keys when the kwarg curates a JSON-native enum for a non-JSON-native
+    constructor value (e.g. ``SelectKBest.score_func``), otherwise ``None``.
     """
     entries = []
     for spec in specs:
@@ -130,6 +132,7 @@ def generate_estimator_catalog_entries(specs: list[EstimatorSpec]) -> list[dict[
                         "type": _infer_param_type(kwarg_spec.default),
                         "default": _json_native_default(kwarg_spec.default),
                         "help": kwarg_spec.help,
+                        "choices": sorted(kwarg_spec.choices) if kwarg_spec.choices else None,
                     }
                     for name, kwarg_spec in sorted(spec.accepted_kwargs.items())
                 ],

@@ -250,7 +250,22 @@ function EstimatorParamsField({
         const value = curated[kwarg.name] ?? kwarg.default;
         const testId = `estimator-param-${kwarg.name}`;
         let kwargWidget: JSX.Element;
-        if (kwarg.type === "bool") {
+        if (kwarg.choices && kwarg.choices.length > 0) {
+          kwargWidget = (
+            <Select
+              data-testid={testId}
+              value={value === null || value === undefined ? "" : String(value)}
+              onChange={(e) => writeCurated(kwarg.name, e.target.value)}
+            >
+              <option value="" />
+              {kwarg.choices.map((choice) => (
+                <option key={choice} value={choice}>
+                  {choice}
+                </option>
+              ))}
+            </Select>
+          );
+        } else if (kwarg.type === "bool") {
           kwargWidget = (
             <input
               type="checkbox"
@@ -264,6 +279,7 @@ function EstimatorParamsField({
             <Input
               type="number"
               data-testid={testId}
+              step={kwarg.type === "int" ? 1 : undefined}
               value={value === null || value === undefined ? "" : String(value)}
               onChange={(e) => {
                 const raw = e.target.value;
@@ -272,7 +288,11 @@ function EstimatorParamsField({
                   return;
                 }
                 const n = Number(raw);
-                writeCurated(kwarg.name, Number.isNaN(n) ? null : n);
+                if (Number.isNaN(n)) {
+                  writeCurated(kwarg.name, null);
+                  return;
+                }
+                writeCurated(kwarg.name, kwarg.type === "int" ? Math.round(n) : n);
               }}
             />
           );
@@ -317,6 +337,56 @@ function EstimatorParamsField({
   );
 }
 
+// Renders the `estimator` choice param for a curated-estimator node type. Identical to
+// ParamRow's "select" branch, except changing the estimator also resets the sibling `params`
+// dict to {} -- otherwise a kwarg valid only for the PREVIOUS estimator lingers as unrecognized
+// "overflow" in EstimatorParamsField and gets resubmitted verbatim on the next curated edit,
+// which the backend rejects with InvalidEstimatorParamsError for the newly-selected estimator.
+function EstimatorChoiceRow({ node, param, meta }: ParamRowProps): JSX.Element {
+  const setParam = useGraphStore((s) => s.setParam);
+  const catalogParam = resolveCatalogParam(meta, param);
+  const choices = catalogParam.hints?.choices ?? [];
+  const error = validateValue(catalogParam, param.value);
+  const testId = `param-${param.name}`;
+
+  return (
+    <div style={{ marginBottom: "0.75rem" }}>
+      <label
+        style={{ display: "block", fontWeight: 600, marginBottom: "0.25rem" }}
+      >
+        {meta?.label ?? param.name}
+        {catalogParam.required ? " *" : ""}
+      </label>
+      <Select
+        data-testid={testId}
+        value={formatValue(catalogParam, param.value)}
+        onChange={(e) => {
+          const next = parseValue(catalogParam, e.target.value);
+          if (next !== param.value) {
+            setParam(node.id, ESTIMATOR_PARAMS_PARAM_NAME, {});
+          }
+          setParam(node.id, param.name, next);
+        }}
+      >
+        <option value="" />
+        {choices.map((choice) => (
+          <option key={choice} value={choice}>
+            {choice}
+          </option>
+        ))}
+      </Select>
+      {meta?.help ? (
+        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{meta.help}</div>
+      ) : null}
+      {error ? (
+        <span data-testid={`error-${param.name}`} style={{ color: "var(--danger)" }}>
+          {error}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export function ConfigForm({ node }: { node: NodeModel }): JSX.Element {
   const catalog = useCatalog();
   const spec = catalog.nodes.find((n) => n.type === node.type);
@@ -352,6 +422,14 @@ export function ConfigForm({ node }: { node: NodeModel }): JSX.Element {
               meta={meta}
               estimator={catalogEstimator}
             />
+          );
+        }
+        if (
+          ESTIMATOR_PARAMS_NODE_TYPES.has(node.type) &&
+          param.name === ESTIMATOR_CHOICE_PARAM_NAME
+        ) {
+          return (
+            <EstimatorChoiceRow key={param.name} node={node} param={param} meta={meta} />
           );
         }
         return <ParamRow key={param.name} node={node} param={param} meta={meta} />;

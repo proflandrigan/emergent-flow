@@ -141,3 +141,74 @@ test("a node type outside the curated-estimator list still uses the plain JSON w
   expect(screen.getByTestId("param-param_grid")).toBeInTheDocument();
   expect(screen.queryByTestId(/estimator-param-/)).not.toBeInTheDocument();
 });
+
+test("ml.pipeline's list-of-dict steps param renders readable JSON, not [object Object]", () => {
+  const id = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("ml.pipeline"), { x: 0, y: 0 });
+  useGraphStore.getState().setParam(id, "steps", [
+    { estimator: "StandardScaler", params: {} },
+    { estimator: "GradientBoostingClassifier", params: { n_estimators: 50 } },
+  ]);
+  const node = useGraphStore.getState().nodes[id];
+  render(<ConfigForm node={node} />);
+
+  const textarea = screen.getByTestId("param-steps") as HTMLTextAreaElement;
+  expect(textarea.value).not.toContain("[object Object]");
+  expect(textarea.value).toContain("StandardScaler");
+  expect(textarea.value).toContain("GradientBoostingClassifier");
+});
+
+test("a curated kwarg with catalog choices renders a select, not a free-text input", () => {
+  const id = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("ml.fit_transform"), { x: 0, y: 0 });
+  useGraphStore.getState().setParam(id, "estimator", "SelectKBest");
+  const node = useGraphStore.getState().nodes[id];
+  render(<ConfigForm node={node} />);
+
+  const select = screen.getByTestId("estimator-param-score_func") as HTMLSelectElement;
+  expect(select.tagName).toBe("SELECT");
+  const options = Array.from(select.querySelectorAll("option")).map((o) => o.value);
+  expect(options).toEqual([
+    "",
+    "f_classif",
+    "f_regression",
+    "mutual_info_classif",
+    "mutual_info_regression",
+  ]);
+
+  fireEvent.change(select, { target: { value: "f_regression" } });
+  const updated = useGraphStore
+    .getState()
+    .nodes[id].params.find((p) => p.name === "params");
+  expect((updated?.value as Record<string, unknown>).score_func).toBe("f_regression");
+});
+
+test("switching estimator clears kwargs that don't belong to the newly selected estimator", () => {
+  const id = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("ml.fit_estimator"), { x: 0, y: 0 });
+  useGraphStore.getState().setParam(id, "estimator", "RandomForestClassifier");
+  useGraphStore.getState().setParam(id, "params", { n_estimators: 100 });
+  let node = useGraphStore.getState().nodes[id];
+  const { rerender } = render(<ConfigForm node={node} />);
+
+  const select = screen.getByTestId("param-estimator") as HTMLSelectElement;
+  fireEvent.change(select, { target: { value: "LogisticRegression" } });
+
+  const updatedParams = useGraphStore
+    .getState()
+    .nodes[id].params.find((p) => p.name === "params");
+  expect(updatedParams?.value).toEqual({});
+
+  // Re-render with the fresh node and confirm the stale kwarg isn't resurrected as "overflow"
+  // and resubmitted on the next curated edit (which would previously crash with
+  // InvalidEstimatorParamsError on the backend for the newly-selected estimator).
+  node = useGraphStore.getState().nodes[id];
+  rerender(<ConfigForm node={node} />);
+  const advanced = screen.getByTestId(
+    "estimator-params-advanced-params",
+  ) as HTMLTextAreaElement;
+  expect(JSON.parse(advanced.value)).toEqual({});
+});

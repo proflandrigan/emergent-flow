@@ -4,6 +4,7 @@ import type { CatalogParam } from "../catalog/types";
 import {
   formatValue,
   isDictType,
+  isListOfDictType,
   isListType,
   parseValue,
   validateValue,
@@ -246,5 +247,62 @@ describe("validateValue - json", () => {
   test("empty object is not treated as empty/required-violating", () => {
     const p = param({ type_token: "dict[str, any]", required: true });
     expect(validateValue(p, {})).toBeNull();
+  });
+
+  test("a JSON array where a dict is expected -> message", () => {
+    const p = param({ type_token: "dict[str, any]" });
+    expect(validateValue(p, [1, 2])).toBe("Must be a JSON object");
+  });
+
+  test("a JSON scalar where a dict is expected -> message", () => {
+    const p = param({ type_token: "dict[str, any]" });
+    expect(validateValue(p, 42)).toBe("Must be a JSON object");
+  });
+});
+
+describe("isListOfDictType", () => {
+  test("true for list[dict[str, any]]", () => {
+    expect(isListOfDictType("list[dict[str, any]]")).toBe(true);
+  });
+
+  test("false for list[str]", () => {
+    expect(isListOfDictType("list[str]")).toBe(false);
+  });
+
+  test("false for dict[str, any]", () => {
+    expect(isListOfDictType("dict[str, any]")).toBe(false);
+  });
+});
+
+describe("widgetForParam - list of dict", () => {
+  test("list[dict[str, any]] -> json, not list", () => {
+    expect(widgetForParam(param({ type_token: "list[dict[str, any]]" }))).toBe("json");
+  });
+});
+
+describe("formatValue - list of dict", () => {
+  test("list-of-dict param pretty-prints as JSON, not '[object Object]'", () => {
+    const p = param({ type_token: "list[dict[str, any]]" });
+    const steps = [{ estimator: "StandardScaler", params: {} }];
+    expect(formatValue(p, steps)).toBe(JSON.stringify(steps, null, 2));
+  });
+});
+
+describe("parseValue - list of dict", () => {
+  test("valid JSON array of objects parses to an array of objects", () => {
+    const p = param({ type_token: "list[dict[str, any]]" });
+    expect(parseValue(p, '[{"estimator": "PCA"}]')).toEqual([{ estimator: "PCA" }]);
+  });
+});
+
+describe("validateValue - list of dict", () => {
+  test("valid array value -> null", () => {
+    const p = param({ type_token: "list[dict[str, any]]" });
+    expect(validateValue(p, [{ estimator: "PCA" }])).toBeNull();
+  });
+
+  test("a JSON object where a list is expected -> message", () => {
+    const p = param({ type_token: "list[dict[str, any]]" });
+    expect(validateValue(p, { estimator: "PCA" })).toBe("Must be a JSON array");
   });
 });

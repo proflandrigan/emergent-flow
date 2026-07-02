@@ -53,6 +53,7 @@ export interface CatalogEstimatorParam {
   type: "bool" | "int" | "float" | "str" | "any";
   default?: unknown;
   help?: string;
+  choices?: string[] | null;
 }
 
 export interface CatalogEstimator {

@@ -17,9 +17,16 @@ export function isDictType(typeToken: string): boolean {
   return typeToken === "dict" || typeToken.startsWith("dict[");
 }
 
+// True when the type token is a list whose elements are themselves dicts/objects, e.g.
+// "list[dict[str, any]]" (ml.pipeline's `steps`). A flat comma-separated "list" widget can't
+// represent per-item object structure, so this shape needs the JSON widget instead.
+export function isListOfDictType(typeToken: string): boolean {
+  return typeToken.startsWith("list[dict") || typeToken.startsWith("list[dict[");
+}
+
 // Choose the widget. Precedence: explicit choices -> "select"; then by type_token:
-//   "bool" -> "checkbox"; "int"|"float" -> "number"; dict types -> "json"; list types -> "list";
-//   otherwise "text".
+//   "bool" -> "checkbox"; "int"|"float" -> "number"; dict types (incl. list-of-dict) -> "json";
+//   list types -> "list"; otherwise "text".
 export function widgetForParam(param: CatalogParam): WidgetKind {
   if (param.hints?.choices) {
     return "select";
@@ -30,7 +37,7 @@ export function widgetForParam(param: CatalogParam): WidgetKind {
   if (param.type_token === "int" || param.type_token === "float") {
     return "number";
   }
-  if (isDictType(param.type_token)) {
+  if (isDictType(param.type_token) || isListOfDictType(param.type_token)) {
     return "json";
   }
   if (isListType(param.type_token)) {
@@ -142,6 +149,13 @@ export function validateValue(
     // means the user's last edit was invalid JSON.
     if (typeof value === "string") {
       return "Invalid JSON";
+    }
+    if (isListOfDictType(param.type_token)) {
+      if (!Array.isArray(value)) {
+        return "Must be a JSON array";
+      }
+    } else if (value === null || typeof value !== "object" || Array.isArray(value)) {
+      return "Must be a JSON object";
     }
     return null;
   }

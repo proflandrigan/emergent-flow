@@ -152,7 +152,29 @@ def test_params_keys_present():
     specs = [_make_spec()]
     entries = generate_estimator_catalog_entries(specs)
     for param in entries[0]["params"]:
-        assert set(param) == {"name", "type", "default", "help"}
+        assert set(param) == {"name", "type", "default", "help", "choices"}
+
+
+def test_param_without_choices_is_none():
+    specs = [_make_spec()]
+    entries = generate_estimator_catalog_entries(specs)
+    assert entries[0]["params"][0]["choices"] is None
+
+
+def test_param_with_choices_is_sorted_key_list():
+    specs = [
+        _make_spec(
+            accepted_kwargs={
+                "score_func": KwargSpec(
+                    default="b",
+                    help="Scoring function.",
+                    choices={"b": object(), "a": object()},
+                ),
+            },
+        )
+    ]
+    entries = generate_estimator_catalog_entries(specs)
+    assert entries[0]["params"][0]["choices"] == ["a", "b"]
 
 
 def test_param_type_bool():
