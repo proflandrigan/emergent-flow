@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import type { CatalogParam } from "../catalog/types";
 import {
   formatValue,
+  isDictType,
   isListType,
   parseValue,
   validateValue,
@@ -182,5 +183,68 @@ describe("validateValue", () => {
   test("string longer than max_length -> message", () => {
     const p = param({ hints: { max_length: 2 } });
     expect(validateValue(p, "abc")).toBe("Must be at most 2 characters");
+  });
+});
+
+describe("isDictType", () => {
+  test("true for dict[str, any]", () => {
+    expect(isDictType("dict[str, any]")).toBe(true);
+  });
+
+  test("true for bare dict", () => {
+    expect(isDictType("dict")).toBe(true);
+  });
+
+  test("false for str", () => {
+    expect(isDictType("str")).toBe(false);
+  });
+});
+
+describe("widgetForParam - json", () => {
+  test("dict[str, any] -> json", () => {
+    expect(widgetForParam(param({ type_token: "dict[str, any]" }))).toBe("json");
+  });
+});
+
+describe("formatValue - json", () => {
+  test("dict param pretty-prints as JSON", () => {
+    const p = param({ type_token: "dict[str, any]" });
+    expect(formatValue(p, { n_estimators: 50 })).toBe(
+      JSON.stringify({ n_estimators: 50 }, null, 2),
+    );
+  });
+
+  test("empty dict formats as '{}'", () => {
+    const p = param({ type_token: "dict[str, any]" });
+    expect(formatValue(p, {})).toBe("{}");
+  });
+});
+
+describe("parseValue - json", () => {
+  test("valid JSON object parses to an object", () => {
+    const p = param({ type_token: "dict[str, any]" });
+    expect(parseValue(p, '{"k": 1}')).toEqual({ k: 1 });
+  });
+
+  test("invalid JSON is returned as the raw string", () => {
+    const p = param({ type_token: "dict[str, any]" });
+    expect(parseValue(p, "{not json")).toBe("{not json");
+  });
+});
+
+describe("validateValue - json", () => {
+  test("valid object value -> null", () => {
+    const p = param({ type_token: "dict[str, any]" });
+    expect(validateValue(p, { k: 1 })).toBeNull();
+  });
+
+  test("invalid JSON (string value) -> Invalid JSON", () => {
+    const p = param({ type_token: "dict[str, any]" });
+    expect(validateValue(p, "{not json")).toBe("Invalid JSON");
+  });
+
+  test("empty object is not treated as empty/required-violating", () => {
+    const p = param({ type_token: "dict[str, any]", required: true });
+    expect(validateValue(p, {})).toBeNull();
   });
 });

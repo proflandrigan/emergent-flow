@@ -2855,6 +2855,36 @@
     },
     {
       "category": "Machine Learning",
+      "description": "Return a structural, inspectable summary of a fitted model.",
+      "family": "ml",
+      "label": "Summarize",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted model to summarize.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "ModelSummary",
+          "direction": "out",
+          "help": "Inspectable, JSON-native structural summary.",
+          "label": null,
+          "name": "summary",
+          "required": true
+        }
+      ],
+      "type": "ml.summarize",
+      "version": 1
+    },
+    {
+      "category": "Machine Learning",
       "description": "Train a logistic-regression classifier and report evaluation metrics.",
       "family": "ml",
       "label": "Train Classifier",

@@ -77,3 +77,67 @@ test("renders the no-params message when the node has no params", () => {
   addNode("nn.module");
   expect(screen.getByTestId("config-no-params")).toBeInTheDocument();
 });
+
+test("renders curated per-kwarg widgets once a recognized estimator is selected", () => {
+  const id = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("ml.fit_estimator"), { x: 0, y: 0 });
+  useGraphStore.getState().setParam(id, "estimator", "RandomForestClassifier");
+  const node = useGraphStore.getState().nodes[id];
+  render(<ConfigForm node={node} />);
+
+  const estimator = catalog.estimators.find((e) => e.key === "RandomForestClassifier");
+  expect(estimator).toBeDefined();
+  for (const kwarg of estimator!.params) {
+    expect(screen.getByTestId(`estimator-param-${kwarg.name}`)).toBeInTheDocument();
+  }
+});
+
+test("editing a curated kwarg field updates only that key in the params dict", () => {
+  const id = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("ml.fit_estimator"), { x: 0, y: 0 });
+  useGraphStore.getState().setParam(id, "estimator", "RandomForestClassifier");
+  useGraphStore.getState().setParam(id, "params", { n_estimators: 100 });
+  const node = useGraphStore.getState().nodes[id];
+  render(<ConfigForm node={node} />);
+
+  const input = screen.getByTestId("estimator-param-n_estimators") as HTMLInputElement;
+  fireEvent.change(input, { target: { value: "250" } });
+
+  const updated = useGraphStore
+    .getState()
+    .nodes[id].params.find((p) => p.name === "params");
+  expect((updated?.value as Record<string, unknown>).n_estimators).toBe(250);
+});
+
+test("editing the advanced params JSON textarea merges into the dict without clobbering curated values", () => {
+  const id = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("ml.fit_estimator"), { x: 0, y: 0 });
+  useGraphStore.getState().setParam(id, "estimator", "RandomForestClassifier");
+  useGraphStore.getState().setParam(id, "params", { n_estimators: 100 });
+  const node = useGraphStore.getState().nodes[id];
+  render(<ConfigForm node={node} />);
+
+  const textarea = screen.getByTestId("estimator-params-advanced-params");
+  fireEvent.change(textarea, { target: { value: '{"class_weight": "balanced"}' } });
+
+  const updated = useGraphStore
+    .getState()
+    .nodes[id].params.find((p) => p.name === "params");
+  const value = updated?.value as Record<string, unknown>;
+  expect(value.class_weight).toBe("balanced");
+  expect(value.n_estimators).toBe(100);
+});
+
+test("a node type outside the curated-estimator list still uses the plain JSON widget for its dict param", () => {
+  const id = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("ml.grid_search"), { x: 0, y: 0 });
+  const node = useGraphStore.getState().nodes[id];
+  render(<ConfigForm node={node} />);
+
+  expect(screen.getByTestId("param-param_grid")).toBeInTheDocument();
+  expect(screen.queryByTestId(/estimator-param-/)).not.toBeInTheDocument();
+});

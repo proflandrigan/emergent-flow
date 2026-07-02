@@ -149,6 +149,7 @@ def test_codegen_is_ruff_clean(name: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.equivalence
 def test_pipeline_equivalence_supervised_final_step() -> None:
     """execute == running the emitted code, for a pipeline ending in a fit-archetype step."""
     df = _classification_df()
@@ -173,6 +174,7 @@ def test_pipeline_equivalence_supervised_final_step() -> None:
     )
 
 
+@pytest.mark.equivalence
 def test_pipeline_equivalence_cluster_detect_final_step() -> None:
     """execute == running the emitted code, for a pipeline ending in a cluster_detect step."""
     df = _classification_df()  # features only matter here; label column is simply unused
@@ -221,6 +223,7 @@ def test_pipeline_allows_repeated_estimator_key_across_steps() -> None:
     model.estimator.predict(df[model.feature_names])  # doesn't raise
 
 
+@pytest.mark.equivalence
 def test_grid_search_equivalence() -> None:
     """execute == running the emitted code, for ml.grid_search."""
     df = _classification_df()
@@ -265,6 +268,7 @@ def test_grid_search_preserves_curated_defaults_outside_param_grid() -> None:
     assert model.estimator.random_state == 0
 
 
+@pytest.mark.equivalence
 def test_cross_validate_equivalence() -> None:
     """execute == running the emitted code, for ml.cross_validate."""
     df = _classification_df()
