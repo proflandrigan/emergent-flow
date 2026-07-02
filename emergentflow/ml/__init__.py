@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import contextlib
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -402,7 +402,14 @@ def _resolve_estimator_and_kwargs(
             f"expected one of {sorted(spec.accepted_kwargs)!r}."
         )
     kwargs = {name: kwarg_spec.default for name, kwarg_spec in spec.accepted_kwargs.items()}
-    kwargs.update(provided_params)
+    for name, value in provided_params.items():
+        default = spec.accepted_kwargs[name].default
+        # JSON (and therefore every UI/codegen-supplied override) has no tuple type, so a
+        # tuple-typed curated default (e.g. MinMaxScaler's feature_range) always arrives here
+        # as a list; sklearn's own param validation rejects a list where it requires a tuple.
+        if isinstance(default, tuple) and isinstance(value, list):
+            value = tuple(value)
+        kwargs[name] = value
     return spec, kwargs
 
 
@@ -645,20 +652,26 @@ def fit_and_label(
     mutated) with an added ``"cluster"`` column (used uniformly for clustering, mixture, and
     outlier/novelty families alike -- continuous anomaly scores remain available separately via
     the existing ``ml.apply_estimator`` node's ``"score_samples"`` op for estimators that support
-    it). Raises ``ValueError`` if the fitted estimator exposes neither ``.labels_`` nor
-    ``.predict`` (not expected for any curated allow-list entry) or if ``df`` already has a
-    ``"cluster"`` column.
+    it). Raises ``ValueError`` if *estimator* is not a ``cluster_detect``-archetype estimator, if
+    ``df`` already has a ``"cluster"`` column, or if the fitted estimator exposes none of
+    ``.labels_``, ``.predict``, ``.fit_predict`` (the last covers ``LocalOutlierFactor`` with
+    ``novelty=False``, whose ``.predict`` is only available when ``novelty=True``).
     """
-    model = fit_estimator(df, estimator=estimator, features=features, params=params)
-    if not isinstance(model, FittedModel):
+    spec = get_estimator_spec(estimator)
+    if spec.archetype != "cluster_detect":
         raise ValueError(f"{estimator!r} is not a cluster_detect-archetype estimator.")
     if "cluster" in df.columns:
         raise ValueError("df already has a 'cluster' column; rename it before labeling.")
+    # spec.archetype == "cluster_detect" guarantees fit_estimator returns a FittedModel.
+    fitted = fit_estimator(df, estimator=estimator, features=features, params=params)
+    model = cast(FittedModel, fitted)
     est = model.estimator
     if hasattr(est, "labels_"):
         labels = est.labels_
     elif hasattr(est, "predict"):
         labels = est.predict(df[model.feature_names])
+    elif hasattr(est, "fit_predict"):
+        labels = est.fit_predict(df[model.feature_names])
     else:
         raise ValueError(f"{model.estimator_type} exposes neither labels_ nor predict.")
     result = df.copy()

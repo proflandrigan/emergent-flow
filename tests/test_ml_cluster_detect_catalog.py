@@ -34,6 +34,7 @@ from emergentflow.codegen.compiler import compile_to_code
 from emergentflow.ir.common import Direction
 from emergentflow.ir.edge import Edge, PortRef
 from emergentflow.ir.graph import Graph
+from emergentflow.ml import fit_and_label
 from emergentflow.ml.registry import get_estimator_spec, known_estimator_keys
 from emergentflow.nodes.examples import ApplyEstimator, ClusterDetect, LoadSample
 
@@ -217,3 +218,29 @@ def test_labels_only_estimator_rejects_predict_on_new_data(estimator_key: str) -
     apply_node = apply_defn.instantiate(op="predict")
     with pytest.raises(ValueError, match="does not support predict"):
         apply_defn.execute(apply_node, inputs={"model": model, "frame": new_df})
+
+
+# ---------------------------------------------------------------------------
+# 4. ``ef.ml.fit_and_label`` archetype validation and the LocalOutlierFactor(novelty=False) path.
+# ---------------------------------------------------------------------------
+
+
+def test_fit_and_label_rejects_fit_archetype_estimator_up_front() -> None:
+    """A ``fit``-archetype (supervised) estimator must be rejected with a clear
+    not-a-cluster_detect-archetype error, not the unrelated "requires a target column" error
+    that leaks out of ``fit_estimator``'s internal ``fit`` branch."""
+    df = _blob_df()
+    with pytest.raises(ValueError, match="not a cluster_detect-archetype estimator"):
+        fit_and_label(df, estimator="LogisticRegression", features=_FEATURES)
+
+
+def test_fit_and_label_local_outlier_factor_novelty_false() -> None:
+    """LocalOutlierFactor with ``novelty=False`` has neither ``.labels_`` nor ``.predict``
+    (sklearn only exposes ``.predict`` when ``novelty=True``) -- ``fit_and_label`` must fall
+    back to ``.fit_predict()`` instead of raising."""
+    df = _blob_df()
+    model, result = fit_and_label(
+        df, estimator="LocalOutlierFactor", features=_FEATURES, params={"novelty": False}
+    )
+    assert "cluster" in result.columns
+    assert set(result["cluster"].unique()).issubset({-1, 1})

@@ -199,3 +199,27 @@ def test_transform_node_rejects_labels_only_style_transformer_on_new_data() -> N
     tr_node = tr_defn.instantiate(op="transform")
     with pytest.raises(ValueError, match="does not support transform"):
         tr_defn.execute(tr_node, inputs={"transformer": transformer, "frame": new_df})
+
+
+# ---------------------------------------------------------------------------
+# 4. Tuple-typed curated defaults (e.g. MinMaxScaler.feature_range) must accept a JSON-native
+#    list override, not just the curated tuple default itself.
+# ---------------------------------------------------------------------------
+
+
+def test_tuple_typed_param_accepts_list_override() -> None:
+    """A caller-supplied override for a tuple-typed kwarg default arrives as a JSON-native list
+    (there is no tuple type in JSON) -- ``ml.fit_transform`` must coerce it back to a tuple
+    before constructing the estimator, not hand sklearn's strict param validation a list."""
+    df = _fit_transform_df()
+    fit_defn = FitTransform()
+    fit_node = fit_defn.instantiate(
+        estimator="MinMaxScaler",
+        features=_NUMERIC_FEATURES,
+        params={"feature_range": [0, 2]},
+    )
+    result = fit_defn.execute(fit_node, inputs={"frame": df})["result"]
+    component_cols = [c for c in result.columns if c.startswith("component_")]
+    for col in component_cols:
+        assert result[col].min() == pytest.approx(0.0)
+        assert result[col].max() == pytest.approx(2.0)
