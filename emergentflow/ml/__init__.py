@@ -602,14 +602,14 @@ def fit_pipeline(
 
     *transform_steps, final_step = steps
     sk_steps: list[tuple[str, Any]] = []
-    for step in transform_steps:
+    for i, step in enumerate(transform_steps):
         spec, kwargs = _resolve_estimator_and_kwargs(step["estimator"], step.get("params"))
         if spec.archetype != "fit_transform":
             raise ValueError(
                 f"pipeline step {step['estimator']!r} must be a fit_transform-archetype "
                 "estimator (every step except the last)."
             )
-        sk_steps.append((step["estimator"], spec.sklearn_class(**kwargs)))
+        sk_steps.append((f"{i}_{step['estimator']}", spec.sklearn_class(**kwargs)))
 
     final_spec, final_kwargs = _resolve_estimator_and_kwargs(
         final_step["estimator"], final_step.get("params")
@@ -619,7 +619,12 @@ def fit_pipeline(
             f"pipeline's final step {final_step['estimator']!r} must be a fit or "
             "cluster_detect-archetype estimator."
         )
-    sk_steps.append((final_step["estimator"], final_spec.sklearn_class(**final_kwargs)))
+    sk_steps.append(
+        (
+            f"{len(transform_steps)}_{final_step['estimator']}",
+            final_spec.sklearn_class(**final_kwargs),
+        )
+    )
     pipe = _SkPipeline(sk_steps)
 
     if final_spec.archetype == "fit":
@@ -684,7 +689,7 @@ def grid_search(
     column per searched kwarg plus ``mean_test_score``, ``std_test_score``, ``rank_test_score``,
     and ``mean_fit_time``. ``df`` is never mutated.
     """
-    spec = get_estimator_spec(estimator)
+    spec, base_kwargs = _resolve_estimator_and_kwargs(estimator, None)
     if spec.archetype != "fit":
         raise ValueError(
             f"{estimator!r} is not a fit-archetype estimator; grid_search requires a "
@@ -702,7 +707,9 @@ def grid_search(
         raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
 
     feature_names = _resolve_features_for_fit(df, features, target=target)
-    grid = GridSearchCV(spec.sklearn_class(), param_grid=param_grid, cv=cv, scoring=scoring)
+    grid = GridSearchCV(
+        spec.sklearn_class(**base_kwargs), param_grid=param_grid, cv=cv, scoring=scoring
+    )
     grid.fit(df[feature_names], df[target])
 
     model = FittedModel(

@@ -198,6 +198,29 @@ def test_pipeline_equivalence_cluster_detect_final_step() -> None:
     )
 
 
+def test_pipeline_allows_repeated_estimator_key_across_steps() -> None:
+    """Pipeline step names must be unique even when two steps share an estimator key.
+
+    Regression test: sklearn's ``Pipeline`` requires unique step names; naming steps by their
+    bare estimator key (with no positional disambiguation) raised a raw, un-typed
+    ``ValueError: Provided step names are not unique`` for any pipeline repeating an estimator
+    (e.g. two ``StandardScaler`` steps with different params).
+    """
+    df = _classification_df()
+    steps = [
+        {"estimator": "StandardScaler", "params": {"with_mean": True}},
+        {"estimator": "StandardScaler", "params": {"with_mean": False}},
+        {"estimator": "LogisticRegression", "params": {}},
+    ]
+
+    defn = Pipeline()
+    node = defn.instantiate(steps=steps, target="label")
+    model = defn.execute(node, inputs={"frame": df.copy()})["model"]
+
+    assert model.estimator_type == "Pipeline"
+    model.estimator.predict(df[model.feature_names])  # doesn't raise
+
+
 def test_grid_search_equivalence() -> None:
     """execute == running the emitted code, for ml.grid_search."""
     df = _classification_df()
@@ -220,6 +243,26 @@ def test_grid_search_equivalence() -> None:
     assert executed_cv["param_C"].tolist() == codegen_cv["param_C"].tolist()
     assert executed_cv["mean_test_score"].tolist() == codegen_cv["mean_test_score"].tolist()
     assert executed_cv["rank_test_score"].tolist() == codegen_cv["rank_test_score"].tolist()
+
+
+def test_grid_search_preserves_curated_defaults_outside_param_grid() -> None:
+    """grid_search's base estimator must use curated defaults for kwargs not in param_grid.
+
+    Regression test: the base estimator used to be constructed with no kwargs at all
+    (``spec.sklearn_class()``), silently dropping curated defaults like
+    ``LogisticRegression``'s ``max_iter=1000``/``random_state=0`` for every run whose
+    ``param_grid`` didn't happen to sweep that kwarg.
+    """
+    df = _classification_df()
+
+    defn = GridSearch()
+    node = defn.instantiate(
+        estimator="LogisticRegression", param_grid={"C": [0.1, 1.0]}, target="label", cv=3
+    )
+    model = defn.execute(node, inputs={"frame": df.copy()})["model"]
+
+    assert model.estimator.max_iter == 1000
+    assert model.estimator.random_state == 0
 
 
 def test_cross_validate_equivalence() -> None:
