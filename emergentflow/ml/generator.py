@@ -88,6 +88,21 @@ def _infer_param_type(default: Any) -> str:
     return "any"
 
 
+def _json_native_default(default: Any) -> Any:
+    """Normalize a curated kwarg default to a JSON-native value.
+
+    A few curated defaults are Python ``tuple``s (e.g. ``MinMaxScaler``'s ``feature_range``,
+    which sklearn's own parameter validation requires to be a literal ``tuple`` at estimator-
+    construction time, not a ``list``). JSON has no tuple type -- ``json.dumps`` already
+    serializes a tuple as an array, but round-tripping it back through ``json.loads`` yields a
+    ``list``, not a ``tuple``, which would make the exported catalog dict unequal to itself
+    across a JSON round trip. Normalizing to a ``list`` here keeps the catalog entry JSON-native
+    by construction; the registry's own ``KwargSpec.default`` (used to construct the live
+    estimator) is untouched and stays a ``tuple``.
+    """
+    return list(default) if isinstance(default, tuple) else default
+
+
 def generate_estimator_catalog_entries(specs: list[EstimatorSpec]) -> list[dict[str, Any]]:
     """Map curated *specs* to JSON-native catalog-entry dicts, sorted by ``key``.
 
@@ -112,7 +127,7 @@ def generate_estimator_catalog_entries(specs: list[EstimatorSpec]) -> list[dict[
                     {
                         "name": name,
                         "type": _infer_param_type(kwarg_spec.default),
-                        "default": kwarg_spec.default,
+                        "default": _json_native_default(kwarg_spec.default),
                         "help": kwarg_spec.help,
                     }
                     for name, kwarg_spec in sorted(spec.accepted_kwargs.items())

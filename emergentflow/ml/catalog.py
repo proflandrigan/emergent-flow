@@ -16,7 +16,23 @@ reviewed allow-list change per estimator family), not enumerated here.
 
 from __future__ import annotations
 
-from sklearn.cluster import KMeans
+from sklearn.cluster import (
+    DBSCAN,
+    AgglomerativeClustering,
+    Birch,
+    KMeans,
+    MeanShift,
+    MiniBatchKMeans,
+    SpectralClustering,
+)
+from sklearn.covariance import EllipticEnvelope
+from sklearn.decomposition import (
+    NMF,
+    PCA,
+    FactorAnalysis,
+    FastICA,
+    TruncatedSVD,
+)
 from sklearn.discriminant_analysis import (
     LinearDiscriminantAnalysis,
     QuadraticDiscriminantAnalysis,
@@ -32,8 +48,17 @@ from sklearn.ensemble import (
     GradientBoostingRegressor,
     HistGradientBoostingClassifier,
     HistGradientBoostingRegressor,
+    IsolationForest,
     RandomForestClassifier,
     RandomForestRegressor,
+)
+from sklearn.feature_selection import (
+    SelectKBest,
+    VarianceThreshold,
+    f_classif,
+    f_regression,
+    mutual_info_classif,
+    mutual_info_regression,
 )
 from sklearn.linear_model import (
     ElasticNet,
@@ -43,17 +68,28 @@ from sklearn.linear_model import (
     SGDClassifier,
     SGDRegressor,
 )
-from sklearn.mixture import GaussianMixture
+from sklearn.manifold import TSNE, Isomap
+from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
 from sklearn.naive_bayes import GaussianNB, MultinomialNB
-from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
-from sklearn.preprocessing import StandardScaler
-from sklearn.svm import SVC, SVR, LinearSVC
+from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor, LocalOutlierFactor
+from sklearn.preprocessing import (
+    MinMaxScaler,
+    Normalizer,
+    OneHotEncoder,
+    OrdinalEncoder,
+    PolynomialFeatures,
+    RobustScaler,
+    StandardScaler,
+)
+from sklearn.svm import SVC, SVR, LinearSVC, OneClassSVM
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 
 from emergentflow.ml.registry import EstimatorSpec, KwargSpec, register_estimator
 from emergentflow.ml.summaries import (
     summarize_classifier,
     summarize_clustering,
+    summarize_decomposition,
+    summarize_outlier,
     summarize_preprocessing,
     summarize_regressor,
 )
@@ -90,6 +126,98 @@ register_estimator(
 
 register_estimator(
     EstimatorSpec(
+        key="MinMaxScaler",
+        import_path="sklearn.preprocessing.MinMaxScaler",
+        sklearn_class=MinMaxScaler,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "feature_range": KwargSpec(
+                default=(0, 1), help="Desired range of transformed data (min, max)."
+            ),
+            "clip": KwargSpec(default=False, help="Clip transformed values to feature_range."),
+        },
+        summary_builder=summarize_preprocessing,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="RobustScaler",
+        import_path="sklearn.preprocessing.RobustScaler",
+        sklearn_class=RobustScaler,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "with_centering": KwargSpec(default=True, help="Center the data before scaling."),
+            "with_scaling": KwargSpec(default=True, help="Scale the data to the IQR."),
+        },
+        summary_builder=summarize_preprocessing,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="Normalizer",
+        import_path="sklearn.preprocessing.Normalizer",
+        sklearn_class=Normalizer,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "norm": KwargSpec(default="l2", help="Norm to use ('l1'/'l2'/'max')."),
+        },
+        summary_builder=summarize_preprocessing,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="OneHotEncoder",
+        import_path="sklearn.preprocessing.OneHotEncoder",
+        sklearn_class=OneHotEncoder,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "handle_unknown": KwargSpec(
+                default="error", help="How to handle unknown categories at transform time."
+            ),
+            "sparse_output": KwargSpec(
+                default=False, help="Return a dense array instead of a sparse matrix."
+            ),
+        },
+        summary_builder=summarize_preprocessing,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="OrdinalEncoder",
+        import_path="sklearn.preprocessing.OrdinalEncoder",
+        sklearn_class=OrdinalEncoder,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "handle_unknown": KwargSpec(
+                default="error", help="How to handle unknown categories at transform time."
+            ),
+        },
+        summary_builder=summarize_preprocessing,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="PolynomialFeatures",
+        import_path="sklearn.preprocessing.PolynomialFeatures",
+        sklearn_class=PolynomialFeatures,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "degree": KwargSpec(default=2, help="The degree of the polynomial features."),
+            "include_bias": KwargSpec(
+                default=True, help="Include a bias (intercept) column of all ones."
+            ),
+        },
+        summary_builder=summarize_preprocessing,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
         key="KMeans",
         import_path="sklearn.cluster.KMeans",
         sklearn_class=KMeans,
@@ -105,12 +233,124 @@ register_estimator(
 
 register_estimator(
     EstimatorSpec(
+        key="MiniBatchKMeans",
+        import_path="sklearn.cluster.MiniBatchKMeans",
+        sklearn_class=MiniBatchKMeans,
+        archetype="cluster_detect",
+        accepted_kwargs={
+            "n_clusters": KwargSpec(default=8, help="Number of clusters to form."),
+            "random_state": KwargSpec(default=0, help="Seed for reproducibility."),
+            "batch_size": KwargSpec(default=1024, help="Size of the mini batches."),
+        },
+        summary_builder=summarize_clustering,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="DBSCAN",
+        import_path="sklearn.cluster.DBSCAN",
+        sklearn_class=DBSCAN,
+        archetype="cluster_detect",
+        accepted_kwargs={
+            "eps": KwargSpec(
+                default=0.5,
+                help="Maximum distance between two samples for one to be "
+                "considered a neighbor of the other.",
+            ),
+            "min_samples": KwargSpec(
+                default=5,
+                help="Number of samples in a neighborhood for a point to be "
+                "considered a core point.",
+            ),
+        },
+        summary_builder=summarize_clustering,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="AgglomerativeClustering",
+        import_path="sklearn.cluster.AgglomerativeClustering",
+        sklearn_class=AgglomerativeClustering,
+        archetype="cluster_detect",
+        accepted_kwargs={
+            "n_clusters": KwargSpec(default=2, help="Number of clusters to find."),
+            "linkage": KwargSpec(
+                default="ward", help="Linkage criterion ('ward'/'complete'/'average'/'single')."
+            ),
+        },
+        summary_builder=summarize_clustering,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="SpectralClustering",
+        import_path="sklearn.cluster.SpectralClustering",
+        sklearn_class=SpectralClustering,
+        archetype="cluster_detect",
+        accepted_kwargs={
+            "n_clusters": KwargSpec(default=8, help="Number of clusters to find."),
+            "random_state": KwargSpec(default=0, help="Seed for reproducibility."),
+        },
+        summary_builder=summarize_clustering,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="MeanShift",
+        import_path="sklearn.cluster.MeanShift",
+        sklearn_class=MeanShift,
+        archetype="cluster_detect",
+        accepted_kwargs={
+            "bandwidth": KwargSpec(default=None, help="Kernel bandwidth (None = auto-estimated)."),
+        },
+        summary_builder=summarize_clustering,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="Birch",
+        import_path="sklearn.cluster.Birch",
+        sklearn_class=Birch,
+        archetype="cluster_detect",
+        accepted_kwargs={
+            "n_clusters": KwargSpec(
+                default=3, help="Number of clusters after the final clustering step."
+            ),
+            "threshold": KwargSpec(
+                default=0.5, help="Radius threshold for a new subcluster to be started."
+            ),
+        },
+        summary_builder=summarize_clustering,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
         key="GaussianMixture",
         import_path="sklearn.mixture.GaussianMixture",
         sklearn_class=GaussianMixture,
         archetype="cluster_detect",
         accepted_kwargs={
             "n_components": KwargSpec(default=1, help="Number of mixture components."),
+            "random_state": KwargSpec(default=0, help="Seed for reproducibility."),
+        },
+        summary_builder=summarize_clustering,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="BayesianGaussianMixture",
+        import_path="sklearn.mixture.BayesianGaussianMixture",
+        sklearn_class=BayesianGaussianMixture,
+        archetype="cluster_detect",
+        accepted_kwargs={
+            "n_components": KwargSpec(default=1, help="Maximum number of mixture components."),
             "random_state": KwargSpec(default=0, help="Seed for reproducibility."),
         },
         summary_builder=summarize_clustering,
@@ -566,5 +806,221 @@ register_estimator(
             "reg_param": KwargSpec(default=0.0, help="Regularization of the covariance estimate."),
         },
         summary_builder=summarize_classifier,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="PCA",
+        import_path="sklearn.decomposition.PCA",
+        sklearn_class=PCA,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "n_components": KwargSpec(default=2, help="Number of components to keep."),
+            "random_state": KwargSpec(default=0, help="Seed for reproducibility."),
+        },
+        summary_builder=summarize_decomposition,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="TruncatedSVD",
+        import_path="sklearn.decomposition.TruncatedSVD",
+        sklearn_class=TruncatedSVD,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "n_components": KwargSpec(default=2, help="Desired dimensionality of output data."),
+            "random_state": KwargSpec(default=0, help="Seed for reproducibility."),
+        },
+        summary_builder=summarize_decomposition,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="NMF",
+        import_path="sklearn.decomposition.NMF",
+        sklearn_class=NMF,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "n_components": KwargSpec(default=2, help="Number of components."),
+            "max_iter": KwargSpec(default=200, help="Maximum number of iterations."),
+            "random_state": KwargSpec(default=0, help="Seed for reproducibility."),
+        },
+        summary_builder=summarize_decomposition,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="FastICA",
+        import_path="sklearn.decomposition.FastICA",
+        sklearn_class=FastICA,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "n_components": KwargSpec(default=2, help="Number of components to use."),
+            "random_state": KwargSpec(default=0, help="Seed for reproducibility."),
+        },
+        summary_builder=summarize_decomposition,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="FactorAnalysis",
+        import_path="sklearn.decomposition.FactorAnalysis",
+        sklearn_class=FactorAnalysis,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "n_components": KwargSpec(
+                default=2, help="Number of latent factors (dimensionality of the state space)."
+            ),
+            "random_state": KwargSpec(default=0, help="Seed for reproducibility."),
+        },
+        summary_builder=summarize_decomposition,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="TSNE",
+        import_path="sklearn.manifold.TSNE",
+        sklearn_class=TSNE,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "n_components": KwargSpec(default=2, help="Dimension of the embedded space."),
+            "perplexity": KwargSpec(
+                default=30.0,
+                help="Related to the number of nearest neighbors used in other manifold "
+                "learning algorithms.",
+            ),
+            "random_state": KwargSpec(default=0, help="Seed for reproducibility."),
+        },
+        summary_builder=summarize_decomposition,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="Isomap",
+        import_path="sklearn.manifold.Isomap",
+        sklearn_class=Isomap,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "n_components": KwargSpec(default=2, help="Number of coordinates for the manifold."),
+            "n_neighbors": KwargSpec(
+                default=5, help="Number of neighbors to consider for each point."
+            ),
+        },
+        summary_builder=summarize_decomposition,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="SelectKBest",
+        import_path="sklearn.feature_selection.SelectKBest",
+        sklearn_class=SelectKBest,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "k": KwargSpec(default=10, help="Number of top features to select."),
+            "score_func": KwargSpec(
+                default="f_classif",
+                help=(
+                    "Scoring function: 'f_classif'/'mutual_info_classif' for a categorical "
+                    "target, 'f_regression'/'mutual_info_regression' for a continuous one."
+                ),
+                choices={
+                    "f_classif": f_classif,
+                    "f_regression": f_regression,
+                    "mutual_info_classif": mutual_info_classif,
+                    "mutual_info_regression": mutual_info_regression,
+                },
+            ),
+        },
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="VarianceThreshold",
+        import_path="sklearn.feature_selection.VarianceThreshold",
+        sklearn_class=VarianceThreshold,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "threshold": KwargSpec(
+                default=0.0, help="Features with variance below this are removed."
+            ),
+        },
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="IsolationForest",
+        import_path="sklearn.ensemble.IsolationForest",
+        sklearn_class=IsolationForest,
+        archetype="cluster_detect",
+        accepted_kwargs={
+            "n_estimators": KwargSpec(default=100, help="Number of base estimators."),
+            "contamination": KwargSpec(
+                default="auto", help="Expected proportion of outliers in the data."
+            ),
+            "random_state": KwargSpec(default=0, help="Seed for reproducibility."),
+        },
+        summary_builder=summarize_outlier,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="LocalOutlierFactor",
+        import_path="sklearn.neighbors.LocalOutlierFactor",
+        sklearn_class=LocalOutlierFactor,
+        archetype="cluster_detect",
+        accepted_kwargs={
+            "n_neighbors": KwargSpec(default=20, help="Number of neighbors to use."),
+            "contamination": KwargSpec(
+                default="auto", help="Expected proportion of outliers in the data."
+            ),
+            "novelty": KwargSpec(
+                default=True,
+                help="Must be True to support predicting on data after a separate fit().",
+            ),
+        },
+        summary_builder=summarize_outlier,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="OneClassSVM",
+        import_path="sklearn.svm.OneClassSVM",
+        sklearn_class=OneClassSVM,
+        archetype="cluster_detect",
+        accepted_kwargs={
+            "kernel": KwargSpec(
+                default="rbf", help="Kernel type ('linear'/'poly'/'rbf'/'sigmoid')."
+            ),
+            "nu": KwargSpec(default=0.5, help="Upper bound on the fraction of training errors."),
+        },
+        summary_builder=summarize_outlier,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="EllipticEnvelope",
+        import_path="sklearn.covariance.EllipticEnvelope",
+        sklearn_class=EllipticEnvelope,
+        archetype="cluster_detect",
+        accepted_kwargs={
+            "contamination": KwargSpec(
+                default=0.1, help="Expected proportion of outliers in the data."
+            ),
+            "random_state": KwargSpec(default=0, help="Seed for reproducibility."),
+        },
+        summary_builder=summarize_outlier,
     )
 )

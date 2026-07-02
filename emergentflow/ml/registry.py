@@ -46,10 +46,18 @@ class KwargSpec:
 
     ``default`` is the value used to construct the estimator when the caller does not
     override it via ``fit_estimator(..., params={...})``.
+
+    ``choices``, when set, curates a JSON-native string enum for a kwarg whose real
+    constructor value isn't JSON-native (e.g. ``SelectKBest.score_func``, which sklearn
+    requires to be a callable). ``default`` and any caller-supplied override must then be one
+    of ``choices``' keys; the adapter resolves the string to ``choices[value]`` before
+    constructing the estimator. Left ``None`` for kwargs whose curated default is already the
+    literal constructor value (the common case).
     """
 
     default: Any
     help: str = ""
+    choices: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)

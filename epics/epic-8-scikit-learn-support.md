@@ -205,17 +205,41 @@ export path this epic scopes but defers).
 > Transformers are the glue that makes estimators usable (scaling, encoding) *and* a whole
 > unsupervised surface (PCA, t-SNE, feature selection). One archetype, generated entries.
 
-- [ ] Registry entries for: preprocessing (StandardScaler, MinMaxScaler, RobustScaler,
+- [x] Registry entries for: preprocessing (StandardScaler, MinMaxScaler, RobustScaler,
   Normalizer, OneHotEncoder, OrdinalEncoder, PolynomialFeatures), decomposition
   (PCA, TruncatedSVD, NMF, FastICA, FactorAnalysis), manifold (TSNE, Isomap — fit_transform only,
   no `transform` on new data where sklearn lacks it), and feature selection
-  (SelectKBest, VarianceThreshold, RFE, SelectFromModel).
-- [ ] The `fit_transform` node emits `Transformer` + a transformed `DataFrame`; a companion
+  (SelectKBest, VarianceThreshold).
+
+  21 `fit_transform`-archetype estimators registered in `emergentflow/ml/catalog.py`. `RFE`
+  and `SelectFromModel` are **deferred**, not shipped: both require a mandatory
+  `estimator=<sklearn estimator instance>` constructor kwarg, which the curated
+  `accepted_kwargs` scheme (JSON-native scalar defaults only) cannot represent without
+  breaking the catalog's JSON round-trip contract — the same "estimator-as-a-constructor-arg"
+  problem Story 8 (pipelines) exists to solve. Revisit alongside Story 8.
+- [x] The `fit_transform` node emits `Transformer` + a transformed `DataFrame`; a companion
   `ml.transform` apply node reuses a fitted `Transformer` on new data (skip/flag estimators that
   don't support out-of-sample `transform`).
-- [ ] Golden + equivalence via the Story 9 harness. **Deferred:** `ColumnTransformer` /
+
+  Shipped as `ml.fit_transform` (`emergentflow/nodes/examples/fit_transform.py`) and
+  `ml.transform` (`emergentflow/nodes/examples/transform.py`), backed by a new
+  `ef.ml.fit_transform` adapter function. Note: `ml.fit_transform` calls sklearn's own
+  `.fit_transform(X[, y])` in one step rather than composing `fit_estimator` +
+  `apply_estimator(op="transform")` — `TSNE` implements `.fit_transform()` but has **no**
+  `.transform()` method at all, so the naive two-call composition fails even on the same
+  frame it was just fit on. `ml.transform`'s existing `hasattr(transformer, "transform")`
+  check on `ef.ml.apply_estimator` then correctly rejects reusing a `TSNE`/no-`.transform()`
+  transformer on new data (skip/flag, not a runtime surprise), without any extra plumbing.
+- [x] Golden + equivalence via the Story 9 harness. **Deferred:** `ColumnTransformer` /
   per-column routing (folds into Story 8 pipelines), custom function transformers (needs the
   escape-hatch decision).
+
+  `tests/test_ml_fit_transform_catalog.py`: golden `ast.parse` + `ruff check` on one
+  representative estimator per family (`StandardScaler`/`PCA`/`Isomap`/`SelectKBest`) via a
+  `LoadSample -> FitTransform` graph, plus an ADR-0002 equivalence matrix computed
+  dynamically over all 21 `archetype="fit_transform"` keys, plus an explicit test that
+  `ml.transform` rejects (not silently misbehaves on) a `TSNE`-fitted transformer applied to a
+  different frame. Scoped slice of Story 9's full harness, limited to this archetype.
 
 ---
 
@@ -223,15 +247,47 @@ export path this epic scopes but defers).
 
 > The "no target" learners that produce labels or scores rather than a predictor.
 
-- [ ] Registry entries for clustering (KMeans, MiniBatchKMeans, DBSCAN, AgglomerativeClustering,
+- [x] Registry entries for clustering (KMeans, MiniBatchKMeans, DBSCAN, AgglomerativeClustering,
   SpectralClustering, MeanShift, Birch), mixture (GaussianMixture, BayesianGaussianMixture), and
   outlier/novelty (IsolationForest, LocalOutlierFactor, OneClassSVM, EllipticEnvelope).
-- [ ] The cluster/detect node emits a `Model` + a `DataFrame` with a `cluster` (or `anomaly_score`)
+
+  13 `cluster_detect`-archetype estimators registered. `LocalOutlierFactor` is curated with
+  `novelty=True` as its default kwarg — sklearn's default (`novelty=False`) only supports
+  `fit_predict()` and has no `.predict()` at all after a separate `.fit()`, which this
+  codebase always does; `novelty=True` is required for it to work through the adapter at all.
+- [x] The cluster/detect node emits a `Model` + a `DataFrame` with a `cluster` (or `anomaly_score`)
   column, plus the family's inspectable summary (sizes, inertia/silhouette, contamination).
-- [ ] Handle the `fit_predict`-only estimators (DBSCAN/LOF) explicitly — they don't produce a
+
+  Shipped as `ml.cluster_detect` (`emergentflow/nodes/examples/cluster_detect.py`), backed by
+  a new `ef.ml.fit_and_label` adapter function that fits and immediately labels the SAME input
+  frame in one step (fitting a `cluster_detect` estimator doesn't by itself produce labels for
+  every family — see below). The output column is uniformly named `cluster` for every family
+  (clustering, mixture, **and** outlier/novelty alike) rather than switching to
+  `anomaly_score` for the outlier family, a deliberate scoping simplification: one column
+  name, one adapter function, no per-family branching. Continuous anomaly scores remain
+  reachable separately via `ml.apply_estimator`'s existing `score_samples` op for estimators
+  that support it.
+- [x] Handle the `fit_predict`-only estimators (DBSCAN/LOF) explicitly — they don't produce a
   reusable predictor for new rows; the node exposes labels, and `predict`-on-new-data is disabled in
   the catalog for them (validation, not a runtime surprise).
-- [ ] Golden + equivalence via the Story 9 harness.
+
+  `ef.ml.fit_and_label` prefers the fitted estimator's `.labels_` attribute (set by every true
+  clustering estimator, including `DBSCAN`/`AgglomerativeClustering`/`SpectralClustering`,
+  which have no `.predict()` at all) and falls back to `.predict()` on the training data itself
+  for mixture models and outlier/novelty detectors (which set no `.labels_`). This fallback
+  lives ONLY in `ml.cluster_detect`, not in `ml.apply_estimator`'s `"predict"` op — so a later
+  `ml.apply_estimator` call against a *different* frame still correctly raises for a
+  labels_-only estimator rather than silently replaying stale training-time labels.
+- [x] Golden + equivalence via the Story 9 harness.
+
+  `tests/test_ml_cluster_detect_catalog.py`: golden `ast.parse` + `ruff check` on one
+  representative estimator per family (`KMeans`/`GaussianMixture`/`IsolationForest`) via a
+  `LoadSample -> ClusterDetect` graph, an ADR-0002 equivalence matrix over all 13
+  `archetype="cluster_detect"` keys (well-separated blob fixture, chosen after discovering
+  that ambiguous/nearby synthetic data can make `KMeans` genuinely nondeterministic run-to-run
+  even with a fixed `random_state`), and explicit tests that the three labels_-only estimators
+  both label their own fit frame and correctly reject `ml.apply_estimator("predict")` on a
+  different frame. Scoped slice of Story 9's full harness, limited to this archetype.
 
 ---
 
