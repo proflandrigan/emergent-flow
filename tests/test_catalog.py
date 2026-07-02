@@ -82,11 +82,11 @@ def ref_registry() -> NodeRegistry:
 
 
 def test_catalog_version_constant():
-    assert CATALOG_VERSION == 1
+    assert CATALOG_VERSION == 2
 
 
 def test_top_level_keys(ref_registry: NodeRegistry):
-    assert set(export_catalog(ref_registry)) == {"catalog_version", "nodes"}
+    assert set(export_catalog(ref_registry)) == {"catalog_version", "nodes", "estimators"}
 
 
 def test_version_in_artifact(ref_registry: NodeRegistry):
@@ -96,6 +96,25 @@ def test_version_in_artifact(ref_registry: NodeRegistry):
 def test_nodes_sorted_by_type(ref_registry: NodeRegistry):
     types = [node["type"] for node in export_catalog(ref_registry)["nodes"]]
     assert types == sorted(types)
+
+
+def test_estimators_present_and_sorted(ref_registry: NodeRegistry):
+    estimators = export_catalog(ref_registry)["estimators"]
+    assert estimators  # the seed catalog is non-empty
+    keys = [e["key"] for e in estimators]
+    assert keys == sorted(keys)
+    for entry in estimators:
+        assert set(entry) >= {
+            "key",
+            "node_type",
+            "archetype",
+            "task",
+            "label",
+            "category",
+            "description",
+            "import_path",
+            "params",
+        }
 
 
 def test_deterministic(ref_registry: NodeRegistry):

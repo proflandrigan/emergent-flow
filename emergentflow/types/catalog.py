@@ -51,3 +51,12 @@ register_type(TypeDef(token="Predictions", description="A DataFrame of model pre
 register_type(
     TypeDef(token="EvaluationResult", description="Evaluation metrics for a fitted model.")
 )
+register_type(
+    TypeDef(
+        token="Transformer",
+        description=(
+            "A fitted unsupervised transformer (e.g. a scaler or PCA) that has "
+            "learned parameters but is not a predictor."
+        ),
+    )
+)

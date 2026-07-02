@@ -17,6 +17,7 @@
     "Predictions",
     "TTestResult",
     "Tensor",
+    "Transformer",
     "any"
   ],
   "version": 1

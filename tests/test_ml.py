@@ -380,8 +380,61 @@ def test_evaluate_classification_returns_accuracy() -> None:
     result = evaluate(model, df)
     assert isinstance(result, EvaluationResult)
     assert result.task == "classification"
-    assert set(result.metrics.keys()) == {"accuracy"}
+    assert set(result.metrics.keys()) == {"accuracy", "precision", "recall", "f1", "roc_auc"}
     assert 0.0 <= result.metrics["accuracy"] <= 1.0
+    assert 0.0 <= result.metrics["precision"] <= 1.0
+    assert 0.0 <= result.metrics["recall"] <= 1.0
+    assert 0.0 <= result.metrics["f1"] <= 1.0
+    assert 0.0 <= result.metrics["roc_auc"] <= 1.0
+
+
+def _make_3class_df() -> pd.DataFrame:
+    """A small 3-class dataset (30 rows, 10 per class) for multiclass evaluation tests."""
+    x1 = [float(i) for i in range(15)] * 2
+    x2 = [float(i % 5) for i in range(30)]
+    label = ["low" if a < 5 else "mid" if a < 10 else "high" for a in x1]
+    return pd.DataFrame({"x1": x1, "x2": x2, "label": label})
+
+
+def test_evaluate_multiclass_returns_task_aware_metrics() -> None:
+    df = _make_3class_df()
+    model = train_random_forest(df, target="label", task="classification", random_state=0)
+    result = evaluate(model, df)
+    assert isinstance(result, EvaluationResult)
+    assert result.task == "classification"
+    expected_keys = {
+        "accuracy",
+        "precision_macro",
+        "recall_macro",
+        "f1_macro",
+        "precision_weighted",
+        "recall_weighted",
+        "f1_weighted",
+    }
+    assert set(result.metrics.keys()) == expected_keys
+    for v in result.metrics.values():
+        assert type(v) is float
+        assert 0.0 <= v <= 1.0
+
+
+def test_evaluate_single_class_estimator_reports_only_accuracy() -> None:
+    """A classifier fit on a single class has ``classes_`` of length 1 (sklearn allows this
+    for e.g. DecisionTreeClassifier); binary precision/recall/f1/roc_auc are undefined in
+    that case, so ``evaluate`` should not try to index a non-existent second class."""
+    from sklearn.tree import DecisionTreeClassifier
+
+    df = pd.DataFrame({"x1": [1.0, 2.0, 3.0, 4.0], "label": [0, 0, 0, 0]})
+    estimator = DecisionTreeClassifier(random_state=0).fit(df[["x1"]], df["label"])
+    model = FittedModel(
+        estimator_type="DecisionTreeClassifier",
+        task="classification",
+        feature_names=["x1"],
+        target="label",
+        estimator=estimator,
+    )
+    result = evaluate(model, df)
+    assert result.metrics.keys() == {"accuracy"}
+    assert result.metrics["accuracy"] == 1.0
 
 
 def test_evaluate_n_equals_row_count() -> None:

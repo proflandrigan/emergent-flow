@@ -15,12 +15,14 @@ re-implementing them inline.
 """
 
 from .anova import Anova
+from .apply_estimator import ApplyEstimator
 from .cast_types import CastTypes
 from .correlation import Correlation
 from .describe import Describe
 from .drop_missing import DropMissing
 from .evaluate import Evaluate
 from .filter_rows import FilterRows
+from .fit_estimator import FitEstimator
 from .impute import ImputeMissing
 from .load_csv import LoadCsv
 from .load_json import LoadJson
@@ -40,12 +42,14 @@ from .ttest import TTest
 
 __all__ = [
     "Anova",
+    "ApplyEstimator",
     "CastTypes",
     "Correlation",
     "Describe",
     "DropMissing",
     "Evaluate",
     "FilterRows",
+    "FitEstimator",
     "GenerateHtmlSummary",
     "ImputeMissing",
     "LoadCsv",

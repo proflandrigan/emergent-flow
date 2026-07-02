@@ -12,7 +12,13 @@ import pandas as pd
 import pytest
 
 from emergentflow.api import PUBLIC_OPS, is_inspectable
-from emergentflow.ml import FittedModel, FittedTransformer, apply_estimator, fit_estimator
+from emergentflow.ml import (
+    FittedModel,
+    FittedTransformer,
+    apply_estimator,
+    fit_estimator,
+    summarize,
+)
 from emergentflow.ml.errors import (
     InvalidEstimatorParamsError,
     MLAdapterError,
@@ -36,6 +42,14 @@ def _make_unsupervised_df() -> pd.DataFrame:
     return pd.DataFrame({"x1": x1, "x2": x2})
 
 
+def _make_regression_df() -> pd.DataFrame:
+    """A small regression dataset (20 rows, 2 features, continuous target)."""
+    x1 = [float(i) for i in range(20)]
+    x2 = [float(i % 5) for i in range(20)]
+    y = [2.0 * x1[i] + 3.0 * x2[i] for i in range(20)]
+    return pd.DataFrame({"x1": x1, "x2": x2, "y": y})
+
+
 # ---------------------------------------------------------------------------
 # Registry (seed catalog)
 # ---------------------------------------------------------------------------
@@ -43,10 +57,38 @@ def _make_unsupervised_df() -> pd.DataFrame:
 
 def test_seed_catalog_registers_expected_keys() -> None:
     assert set(known_estimator_keys()) == {
+        "AdaBoostClassifier",
+        "AdaBoostRegressor",
+        "BaggingClassifier",
+        "BaggingRegressor",
+        "DecisionTreeClassifier",
+        "DecisionTreeRegressor",
+        "ElasticNet",
+        "ExtraTreesClassifier",
+        "ExtraTreesRegressor",
         "GaussianMixture",
+        "GaussianNB",
+        "GradientBoostingClassifier",
+        "GradientBoostingRegressor",
+        "HistGradientBoostingClassifier",
+        "HistGradientBoostingRegressor",
         "KMeans",
+        "KNeighborsClassifier",
+        "KNeighborsRegressor",
+        "Lasso",
         "LogisticRegression",
+        "MultinomialNB",
+        "RandomForestClassifier",
+        "RandomForestRegressor",
+        "Ridge",
+        "SGDClassifier",
+        "SGDRegressor",
+        "SVC",
+        "SVR",
         "StandardScaler",
+        "LinearDiscriminantAnalysis",
+        "LinearSVC",
+        "QuadraticDiscriminantAnalysis",
     }
 
 
@@ -130,6 +172,117 @@ def test_fit_estimator_result_is_inspectable() -> None:
     df = _make_classification_df()
     model = fit_estimator(df, estimator="LogisticRegression", target="label")
     assert is_inspectable(model)
+
+
+# ---------------------------------------------------------------------------
+# fit_estimator -- new linear estimators (Ridge, Lasso, ElasticNet,
+#                  SGDClassifier, SGDRegressor)
+# ---------------------------------------------------------------------------
+
+
+def test_fit_estimator_ridge() -> None:
+    df = _make_regression_df()
+    model = fit_estimator(df, estimator="Ridge", target="y")
+    assert isinstance(model, FittedModel)
+    assert model.estimator_type == "Ridge"
+    assert model.task == "regression"
+    assert model.target == "y"
+    assert model.feature_names == ["x1", "x2"]
+    result = apply_estimator(model, df, op="predict")
+    assert "prediction" in result.columns
+
+
+def test_fit_estimator_lasso() -> None:
+    df = _make_regression_df()
+    model = fit_estimator(df, estimator="Lasso", target="y")
+    assert isinstance(model, FittedModel)
+    assert model.estimator_type == "Lasso"
+    assert model.task == "regression"
+    assert model.target == "y"
+    assert model.feature_names == ["x1", "x2"]
+    result = apply_estimator(model, df, op="predict")
+    assert "prediction" in result.columns
+
+
+def test_fit_estimator_elastic_net() -> None:
+    df = _make_regression_df()
+    model = fit_estimator(df, estimator="ElasticNet", target="y")
+    assert isinstance(model, FittedModel)
+    assert model.estimator_type == "ElasticNet"
+    assert model.task == "regression"
+    assert model.target == "y"
+    assert model.feature_names == ["x1", "x2"]
+    result = apply_estimator(model, df, op="predict")
+    assert "prediction" in result.columns
+
+
+def test_fit_estimator_sgd_classifier() -> None:
+    df = _make_classification_df()
+    model = fit_estimator(df, estimator="SGDClassifier", target="label")
+    assert isinstance(model, FittedModel)
+    assert model.estimator_type == "SGDClassifier"
+    assert model.task == "classification"
+    assert model.target == "label"
+    assert model.feature_names == ["x1", "x2"]
+    result = apply_estimator(model, df, op="predict")
+    assert "prediction" in result.columns
+
+
+def test_fit_estimator_sgd_regressor() -> None:
+    df = _make_regression_df()
+    model = fit_estimator(df, estimator="SGDRegressor", target="y")
+    assert isinstance(model, FittedModel)
+    assert model.estimator_type == "SGDRegressor"
+    assert model.task == "regression"
+    assert model.target == "y"
+    assert model.feature_names == ["x1", "x2"]
+    result = apply_estimator(model, df, op="predict")
+    assert "prediction" in result.columns
+
+
+# ---------------------------------------------------------------------------
+# Summarize for each of the 5 new linear estimators
+# ---------------------------------------------------------------------------
+
+
+def test_summarize_ridge() -> None:
+    df = _make_regression_df()
+    model = fit_estimator(df, estimator="Ridge", target="y")
+    result = summarize(model)
+    assert isinstance(result, dict)
+    assert len(result) > 0
+
+
+def test_summarize_lasso() -> None:
+    df = _make_regression_df()
+    model = fit_estimator(df, estimator="Lasso", target="y")
+    result = summarize(model)
+    assert isinstance(result, dict)
+    assert len(result) > 0
+
+
+def test_summarize_elastic_net() -> None:
+    df = _make_regression_df()
+    model = fit_estimator(df, estimator="ElasticNet", target="y")
+    result = summarize(model)
+    assert isinstance(result, dict)
+    assert len(result) > 0
+
+
+def test_summarize_sgd_classifier() -> None:
+    df = _make_classification_df()
+    model = fit_estimator(df, estimator="SGDClassifier", target="label")
+    result = summarize(model)
+    assert isinstance(result, dict)
+    assert len(result) > 0
+
+
+def test_summarize_sgd_regressor() -> None:
+    df = _make_regression_df()
+    model = fit_estimator(df, estimator="SGDRegressor", target="y")
+    result = summarize(model)
+    assert isinstance(result, dict)
+    assert len(result) > 0
 
 
 # ---------------------------------------------------------------------------
@@ -314,3 +467,127 @@ def test_apply_estimator_score_samples_raises_on_existing_score_column() -> None
     )
     with pytest.raises(ValueError):
         apply_estimator(model, df, op="score_samples")
+
+
+# ---------------------------------------------------------------------------
+# Tree & ensemble estimators (7 kinds × classifier + regressor = 14)
+# ---------------------------------------------------------------------------
+
+_TREE_ENSEMBLE_CLASSIFIER_KEYS = [
+    "DecisionTreeClassifier",
+    "RandomForestClassifier",
+    "ExtraTreesClassifier",
+    "GradientBoostingClassifier",
+    "HistGradientBoostingClassifier",
+    "AdaBoostClassifier",
+    "BaggingClassifier",
+]
+
+_TREE_ENSEMBLE_REGRESSOR_KEYS = [
+    "DecisionTreeRegressor",
+    "RandomForestRegressor",
+    "ExtraTreesRegressor",
+    "GradientBoostingRegressor",
+    "HistGradientBoostingRegressor",
+    "AdaBoostRegressor",
+    "BaggingRegressor",
+]
+
+
+@pytest.mark.parametrize("estimator_key", _TREE_ENSEMBLE_CLASSIFIER_KEYS)
+def test_tree_ensemble_classifier_fits_and_predicts(estimator_key: str) -> None:
+    df = _make_classification_df()
+    model = fit_estimator(df, estimator=estimator_key, target="label")
+    assert isinstance(model, FittedModel)
+    assert model.estimator_type == estimator_key
+    assert model.task == "classification"
+    result = apply_estimator(model, df, op="predict")
+    assert "prediction" in result.columns
+    summary = summarize(model)
+    assert isinstance(summary, dict)
+
+
+@pytest.mark.parametrize("estimator_key", _TREE_ENSEMBLE_REGRESSOR_KEYS)
+def test_tree_ensemble_regressor_fits_and_predicts(estimator_key: str) -> None:
+    df = _make_regression_df()
+    model = fit_estimator(df, estimator=estimator_key, target="y")
+    assert isinstance(model, FittedModel)
+    assert model.estimator_type == estimator_key
+    assert model.task == "regression"
+    result = apply_estimator(model, df, op="predict")
+    assert "prediction" in result.columns
+    summary = summarize(model)
+    assert isinstance(summary, dict)
+
+
+# ---------------------------------------------------------------------------
+# Neighbors and naive Bayes (4 estimators)
+# ---------------------------------------------------------------------------
+
+_NEIGHBORS_BAYES_CLASSIFIER_KEYS = ["KNeighborsClassifier", "GaussianNB", "MultinomialNB"]
+_NEIGHBORS_BAYES_REGRESSOR_KEYS = ["KNeighborsRegressor"]
+
+
+@pytest.mark.parametrize("estimator_key", _NEIGHBORS_BAYES_CLASSIFIER_KEYS)
+def test_neighbors_bayes_classifier_fits_and_predicts(estimator_key: str) -> None:
+    df = _make_classification_df()
+    model = fit_estimator(df, estimator=estimator_key, target="label")
+    assert isinstance(model, FittedModel)
+    assert model.estimator_type == estimator_key
+    assert model.task == "classification"
+    result = apply_estimator(model, df, op="predict")
+    assert "prediction" in result.columns
+    summary = summarize(model)
+    assert isinstance(summary, dict)
+
+
+@pytest.mark.parametrize("estimator_key", _NEIGHBORS_BAYES_REGRESSOR_KEYS)
+def test_neighbors_bayes_regressor_fits_and_predicts(estimator_key: str) -> None:
+    df = _make_regression_df()
+    model = fit_estimator(df, estimator=estimator_key, target="y")
+    assert isinstance(model, FittedModel)
+    assert model.estimator_type == estimator_key
+    assert model.task == "regression"
+    result = apply_estimator(model, df, op="predict")
+    assert "prediction" in result.columns
+    summary = summarize(model)
+    assert isinstance(summary, dict)
+
+
+# ---------------------------------------------------------------------------
+# SVM and discriminant-analysis estimators (5 estimators)
+# ---------------------------------------------------------------------------
+
+_SVM_DISCRIMINANT_CLASSIFIER_KEYS = [
+    "LinearSVC",
+    "SVC",
+    "LinearDiscriminantAnalysis",
+    "QuadraticDiscriminantAnalysis",
+]
+_SVM_DISCRIMINANT_REGRESSOR_KEYS = ["SVR"]
+
+
+@pytest.mark.parametrize("estimator_key", _SVM_DISCRIMINANT_CLASSIFIER_KEYS)
+def test_svm_discriminant_classifier_fits_and_predicts(estimator_key: str) -> None:
+    df = _make_classification_df()
+    model = fit_estimator(df, estimator=estimator_key, target="label")
+    assert isinstance(model, FittedModel)
+    assert model.estimator_type == estimator_key
+    assert model.task == "classification"
+    result = apply_estimator(model, df, op="predict")
+    assert "prediction" in result.columns
+    summary = summarize(model)
+    assert isinstance(summary, dict)
+
+
+@pytest.mark.parametrize("estimator_key", _SVM_DISCRIMINANT_REGRESSOR_KEYS)
+def test_svm_discriminant_regressor_fits_and_predicts(estimator_key: str) -> None:
+    df = _make_regression_df()
+    model = fit_estimator(df, estimator=estimator_key, target="y")
+    assert isinstance(model, FittedModel)
+    assert model.estimator_type == estimator_key
+    assert model.task == "regression"
+    result = apply_estimator(model, df, op="predict")
+    assert "prediction" in result.columns
+    summary = summarize(model)
+    assert isinstance(summary, dict)

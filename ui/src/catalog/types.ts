@@ -48,7 +48,27 @@ export interface CatalogNode {
   params: CatalogParam[];
 }
 
+export interface CatalogEstimatorParam {
+  name: string;
+  type: "bool" | "int" | "float" | "str" | "any";
+  default?: unknown;
+  help?: string;
+}
+
+export interface CatalogEstimator {
+  key: string;
+  node_type: string;
+  archetype: string;
+  task: string;
+  label: string;
+  category: string;
+  description: string;
+  import_path: string;
+  params: CatalogEstimatorParam[];
+}
+
 export interface Catalog {
   catalog_version: number;
   nodes: CatalogNode[];
+  estimators: CatalogEstimator[];
 }

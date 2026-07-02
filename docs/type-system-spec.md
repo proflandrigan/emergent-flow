@@ -11,7 +11,8 @@ for compatibility and structural integrity.
 
 The Emergent Flow type system is **nominal**. A type is a string token; the only relationships are token equality and declared subtype/supertype relations. `"any"` is the explicit TOP / wildcard type, which is a supertype of all registered types and a subtype of nothing else. Every type is implicitly a subtype of `"any"`.
 
-Registered tokens today: `DataFrame`, `ClassifierResult`, `AnovaResult`, `HTML`, `Tensor`, and `any`.
+Registered tokens today: `DataFrame`, `ClassifierResult`, `AnovaResult`, `HTML`, `Tensor`,
+`Model`, `Transformer`, and `any`.
 
 The registry lives in `emergentflow/types/` and supports declarative extensibility: an out-of-core package can register new type tokens, mirroring the node registry plugin pattern (ADR 0006). An example stub is provided at `examples/type_plugin_stub/`. The registry and its subtype table serialize to JSON so the frontend requires no Python.
 
@@ -37,6 +38,7 @@ Compatibility is decided by a pure function `is_compatible(source_type, target_t
 | `any`              | `anything`     | COMPATIBLE     |
 | `Mystery`          | `DataFrame`    | UNKNOWN        |
 | `TimeSeries`       | `DataFrame`    | COMPATIBLE (subtype) † |
+| `Transformer`      | `Model`        | INCOMPATIBLE   |
 
 † The `TimeSeries → DataFrame` row assumes `TimeSeries` has been registered as a subtype of
 `DataFrame` (e.g. `registry.register(TypeDef(token="TimeSeries", supertypes=("DataFrame",)))`).

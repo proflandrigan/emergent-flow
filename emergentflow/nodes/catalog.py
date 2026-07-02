@@ -17,24 +17,29 @@ from __future__ import annotations
 from typing import Any
 
 from emergentflow.api import public_op
+from emergentflow.ml.generator import generate_estimator_catalog_entries
+from emergentflow.ml.registry import get_estimator_spec, known_estimator_keys
 from emergentflow.nodes.registry import NodeRegistry
 from emergentflow.nodes.registry import registry as default_registry
 
 #: Version of the catalog artifact *shape*. Bump on a breaking change to the artifact
 #: structure (new/removed/renamed top-level or per-node fields). Distinct from
 #: ``Graph.schema_version`` (IR wire format) and each node's contract ``version``.
-CATALOG_VERSION = 1
+CATALOG_VERSION = 2
 
 
 @public_op(name="ef.export_catalog")
 def export_catalog(registry: NodeRegistry = default_registry) -> dict[str, Any]:
     """Build the versioned node-catalog artifact from *registry*.
 
-    Pure function of *registry*: no I/O, no global mutation. Nodes are emitted in
-    ``type``-sorted order (``registry.specs()`` already sorts), so the output is stable
-    for golden tests. Each node is a JSON-native ``NodeSpec`` dump (ADR 0015 shape).
+    Pure function of *registry* and the live estimator registry: no I/O, no global mutation.
+    Nodes are emitted in ``type``-sorted order (``registry.specs()`` already sorts); the
+    ``"estimators"`` list (Epic 8 prerequisite) is generated from the curated allow-list via
+    :func:`~emergentflow.ml.generator.generate_estimator_catalog_entries`, sorted by ``key``.
     """
+    estimator_specs = [get_estimator_spec(key) for key in known_estimator_keys()]
     return {
         "catalog_version": CATALOG_VERSION,
         "nodes": [spec.model_dump(mode="json") for spec in registry.specs()],
+        "estimators": generate_estimator_catalog_entries(estimator_specs),
     }
