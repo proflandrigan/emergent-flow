@@ -97,6 +97,7 @@ from emergentflow.ml.summaries import (
 register_estimator(
     EstimatorSpec(
         key="LogisticRegression",
+        description="Linear classifier that models class probabilities via the logistic function.",
         import_path="sklearn.linear_model.LogisticRegression",
         sklearn_class=LogisticRegression,
         archetype="fit",
@@ -113,6 +114,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="StandardScaler",
+        description="Standardizes features by removing the mean and scaling to unit variance.",
         import_path="sklearn.preprocessing.StandardScaler",
         sklearn_class=StandardScaler,
         archetype="fit_transform",
@@ -127,6 +129,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="MinMaxScaler",
+        description="Scales features to a given range, typically [0, 1].",
         import_path="sklearn.preprocessing.MinMaxScaler",
         sklearn_class=MinMaxScaler,
         archetype="fit_transform",
@@ -143,6 +146,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="RobustScaler",
+        description="Scales features using statistics robust to outliers (median and IQR).",
         import_path="sklearn.preprocessing.RobustScaler",
         sklearn_class=RobustScaler,
         archetype="fit_transform",
@@ -157,6 +161,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="Normalizer",
+        description="Scales each sample (row) to unit norm.",
         import_path="sklearn.preprocessing.Normalizer",
         sklearn_class=Normalizer,
         archetype="fit_transform",
@@ -170,6 +175,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="OneHotEncoder",
+        description="Encodes categorical features as one-hot binary columns.",
         import_path="sklearn.preprocessing.OneHotEncoder",
         sklearn_class=OneHotEncoder,
         archetype="fit_transform",
@@ -188,6 +194,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="OrdinalEncoder",
+        description="Encodes categorical features as ordinal integer codes.",
         import_path="sklearn.preprocessing.OrdinalEncoder",
         sklearn_class=OrdinalEncoder,
         archetype="fit_transform",
@@ -203,6 +210,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="PolynomialFeatures",
+        description="Generates polynomial and interaction features from existing features.",
         import_path="sklearn.preprocessing.PolynomialFeatures",
         sklearn_class=PolynomialFeatures,
         archetype="fit_transform",
@@ -219,6 +227,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="KMeans",
+        description="Partitions data into k clusters by minimizing within-cluster variance.",
         import_path="sklearn.cluster.KMeans",
         sklearn_class=KMeans,
         archetype="cluster_detect",
@@ -234,6 +243,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="MiniBatchKMeans",
+        description="A faster, mini-batch variant of KMeans clustering for large datasets.",
         import_path="sklearn.cluster.MiniBatchKMeans",
         sklearn_class=MiniBatchKMeans,
         archetype="cluster_detect",
@@ -249,6 +259,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="DBSCAN",
+        description="Density-based clustering that groups closely packed points "
+        "and flags outliers as noise.",
         import_path="sklearn.cluster.DBSCAN",
         sklearn_class=DBSCAN,
         archetype="cluster_detect",
@@ -271,6 +283,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="AgglomerativeClustering",
+        description="Builds nested clusters by successively merging or splitting groups.",
         import_path="sklearn.cluster.AgglomerativeClustering",
         sklearn_class=AgglomerativeClustering,
         archetype="cluster_detect",
@@ -287,6 +300,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="SpectralClustering",
+        description="Clusters data using the eigenvalues of a similarity matrix "
+        "for dimensionality reduction before clustering.",
         import_path="sklearn.cluster.SpectralClustering",
         sklearn_class=SpectralClustering,
         archetype="cluster_detect",
@@ -301,6 +316,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="MeanShift",
+        description="Clustering by iteratively shifting points toward the mode of their "
+        "neighborhood density.",
         import_path="sklearn.cluster.MeanShift",
         sklearn_class=MeanShift,
         archetype="cluster_detect",
@@ -314,6 +331,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="Birch",
+        description="Incrementally builds a tree of cluster summaries for memory-efficient "
+        "clustering of large datasets.",
         import_path="sklearn.cluster.Birch",
         sklearn_class=Birch,
         archetype="cluster_detect",
@@ -332,6 +351,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="GaussianMixture",
+        description="Fits a mixture of Gaussian distributions to model cluster membership "
+        "probabilistically.",
         import_path="sklearn.mixture.GaussianMixture",
         sklearn_class=GaussianMixture,
         archetype="cluster_detect",
@@ -346,6 +367,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="BayesianGaussianMixture",
+        description="A Gaussian mixture model fit with variational Bayesian inference, which can "
+        "prune unneeded components.",
         import_path="sklearn.mixture.BayesianGaussianMixture",
         sklearn_class=BayesianGaussianMixture,
         archetype="cluster_detect",
@@ -360,6 +383,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="Ridge",
+        description="Linear regression with L2 regularization to shrink coefficients and "
+        "reduce overfitting.",
         import_path="sklearn.linear_model.Ridge",
         sklearn_class=Ridge,
         archetype="fit",
@@ -375,6 +400,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="Lasso",
+        description="Linear regression with L1 regularization that can shrink some "
+        "coefficients to zero.",
         import_path="sklearn.linear_model.Lasso",
         sklearn_class=Lasso,
         archetype="fit",
@@ -391,6 +418,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="ElasticNet",
+        description="Linear regression combining L1 and L2 regularization penalties.",
         import_path="sklearn.linear_model.ElasticNet",
         sklearn_class=ElasticNet,
         archetype="fit",
@@ -408,6 +436,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="SGDClassifier",
+        description="Linear classifier fit via stochastic gradient descent, supporting "
+        "multiple loss functions.",
         import_path="sklearn.linear_model.SGDClassifier",
         sklearn_class=SGDClassifier,
         archetype="fit",
@@ -425,6 +455,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="SGDRegressor",
+        description="Linear regressor fit via stochastic gradient descent.",
         import_path="sklearn.linear_model.SGDRegressor",
         sklearn_class=SGDRegressor,
         archetype="fit",
@@ -442,6 +473,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="DecisionTreeClassifier",
+        description="Classifies data by learning simple decision rules inferred from "
+        "feature splits.",
         import_path="sklearn.tree.DecisionTreeClassifier",
         sklearn_class=DecisionTreeClassifier,
         archetype="fit",
@@ -458,6 +491,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="DecisionTreeRegressor",
+        description="Predicts continuous values by learning decision rules inferred from "
+        "feature splits.",
         import_path="sklearn.tree.DecisionTreeRegressor",
         sklearn_class=DecisionTreeRegressor,
         archetype="fit",
@@ -474,6 +509,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="RandomForestClassifier",
+        description="An ensemble of randomized decision trees combined by majority vote for "
+        "classification.",
         import_path="sklearn.ensemble.RandomForestClassifier",
         sklearn_class=RandomForestClassifier,
         archetype="fit",
@@ -490,6 +527,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="RandomForestRegressor",
+        description="An ensemble of randomized decision trees combined by averaging for "
+        "regression.",
         import_path="sklearn.ensemble.RandomForestRegressor",
         sklearn_class=RandomForestRegressor,
         archetype="fit",
@@ -506,6 +545,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="ExtraTreesClassifier",
+        description="An ensemble of extremely randomized trees for classification, "
+        "trading some bias for reduced variance.",
         import_path="sklearn.ensemble.ExtraTreesClassifier",
         sklearn_class=ExtraTreesClassifier,
         archetype="fit",
@@ -522,6 +563,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="ExtraTreesRegressor",
+        description="An ensemble of extremely randomized trees for regression, "
+        "trading some bias for reduced variance.",
         import_path="sklearn.ensemble.ExtraTreesRegressor",
         sklearn_class=ExtraTreesRegressor,
         archetype="fit",
@@ -538,6 +581,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="GradientBoostingClassifier",
+        description="Builds an additive ensemble of trees that sequentially correct "
+        "prior errors for classification.",
         import_path="sklearn.ensemble.GradientBoostingClassifier",
         sklearn_class=GradientBoostingClassifier,
         archetype="fit",
@@ -555,6 +600,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="GradientBoostingRegressor",
+        description="Builds an additive ensemble of trees that sequentially correct "
+        "prior errors for regression.",
         import_path="sklearn.ensemble.GradientBoostingRegressor",
         sklearn_class=GradientBoostingRegressor,
         archetype="fit",
@@ -572,6 +619,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="HistGradientBoostingClassifier",
+        description="A histogram-based gradient boosting classifier, fast on large datasets.",
         import_path="sklearn.ensemble.HistGradientBoostingClassifier",
         sklearn_class=HistGradientBoostingClassifier,
         archetype="fit",
@@ -588,6 +636,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="HistGradientBoostingRegressor",
+        description="A histogram-based gradient boosting regressor, fast on large datasets.",
         import_path="sklearn.ensemble.HistGradientBoostingRegressor",
         sklearn_class=HistGradientBoostingRegressor,
         archetype="fit",
@@ -604,6 +653,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="AdaBoostClassifier",
+        description="An ensemble that combines weak classifiers, reweighting "
+        "misclassified samples each round.",
         import_path="sklearn.ensemble.AdaBoostClassifier",
         sklearn_class=AdaBoostClassifier,
         archetype="fit",
@@ -620,6 +671,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="AdaBoostRegressor",
+        description="An ensemble that combines weak regressors, reweighting "
+        "poorly predicted samples each round.",
         import_path="sklearn.ensemble.AdaBoostRegressor",
         sklearn_class=AdaBoostRegressor,
         archetype="fit",
@@ -636,6 +689,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="BaggingClassifier",
+        description="An ensemble that fits classifiers on random subsets of the data "
+        "and aggregates their votes.",
         import_path="sklearn.ensemble.BaggingClassifier",
         sklearn_class=BaggingClassifier,
         archetype="fit",
@@ -653,6 +708,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="BaggingRegressor",
+        description="An ensemble that fits regressors on random subsets of the data "
+        "and averages their predictions.",
         import_path="sklearn.ensemble.BaggingRegressor",
         sklearn_class=BaggingRegressor,
         archetype="fit",
@@ -670,6 +727,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="KNeighborsClassifier",
+        description="Classifies a sample by majority vote among its nearest neighbors.",
         import_path="sklearn.neighbors.KNeighborsClassifier",
         sklearn_class=KNeighborsClassifier,
         archetype="fit",
@@ -685,6 +743,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="KNeighborsRegressor",
+        description="Predicts a value by averaging its nearest neighbors' targets.",
         import_path="sklearn.neighbors.KNeighborsRegressor",
         sklearn_class=KNeighborsRegressor,
         archetype="fit",
@@ -700,6 +759,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="GaussianNB",
+        description="Naive Bayes classifier assuming features are normally distributed "
+        "within each class.",
         import_path="sklearn.naive_bayes.GaussianNB",
         sklearn_class=GaussianNB,
         archetype="fit",
@@ -717,6 +778,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="MultinomialNB",
+        description="Naive Bayes classifier suited to discrete count data such as "
+        "word frequencies.",
         import_path="sklearn.naive_bayes.MultinomialNB",
         sklearn_class=MultinomialNB,
         archetype="fit",
@@ -733,6 +796,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="LinearSVC",
+        description="Linear support vector classifier that finds a maximum-margin "
+        "separating hyperplane.",
         import_path="sklearn.svm.LinearSVC",
         sklearn_class=LinearSVC,
         archetype="fit",
@@ -749,6 +814,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="SVC",
+        description="Support vector classifier that can use kernel functions to separate "
+        "non-linearly-separable data.",
         import_path="sklearn.svm.SVC",
         sklearn_class=SVC,
         archetype="fit",
@@ -767,6 +834,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="SVR",
+        description="Support vector regressor that fits within a margin of tolerance "
+        "using kernel functions.",
         import_path="sklearn.svm.SVR",
         sklearn_class=SVR,
         archetype="fit",
@@ -784,6 +853,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="LinearDiscriminantAnalysis",
+        description="Classifies by finding a linear combination of features that best "
+        "separates classes.",
         import_path="sklearn.discriminant_analysis.LinearDiscriminantAnalysis",
         sklearn_class=LinearDiscriminantAnalysis,
         archetype="fit",
@@ -798,6 +869,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="QuadraticDiscriminantAnalysis",
+        description="Classifies using a quadratic decision boundary fit per class, assuming "
+        "Gaussian class-conditional densities.",
         import_path="sklearn.discriminant_analysis.QuadraticDiscriminantAnalysis",
         sklearn_class=QuadraticDiscriminantAnalysis,
         archetype="fit",
@@ -812,6 +885,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="PCA",
+        description="Reduces dimensionality by projecting data onto directions of maximum "
+        "variance.",
         import_path="sklearn.decomposition.PCA",
         sklearn_class=PCA,
         archetype="fit_transform",
@@ -826,6 +901,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="TruncatedSVD",
+        description="Reduces dimensionality via truncated singular value decomposition, "
+        "effective on sparse data.",
         import_path="sklearn.decomposition.TruncatedSVD",
         sklearn_class=TruncatedSVD,
         archetype="fit_transform",
@@ -840,6 +917,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="NMF",
+        description="Factorizes data into non-negative components, useful for "
+        "parts-based representations.",
         import_path="sklearn.decomposition.NMF",
         sklearn_class=NMF,
         archetype="fit_transform",
@@ -855,6 +934,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="FastICA",
+        description="Separates a multivariate signal into additive, statistically "
+        "independent components.",
         import_path="sklearn.decomposition.FastICA",
         sklearn_class=FastICA,
         archetype="fit_transform",
@@ -869,6 +950,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="FactorAnalysis",
+        description="Models observed features as linear combinations of a smaller set of "
+        "latent factors plus noise.",
         import_path="sklearn.decomposition.FactorAnalysis",
         sklearn_class=FactorAnalysis,
         archetype="fit_transform",
@@ -885,6 +968,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="TSNE",
+        description="Non-linear dimensionality reduction that embeds high-dimensional data "
+        "for visualization, preserving local structure.",
         import_path="sklearn.manifold.TSNE",
         sklearn_class=TSNE,
         archetype="fit_transform",
@@ -904,6 +989,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="Isomap",
+        description="Non-linear dimensionality reduction that preserves geodesic distances "
+        "along a manifold.",
         import_path="sklearn.manifold.Isomap",
         sklearn_class=Isomap,
         archetype="fit_transform",
@@ -920,6 +1007,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="SelectKBest",
+        description="Selects the k highest-scoring features according to a statistical "
+        "scoring function.",
         import_path="sklearn.feature_selection.SelectKBest",
         sklearn_class=SelectKBest,
         archetype="fit_transform",
@@ -945,6 +1034,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="VarianceThreshold",
+        description="Removes features whose variance falls below a given threshold.",
         import_path="sklearn.feature_selection.VarianceThreshold",
         sklearn_class=VarianceThreshold,
         archetype="fit_transform",
@@ -959,6 +1049,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="IsolationForest",
+        description="Detects anomalies by isolating observations via random recursive "
+        "partitioning.",
         import_path="sklearn.ensemble.IsolationForest",
         sklearn_class=IsolationForest,
         archetype="cluster_detect",
@@ -976,6 +1068,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="LocalOutlierFactor",
+        description="Detects anomalies by comparing a sample's local density to that of "
+        "its neighbors.",
         import_path="sklearn.neighbors.LocalOutlierFactor",
         sklearn_class=LocalOutlierFactor,
         archetype="cluster_detect",
@@ -996,6 +1090,8 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="OneClassSVM",
+        description="Detects anomalies by learning a boundary that encloses the bulk of "
+        "normal data.",
         import_path="sklearn.svm.OneClassSVM",
         sklearn_class=OneClassSVM,
         archetype="cluster_detect",
@@ -1012,6 +1108,7 @@ register_estimator(
 register_estimator(
     EstimatorSpec(
         key="EllipticEnvelope",
+        description="Detects anomalies by fitting a robust covariance ellipse to normal data.",
         import_path="sklearn.covariance.EllipticEnvelope",
         sklearn_class=EllipticEnvelope,
         archetype="cluster_detect",

@@ -6,7 +6,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Ensemble',
-        'description': 'An AdaBoost classifier.',
+        'description': 'An ensemble that combines weak classifiers, reweighting misclassified samples each round.',
         'import_path': 'sklearn.ensemble.AdaBoostClassifier',
         'key': 'AdaBoostClassifier',
         'label': 'Ada Boost Classifier',
@@ -36,7 +36,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Ensemble',
-        'description': 'An AdaBoost regressor.',
+        'description': 'An ensemble that combines weak regressors, reweighting poorly predicted samples each round.',
         'import_path': 'sklearn.ensemble.AdaBoostRegressor',
         'key': 'AdaBoostRegressor',
         'label': 'Ada Boost Regressor',
@@ -66,7 +66,7 @@
       dict({
         'archetype': 'cluster_detect',
         'category': 'Cluster',
-        'description': 'Agglomerative Clustering.',
+        'description': 'Builds nested clusters by successively merging or splitting groups.',
         'import_path': 'sklearn.cluster.AgglomerativeClustering',
         'key': 'AgglomerativeClustering',
         'label': 'Agglomerative Clustering',
@@ -90,7 +90,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Ensemble',
-        'description': 'A Bagging classifier.',
+        'description': 'An ensemble that fits classifiers on random subsets of the data and aggregates their votes.',
         'import_path': 'sklearn.ensemble.BaggingClassifier',
         'key': 'BaggingClassifier',
         'label': 'Bagging Classifier',
@@ -114,7 +114,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Ensemble',
-        'description': 'A Bagging regressor.',
+        'description': 'An ensemble that fits regressors on random subsets of the data and averages their predictions.',
         'import_path': 'sklearn.ensemble.BaggingRegressor',
         'key': 'BaggingRegressor',
         'label': 'Bagging Regressor',
@@ -138,7 +138,7 @@
       dict({
         'archetype': 'cluster_detect',
         'category': 'Mixture',
-        'description': 'Variational Bayesian estimation of a Gaussian mixture.',
+        'description': 'A Gaussian mixture model fit with variational Bayesian inference, which can prune unneeded components.',
         'import_path': 'sklearn.mixture.BayesianGaussianMixture',
         'key': 'BayesianGaussianMixture',
         'label': 'Bayesian Gaussian Mixture',
@@ -162,7 +162,7 @@
       dict({
         'archetype': 'cluster_detect',
         'category': 'Cluster',
-        'description': 'Implements the BIRCH clustering algorithm.',
+        'description': 'Incrementally builds a tree of cluster summaries for memory-efficient clustering of large datasets.',
         'import_path': 'sklearn.cluster.Birch',
         'key': 'Birch',
         'label': 'Birch',
@@ -186,7 +186,7 @@
       dict({
         'archetype': 'cluster_detect',
         'category': 'Cluster',
-        'description': 'Perform DBSCAN clustering from vector array or distance matrix.',
+        'description': 'Density-based clustering that groups closely packed points and flags outliers as noise.',
         'import_path': 'sklearn.cluster.DBSCAN',
         'key': 'DBSCAN',
         'label': 'DBSCAN',
@@ -210,7 +210,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Tree',
-        'description': 'A decision tree classifier.',
+        'description': 'Classifies data by learning simple decision rules inferred from feature splits.',
         'import_path': 'sklearn.tree.DecisionTreeClassifier',
         'key': 'DecisionTreeClassifier',
         'label': 'Decision Tree Classifier',
@@ -240,7 +240,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Tree',
-        'description': 'A decision tree regressor.',
+        'description': 'Predicts continuous values by learning decision rules inferred from feature splits.',
         'import_path': 'sklearn.tree.DecisionTreeRegressor',
         'key': 'DecisionTreeRegressor',
         'label': 'Decision Tree Regressor',
@@ -270,7 +270,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Linear Model',
-        'description': 'Linear regression with combined L1 and L2 priors as regularizer.',
+        'description': 'Linear regression combining L1 and L2 regularization penalties.',
         'import_path': 'sklearn.linear_model.ElasticNet',
         'key': 'ElasticNet',
         'label': 'Elastic Net',
@@ -306,7 +306,7 @@
       dict({
         'archetype': 'cluster_detect',
         'category': 'Covariance',
-        'description': 'An object for detecting outliers in a Gaussian distributed dataset.',
+        'description': 'Detects anomalies by fitting a robust covariance ellipse to normal data.',
         'import_path': 'sklearn.covariance.EllipticEnvelope',
         'key': 'EllipticEnvelope',
         'label': 'Elliptic Envelope',
@@ -330,7 +330,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Ensemble',
-        'description': 'An extra-trees classifier.',
+        'description': 'An ensemble of extremely randomized trees for classification, trading some bias for reduced variance.',
         'import_path': 'sklearn.ensemble.ExtraTreesClassifier',
         'key': 'ExtraTreesClassifier',
         'label': 'Extra Trees Classifier',
@@ -360,7 +360,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Ensemble',
-        'description': 'An extra-trees regressor.',
+        'description': 'An ensemble of extremely randomized trees for regression, trading some bias for reduced variance.',
         'import_path': 'sklearn.ensemble.ExtraTreesRegressor',
         'key': 'ExtraTreesRegressor',
         'label': 'Extra Trees Regressor',
@@ -390,7 +390,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Decomposition',
-        'description': 'Factor Analysis (FA).',
+        'description': 'Models observed features as linear combinations of a smaller set of latent factors plus noise.',
         'import_path': 'sklearn.decomposition.FactorAnalysis',
         'key': 'FactorAnalysis',
         'label': 'Factor Analysis',
@@ -414,7 +414,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Decomposition',
-        'description': 'FastICA: a fast algorithm for Independent Component Analysis.',
+        'description': 'Separates a multivariate signal into additive, statistically independent components.',
         'import_path': 'sklearn.decomposition.FastICA',
         'key': 'FastICA',
         'label': 'Fast ICA',
@@ -438,7 +438,7 @@
       dict({
         'archetype': 'cluster_detect',
         'category': 'Mixture',
-        'description': 'Gaussian Mixture.',
+        'description': 'Fits a mixture of Gaussian distributions to model cluster membership probabilistically.',
         'import_path': 'sklearn.mixture.GaussianMixture',
         'key': 'GaussianMixture',
         'label': 'Gaussian Mixture',
@@ -462,7 +462,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Naive Bayes',
-        'description': 'Gaussian Naive Bayes (GaussianNB).',
+        'description': 'Naive Bayes classifier assuming features are normally distributed within each class.',
         'import_path': 'sklearn.naive_bayes.GaussianNB',
         'key': 'GaussianNB',
         'label': 'Gaussian NB',
@@ -480,7 +480,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Ensemble',
-        'description': 'Gradient Boosting for classification.',
+        'description': 'Builds an additive ensemble of trees that sequentially correct prior errors for classification.',
         'import_path': 'sklearn.ensemble.GradientBoostingClassifier',
         'key': 'GradientBoostingClassifier',
         'label': 'Gradient Boosting Classifier',
@@ -516,7 +516,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Ensemble',
-        'description': 'Gradient Boosting for regression.',
+        'description': 'Builds an additive ensemble of trees that sequentially correct prior errors for regression.',
         'import_path': 'sklearn.ensemble.GradientBoostingRegressor',
         'key': 'GradientBoostingRegressor',
         'label': 'Gradient Boosting Regressor',
@@ -552,7 +552,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Ensemble',
-        'description': 'Histogram-based Gradient Boosting Classification Tree.',
+        'description': 'A histogram-based gradient boosting classifier, fast on large datasets.',
         'import_path': 'sklearn.ensemble.HistGradientBoostingClassifier',
         'key': 'HistGradientBoostingClassifier',
         'label': 'Hist Gradient Boosting Classifier',
@@ -582,7 +582,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Ensemble',
-        'description': 'Histogram-based Gradient Boosting Regression Tree.',
+        'description': 'A histogram-based gradient boosting regressor, fast on large datasets.',
         'import_path': 'sklearn.ensemble.HistGradientBoostingRegressor',
         'key': 'HistGradientBoostingRegressor',
         'label': 'Hist Gradient Boosting Regressor',
@@ -612,7 +612,7 @@
       dict({
         'archetype': 'cluster_detect',
         'category': 'Ensemble',
-        'description': 'Isolation Forest Algorithm.',
+        'description': 'Detects anomalies by isolating observations via random recursive partitioning.',
         'import_path': 'sklearn.ensemble.IsolationForest',
         'key': 'IsolationForest',
         'label': 'Isolation Forest',
@@ -642,7 +642,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Manifold',
-        'description': 'Isomap Embedding.',
+        'description': 'Non-linear dimensionality reduction that preserves geodesic distances along a manifold.',
         'import_path': 'sklearn.manifold.Isomap',
         'key': 'Isomap',
         'label': 'Isomap',
@@ -666,7 +666,7 @@
       dict({
         'archetype': 'cluster_detect',
         'category': 'Cluster',
-        'description': 'K-Means clustering.',
+        'description': 'Partitions data into k clusters by minimizing within-cluster variance.',
         'import_path': 'sklearn.cluster.KMeans',
         'key': 'KMeans',
         'label': 'K Means',
@@ -696,7 +696,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Neighbors',
-        'description': 'Classifier implementing the k-nearest neighbors vote.',
+        'description': 'Classifies a sample by majority vote among its nearest neighbors.',
         'import_path': 'sklearn.neighbors.KNeighborsClassifier',
         'key': 'KNeighborsClassifier',
         'label': 'K Neighbors Classifier',
@@ -720,7 +720,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Neighbors',
-        'description': 'Regression based on k-nearest neighbors.',
+        'description': "Predicts a value by averaging its nearest neighbors' targets.",
         'import_path': 'sklearn.neighbors.KNeighborsRegressor',
         'key': 'KNeighborsRegressor',
         'label': 'K Neighbors Regressor',
@@ -744,7 +744,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Linear Model',
-        'description': 'Linear Model trained with L1 prior as regularizer (aka the Lasso).',
+        'description': 'Linear regression with L1 regularization that can shrink some coefficients to zero.',
         'import_path': 'sklearn.linear_model.Lasso',
         'key': 'Lasso',
         'label': 'Lasso',
@@ -774,7 +774,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Discriminant Analysis',
-        'description': 'Linear Discriminant Analysis.',
+        'description': 'Classifies by finding a linear combination of features that best separates classes.',
         'import_path': 'sklearn.discriminant_analysis.LinearDiscriminantAnalysis',
         'key': 'LinearDiscriminantAnalysis',
         'label': 'Linear Discriminant Analysis',
@@ -792,7 +792,7 @@
       dict({
         'archetype': 'fit',
         'category': 'SVM',
-        'description': 'Linear Support Vector Classification.',
+        'description': 'Linear support vector classifier that finds a maximum-margin separating hyperplane.',
         'import_path': 'sklearn.svm.LinearSVC',
         'key': 'LinearSVC',
         'label': 'Linear SVC',
@@ -822,7 +822,7 @@
       dict({
         'archetype': 'cluster_detect',
         'category': 'Neighbors',
-        'description': 'Unsupervised Outlier Detection using the Local Outlier Factor (LOF).',
+        'description': "Detects anomalies by comparing a sample's local density to that of its neighbors.",
         'import_path': 'sklearn.neighbors.LocalOutlierFactor',
         'key': 'LocalOutlierFactor',
         'label': 'Local Outlier Factor',
@@ -852,7 +852,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Linear Model',
-        'description': 'Logistic Regression (aka logit, MaxEnt) classifier.',
+        'description': 'Linear classifier that models class probabilities via the logistic function.',
         'import_path': 'sklearn.linear_model.LogisticRegression',
         'key': 'LogisticRegression',
         'label': 'Logistic Regression',
@@ -882,7 +882,7 @@
       dict({
         'archetype': 'cluster_detect',
         'category': 'Cluster',
-        'description': 'Mean shift clustering using a flat kernel.',
+        'description': 'Clustering by iteratively shifting points toward the mode of their neighborhood density.',
         'import_path': 'sklearn.cluster.MeanShift',
         'key': 'MeanShift',
         'label': 'Mean Shift',
@@ -900,7 +900,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Preprocessing',
-        'description': 'Transform features by scaling each feature to a given range.',
+        'description': 'Scales features to a given range, typically [0, 1].',
         'import_path': 'sklearn.preprocessing.MinMaxScaler',
         'key': 'MinMaxScaler',
         'label': 'Min Max Scaler',
@@ -927,7 +927,7 @@
       dict({
         'archetype': 'cluster_detect',
         'category': 'Cluster',
-        'description': 'Mini-Batch K-Means clustering.',
+        'description': 'A faster, mini-batch variant of KMeans clustering for large datasets.',
         'import_path': 'sklearn.cluster.MiniBatchKMeans',
         'key': 'MiniBatchKMeans',
         'label': 'Mini Batch K Means',
@@ -957,7 +957,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Naive Bayes',
-        'description': 'Naive Bayes classifier for multinomial models.',
+        'description': 'Naive Bayes classifier suited to discrete count data such as word frequencies.',
         'import_path': 'sklearn.naive_bayes.MultinomialNB',
         'key': 'MultinomialNB',
         'label': 'Multinomial NB',
@@ -975,7 +975,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Decomposition',
-        'description': 'Non-Negative Matrix Factorization (NMF).',
+        'description': 'Factorizes data into non-negative components, useful for parts-based representations.',
         'import_path': 'sklearn.decomposition.NMF',
         'key': 'NMF',
         'label': 'NMF',
@@ -1005,7 +1005,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Preprocessing',
-        'description': 'Normalize samples individually to unit norm.',
+        'description': 'Scales each sample (row) to unit norm.',
         'import_path': 'sklearn.preprocessing.Normalizer',
         'key': 'Normalizer',
         'label': 'Normalizer',
@@ -1023,7 +1023,7 @@
       dict({
         'archetype': 'cluster_detect',
         'category': 'SVM',
-        'description': 'Unsupervised Outlier Detection.',
+        'description': 'Detects anomalies by learning a boundary that encloses the bulk of normal data.',
         'import_path': 'sklearn.svm.OneClassSVM',
         'key': 'OneClassSVM',
         'label': 'One Class SVM',
@@ -1047,7 +1047,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Preprocessing',
-        'description': 'Encode categorical features as a one-hot numeric array.',
+        'description': 'Encodes categorical features as one-hot binary columns.',
         'import_path': 'sklearn.preprocessing.OneHotEncoder',
         'key': 'OneHotEncoder',
         'label': 'One Hot Encoder',
@@ -1071,7 +1071,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Preprocessing',
-        'description': 'Encode categorical features as an integer array.',
+        'description': 'Encodes categorical features as ordinal integer codes.',
         'import_path': 'sklearn.preprocessing.OrdinalEncoder',
         'key': 'OrdinalEncoder',
         'label': 'Ordinal Encoder',
@@ -1089,7 +1089,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Decomposition',
-        'description': 'Principal component analysis (PCA).',
+        'description': 'Reduces dimensionality by projecting data onto directions of maximum variance.',
         'import_path': 'sklearn.decomposition.PCA',
         'key': 'PCA',
         'label': 'PCA',
@@ -1113,7 +1113,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Preprocessing',
-        'description': 'Generate polynomial and interaction features.',
+        'description': 'Generates polynomial and interaction features from existing features.',
         'import_path': 'sklearn.preprocessing.PolynomialFeatures',
         'key': 'PolynomialFeatures',
         'label': 'Polynomial Features',
@@ -1137,7 +1137,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Discriminant Analysis',
-        'description': 'Quadratic Discriminant Analysis.',
+        'description': 'Classifies using a quadratic decision boundary fit per class, assuming Gaussian class-conditional densities.',
         'import_path': 'sklearn.discriminant_analysis.QuadraticDiscriminantAnalysis',
         'key': 'QuadraticDiscriminantAnalysis',
         'label': 'Quadratic Discriminant Analysis',
@@ -1155,7 +1155,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Ensemble',
-        'description': 'A random forest classifier.',
+        'description': 'An ensemble of randomized decision trees combined by majority vote for classification.',
         'import_path': 'sklearn.ensemble.RandomForestClassifier',
         'key': 'RandomForestClassifier',
         'label': 'Random Forest Classifier',
@@ -1185,7 +1185,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Ensemble',
-        'description': 'A random forest regressor.',
+        'description': 'An ensemble of randomized decision trees combined by averaging for regression.',
         'import_path': 'sklearn.ensemble.RandomForestRegressor',
         'key': 'RandomForestRegressor',
         'label': 'Random Forest Regressor',
@@ -1215,7 +1215,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Linear Model',
-        'description': 'Linear least squares with l2 regularization.',
+        'description': 'Linear regression with L2 regularization to shrink coefficients and reduce overfitting.',
         'import_path': 'sklearn.linear_model.Ridge',
         'key': 'Ridge',
         'label': 'Ridge',
@@ -1239,7 +1239,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Preprocessing',
-        'description': 'Scale features using statistics that are robust to outliers.',
+        'description': 'Scales features using statistics robust to outliers (median and IQR).',
         'import_path': 'sklearn.preprocessing.RobustScaler',
         'key': 'RobustScaler',
         'label': 'Robust Scaler',
@@ -1263,7 +1263,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Linear Model',
-        'description': 'Linear classifiers (SVM, logistic regression, etc.) with SGD training.',
+        'description': 'Linear classifier fit via stochastic gradient descent, supporting multiple loss functions.',
         'import_path': 'sklearn.linear_model.SGDClassifier',
         'key': 'SGDClassifier',
         'label': 'SGD Classifier',
@@ -1299,7 +1299,7 @@
       dict({
         'archetype': 'fit',
         'category': 'Linear Model',
-        'description': 'Linear model fitted by minimizing a regularized empirical loss with SGD.',
+        'description': 'Linear regressor fit via stochastic gradient descent.',
         'import_path': 'sklearn.linear_model.SGDRegressor',
         'key': 'SGDRegressor',
         'label': 'SGD Regressor',
@@ -1335,7 +1335,7 @@
       dict({
         'archetype': 'fit',
         'category': 'SVM',
-        'description': 'C-Support Vector Classification.',
+        'description': 'Support vector classifier that can use kernel functions to separate non-linearly-separable data.',
         'import_path': 'sklearn.svm.SVC',
         'key': 'SVC',
         'label': 'SVC',
@@ -1365,7 +1365,7 @@
       dict({
         'archetype': 'fit',
         'category': 'SVM',
-        'description': 'Epsilon-Support Vector Regression.',
+        'description': 'Support vector regressor that fits within a margin of tolerance using kernel functions.',
         'import_path': 'sklearn.svm.SVR',
         'key': 'SVR',
         'label': 'SVR',
@@ -1389,7 +1389,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Feature Selection',
-        'description': 'Select features according to the k highest scores.',
+        'description': 'Selects the k highest-scoring features according to a statistical scoring function.',
         'import_path': 'sklearn.feature_selection.SelectKBest',
         'key': 'SelectKBest',
         'label': 'Select K Best',
@@ -1413,7 +1413,7 @@
       dict({
         'archetype': 'cluster_detect',
         'category': 'Cluster',
-        'description': 'Apply clustering to a projection of the normalized Laplacian.',
+        'description': 'Clusters data using the eigenvalues of a similarity matrix for dimensionality reduction before clustering.',
         'import_path': 'sklearn.cluster.SpectralClustering',
         'key': 'SpectralClustering',
         'label': 'Spectral Clustering',
@@ -1437,7 +1437,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Preprocessing',
-        'description': 'Standardize features by removing the mean and scaling to unit variance.',
+        'description': 'Standardizes features by removing the mean and scaling to unit variance.',
         'import_path': 'sklearn.preprocessing.StandardScaler',
         'key': 'StandardScaler',
         'label': 'Standard Scaler',
@@ -1461,7 +1461,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Manifold',
-        'description': 'T-distributed Stochastic Neighbor Embedding.',
+        'description': 'Non-linear dimensionality reduction that embeds high-dimensional data for visualization, preserving local structure.',
         'import_path': 'sklearn.manifold.TSNE',
         'key': 'TSNE',
         'label': 'TSNE',
@@ -1491,7 +1491,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Decomposition',
-        'description': 'Dimensionality reduction using truncated SVD (aka LSA).',
+        'description': 'Reduces dimensionality via truncated singular value decomposition, effective on sparse data.',
         'import_path': 'sklearn.decomposition.TruncatedSVD',
         'key': 'TruncatedSVD',
         'label': 'Truncated SVD',
@@ -1515,7 +1515,7 @@
       dict({
         'archetype': 'fit_transform',
         'category': 'Feature Selection',
-        'description': 'Feature selector that removes all low-variance features.',
+        'description': 'Removes features whose variance falls below a given threshold.',
         'import_path': 'sklearn.feature_selection.VarianceThreshold',
         'key': 'VarianceThreshold',
         'label': 'Variance Threshold',

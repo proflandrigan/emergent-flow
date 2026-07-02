@@ -19,12 +19,14 @@ from .apply_estimator import ApplyEstimator
 from .cast_types import CastTypes
 from .cluster_detect import ClusterDetect
 from .correlation import Correlation
+from .cross_validate import CrossValidate
 from .describe import Describe
 from .drop_missing import DropMissing
 from .evaluate import Evaluate
 from .filter_rows import FilterRows
 from .fit_estimator import FitEstimator
 from .fit_transform import FitTransform
+from .grid_search import GridSearch
 from .impute import ImputeMissing
 from .load_csv import LoadCsv
 from .load_json import LoadJson
@@ -33,6 +35,7 @@ from .load_sample import LoadSample
 from .nn_linear import NnLinear
 from .nn_module import NnModule
 from .nn_relu import NnReLU
+from .pipeline import Pipeline
 from .predict import Predict
 from .report import GenerateHtmlSummary
 from .select_columns import SelectColumns
@@ -49,6 +52,7 @@ __all__ = [
     "CastTypes",
     "ClusterDetect",
     "Correlation",
+    "CrossValidate",
     "Describe",
     "DropMissing",
     "Evaluate",
@@ -56,6 +60,7 @@ __all__ = [
     "FitEstimator",
     "FitTransform",
     "GenerateHtmlSummary",
+    "GridSearch",
     "ImputeMissing",
     "LoadCsv",
     "LoadJson",
@@ -64,6 +69,7 @@ __all__ = [
     "NnLinear",
     "NnModule",
     "NnReLU",
+    "Pipeline",
     "Predict",
     "SelectColumns",
     "TrainClassifier",

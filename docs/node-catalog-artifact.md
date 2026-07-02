@@ -167,3 +167,56 @@ serializations of the same registry through the same function.
   reference nodes — Story 2.
 - Any new node added to widen a family (Stories 3–6) — this document fixes the shape every
   such node's metadata must conform to, not the nodes themselves.
+
+## Generating & curating the estimator catalog (Epic 8, Story 7)
+
+The `"estimators"` top-level key (see the artifact shape above) is not hand-written per node —
+it is **generated** from a curated scikit-learn allow-list, the same "breadth is data, not
+code" strategy [ADR 0016](./adr/0016-sklearn-estimator-adapter.md) locks for the whole
+classical-ML surface.
+
+**The pipeline:**
+
+1. `emergentflow/ml/registry.py` defines `EstimatorSpec` — one curated allow-list entry
+   (estimator key, import path, live sklearn class, archetype, accepted constructor kwargs, a
+   curated one-line `description`, and an inspectable-summary builder).
+2. `emergentflow/ml/catalog.py` registers every curated estimator via
+   `register_estimator(EstimatorSpec(...))` calls, importing this module for its
+   registration side effect (mirroring how `emergentflow.types.catalog` registers type
+   tokens).
+3. `emergentflow/ml/generator.py`'s pure `generate_estimator_catalog_entries()` maps the live
+   registry into JSON-native catalog-entry dicts (`key`, `node_type`, `archetype`, `task`,
+   `label`, `category`, `description`, `import_path`, `params`), sorted by `key`.
+4. `ef.export_catalog()` (`emergentflow/nodes/catalog.py`) calls the generator over
+   `known_estimator_keys()` and merges its output into the `"estimators"` key of the artifact
+   this document specifies.
+
+**Curated, not enumerated.** The generated set is always exactly the curated allow-list
+(`known_estimator_keys()`), never `sklearn.utils.all_estimators()` at runtime — this is what
+keeps the catalog deterministic and independent of whichever sklearn version happens to be
+installed (ADR 0016, curation policy). `tests/test_ml_generator.py`'s
+`test_generated_catalog_keys_match_allow_list_exactly` and `test_estimator_catalog_golden`
+enforce this with a golden snapshot.
+
+**Curated descriptions.** Each `EstimatorSpec.description` is a curated, hand-written one-line
+summary, not the raw sklearn docstring first line. An entry with an empty `description` falls
+back to the docstring (`emergentflow.ml.generator._first_doc_line`) — but every currently
+registered estimator has a curated description
+(`test_every_registered_estimator_has_a_curated_description` enforces this), so the fallback
+only fires for a newly added, not-yet-curated entry.
+
+**How to add an estimator.** Adding scikit-learn coverage is a reviewed data change, not
+automatic:
+
+1. Add a `register_estimator(EstimatorSpec(...))` call to `emergentflow/ml/catalog.py`,
+   including a curated `description`, the correct `archetype`
+   (`"fit"` / `"fit_transform"` / `"cluster_detect"`), curated `accepted_kwargs`, and a
+   `summary_builder` from `emergentflow/ml/summaries.py` (or a new one, for a genuinely new
+   family).
+2. Regenerate the golden snapshots:
+   `uv run pytest tests/test_ml_generator.py tests/test_catalog.py --snapshot-update`.
+3. Regenerate the committed UI contracts artifact so the bundled canvas stays in sync:
+   `uv run python scripts/export_ui_contracts.py`.
+4. Review the diff (new/changed catalog entries, updated snapshots) like any other change —
+   this is the reviewed-change discipline ADR 0016 commits to; there is no automatic discovery
+   path from an installed sklearn version into the catalog.

@@ -75,6 +75,10 @@ class EstimatorSpec:
     archetype: which of the three fixed adapter shapes this estimator uses.
     task: ``"classification"`` | ``"regression"`` for ``archetype="fit"`` estimators;
         ``None`` for unsupervised archetypes.
+    description: a curated, hand-written one-line summary of the estimator (Epic 8, Story 7).
+        Takes priority over the raw sklearn docstring first line in the generated catalog
+        entry (see ``emergentflow.ml.generator``). Left ``""`` (the default) for entries that
+        have not yet been curated, in which case the generator falls back to the docstring.
     accepted_kwargs: curated allow-list of constructor kwargs -> :class:`KwargSpec`.
         Keys not present here are rejected by the adapter as unknown params.
     summary_builder: optional inspectable-summary builder for this estimator's family;
@@ -86,6 +90,7 @@ class EstimatorSpec:
     sklearn_class: type
     archetype: Archetype
     task: str | None = None
+    description: str = ""
     accepted_kwargs: dict[str, KwargSpec] = field(default_factory=dict)
     summary_builder: Callable[[Any], dict[str, Any]] | None = None
 

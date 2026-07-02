@@ -37,7 +37,10 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import cross_validate as _sk_cross_validate
 from sklearn.model_selection import train_test_split as _sk_split
+from sklearn.pipeline import Pipeline as _SkPipeline
 
 from emergentflow.api import public_op
 from emergentflow.ml.errors import InvalidEstimatorParamsError, UnknownEstimatorError
@@ -46,10 +49,13 @@ from emergentflow.ml.registry import get_estimator_spec
 __all__ = [
     "FOREST_TASKS",
     "apply_estimator",
+    "cross_validate",
     "evaluate",
     "fit_and_label",
     "fit_estimator",
+    "fit_pipeline",
     "fit_transform",
+    "grid_search",
     "predict",
     "summarize",
     "train_classifier",
@@ -554,6 +560,221 @@ def fit_transform(
         transformer=est,
     )
     return transformer, result
+
+
+@public_op(name="ef.ml.fit_pipeline")
+def fit_pipeline(
+    df: pd.DataFrame,
+    *,
+    steps: list[dict[str, Any]],
+    target: str | None = None,
+    features: list[str] | None = None,
+) -> FittedModel:
+    """Fit an ordered chain of curated estimators as one sklearn ``Pipeline``.
+
+    The ``ml.pipeline`` node's backend (Epic 8, Story 8 / ADR 0016). Every step but the last
+    must be a ``fit_transform``-archetype estimator (a scaler, encoder, decomposition, ...);
+    the final step must be a ``fit`` (supervised classifier/regressor) or ``cluster_detect``
+    (unsupervised label/score) archetype estimator. Composing the whole chain into ONE
+    ``sklearn.pipeline.Pipeline`` object -- rather than requiring N separate
+    ``ml.apply_estimator`` nodes wired in sequence at inference time -- is the distinct
+    graph-shape pipelines solve (Epic 8, Story 8): the fitted ``Pipeline`` rides inside a
+    single :class:`FittedModel` and, because a ``Pipeline`` duck-types ``.predict()`` /
+    ``.transform()`` / ``.score_samples()`` exactly like any single estimator, the EXISTING
+    ``ef.ml.apply_estimator`` adapter (and its ``ml.apply_estimator`` node) works against it
+    completely unchanged.
+
+    ``steps`` is an ordered list of ``{"estimator": <key>, "params": {...}}`` dicts, each
+    validated against the allow-list registry exactly like :func:`fit_estimator` (unknown
+    estimator/params raise the same typed errors:
+    :class:`~emergentflow.ml.errors.UnknownEstimatorError` /
+    :class:`~emergentflow.ml.errors.InvalidEstimatorParamsError`). Raises ``ValueError`` if
+    ``steps`` is empty, if any non-final step is not a ``fit_transform``-archetype estimator,
+    or if the final step is not a ``fit``/``cluster_detect``-archetype estimator. A ``fit``
+    final step also requires ``target`` (mirroring :func:`fit_estimator`); a ``cluster_detect``
+    final step ignores ``target`` entirely.
+
+    Deterministic given a ``random_state`` kwarg where the underlying estimators accept one.
+    Never mutates ``df``.
+    """
+    if not steps:
+        raise ValueError("pipeline requires at least one step.")
+
+    *transform_steps, final_step = steps
+    sk_steps: list[tuple[str, Any]] = []
+    for step in transform_steps:
+        spec, kwargs = _resolve_estimator_and_kwargs(step["estimator"], step.get("params"))
+        if spec.archetype != "fit_transform":
+            raise ValueError(
+                f"pipeline step {step['estimator']!r} must be a fit_transform-archetype "
+                "estimator (every step except the last)."
+            )
+        sk_steps.append((step["estimator"], spec.sklearn_class(**kwargs)))
+
+    final_spec, final_kwargs = _resolve_estimator_and_kwargs(
+        final_step["estimator"], final_step.get("params")
+    )
+    if final_spec.archetype not in ("fit", "cluster_detect"):
+        raise ValueError(
+            f"pipeline's final step {final_step['estimator']!r} must be a fit or "
+            "cluster_detect-archetype estimator."
+        )
+    sk_steps.append((final_step["estimator"], final_spec.sklearn_class(**final_kwargs)))
+    pipe = _SkPipeline(sk_steps)
+
+    if final_spec.archetype == "fit":
+        if target is None:
+            raise ValueError(
+                f"pipeline estimator {final_step['estimator']!r} requires a target column."
+            )
+        if target not in df.columns:
+            raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+        feature_names = _resolve_features_for_fit(df, features, target=target)
+        pipe.fit(df[feature_names], df[target])
+        return FittedModel(
+            estimator_type="Pipeline",
+            task=final_spec.task or "classification",
+            feature_names=list(feature_names),
+            target=target,
+            estimator=pipe,
+        )
+
+    # final_spec.archetype == "cluster_detect"
+    feature_names = _resolve_features_for_fit(df, features, target=None)
+    pipe.fit(df[feature_names])
+    return FittedModel(
+        estimator_type="Pipeline",
+        task=final_spec.task or "clustering",
+        feature_names=list(feature_names),
+        target=None,
+        estimator=pipe,
+    )
+
+
+@public_op(name="ef.ml.grid_search")
+def grid_search(
+    df: pd.DataFrame,
+    *,
+    estimator: str,
+    param_grid: dict[str, list[Any]],
+    target: str,
+    features: list[str] | None = None,
+    cv: int = 5,
+    scoring: str | None = None,
+) -> tuple[FittedModel, pd.DataFrame]:
+    """Search ``param_grid`` for a curated, ``fit``-archetype (supervised) estimator.
+
+    The ``ml.grid_search`` node's backend (Epic 8, Story 8 / ADR 0016). Thin wrapper over
+    ``sklearn.model_selection.GridSearchCV``: fits every combination of ``param_grid`` values
+    via ``cv``-fold cross-validation and refits the best-scoring combination on the full
+    ``df``. Restricted to ``fit``-archetype estimators (classifiers/regressors) -- clustering
+    and transformer archetypes are out of scope for this node.
+
+    ``param_grid`` keys are validated against the estimator's ``accepted_kwargs`` allow-list
+    (unknown keys raise :class:`~emergentflow.ml.errors.InvalidEstimatorParamsError`), exactly
+    like every other adapter entry point; each value must be a non-empty list of candidate
+    values for that kwarg. Raises ``ValueError`` if *estimator* is not a ``fit``-archetype
+    estimator, if ``param_grid`` is empty, or if ``target`` is missing from ``df``.
+
+    Returns ``(model, cv_results)`` where ``model`` is a :class:`FittedModel` wrapping
+    ``GridSearchCV.best_estimator_`` (a real fitted instance of the estimator's own sklearn
+    class, refit on all of ``df`` -- so ``ef.ml.evaluate``/``ef.ml.summarize`` work on it
+    exactly as they would on a directly-fit estimator) and ``cv_results`` is a NEW, tidy
+    DataFrame (one row per parameter combination, sorted by rank) with one ``param_<name>``
+    column per searched kwarg plus ``mean_test_score``, ``std_test_score``, ``rank_test_score``,
+    and ``mean_fit_time``. ``df`` is never mutated.
+    """
+    spec = get_estimator_spec(estimator)
+    if spec.archetype != "fit":
+        raise ValueError(
+            f"{estimator!r} is not a fit-archetype estimator; grid_search requires a "
+            "supervised classifier/regressor."
+        )
+    if not param_grid:
+        raise ValueError("param_grid must not be empty.")
+    unknown_params = [k for k in param_grid if k not in spec.accepted_kwargs]
+    if unknown_params:
+        raise InvalidEstimatorParamsError(
+            f"unknown params {unknown_params!r} for estimator {estimator!r}; "
+            f"expected one of {sorted(spec.accepted_kwargs)!r}."
+        )
+    if target not in df.columns:
+        raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+
+    feature_names = _resolve_features_for_fit(df, features, target=target)
+    grid = GridSearchCV(spec.sklearn_class(), param_grid=param_grid, cv=cv, scoring=scoring)
+    grid.fit(df[feature_names], df[target])
+
+    model = FittedModel(
+        estimator_type=spec.key,
+        task=spec.task or "classification",
+        feature_names=list(feature_names),
+        target=target,
+        estimator=grid.best_estimator_,
+    )
+
+    cv_results = grid.cv_results_
+    result_df = pd.DataFrame(
+        {f"param_{name}": list(cv_results[f"param_{name}"]) for name in sorted(param_grid)}
+    )
+    result_df["mean_test_score"] = cv_results["mean_test_score"]
+    result_df["std_test_score"] = cv_results["std_test_score"]
+    result_df["rank_test_score"] = cv_results["rank_test_score"]
+    result_df["mean_fit_time"] = cv_results["mean_fit_time"]
+    result_df = result_df.sort_values("rank_test_score").reset_index(drop=True)
+
+    return model, result_df
+
+
+@public_op(name="ef.ml.cross_validate")
+def cross_validate(
+    df: pd.DataFrame,
+    *,
+    estimator: str,
+    target: str,
+    features: list[str] | None = None,
+    params: dict[str, Any] | None = None,
+    cv: int = 5,
+    scoring: str | None = None,
+) -> pd.DataFrame:
+    """Cross-validate a curated, ``fit``-archetype (supervised) estimator on ``df``.
+
+    The ``ml.cross_validate`` node's backend (Epic 8, Story 8 / ADR 0016). Thin wrapper over
+    ``sklearn.model_selection.cross_validate``: fits and scores ``cv`` folds of a single,
+    fixed-hyperparameter estimator instance. Unlike :func:`grid_search`, this produces no
+    reusable :class:`FittedModel` -- sklearn's ``cross_validate`` fits and discards its
+    internal per-fold models by default and has no single canonical "best" estimator to keep,
+    so this is a pure evaluation step.
+
+    ``estimator``/``params`` are validated against the allow-list registry exactly like
+    :func:`fit_estimator` (unknown estimator/params raise the same typed errors). Raises
+    ``ValueError`` if *estimator* is not a ``fit``-archetype estimator or if ``target`` is
+    missing from ``df``.
+
+    Returns a NEW, tidy DataFrame, one row per fold, with columns ``fold`` (0-indexed),
+    ``test_score``, ``fit_time``, ``score_time``. ``df`` is never mutated.
+    """
+    spec, kwargs = _resolve_estimator_and_kwargs(estimator, params)
+    if spec.archetype != "fit":
+        raise ValueError(
+            f"{estimator!r} is not a fit-archetype estimator; cross_validate requires a "
+            "supervised classifier/regressor."
+        )
+    if target not in df.columns:
+        raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+
+    feature_names = _resolve_features_for_fit(df, features, target=target)
+    est = spec.sklearn_class(**kwargs)
+    cv_result = _sk_cross_validate(est, df[feature_names], df[target], cv=cv, scoring=scoring)
+
+    return pd.DataFrame(
+        {
+            "fold": list(range(len(cv_result["test_score"]))),
+            "test_score": cv_result["test_score"],
+            "fit_time": cv_result["fit_time"],
+            "score_time": cv_result["score_time"],
+        }
+    )
 
 
 @public_op(name="ef.ml.apply_estimator")

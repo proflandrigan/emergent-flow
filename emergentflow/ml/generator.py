@@ -6,9 +6,10 @@ A pure generator mapping curated ``EstimatorSpec`` allow-list entries to catalog
 
 Turns the estimator registry into JSON-native data the canvas palette can eventually render
 with zero per-estimator UI code: no I/O, no global state, deterministic given the same input
-list (mirrors the codegen pipeline's small-deterministic-pass convention). Descriptions come
-from each sklearn class's docstring first line -- a minimal simplification; full curated,
-hand-reviewed descriptions are a later enhancement (epic Story 7).
+list (mirrors the codegen pipeline's small-deterministic-pass convention). Each entry's
+description prefers the curated ``EstimatorSpec.description`` (Epic 8, Story 7); entries that
+have not yet been curated (``description == ""``) fall back to the sklearn class's docstring
+first line.
 """
 
 from __future__ import annotations
@@ -121,7 +122,7 @@ def generate_estimator_catalog_entries(specs: list[EstimatorSpec]) -> list[dict[
                 "task": spec.task,
                 "label": _humanize(spec.key),
                 "category": _category_from_import_path(spec.import_path),
-                "description": _first_doc_line(spec.sklearn_class),
+                "description": spec.description.strip() or _first_doc_line(spec.sklearn_class),
                 "import_path": spec.import_path,
                 "params": [
                     {
