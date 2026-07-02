@@ -296,15 +296,29 @@ export path this epic scopes but defers).
 > Turn the registry into Epic 6 catalog-as-data entries deterministically. This is what makes
 > "complete support" a data artifact rather than N hand-written files.
 
-- [ ] A pure generator maps each `EstimatorSpec` → a catalog entry (`type` = archetype, plus
+- [x] A pure generator maps each `EstimatorSpec` → a catalog entry (`type` = archetype, plus
   `estimator` key, curated per-param `{type, default, help, hints}`, `label`, `category`,
   `description` — descriptions summarized from the sklearn docstring first line, curated, not raw).
-- [ ] Entries feed `ef.export_catalog()` (Epic 6 Story 2) — **golden test** with stable ordering;
+
+  The Story 4 generator (`emergentflow/ml/generator.py`) already mapped the registry to
+  catalog entries; this story adds a curated `EstimatorSpec.description` field (falls back to
+  the raw docstring first line only when uncurated) and curates a hand-written one-liner for
+  all 58 registered estimators in `emergentflow/ml/catalog.py`.
+- [x] Entries feed `ef.export_catalog()` (Epic 6 Story 2) — **golden test** with stable ordering;
   the generated set is pinned to the curated allow-list so output is independent of the installed
   sklearn's estimator enumeration.
-- [ ] Document the generation + curation process in `docs/` next to the catalog-as-data contract,
+
+  `tests/test_ml_generator.py` adds a dedicated golden (`test_estimator_catalog_golden`) over
+  the full live registry, plus tests pinning the generated key set to `known_estimator_keys()`
+  exactly and asserting every entry uses its curated description (not the docstring fallback).
+- [x] Document the generation + curation process in `docs/` next to the catalog-as-data contract,
   including how to add an estimator (allow-list edit + regenerate golden), so it's a reviewed change,
   not automatic.
+
+  `docs/node-catalog-artifact.md` gains a "Generating & curating the estimator catalog"
+  section covering the registry → generator → `ef.export_catalog()` pipeline and a
+  how-to-add-an-estimator checklist (allow-list edit, regenerate golden snapshots, regenerate
+  the committed UI contracts).
 
 ---
 
@@ -314,12 +328,40 @@ export path this epic scopes but defers).
 > sklearn use, but it is a distinct graph-shape problem — sequence a chain of fitted steps — and can
 > ship after the estimator surface. Gate it behind Stories 2–7 landing.
 
-- [ ] A `ml.pipeline` node (or graph-native chaining convention) that fits an ordered sequence of
+- [x] A `ml.pipeline` node (or graph-native chaining convention) that fits an ordered sequence of
   transformer steps + a final estimator, emitted through the adapter so ADR-0002 still holds.
-- [ ] `ml.grid_search` / `ml.cross_validate` returning **inspectable** CV results (best params, per-
+
+  Shipped as `ml.pipeline` (`emergentflow/nodes/examples/pipeline.py`), backed by a new
+  `ef.ml.fit_pipeline` adapter function. Every step but the last must be a
+  `fit_transform`-archetype estimator; the final step must be `fit` (supervised) or
+  `cluster_detect` (unsupervised), composed into one `sklearn.pipeline.Pipeline` and wrapped
+  in the existing `FittedModel`. Deliberately no separate "apply pipeline" node: because a
+  fitted `Pipeline` duck-types `.predict()`/`.transform()`/`.score_samples()` exactly like any
+  single estimator, the existing `ml.apply_estimator` node works against it unchanged — the
+  node only needs to produce the fitted `Model` (mirroring `ml.fit_estimator`'s port shape),
+  not also a transformed/labeled frame.
+- [x] `ml.grid_search` / `ml.cross_validate` returning **inspectable** CV results (best params, per-
   fold scores as a tidy frame) — the fitted best-estimator rides in `FittedModel`.
-- [ ] Golden + equivalence via the Story 9 harness. **Deferred:** nested CV, `ColumnTransformer`
+
+  Shipped as `ml.grid_search` (`ef.ml.grid_search`) and `ml.cross_validate`
+  (`ef.ml.cross_validate`), both restricted to `fit`-archetype (supervised) estimators only —
+  a deliberate scope cut, matching the epic's own deferred-scope framing below.
+  `ml.grid_search` wraps `sklearn.model_selection.GridSearchCV`, returning a `FittedModel`
+  built from `best_estimator_` (using the estimator's own registry key as `estimator_type`, so
+  `ef.ml.evaluate`/`ef.ml.summarize` work on it unchanged) plus a tidy per-combination
+  `cv_results` frame. `ml.cross_validate` wraps `sklearn.model_selection.cross_validate` and
+  returns only a tidy per-fold frame (`fold`/`test_score`/`fit_time`/`score_time`) — no `Model`
+  output, since `cross_validate` fits and discards per-fold models with no single canonical
+  "best" estimator to keep.
+- [x] Golden + equivalence via the Story 9 harness. **Deferred:** nested CV, `ColumnTransformer`
   routing, randomized/Bayesian search backends beyond sklearn's built-ins.
+
+  `tests/test_ml_pipeline_and_selection.py`: golden `ast.parse` + `ruff check` on a
+  representative graph per new node type, plus ADR-0002 equivalence tests for a
+  supervised-final-step pipeline, a cluster_detect-final-step pipeline, `ml.grid_search`, and
+  `ml.cross_validate`. Scoped to these three node types (not a whole estimator-archetype
+  matrix, since each is a single node file, not a generated catalog family) — a Story 9 harness
+  slice, same pattern as Stories 4/5/6's own scoped test files.
 
 ---
 

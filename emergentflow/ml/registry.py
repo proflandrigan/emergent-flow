@@ -32,6 +32,7 @@ __all__ = [
     "register_estimator",
     "get_estimator_spec",
     "known_estimator_keys",
+    "keys_for_archetype",
 ]
 
 #: The three fixed adapter shapes locked by ADR 0016 subsection 3. ("apply" is not an
@@ -75,6 +76,10 @@ class EstimatorSpec:
     archetype: which of the three fixed adapter shapes this estimator uses.
     task: ``"classification"`` | ``"regression"`` for ``archetype="fit"`` estimators;
         ``None`` for unsupervised archetypes.
+    description: a curated, hand-written one-line summary of the estimator (Epic 8, Story 7).
+        Takes priority over the raw sklearn docstring first line in the generated catalog
+        entry (see ``emergentflow.ml.generator``). Left ``""`` (the default) for entries that
+        have not yet been curated, in which case the generator falls back to the docstring.
     accepted_kwargs: curated allow-list of constructor kwargs -> :class:`KwargSpec`.
         Keys not present here are rejected by the adapter as unknown params.
     summary_builder: optional inspectable-summary builder for this estimator's family;
@@ -86,6 +91,7 @@ class EstimatorSpec:
     sklearn_class: type
     archetype: Archetype
     task: str | None = None
+    description: str = ""
     accepted_kwargs: dict[str, KwargSpec] = field(default_factory=dict)
     summary_builder: Callable[[Any], dict[str, Any]] | None = None
 
@@ -123,3 +129,12 @@ def get_estimator_spec(key: str) -> EstimatorSpec:
 def known_estimator_keys() -> list[str]:
     """Return every registered estimator key, sorted for deterministic output."""
     return sorted(_REGISTRY)
+
+
+def keys_for_archetype(archetype: Archetype) -> list[str]:
+    """Every registered estimator key whose archetype is *archetype*, sorted.
+
+    Shared by every archetype node's ``estimator`` dropdown (``choices=`` hint), so the
+    fit/fit_transform/cluster_detect filter logic has exactly one implementation.
+    """
+    return sorted(k for k, spec in _REGISTRY.items() if spec.archetype == archetype)

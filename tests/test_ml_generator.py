@@ -11,7 +11,12 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 
 from emergentflow.ml.generator import generate_estimator_catalog_entries
-from emergentflow.ml.registry import EstimatorSpec, KwargSpec
+from emergentflow.ml.registry import (
+    EstimatorSpec,
+    KwargSpec,
+    get_estimator_spec,
+    known_estimator_keys,
+)
 
 
 def _make_spec(
@@ -20,6 +25,7 @@ def _make_spec(
     sklearn_class: type = LogisticRegression,
     archetype: str = "fit",
     task: str | None = "classification",
+    description: str = "",
     accepted_kwargs: dict | None = None,
 ) -> EstimatorSpec:
     if accepted_kwargs is None:
@@ -33,6 +39,7 @@ def _make_spec(
         sklearn_class=sklearn_class,
         archetype=archetype,  # type: ignore[arg-type]
         task=task,
+        description=description,
         accepted_kwargs=accepted_kwargs,
     )
 
@@ -112,6 +119,19 @@ def test_description_non_empty_for_real_class():
     specs = [_make_spec(sklearn_class=LogisticRegression)]
     entries = generate_estimator_catalog_entries(specs)
     assert entries[0]["description"] != ""
+
+
+def test_curated_description_takes_priority_over_docstring():
+    specs = [_make_spec(sklearn_class=LogisticRegression, description="A curated one-liner.")]
+    entries = generate_estimator_catalog_entries(specs)
+    assert entries[0]["description"] == "A curated one-liner."
+
+
+def test_empty_curated_description_falls_back_to_docstring():
+    specs = [_make_spec(sklearn_class=LogisticRegression, description="")]
+    entries = generate_estimator_catalog_entries(specs)
+    assert entries[0]["description"] != ""
+    assert entries[0]["description"] != "A curated one-liner."
 
 
 # ---------------------------------------------------------------------------
@@ -199,3 +219,45 @@ def test_pure_function():
     second = generate_estimator_catalog_entries(specs)
     assert first == second
     assert first is not second
+
+
+# ---------------------------------------------------------------------------
+# golden: the full generated estimator catalog, pinned to the curated allow-list
+# ---------------------------------------------------------------------------
+
+
+def _live_estimator_specs() -> list[EstimatorSpec]:
+    return [get_estimator_spec(key) for key in known_estimator_keys()]
+
+
+def test_every_registered_estimator_has_a_curated_description():
+    """Every curated allow-list entry has a non-empty, hand-written description.
+
+    Guards against a future estimator being added to the allow-list without also curating
+    its description (which would silently fall back to the raw sklearn docstring).
+    """
+    for spec in _live_estimator_specs():
+        assert spec.description.strip(), f"{spec.key!r} has no curated description."
+
+
+def test_generated_catalog_uses_curated_descriptions_not_docstrings():
+    """The generated entry's description is the curated one verbatim, not the docstring."""
+    entries = {e["key"]: e for e in generate_estimator_catalog_entries(_live_estimator_specs())}
+    for spec in _live_estimator_specs():
+        assert entries[spec.key]["description"] == spec.description.strip()
+
+
+def test_generated_catalog_keys_match_allow_list_exactly():
+    """The generated entry set is exactly the curated allow-list -- pinned, not enumerated.
+
+    This is what makes the catalog independent of the installed sklearn version: it always
+    reflects ``known_estimator_keys()`` (the curated registry), never
+    ``sklearn.utils.all_estimators()``.
+    """
+    entries = generate_estimator_catalog_entries(_live_estimator_specs())
+    assert sorted(e["key"] for e in entries) == known_estimator_keys()
+
+
+def test_estimator_catalog_golden(snapshot) -> None:
+    """Pin the full generated estimator-catalog entry list (stable ordering + shape)."""
+    assert generate_estimator_catalog_entries(_live_estimator_specs()) == snapshot

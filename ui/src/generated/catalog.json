@@ -4,7 +4,7 @@
     {
       "archetype": "fit",
       "category": "Ensemble",
-      "description": "An AdaBoost classifier.",
+      "description": "An ensemble that combines weak classifiers, reweighting misclassified samples each round.",
       "import_path": "sklearn.ensemble.AdaBoostClassifier",
       "key": "AdaBoostClassifier",
       "label": "Ada Boost Classifier",
@@ -34,7 +34,7 @@
     {
       "archetype": "fit",
       "category": "Ensemble",
-      "description": "An AdaBoost regressor.",
+      "description": "An ensemble that combines weak regressors, reweighting poorly predicted samples each round.",
       "import_path": "sklearn.ensemble.AdaBoostRegressor",
       "key": "AdaBoostRegressor",
       "label": "Ada Boost Regressor",
@@ -64,7 +64,7 @@
     {
       "archetype": "cluster_detect",
       "category": "Cluster",
-      "description": "Agglomerative Clustering.",
+      "description": "Builds nested clusters by successively merging or splitting groups.",
       "import_path": "sklearn.cluster.AgglomerativeClustering",
       "key": "AgglomerativeClustering",
       "label": "Agglomerative Clustering",
@@ -88,7 +88,7 @@
     {
       "archetype": "fit",
       "category": "Ensemble",
-      "description": "A Bagging classifier.",
+      "description": "An ensemble that fits classifiers on random subsets of the data and aggregates their votes.",
       "import_path": "sklearn.ensemble.BaggingClassifier",
       "key": "BaggingClassifier",
       "label": "Bagging Classifier",
@@ -112,7 +112,7 @@
     {
       "archetype": "fit",
       "category": "Ensemble",
-      "description": "A Bagging regressor.",
+      "description": "An ensemble that fits regressors on random subsets of the data and averages their predictions.",
       "import_path": "sklearn.ensemble.BaggingRegressor",
       "key": "BaggingRegressor",
       "label": "Bagging Regressor",
@@ -136,7 +136,7 @@
     {
       "archetype": "cluster_detect",
       "category": "Mixture",
-      "description": "Variational Bayesian estimation of a Gaussian mixture.",
+      "description": "A Gaussian mixture model fit with variational Bayesian inference, which can prune unneeded components.",
       "import_path": "sklearn.mixture.BayesianGaussianMixture",
       "key": "BayesianGaussianMixture",
       "label": "Bayesian Gaussian Mixture",
@@ -160,7 +160,7 @@
     {
       "archetype": "cluster_detect",
       "category": "Cluster",
-      "description": "Implements the BIRCH clustering algorithm.",
+      "description": "Incrementally builds a tree of cluster summaries for memory-efficient clustering of large datasets.",
       "import_path": "sklearn.cluster.Birch",
       "key": "Birch",
       "label": "Birch",
@@ -184,7 +184,7 @@
     {
       "archetype": "cluster_detect",
       "category": "Cluster",
-      "description": "Perform DBSCAN clustering from vector array or distance matrix.",
+      "description": "Density-based clustering that groups closely packed points and flags outliers as noise.",
       "import_path": "sklearn.cluster.DBSCAN",
       "key": "DBSCAN",
       "label": "DBSCAN",
@@ -208,7 +208,7 @@
     {
       "archetype": "fit",
       "category": "Tree",
-      "description": "A decision tree classifier.",
+      "description": "Classifies data by learning simple decision rules inferred from feature splits.",
       "import_path": "sklearn.tree.DecisionTreeClassifier",
       "key": "DecisionTreeClassifier",
       "label": "Decision Tree Classifier",
@@ -238,7 +238,7 @@
     {
       "archetype": "fit",
       "category": "Tree",
-      "description": "A decision tree regressor.",
+      "description": "Predicts continuous values by learning decision rules inferred from feature splits.",
       "import_path": "sklearn.tree.DecisionTreeRegressor",
       "key": "DecisionTreeRegressor",
       "label": "Decision Tree Regressor",
@@ -268,7 +268,7 @@
     {
       "archetype": "fit",
       "category": "Linear Model",
-      "description": "Linear regression with combined L1 and L2 priors as regularizer.",
+      "description": "Linear regression combining L1 and L2 regularization penalties.",
       "import_path": "sklearn.linear_model.ElasticNet",
       "key": "ElasticNet",
       "label": "Elastic Net",
@@ -304,7 +304,7 @@
     {
       "archetype": "cluster_detect",
       "category": "Covariance",
-      "description": "An object for detecting outliers in a Gaussian distributed dataset.",
+      "description": "Detects anomalies by fitting a robust covariance ellipse to normal data.",
       "import_path": "sklearn.covariance.EllipticEnvelope",
       "key": "EllipticEnvelope",
       "label": "Elliptic Envelope",
@@ -328,7 +328,7 @@
     {
       "archetype": "fit",
       "category": "Ensemble",
-      "description": "An extra-trees classifier.",
+      "description": "An ensemble of extremely randomized trees for classification, trading some bias for reduced variance.",
       "import_path": "sklearn.ensemble.ExtraTreesClassifier",
       "key": "ExtraTreesClassifier",
       "label": "Extra Trees Classifier",
@@ -358,7 +358,7 @@
     {
       "archetype": "fit",
       "category": "Ensemble",
-      "description": "An extra-trees regressor.",
+      "description": "An ensemble of extremely randomized trees for regression, trading some bias for reduced variance.",
       "import_path": "sklearn.ensemble.ExtraTreesRegressor",
       "key": "ExtraTreesRegressor",
       "label": "Extra Trees Regressor",
@@ -388,7 +388,7 @@
     {
       "archetype": "fit_transform",
       "category": "Decomposition",
-      "description": "Factor Analysis (FA).",
+      "description": "Models observed features as linear combinations of a smaller set of latent factors plus noise.",
       "import_path": "sklearn.decomposition.FactorAnalysis",
       "key": "FactorAnalysis",
       "label": "Factor Analysis",
@@ -412,7 +412,7 @@
     {
       "archetype": "fit_transform",
       "category": "Decomposition",
-      "description": "FastICA: a fast algorithm for Independent Component Analysis.",
+      "description": "Separates a multivariate signal into additive, statistically independent components.",
       "import_path": "sklearn.decomposition.FastICA",
       "key": "FastICA",
       "label": "Fast ICA",
@@ -436,7 +436,7 @@
     {
       "archetype": "cluster_detect",
       "category": "Mixture",
-      "description": "Gaussian Mixture.",
+      "description": "Fits a mixture of Gaussian distributions to model cluster membership probabilistically.",
       "import_path": "sklearn.mixture.GaussianMixture",
       "key": "GaussianMixture",
       "label": "Gaussian Mixture",
@@ -460,7 +460,7 @@
     {
       "archetype": "fit",
       "category": "Naive Bayes",
-      "description": "Gaussian Naive Bayes (GaussianNB).",
+      "description": "Naive Bayes classifier assuming features are normally distributed within each class.",
       "import_path": "sklearn.naive_bayes.GaussianNB",
       "key": "GaussianNB",
       "label": "Gaussian NB",
@@ -478,7 +478,7 @@
     {
       "archetype": "fit",
       "category": "Ensemble",
-      "description": "Gradient Boosting for classification.",
+      "description": "Builds an additive ensemble of trees that sequentially correct prior errors for classification.",
       "import_path": "sklearn.ensemble.GradientBoostingClassifier",
       "key": "GradientBoostingClassifier",
       "label": "Gradient Boosting Classifier",
@@ -514,7 +514,7 @@
     {
       "archetype": "fit",
       "category": "Ensemble",
-      "description": "Gradient Boosting for regression.",
+      "description": "Builds an additive ensemble of trees that sequentially correct prior errors for regression.",
       "import_path": "sklearn.ensemble.GradientBoostingRegressor",
       "key": "GradientBoostingRegressor",
       "label": "Gradient Boosting Regressor",
@@ -550,7 +550,7 @@
     {
       "archetype": "fit",
       "category": "Ensemble",
-      "description": "Histogram-based Gradient Boosting Classification Tree.",
+      "description": "A histogram-based gradient boosting classifier, fast on large datasets.",
       "import_path": "sklearn.ensemble.HistGradientBoostingClassifier",
       "key": "HistGradientBoostingClassifier",
       "label": "Hist Gradient Boosting Classifier",
@@ -580,7 +580,7 @@
     {
       "archetype": "fit",
       "category": "Ensemble",
-      "description": "Histogram-based Gradient Boosting Regression Tree.",
+      "description": "A histogram-based gradient boosting regressor, fast on large datasets.",
       "import_path": "sklearn.ensemble.HistGradientBoostingRegressor",
       "key": "HistGradientBoostingRegressor",
       "label": "Hist Gradient Boosting Regressor",
@@ -610,7 +610,7 @@
     {
       "archetype": "cluster_detect",
       "category": "Ensemble",
-      "description": "Isolation Forest Algorithm.",
+      "description": "Detects anomalies by isolating observations via random recursive partitioning.",
       "import_path": "sklearn.ensemble.IsolationForest",
       "key": "IsolationForest",
       "label": "Isolation Forest",
@@ -640,7 +640,7 @@
     {
       "archetype": "fit_transform",
       "category": "Manifold",
-      "description": "Isomap Embedding.",
+      "description": "Non-linear dimensionality reduction that preserves geodesic distances along a manifold.",
       "import_path": "sklearn.manifold.Isomap",
       "key": "Isomap",
       "label": "Isomap",
@@ -664,7 +664,7 @@
     {
       "archetype": "cluster_detect",
       "category": "Cluster",
-      "description": "K-Means clustering.",
+      "description": "Partitions data into k clusters by minimizing within-cluster variance.",
       "import_path": "sklearn.cluster.KMeans",
       "key": "KMeans",
       "label": "K Means",
@@ -694,7 +694,7 @@
     {
       "archetype": "fit",
       "category": "Neighbors",
-      "description": "Classifier implementing the k-nearest neighbors vote.",
+      "description": "Classifies a sample by majority vote among its nearest neighbors.",
       "import_path": "sklearn.neighbors.KNeighborsClassifier",
       "key": "KNeighborsClassifier",
       "label": "K Neighbors Classifier",
@@ -718,7 +718,7 @@
     {
       "archetype": "fit",
       "category": "Neighbors",
-      "description": "Regression based on k-nearest neighbors.",
+      "description": "Predicts a value by averaging its nearest neighbors' targets.",
       "import_path": "sklearn.neighbors.KNeighborsRegressor",
       "key": "KNeighborsRegressor",
       "label": "K Neighbors Regressor",
@@ -742,7 +742,7 @@
     {
       "archetype": "fit",
       "category": "Linear Model",
-      "description": "Linear Model trained with L1 prior as regularizer (aka the Lasso).",
+      "description": "Linear regression with L1 regularization that can shrink some coefficients to zero.",
       "import_path": "sklearn.linear_model.Lasso",
       "key": "Lasso",
       "label": "Lasso",
@@ -772,7 +772,7 @@
     {
       "archetype": "fit",
       "category": "Discriminant Analysis",
-      "description": "Linear Discriminant Analysis.",
+      "description": "Classifies by finding a linear combination of features that best separates classes.",
       "import_path": "sklearn.discriminant_analysis.LinearDiscriminantAnalysis",
       "key": "LinearDiscriminantAnalysis",
       "label": "Linear Discriminant Analysis",
@@ -790,7 +790,7 @@
     {
       "archetype": "fit",
       "category": "SVM",
-      "description": "Linear Support Vector Classification.",
+      "description": "Linear support vector classifier that finds a maximum-margin separating hyperplane.",
       "import_path": "sklearn.svm.LinearSVC",
       "key": "LinearSVC",
       "label": "Linear SVC",
@@ -820,7 +820,7 @@
     {
       "archetype": "cluster_detect",
       "category": "Neighbors",
-      "description": "Unsupervised Outlier Detection using the Local Outlier Factor (LOF).",
+      "description": "Detects anomalies by comparing a sample's local density to that of its neighbors.",
       "import_path": "sklearn.neighbors.LocalOutlierFactor",
       "key": "LocalOutlierFactor",
       "label": "Local Outlier Factor",
@@ -850,7 +850,7 @@
     {
       "archetype": "fit",
       "category": "Linear Model",
-      "description": "Logistic Regression (aka logit, MaxEnt) classifier.",
+      "description": "Linear classifier that models class probabilities via the logistic function.",
       "import_path": "sklearn.linear_model.LogisticRegression",
       "key": "LogisticRegression",
       "label": "Logistic Regression",
@@ -880,7 +880,7 @@
     {
       "archetype": "cluster_detect",
       "category": "Cluster",
-      "description": "Mean shift clustering using a flat kernel.",
+      "description": "Clustering by iteratively shifting points toward the mode of their neighborhood density.",
       "import_path": "sklearn.cluster.MeanShift",
       "key": "MeanShift",
       "label": "Mean Shift",
@@ -898,7 +898,7 @@
     {
       "archetype": "fit_transform",
       "category": "Preprocessing",
-      "description": "Transform features by scaling each feature to a given range.",
+      "description": "Scales features to a given range, typically [0, 1].",
       "import_path": "sklearn.preprocessing.MinMaxScaler",
       "key": "MinMaxScaler",
       "label": "Min Max Scaler",
@@ -925,7 +925,7 @@
     {
       "archetype": "cluster_detect",
       "category": "Cluster",
-      "description": "Mini-Batch K-Means clustering.",
+      "description": "A faster, mini-batch variant of KMeans clustering for large datasets.",
       "import_path": "sklearn.cluster.MiniBatchKMeans",
       "key": "MiniBatchKMeans",
       "label": "Mini Batch K Means",
@@ -955,7 +955,7 @@
     {
       "archetype": "fit",
       "category": "Naive Bayes",
-      "description": "Naive Bayes classifier for multinomial models.",
+      "description": "Naive Bayes classifier suited to discrete count data such as word frequencies.",
       "import_path": "sklearn.naive_bayes.MultinomialNB",
       "key": "MultinomialNB",
       "label": "Multinomial NB",
@@ -973,7 +973,7 @@
     {
       "archetype": "fit_transform",
       "category": "Decomposition",
-      "description": "Non-Negative Matrix Factorization (NMF).",
+      "description": "Factorizes data into non-negative components, useful for parts-based representations.",
       "import_path": "sklearn.decomposition.NMF",
       "key": "NMF",
       "label": "NMF",
@@ -1003,7 +1003,7 @@
     {
       "archetype": "fit_transform",
       "category": "Preprocessing",
-      "description": "Normalize samples individually to unit norm.",
+      "description": "Scales each sample (row) to unit norm.",
       "import_path": "sklearn.preprocessing.Normalizer",
       "key": "Normalizer",
       "label": "Normalizer",
@@ -1021,7 +1021,7 @@
     {
       "archetype": "cluster_detect",
       "category": "SVM",
-      "description": "Unsupervised Outlier Detection.",
+      "description": "Detects anomalies by learning a boundary that encloses the bulk of normal data.",
       "import_path": "sklearn.svm.OneClassSVM",
       "key": "OneClassSVM",
       "label": "One Class SVM",
@@ -1045,7 +1045,7 @@
     {
       "archetype": "fit_transform",
       "category": "Preprocessing",
-      "description": "Encode categorical features as a one-hot numeric array.",
+      "description": "Encodes categorical features as one-hot binary columns.",
       "import_path": "sklearn.preprocessing.OneHotEncoder",
       "key": "OneHotEncoder",
       "label": "One Hot Encoder",
@@ -1069,7 +1069,7 @@
     {
       "archetype": "fit_transform",
       "category": "Preprocessing",
-      "description": "Encode categorical features as an integer array.",
+      "description": "Encodes categorical features as ordinal integer codes.",
       "import_path": "sklearn.preprocessing.OrdinalEncoder",
       "key": "OrdinalEncoder",
       "label": "Ordinal Encoder",
@@ -1087,7 +1087,7 @@
     {
       "archetype": "fit_transform",
       "category": "Decomposition",
-      "description": "Principal component analysis (PCA).",
+      "description": "Reduces dimensionality by projecting data onto directions of maximum variance.",
       "import_path": "sklearn.decomposition.PCA",
       "key": "PCA",
       "label": "PCA",
@@ -1111,7 +1111,7 @@
     {
       "archetype": "fit_transform",
       "category": "Preprocessing",
-      "description": "Generate polynomial and interaction features.",
+      "description": "Generates polynomial and interaction features from existing features.",
       "import_path": "sklearn.preprocessing.PolynomialFeatures",
       "key": "PolynomialFeatures",
       "label": "Polynomial Features",
@@ -1135,7 +1135,7 @@
     {
       "archetype": "fit",
       "category": "Discriminant Analysis",
-      "description": "Quadratic Discriminant Analysis.",
+      "description": "Classifies using a quadratic decision boundary fit per class, assuming Gaussian class-conditional densities.",
       "import_path": "sklearn.discriminant_analysis.QuadraticDiscriminantAnalysis",
       "key": "QuadraticDiscriminantAnalysis",
       "label": "Quadratic Discriminant Analysis",
@@ -1153,7 +1153,7 @@
     {
       "archetype": "fit",
       "category": "Ensemble",
-      "description": "A random forest classifier.",
+      "description": "An ensemble of randomized decision trees combined by majority vote for classification.",
       "import_path": "sklearn.ensemble.RandomForestClassifier",
       "key": "RandomForestClassifier",
       "label": "Random Forest Classifier",
@@ -1183,7 +1183,7 @@
     {
       "archetype": "fit",
       "category": "Ensemble",
-      "description": "A random forest regressor.",
+      "description": "An ensemble of randomized decision trees combined by averaging for regression.",
       "import_path": "sklearn.ensemble.RandomForestRegressor",
       "key": "RandomForestRegressor",
       "label": "Random Forest Regressor",
@@ -1213,7 +1213,7 @@
     {
       "archetype": "fit",
       "category": "Linear Model",
-      "description": "Linear least squares with l2 regularization.",
+      "description": "Linear regression with L2 regularization to shrink coefficients and reduce overfitting.",
       "import_path": "sklearn.linear_model.Ridge",
       "key": "Ridge",
       "label": "Ridge",
@@ -1237,7 +1237,7 @@
     {
       "archetype": "fit_transform",
       "category": "Preprocessing",
-      "description": "Scale features using statistics that are robust to outliers.",
+      "description": "Scales features using statistics robust to outliers (median and IQR).",
       "import_path": "sklearn.preprocessing.RobustScaler",
       "key": "RobustScaler",
       "label": "Robust Scaler",
@@ -1261,7 +1261,7 @@
     {
       "archetype": "fit",
       "category": "Linear Model",
-      "description": "Linear classifiers (SVM, logistic regression, etc.) with SGD training.",
+      "description": "Linear classifier fit via stochastic gradient descent, supporting multiple loss functions.",
       "import_path": "sklearn.linear_model.SGDClassifier",
       "key": "SGDClassifier",
       "label": "SGD Classifier",
@@ -1297,7 +1297,7 @@
     {
       "archetype": "fit",
       "category": "Linear Model",
-      "description": "Linear model fitted by minimizing a regularized empirical loss with SGD.",
+      "description": "Linear regressor fit via stochastic gradient descent.",
       "import_path": "sklearn.linear_model.SGDRegressor",
       "key": "SGDRegressor",
       "label": "SGD Regressor",
@@ -1333,7 +1333,7 @@
     {
       "archetype": "fit",
       "category": "SVM",
-      "description": "C-Support Vector Classification.",
+      "description": "Support vector classifier that can use kernel functions to separate non-linearly-separable data.",
       "import_path": "sklearn.svm.SVC",
       "key": "SVC",
       "label": "SVC",
@@ -1363,7 +1363,7 @@
     {
       "archetype": "fit",
       "category": "SVM",
-      "description": "Epsilon-Support Vector Regression.",
+      "description": "Support vector regressor that fits within a margin of tolerance using kernel functions.",
       "import_path": "sklearn.svm.SVR",
       "key": "SVR",
       "label": "SVR",
@@ -1387,7 +1387,7 @@
     {
       "archetype": "fit_transform",
       "category": "Feature Selection",
-      "description": "Select features according to the k highest scores.",
+      "description": "Selects the k highest-scoring features according to a statistical scoring function.",
       "import_path": "sklearn.feature_selection.SelectKBest",
       "key": "SelectKBest",
       "label": "Select K Best",
@@ -1411,7 +1411,7 @@
     {
       "archetype": "cluster_detect",
       "category": "Cluster",
-      "description": "Apply clustering to a projection of the normalized Laplacian.",
+      "description": "Clusters data using the eigenvalues of a similarity matrix for dimensionality reduction before clustering.",
       "import_path": "sklearn.cluster.SpectralClustering",
       "key": "SpectralClustering",
       "label": "Spectral Clustering",
@@ -1435,7 +1435,7 @@
     {
       "archetype": "fit_transform",
       "category": "Preprocessing",
-      "description": "Standardize features by removing the mean and scaling to unit variance.",
+      "description": "Standardizes features by removing the mean and scaling to unit variance.",
       "import_path": "sklearn.preprocessing.StandardScaler",
       "key": "StandardScaler",
       "label": "Standard Scaler",
@@ -1459,7 +1459,7 @@
     {
       "archetype": "fit_transform",
       "category": "Manifold",
-      "description": "T-distributed Stochastic Neighbor Embedding.",
+      "description": "Non-linear dimensionality reduction that embeds high-dimensional data for visualization, preserving local structure.",
       "import_path": "sklearn.manifold.TSNE",
       "key": "TSNE",
       "label": "TSNE",
@@ -1489,7 +1489,7 @@
     {
       "archetype": "fit_transform",
       "category": "Decomposition",
-      "description": "Dimensionality reduction using truncated SVD (aka LSA).",
+      "description": "Reduces dimensionality via truncated singular value decomposition, effective on sparse data.",
       "import_path": "sklearn.decomposition.TruncatedSVD",
       "key": "TruncatedSVD",
       "label": "Truncated SVD",
@@ -1513,7 +1513,7 @@
     {
       "archetype": "fit_transform",
       "category": "Feature Selection",
-      "description": "Feature selector that removes all low-variance features.",
+      "description": "Removes features whose variance falls below a given threshold.",
       "import_path": "sklearn.feature_selection.VarianceThreshold",
       "key": "VarianceThreshold",
       "label": "Variance Threshold",
@@ -2254,6 +2254,130 @@
     },
     {
       "category": "Machine Learning",
+      "description": "Cross-validate a curated, fit-archetype sklearn estimator.",
+      "family": "ml",
+      "label": "Cross Validate",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which allow-listed sklearn classifier/regressor to cross-validate.",
+          "hints": {
+            "choices": [
+              "AdaBoostClassifier",
+              "AdaBoostRegressor",
+              "BaggingClassifier",
+              "BaggingRegressor",
+              "DecisionTreeClassifier",
+              "DecisionTreeRegressor",
+              "ElasticNet",
+              "ExtraTreesClassifier",
+              "ExtraTreesRegressor",
+              "GaussianNB",
+              "GradientBoostingClassifier",
+              "GradientBoostingRegressor",
+              "HistGradientBoostingClassifier",
+              "HistGradientBoostingRegressor",
+              "KNeighborsClassifier",
+              "KNeighborsRegressor",
+              "Lasso",
+              "LinearDiscriminantAnalysis",
+              "LinearSVC",
+              "LogisticRegression",
+              "MultinomialNB",
+              "QuadraticDiscriminantAnalysis",
+              "RandomForestClassifier",
+              "RandomForestRegressor",
+              "Ridge",
+              "SGDClassifier",
+              "SGDRegressor",
+              "SVC",
+              "SVR"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Estimator",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": null,
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to use as features; empty/unset uses every other column.",
+          "hints": null,
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": {},
+          "help": "Constructor kwargs for the chosen estimator (allow-listed per estimator).",
+          "hints": null,
+          "label": "Estimator params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        },
+        {
+          "default": 5,
+          "help": "Number of cross-validation folds.",
+          "hints": null,
+          "label": "CV folds",
+          "name": "cv",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "sklearn scoring string (e.g. 'accuracy', 'r2'); unset uses the estimator's default scorer.",
+          "hints": null,
+          "label": "Scoring metric",
+          "name": "scoring",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing features and the target column.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "One row per cross-validation fold, with test_score/fit_time/score_time.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "ml.cross_validate",
+      "version": 1
+    },
+    {
+      "category": "Machine Learning",
       "description": "Score a fitted model against labeled data.",
       "family": "ml",
       "label": "Evaluate",
@@ -2497,6 +2621,197 @@
         }
       ],
       "type": "ml.fit_transform",
+      "version": 1
+    },
+    {
+      "category": "Machine Learning",
+      "description": "Search a hyperparameter grid for a curated, fit-archetype sklearn estimator.",
+      "family": "ml",
+      "label": "Grid Search",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which allow-listed sklearn classifier/regressor to search.",
+          "hints": {
+            "choices": [
+              "AdaBoostClassifier",
+              "AdaBoostRegressor",
+              "BaggingClassifier",
+              "BaggingRegressor",
+              "DecisionTreeClassifier",
+              "DecisionTreeRegressor",
+              "ElasticNet",
+              "ExtraTreesClassifier",
+              "ExtraTreesRegressor",
+              "GaussianNB",
+              "GradientBoostingClassifier",
+              "GradientBoostingRegressor",
+              "HistGradientBoostingClassifier",
+              "HistGradientBoostingRegressor",
+              "KNeighborsClassifier",
+              "KNeighborsRegressor",
+              "Lasso",
+              "LinearDiscriminantAnalysis",
+              "LinearSVC",
+              "LogisticRegression",
+              "MultinomialNB",
+              "QuadraticDiscriminantAnalysis",
+              "RandomForestClassifier",
+              "RandomForestRegressor",
+              "Ridge",
+              "SGDClassifier",
+              "SGDRegressor",
+              "SVC",
+              "SVR"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Estimator",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Constructor kwarg name -> list of candidate values to search.",
+          "hints": null,
+          "label": "Parameter grid",
+          "name": "param_grid",
+          "required": true,
+          "type_token": "dict[str, list[any]]"
+        },
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": null,
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to use as features; empty/unset uses every other column.",
+          "hints": null,
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": 5,
+          "help": "Number of cross-validation folds.",
+          "hints": null,
+          "label": "CV folds",
+          "name": "cv",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "sklearn scoring string (e.g. 'accuracy', 'r2'); unset uses the estimator's default scorer.",
+          "hints": null,
+          "label": "Scoring metric",
+          "name": "scoring",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing features and the target column.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "out",
+          "help": "The best-scoring fitted model, refit on the full input frame.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "One row per searched parameter combination, sorted by rank.",
+          "label": null,
+          "name": "cv_results",
+          "required": true
+        }
+      ],
+      "type": "ml.grid_search",
+      "version": 1
+    },
+    {
+      "category": "Machine Learning",
+      "description": "Fit an ordered chain of curated estimators as one sklearn Pipeline.",
+      "family": "ml",
+      "label": "Pipeline",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Ordered list of {estimator, params} dicts. Every step but the last must be a fit_transform-archetype estimator; the last must be a fit or cluster_detect-archetype estimator.",
+          "hints": null,
+          "label": "Pipeline steps",
+          "name": "steps",
+          "required": true,
+          "type_token": "list[dict[str, any]]"
+        },
+        {
+          "default": null,
+          "help": "Column to predict; required only when the final step is a fit-archetype (supervised) estimator.",
+          "hints": null,
+          "label": "Target column",
+          "name": "target",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to use as features; empty/unset uses every other column.",
+          "hints": null,
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing features and (if the final step is supervised) the target column.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "out",
+          "help": "The fitted pipeline, wrapping every step as one Model.",
+          "label": null,
+          "name": "model",
+          "required": true
+        }
+      ],
+      "type": "ml.pipeline",
       "version": 1
     },
     {
