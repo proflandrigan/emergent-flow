@@ -18,12 +18,9 @@ from typing import Any
 import numpy as np
 
 
-def summarize_classifier(estimator: Any) -> dict[str, Any]:
-    """Structural summary for a fitted classifier: classes + coefficients/importances."""
+def _coefficients_or_importances(estimator: Any) -> dict[str, Any]:
+    """``{"coefficients": [...]}`` from ``coef_``, else ``{"feature_importances": [...]}``."""
     summary: dict[str, Any] = {}
-    classes = getattr(estimator, "classes_", None)
-    if classes is not None:
-        summary["classes"] = [str(c) for c in classes]
     coef = getattr(estimator, "coef_", None)
     if coef is not None:
         coef_arr = np.asarray(coef)
@@ -37,19 +34,19 @@ def summarize_classifier(estimator: Any) -> dict[str, Any]:
     return summary
 
 
+def summarize_classifier(estimator: Any) -> dict[str, Any]:
+    """Structural summary for a fitted classifier: classes + coefficients/importances."""
+    summary: dict[str, Any] = {}
+    classes = getattr(estimator, "classes_", None)
+    if classes is not None:
+        summary["classes"] = [str(c) for c in classes]
+    summary.update(_coefficients_or_importances(estimator))
+    return summary
+
+
 def summarize_regressor(estimator: Any) -> dict[str, Any]:
     """Structural summary for a fitted regressor: coefficients/importances + intercept."""
-    summary: dict[str, Any] = {}
-    coef = getattr(estimator, "coef_", None)
-    if coef is not None:
-        coef_arr = np.asarray(coef)
-        summary["coefficients"] = (
-            [float(v) for v in coef_arr]
-            if coef_arr.ndim == 1
-            else [[float(v) for v in row] for row in coef_arr]
-        )
-    elif getattr(estimator, "feature_importances_", None) is not None:
-        summary["feature_importances"] = [float(v) for v in estimator.feature_importances_]
+    summary: dict[str, Any] = _coefficients_or_importances(estimator)
     intercept = getattr(estimator, "intercept_", None)
     if intercept is not None:
         intercept_arr = np.asarray(intercept)

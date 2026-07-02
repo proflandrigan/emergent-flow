@@ -139,7 +139,10 @@ def evaluate(model: FittedModel, df: pd.DataFrame) -> EvaluationResult:
     Regression metrics: ``r2``, ``mae``, ``rmse``. Classification metrics: ``accuracy`` always,
     plus ``precision``/``recall``/``f1`` (binary) or their ``_macro``/``_weighted`` variants
     (multiclass, via ``sklearn.metrics.classification_report``), plus ``roc_auc`` when the task is
-    binary and the estimator exposes ``predict_proba``. Validates
+    binary, the estimator exposes ``predict_proba``, and it is defined for ``df`` (skipped when
+    ``df`` contains only one of the two classes). Only ``accuracy`` is reported if the fitted
+    estimator was trained on a single class (``classes_`` has fewer than 2 entries), since
+    precision/recall/f1/roc_auc are undefined in that degenerate case. Validates
     that the target and feature columns are present. Never mutates ``df``.
     """
     if model.target not in df.columns:
@@ -168,7 +171,7 @@ def evaluate(model: FittedModel, df: pd.DataFrame) -> EvaluationResult:
             metrics["precision_weighted"] = float(report["weighted avg"]["precision"])
             metrics["recall_weighted"] = float(report["weighted avg"]["recall"])
             metrics["f1_weighted"] = float(report["weighted avg"]["f1-score"])
-        else:
+        elif n_classes == 2:
             pos_label = classes[1] if classes is not None else 1
             metrics["precision"] = float(
                 precision_score(y_true, y_pred, zero_division=0, pos_label=pos_label)
@@ -177,10 +180,12 @@ def evaluate(model: FittedModel, df: pd.DataFrame) -> EvaluationResult:
                 recall_score(y_true, y_pred, zero_division=0, pos_label=pos_label)
             )
             metrics["f1"] = float(f1_score(y_true, y_pred, zero_division=0, pos_label=pos_label))
-            if n_classes == 2 and hasattr(model.estimator, "predict_proba"):
+            if hasattr(model.estimator, "predict_proba"):
                 proba = model.estimator.predict_proba(df[model.feature_names])
                 with contextlib.suppress(ValueError):
                     metrics["roc_auc"] = float(roc_auc_score(y_true, proba[:, 1]))
+        # else: fewer than 2 classes in `classes_` (a degenerate single-class fit) --
+        # precision/recall/f1/roc_auc are undefined, so only `accuracy` is reported.
     return EvaluationResult(task=model.task, n=int(df.shape[0]), metrics=metrics)
 
 

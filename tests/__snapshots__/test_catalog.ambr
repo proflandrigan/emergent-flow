@@ -297,7 +297,7 @@
         'description': 'Gaussian Naive Bayes (GaussianNB).',
         'import_path': 'sklearn.naive_bayes.GaussianNB',
         'key': 'GaussianNB',
-        'label': 'Gaussian N B',
+        'label': 'Gaussian NB',
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
@@ -569,11 +569,11 @@
       }),
       dict({
         'archetype': 'fit',
-        'category': 'Svm',
+        'category': 'SVM',
         'description': 'Linear Support Vector Classification.',
         'import_path': 'sklearn.svm.LinearSVC',
         'key': 'LinearSVC',
-        'label': 'Linear S V C',
+        'label': 'Linear SVC',
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
@@ -633,7 +633,7 @@
         'description': 'Naive Bayes classifier for multinomial models.',
         'import_path': 'sklearn.naive_bayes.MultinomialNB',
         'key': 'MultinomialNB',
-        'label': 'Multinomial N B',
+        'label': 'Multinomial NB',
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
@@ -753,7 +753,7 @@
         'description': 'Linear classifiers (SVM, logistic regression, etc.) with SGD training.',
         'import_path': 'sklearn.linear_model.SGDClassifier',
         'key': 'SGDClassifier',
-        'label': 'S G D Classifier',
+        'label': 'SGD Classifier',
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
@@ -789,7 +789,7 @@
         'description': 'Linear model fitted by minimizing a regularized empirical loss with SGD.',
         'import_path': 'sklearn.linear_model.SGDRegressor',
         'key': 'SGDRegressor',
-        'label': 'S G D Regressor',
+        'label': 'SGD Regressor',
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
@@ -821,11 +821,11 @@
       }),
       dict({
         'archetype': 'fit',
-        'category': 'Svm',
+        'category': 'SVM',
         'description': 'C-Support Vector Classification.',
         'import_path': 'sklearn.svm.SVC',
         'key': 'SVC',
-        'label': 'S V C',
+        'label': 'SVC',
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
@@ -851,11 +851,11 @@
       }),
       dict({
         'archetype': 'fit',
-        'category': 'Svm',
+        'category': 'SVM',
         'description': 'Epsilon-Support Vector Regression.',
         'import_path': 'sklearn.svm.SVR',
         'key': 'SVR',
-        'label': 'S V R',
+        'label': 'SVR',
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({

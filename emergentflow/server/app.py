@@ -11,7 +11,8 @@ Routes:
 - ``GET  /``                 -- ``_static/index.html`` when present, else the demo page
 - ``GET  /healthz``          -- ``{"status": "ok"}``
 - ``GET  /schema``           -- the IR JSON Schema
-- ``GET  /catalog``          -- ``{"catalog_version": <int>, "nodes": [...]}`` (ADR 0015)
+- ``GET  /catalog``          -- ``{"catalog_version": <int>, "nodes": [...], "estimators": [...]}``
+  (ADR 0015)
 - ``GET  /reports/{hash}``   -- a stored HTML report blob (Epic 7 Story 3)
 - ``POST /cache/clear``      -- ``{"status": "ok"}``
 - ``POST /compile``          -- IR JSON -> ``{"code": ...}``

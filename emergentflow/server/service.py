@@ -77,9 +77,10 @@ def get_catalog() -> dict[str, Any]:
     Delegates to the single canonical builder ``ef.export_catalog`` so the server's
     ``GET /catalog``, the committed ``ui/src/generated/catalog.json``, and the SDK's
     ``ef.export_catalog()`` all serve byte-identical data -- one source of truth, no
-    two-tier palette. Shape: ``{"catalog_version": <int>, "nodes": [<NodeSpec as JSON>, ...]}``,
-    nodes sorted by ``type``. The palette (Epic 5 Story 3) and the schema-driven config
-    panels (Story 4) render entirely from this -- no Python in the client.
+    two-tier palette. Shape: ``{"catalog_version": <int>, "nodes": [<NodeSpec as JSON>, ...],
+    "estimators": [<estimator catalog entry, Epic 8>, ...]}``, both lists sorted by their
+    ``type``/``key``. The palette (Epic 5 Story 3) and the schema-driven config panels
+    (Story 4) render entirely from this -- no Python in the client.
     """
     return export_catalog()
 

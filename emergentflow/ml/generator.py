@@ -29,13 +29,30 @@ _ARCHETYPE_NODE_TYPE: dict[Archetype, str] = {
     "cluster_detect": "ml.cluster_detect",
 }
 
-_CAMEL_BOUNDARY = re.compile(r"(?<!^)(?=[A-Z])")
+#: Splits before a lowercase/digit -> uppercase transition (``"Logistic|Regression"``) and
+#: before the last capital of an acronym run when followed by a new word (``"Gaussian|NB"``,
+#: ``"Linear|SVC"``) -- but never inside a bare acronym (``"SVC"``, ``"LDA"`` stay whole).
+_CAMEL_BOUNDARY = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+
+#: Lowercase sklearn module segments that are acronyms, not words -- ``_humanize`` would
+#: otherwise title-case them into nonsense (``"svm"`` -> ``"Svm"`` instead of ``"SVM"``).
+_ACRONYMS = frozenset({"svm"})
 
 
 def _humanize(token: str) -> str:
-    """``"LogisticRegression"`` -> ``"Logistic Regression"``; CamelCase/underscore split."""
+    """``"LogisticRegression"`` -> ``"Logistic Regression"``; CamelCase/underscore split.
+
+    Preserves existing acronym runs (``"GaussianNB"`` -> ``"Gaussian NB"``, not ``"Gaussian N
+    B"``) and upper-cases known lowercase acronyms (``"svm"`` -> ``"SVM"``).
+    """
     spaced = _CAMEL_BOUNDARY.sub(" ", token.replace("_", " "))
-    return " ".join(word.capitalize() for word in spaced.split())
+    words = []
+    for word in spaced.split():
+        if word.isupper() or word.lower() in _ACRONYMS:
+            words.append(word.upper())
+        else:
+            words.append(word.capitalize())
+    return " ".join(words)
 
 
 def _category_from_import_path(import_path: str) -> str:
