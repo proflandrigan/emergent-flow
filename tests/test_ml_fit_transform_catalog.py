@@ -25,6 +25,7 @@ from emergentflow.codegen.compiler import compile_to_code
 from emergentflow.ir.common import Direction
 from emergentflow.ir.edge import Edge, PortRef
 from emergentflow.ir.graph import Graph
+from emergentflow.ml.errors import InvalidEstimatorParamsError
 from emergentflow.ml.registry import get_estimator_spec, known_estimator_keys
 from emergentflow.nodes.examples import FitTransform, LoadSample, Transform
 
@@ -223,3 +224,52 @@ def test_tuple_typed_param_accepts_list_override() -> None:
     for col in component_cols:
         assert result[col].min() == pytest.approx(0.0)
         assert result[col].max() == pytest.approx(2.0)
+
+
+# ---------------------------------------------------------------------------
+# 5. SelectKBest.score_func: the curated default (f_classif) must not silently degenerate to
+#    NaN scores for a continuous (regression) target -- score_func must be overridable.
+# ---------------------------------------------------------------------------
+
+
+def _regression_df() -> pd.DataFrame:
+    """30 rows where y is a noisy linear function of x1/x2 -- a genuinely continuous target
+    that f_classif (SelectKBest's curated default, an ANOVA F-test for CATEGORICAL targets)
+    scores as all-NaN, since it treats each distinct float value of y as its own class."""
+    n = 30
+    x1 = [float(i) for i in range(n)]
+    x2 = [float(n - i) for i in range(n)]
+    x3 = [float(i % 4) for i in range(n)]
+    y = [3.0 * a - 2.0 * b + 0.01 * i for i, (a, b) in enumerate(zip(x1, x2, strict=True))]
+    return pd.DataFrame({"x1": x1, "x2": x2, "x3": x3, "y": y})
+
+
+def test_select_k_best_score_func_override_avoids_nan_scores_for_continuous_target() -> None:
+    """Overriding score_func to 'f_regression' for a continuous target yields real,
+    non-NaN scores -- the curated default ('f_classif') would silently produce all-NaN."""
+    df = _regression_df()
+    fit_defn = FitTransform()
+    node = fit_defn.instantiate(
+        estimator="SelectKBest",
+        target="y",
+        features=["x1", "x2", "x3"],
+        params={"k": 2, "score_func": "f_regression"},
+    )
+    fitted = fit_defn.execute(node, inputs={"frame": df})
+    scores = fitted["transformer"].transformer.scores_
+    assert not any(pd.isna(s) for s in scores)
+
+
+def test_select_k_best_score_func_rejects_unknown_choice() -> None:
+    """An unrecognized score_func string is rejected with a clear, curated-choices error
+    instead of failing deep inside sklearn with a cryptic 'not callable' error."""
+    df = _regression_df()
+    fit_defn = FitTransform()
+    node = fit_defn.instantiate(
+        estimator="SelectKBest",
+        target="y",
+        features=["x1", "x2", "x3"],
+        params={"score_func": "bogus"},
+    )
+    with pytest.raises(InvalidEstimatorParamsError, match="not a valid 'score_func'"):
+        fit_defn.execute(node, inputs={"frame": df})

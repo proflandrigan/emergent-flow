@@ -401,13 +401,20 @@ def _resolve_estimator_and_kwargs(
             f"unknown params {unknown_params!r} for estimator {estimator!r}; "
             f"expected one of {sorted(spec.accepted_kwargs)!r}."
         )
-    kwargs = {name: kwarg_spec.default for name, kwarg_spec in spec.accepted_kwargs.items()}
-    for name, value in provided_params.items():
-        default = spec.accepted_kwargs[name].default
+    kwargs: dict[str, Any] = {}
+    for name, kwarg_spec in spec.accepted_kwargs.items():
+        value = provided_params.get(name, kwarg_spec.default)
+        if kwarg_spec.choices is not None:
+            if value not in kwarg_spec.choices:
+                raise InvalidEstimatorParamsError(
+                    f"{value!r} is not a valid {name!r} for estimator {estimator!r}; "
+                    f"expected one of {sorted(kwarg_spec.choices)!r}."
+                )
+            value = kwarg_spec.choices[value]
         # JSON (and therefore every UI/codegen-supplied override) has no tuple type, so a
         # tuple-typed curated default (e.g. MinMaxScaler's feature_range) always arrives here
         # as a list; sklearn's own param validation rejects a list where it requires a tuple.
-        if isinstance(default, tuple) and isinstance(value, list):
+        elif isinstance(kwarg_spec.default, tuple) and isinstance(value, list):
             value = tuple(value)
         kwargs[name] = value
     return spec, kwargs

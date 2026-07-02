@@ -1398,6 +1398,12 @@
           "help": "Number of top features to select.",
           "name": "k",
           "type": "int"
+        },
+        {
+          "default": "f_classif",
+          "help": "Scoring function: 'f_classif'/'mutual_info_classif' for a categorical target, 'f_regression'/'mutual_info_regression' for a continuous one.",
+          "name": "score_func",
+          "type": "str"
         }
       ],
       "task": null

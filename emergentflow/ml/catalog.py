@@ -52,7 +52,14 @@ from sklearn.ensemble import (
     RandomForestClassifier,
     RandomForestRegressor,
 )
-from sklearn.feature_selection import SelectKBest, VarianceThreshold
+from sklearn.feature_selection import (
+    SelectKBest,
+    VarianceThreshold,
+    f_classif,
+    f_regression,
+    mutual_info_classif,
+    mutual_info_regression,
+)
 from sklearn.linear_model import (
     ElasticNet,
     Lasso,
@@ -918,6 +925,19 @@ register_estimator(
         archetype="fit_transform",
         accepted_kwargs={
             "k": KwargSpec(default=10, help="Number of top features to select."),
+            "score_func": KwargSpec(
+                default="f_classif",
+                help=(
+                    "Scoring function: 'f_classif'/'mutual_info_classif' for a categorical "
+                    "target, 'f_regression'/'mutual_info_regression' for a continuous one."
+                ),
+                choices={
+                    "f_classif": f_classif,
+                    "f_regression": f_regression,
+                    "mutual_info_classif": mutual_info_classif,
+                    "mutual_info_regression": mutual_info_regression,
+                },
+            ),
         },
     )
 )

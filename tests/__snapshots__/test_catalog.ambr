@@ -1401,6 +1401,12 @@
             'name': 'k',
             'type': 'int',
           }),
+          dict({
+            'default': 'f_classif',
+            'help': "Scoring function: 'f_classif'/'mutual_info_classif' for a categorical target, 'f_regression'/'mutual_info_regression' for a continuous one.",
+            'name': 'score_func',
+            'type': 'str',
+          }),
         ]),
         'task': None,
       }),
