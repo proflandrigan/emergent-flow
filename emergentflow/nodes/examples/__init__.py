@@ -39,6 +39,7 @@ from .pipeline import Pipeline
 from .predict import Predict
 from .report import GenerateHtmlSummary
 from .select_columns import SelectColumns
+from .summarize import Summarize
 from .train import TrainClassifier
 from .train_random_forest import TrainRandomForest
 from .train_regressor import TrainRegressor
@@ -72,6 +73,7 @@ __all__ = [
     "Pipeline",
     "Predict",
     "SelectColumns",
+    "Summarize",
     "TrainClassifier",
     "TrainRandomForest",
     "TrainRegressor",

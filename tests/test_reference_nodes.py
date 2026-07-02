@@ -35,6 +35,7 @@ from emergentflow.nodes.examples import (
     LoadSample,
     Predict,
     SelectColumns,
+    Summarize,
     TrainClassifier,
     TrainRandomForest,
     TrainRegressor,
@@ -555,6 +556,45 @@ class TestEvaluate:
         assert scope["result"].task == executed["result"].task
         assert scope["result"].n == executed["result"].n
         assert scope["result"].metrics == executed["result"].metrics
+
+
+# ---------------------------------------------------------------------------
+# ml.summarize
+# ---------------------------------------------------------------------------
+
+
+class TestSummarize:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Summarize()
+        df = pd.DataFrame(
+            {
+                "x": [float(i) for i in range(20)],
+                "y": [2.0 * float(i) + 1.0 for i in range(20)],
+            }
+        )
+        model = train_regressor(df, target="y")
+        node = defn.instantiate()
+        inputs = {"model": model}
+        executed = defn.execute(node, inputs)
+        scope = {"model": model}
+        _run_codegen(defn, node, scope)
+        assert scope["summary"] == executed["summary"]
+
+    def test_unsupported_estimator_degrades_gracefully(self):
+        """A model whose estimator_type has no registered summary builder must not crash --
+        it degrades to {"kind": "unsupported"}, never a live estimator on the payload."""
+        defn = Summarize()
+        df = pd.DataFrame(
+            {
+                "x": [float(i) for i in range(20)],
+                "y": [2.0 * float(i) + 1.0 for i in range(20)],
+            }
+        )
+        model = train_regressor(df, target="y")
+        node = defn.instantiate()
+        result = defn.execute(node, inputs={"model": model})
+        assert isinstance(result["summary"], dict)
 
 
 # ---------------------------------------------------------------------------

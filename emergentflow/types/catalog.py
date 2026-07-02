@@ -60,3 +60,12 @@ register_type(
         ),
     )
 )
+register_type(
+    TypeDef(
+        token="ModelSummary",
+        description=(
+            "A structural, JSON-native inspectable summary of a fitted model or "
+            "transformer (accuracy/coefficients, explained variance, cluster sizes, ...)."
+        ),
+    )
+)

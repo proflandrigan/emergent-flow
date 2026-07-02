@@ -1,6 +1,6 @@
 # The Acceptance Demo
 
-**What the app can do today.** This document describes the canonical end-to-end pipeline that supersedes the original hardcoded 5-node vertical slice as the reference usable example. The vertical slice still exists as a contract-by-construction proof; the acceptance demo is the practical, demoable pipeline.
+**What the app can do today.** This document originally described the canonical end-to-end pipeline that superseded the original hardcoded 5-node vertical slice as the reference usable example. It has since itself been superseded as the flagship reference by the Epic 8 classical-ML acceptance demos below, which exercise the full sklearn estimator catalog (Epic 8) rather than the demo-sized `ef.ml` slice (`train_regressor`/`predict`/`evaluate`) this original pipeline used. The vertical slice still exists as a contract-by-construction proof; this original pipeline remains a valid, simpler worked example.
 
 ## The Pipeline
 
@@ -34,3 +34,65 @@ Three gates enforce correctness:
 ## Canvas Round-Trip
 
 The same graph loads in the canvas palette (via `ef.export_catalog()`), compiles through the `/compile` endpoint to downloadable Python, and executes via `/execute` with real-time per-node status — the data-driven catalog path shipped in Stories 2–6.
+
+## Classical ML Today (Epic 8) — the current flagship reference
+
+Epic 8 built out the full scikit-learn estimator surface behind a generic adapter + four node
+archetypes (`ml.fit_estimator`, `ml.fit_transform`, `ml.cluster_detect`, `ml.pipeline`/
+`ml.grid_search`/`ml.cross_validate`) and a generated catalog, rather than one hand-written node
+per estimator (`docs/adr/0016-sklearn-estimator-adapter.md`). Two new pipelines under
+`examples/sklearn_acceptance_demo/` are the acceptance criteria for that epic and now supersede
+the pipeline described above as the "classical ML the app can do today" reference.
+
+### Supervised: scale → select → classify → evaluate
+
+```
+load_sample(iris) ─→ drop_missing ─→ ml.pipeline([StandardScaler, SelectKBest, GradientBoostingClassifier]) ──(model)──→ evaluate
+                                                                                      └────────────(cleaned frame)───────────┘
+```
+
+`ml.pipeline` composes the scaler, feature-selector, and classifier into ONE fitted
+`sklearn.pipeline.Pipeline` (not three DataFrame-chained nodes — see the note below on why),
+riding inside the same `FittedModel`/`Model` port every other supervised node uses, so the
+existing `ml.evaluate` node scores it unchanged.
+
+### Unsupervised: scale → cluster → summarize
+
+```
+load_sample(iris) ─→ ml.fit_transform(StandardScaler) ──(result)──→ ml.cluster_detect(KMeans) ──(model)──→ ml.summarize
+                                       └──(transformer)──→ ml.transform  ←──(frame)──┘
+```
+
+Demonstrates a real `Transformer`-bearing edge (`ml.fit_transform`'s `transformer` output wired
+into the companion `ml.transform` apply node) alongside a labeled frame (`ml.cluster_detect`'s
+`cluster` column) and an inspectable structural summary (`ml.summarize`, backed by
+`ef.ml.summarize()` — cluster sizes / inertia for `KMeans`).
+
+**Why not `scale → PCA → cluster`, matching the epic's original informal wording exactly?**
+`ef.ml.fit_transform` always names its output columns `component_0`, `component_1`, ... and
+raises if the input frame it's given already has a column with one of those names — so two
+`ml.fit_transform` nodes cannot be chained directly via a DataFrame edge (the second call's
+`component_0` collides with the first call's). Composing more than one transform step requires
+`ml.pipeline` instead (as the supervised demo above does) — but a `Pipeline`-wrapped `Model`'s
+`estimator_type` is `"Pipeline"`, which has no registered summary builder, so `ml.summarize`
+would degrade to `{"kind": "unsupported"}` and defeat the point of the "inspectable cluster
+summary" acceptance criterion. This demo keeps exactly one `fit_transform` step feeding directly
+into `cluster_detect` so `ml.summarize` returns KMeans's real structural summary.
+
+### Where they live
+
+- **`examples/sklearn_acceptance_demo/supervised_pipeline.json`** /
+  **`examples/sklearn_acceptance_demo/unsupervised_pipeline.json`** — the IR graphs in canonical
+  form, generated and validated by `tests/test_sklearn_acceptance_demo.py`.
+- Both graphs load in the canvas palette (via `ef.export_catalog()`'s generated `"estimators"`
+  entries), compile through `/compile` to downloadable Python, and execute via `/execute` — the
+  same data-driven catalog path the original acceptance demo above documents, now exercising the
+  full sklearn archetype surface.
+
+### How they're verified
+
+`tests/test_sklearn_acceptance_demo.py` proves, for each pipeline: the committed JSON matches
+what the builder function produces (a drift guard), the graph's node/edge counts and node types
+are as expected, and an `@pytest.mark.equivalence` test (reusing
+`tests/test_codegen_equivalence.py`'s `assert_equivalent` harness) that `execute(graph)` and
+running the code `compile_to_code(graph)` emits produce equivalent results end to end.

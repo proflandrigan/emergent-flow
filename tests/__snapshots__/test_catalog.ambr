@@ -13,18 +13,21 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 1.0,
             'help': "Shrinks each estimator's contribution.",
             'name': 'learning_rate',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 50,
             'help': 'Maximum number of estimators.',
             'name': 'n_estimators',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -43,18 +46,21 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 1.0,
             'help': "Shrinks each estimator's contribution.",
             'name': 'learning_rate',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 50,
             'help': 'Maximum number of estimators.',
             'name': 'n_estimators',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -73,12 +79,14 @@
         'node_type': 'ml.cluster_detect',
         'params': list([
           dict({
+            'choices': None,
             'default': 'ward',
             'help': "Linkage criterion ('ward'/'complete'/'average'/'single').",
             'name': 'linkage',
             'type': 'str',
           }),
           dict({
+            'choices': None,
             'default': 2,
             'help': 'Number of clusters to find.',
             'name': 'n_clusters',
@@ -97,12 +105,14 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 10,
             'help': 'Number of base estimators in the ensemble.',
             'name': 'n_estimators',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -121,12 +131,14 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 10,
             'help': 'Number of base estimators in the ensemble.',
             'name': 'n_estimators',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -145,12 +157,14 @@
         'node_type': 'ml.cluster_detect',
         'params': list([
           dict({
+            'choices': None,
             'default': 1,
             'help': 'Maximum number of mixture components.',
             'name': 'n_components',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -169,12 +183,14 @@
         'node_type': 'ml.cluster_detect',
         'params': list([
           dict({
+            'choices': None,
             'default': 3,
             'help': 'Number of clusters after the final clustering step.',
             'name': 'n_clusters',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0.5,
             'help': 'Radius threshold for a new subcluster to be started.',
             'name': 'threshold',
@@ -193,12 +209,14 @@
         'node_type': 'ml.cluster_detect',
         'params': list([
           dict({
+            'choices': None,
             'default': 0.5,
             'help': 'Maximum distance between two samples for one to be considered a neighbor of the other.',
             'name': 'eps',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 5,
             'help': 'Number of samples in a neighborhood for a point to be considered a core point.',
             'name': 'min_samples',
@@ -217,18 +235,21 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': None,
             'help': 'Maximum tree depth (None = unlimited).',
             'name': 'max_depth',
             'type': 'any',
           }),
           dict({
+            'choices': None,
             'default': 2,
             'help': 'Minimum samples to split a node.',
             'name': 'min_samples_split',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -247,18 +268,21 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': None,
             'help': 'Maximum tree depth (None = unlimited).',
             'name': 'max_depth',
             'type': 'any',
           }),
           dict({
+            'choices': None,
             'default': 2,
             'help': 'Minimum samples to split a node.',
             'name': 'min_samples_split',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -277,24 +301,28 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 1.0,
             'help': 'Regularization strength.',
             'name': 'alpha',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 0.5,
             'help': 'Mixing ratio between L1 and L2 penalty.',
             'name': 'l1_ratio',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 1000,
             'help': 'Maximum solver iterations.',
             'name': 'max_iter',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -313,12 +341,14 @@
         'node_type': 'ml.cluster_detect',
         'params': list([
           dict({
+            'choices': None,
             'default': 0.1,
             'help': 'Expected proportion of outliers in the data.',
             'name': 'contamination',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -337,18 +367,21 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': None,
             'help': 'Maximum tree depth (None = unlimited).',
             'name': 'max_depth',
             'type': 'any',
           }),
           dict({
+            'choices': None,
             'default': 100,
             'help': 'Number of trees in the forest.',
             'name': 'n_estimators',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -367,18 +400,21 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': None,
             'help': 'Maximum tree depth (None = unlimited).',
             'name': 'max_depth',
             'type': 'any',
           }),
           dict({
+            'choices': None,
             'default': 100,
             'help': 'Number of trees in the forest.',
             'name': 'n_estimators',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -397,12 +433,14 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': 2,
             'help': 'Number of latent factors (dimensionality of the state space).',
             'name': 'n_components',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -421,12 +459,14 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': 2,
             'help': 'Number of components to use.',
             'name': 'n_components',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -445,12 +485,14 @@
         'node_type': 'ml.cluster_detect',
         'params': list([
           dict({
+            'choices': None,
             'default': 1,
             'help': 'Number of mixture components.',
             'name': 'n_components',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -469,6 +511,7 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 1e-09,
             'help': 'Portion of the largest variance added for calculation stability.',
             'name': 'var_smoothing',
@@ -487,24 +530,28 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 0.1,
             'help': "Shrinks each tree's contribution.",
             'name': 'learning_rate',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 3,
             'help': 'Maximum depth of each tree.',
             'name': 'max_depth',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 100,
             'help': 'Number of boosting stages.',
             'name': 'n_estimators',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -523,24 +570,28 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 0.1,
             'help': "Shrinks each tree's contribution.",
             'name': 'learning_rate',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 3,
             'help': 'Maximum depth of each tree.',
             'name': 'max_depth',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 100,
             'help': 'Number of boosting stages.',
             'name': 'n_estimators',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -559,18 +610,21 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 0.1,
             'help': "Shrinks each tree's contribution.",
             'name': 'learning_rate',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 100,
             'help': 'Maximum number of boosting iterations.',
             'name': 'max_iter',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -589,18 +643,21 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 0.1,
             'help': "Shrinks each tree's contribution.",
             'name': 'learning_rate',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 100,
             'help': 'Maximum number of boosting iterations.',
             'name': 'max_iter',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -619,18 +676,21 @@
         'node_type': 'ml.cluster_detect',
         'params': list([
           dict({
+            'choices': None,
             'default': 'auto',
             'help': 'Expected proportion of outliers in the data.',
             'name': 'contamination',
             'type': 'str',
           }),
           dict({
+            'choices': None,
             'default': 100,
             'help': 'Number of base estimators.',
             'name': 'n_estimators',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -649,12 +709,14 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': 2,
             'help': 'Number of coordinates for the manifold.',
             'name': 'n_components',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 5,
             'help': 'Number of neighbors to consider for each point.',
             'name': 'n_neighbors',
@@ -673,18 +735,21 @@
         'node_type': 'ml.cluster_detect',
         'params': list([
           dict({
+            'choices': None,
             'default': 8,
             'help': 'Number of clusters to form.',
             'name': 'n_clusters',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 10,
             'help': 'Number of centroid-seed runs.',
             'name': 'n_init',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -703,12 +768,14 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 5,
             'help': 'Number of neighbors to use.',
             'name': 'n_neighbors',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 'uniform',
             'help': "Weight function ('uniform'/'distance').",
             'name': 'weights',
@@ -727,12 +794,14 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 5,
             'help': 'Number of neighbors to use.',
             'name': 'n_neighbors',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 'uniform',
             'help': "Weight function ('uniform'/'distance').",
             'name': 'weights',
@@ -751,18 +820,21 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 1.0,
             'help': 'Regularization strength.',
             'name': 'alpha',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 1000,
             'help': 'Maximum solver iterations.',
             'name': 'max_iter',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -781,6 +853,7 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 'svd',
             'help': "Solver ('svd'/'lsqr'/'eigen').",
             'name': 'solver',
@@ -799,18 +872,21 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 1.0,
             'help': 'Regularization strength (inverse).',
             'name': 'C',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 1000,
             'help': 'Maximum solver iterations.',
             'name': 'max_iter',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -829,18 +905,21 @@
         'node_type': 'ml.cluster_detect',
         'params': list([
           dict({
+            'choices': None,
             'default': 'auto',
             'help': 'Expected proportion of outliers in the data.',
             'name': 'contamination',
             'type': 'str',
           }),
           dict({
+            'choices': None,
             'default': 20,
             'help': 'Number of neighbors to use.',
             'name': 'n_neighbors',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': True,
             'help': 'Must be True to support predicting on data after a separate fit().',
             'name': 'novelty',
@@ -859,18 +938,21 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 1.0,
             'help': 'Inverse of regularization strength.',
             'name': 'C',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 1000,
             'help': 'Maximum solver iterations.',
             'name': 'max_iter',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -889,6 +971,7 @@
         'node_type': 'ml.cluster_detect',
         'params': list([
           dict({
+            'choices': None,
             'default': None,
             'help': 'Kernel bandwidth (None = auto-estimated).',
             'name': 'bandwidth',
@@ -907,12 +990,14 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': False,
             'help': 'Clip transformed values to feature_range.',
             'name': 'clip',
             'type': 'bool',
           }),
           dict({
+            'choices': None,
             'default': list([
               0,
               1,
@@ -934,18 +1019,21 @@
         'node_type': 'ml.cluster_detect',
         'params': list([
           dict({
+            'choices': None,
             'default': 1024,
             'help': 'Size of the mini batches.',
             'name': 'batch_size',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 8,
             'help': 'Number of clusters to form.',
             'name': 'n_clusters',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -964,6 +1052,7 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 1.0,
             'help': 'Additive (Laplace/Lidstone) smoothing parameter.',
             'name': 'alpha',
@@ -982,18 +1071,21 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': 200,
             'help': 'Maximum number of iterations.',
             'name': 'max_iter',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 2,
             'help': 'Number of components.',
             'name': 'n_components',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -1012,6 +1104,7 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': 'l2',
             'help': "Norm to use ('l1'/'l2'/'max').",
             'name': 'norm',
@@ -1030,12 +1123,14 @@
         'node_type': 'ml.cluster_detect',
         'params': list([
           dict({
+            'choices': None,
             'default': 'rbf',
             'help': "Kernel type ('linear'/'poly'/'rbf'/'sigmoid').",
             'name': 'kernel',
             'type': 'str',
           }),
           dict({
+            'choices': None,
             'default': 0.5,
             'help': 'Upper bound on the fraction of training errors.',
             'name': 'nu',
@@ -1054,12 +1149,14 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': 'error',
             'help': 'How to handle unknown categories at transform time.',
             'name': 'handle_unknown',
             'type': 'str',
           }),
           dict({
+            'choices': None,
             'default': False,
             'help': 'Return a dense array instead of a sparse matrix.',
             'name': 'sparse_output',
@@ -1078,6 +1175,7 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': 'error',
             'help': 'How to handle unknown categories at transform time.',
             'name': 'handle_unknown',
@@ -1096,12 +1194,14 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': 2,
             'help': 'Number of components to keep.',
             'name': 'n_components',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -1120,12 +1220,14 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': 2,
             'help': 'The degree of the polynomial features.',
             'name': 'degree',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': True,
             'help': 'Include a bias (intercept) column of all ones.',
             'name': 'include_bias',
@@ -1144,6 +1246,7 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 0.0,
             'help': 'Regularization of the covariance estimate.',
             'name': 'reg_param',
@@ -1162,18 +1265,21 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': None,
             'help': 'Maximum tree depth (None = unlimited).',
             'name': 'max_depth',
             'type': 'any',
           }),
           dict({
+            'choices': None,
             'default': 100,
             'help': 'Number of trees in the forest.',
             'name': 'n_estimators',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -1192,18 +1298,21 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': None,
             'help': 'Maximum tree depth (None = unlimited).',
             'name': 'max_depth',
             'type': 'any',
           }),
           dict({
+            'choices': None,
             'default': 100,
             'help': 'Number of trees in the forest.',
             'name': 'n_estimators',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -1222,12 +1331,14 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 1.0,
             'help': 'Regularization strength.',
             'name': 'alpha',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -1246,12 +1357,14 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': True,
             'help': 'Center the data before scaling.',
             'name': 'with_centering',
             'type': 'bool',
           }),
           dict({
+            'choices': None,
             'default': True,
             'help': 'Scale the data to the IQR.',
             'name': 'with_scaling',
@@ -1270,24 +1383,28 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 0.0001,
             'help': 'Regularization strength.',
             'name': 'alpha',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 'hinge',
             'help': 'Loss function to optimize.',
             'name': 'loss',
             'type': 'str',
           }),
           dict({
+            'choices': None,
             'default': 1000,
             'help': 'Maximum passes over the training data.',
             'name': 'max_iter',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -1306,24 +1423,28 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 0.0001,
             'help': 'Regularization strength.',
             'name': 'alpha',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 'squared_error',
             'help': 'Loss function to optimize.',
             'name': 'loss',
             'type': 'str',
           }),
           dict({
+            'choices': None,
             'default': 1000,
             'help': 'Maximum passes over the training data.',
             'name': 'max_iter',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -1342,18 +1463,21 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 1.0,
             'help': 'Regularization strength (inverse).',
             'name': 'C',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 'rbf',
             'help': "Kernel type ('linear'/'poly'/'rbf'/'sigmoid').",
             'name': 'kernel',
             'type': 'str',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -1372,12 +1496,14 @@
         'node_type': 'ml.fit_estimator',
         'params': list([
           dict({
+            'choices': None,
             'default': 1.0,
             'help': 'Regularization strength (inverse).',
             'name': 'C',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 'rbf',
             'help': "Kernel type ('linear'/'poly'/'rbf'/'sigmoid').",
             'name': 'kernel',
@@ -1396,12 +1522,19 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': 10,
             'help': 'Number of top features to select.',
             'name': 'k',
             'type': 'int',
           }),
           dict({
+            'choices': list([
+              'f_classif',
+              'f_regression',
+              'mutual_info_classif',
+              'mutual_info_regression',
+            ]),
             'default': 'f_classif',
             'help': "Scoring function: 'f_classif'/'mutual_info_classif' for a categorical target, 'f_regression'/'mutual_info_regression' for a continuous one.",
             'name': 'score_func',
@@ -1420,12 +1553,14 @@
         'node_type': 'ml.cluster_detect',
         'params': list([
           dict({
+            'choices': None,
             'default': 8,
             'help': 'Number of clusters to find.',
             'name': 'n_clusters',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -1444,12 +1579,14 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': True,
             'help': 'Center the data before scaling.',
             'name': 'with_mean',
             'type': 'bool',
           }),
           dict({
+            'choices': None,
             'default': True,
             'help': 'Scale the data to unit variance.',
             'name': 'with_std',
@@ -1468,18 +1605,21 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': 2,
             'help': 'Dimension of the embedded space.',
             'name': 'n_components',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 30.0,
             'help': 'Related to the number of nearest neighbors used in other manifold learning algorithms.',
             'name': 'perplexity',
             'type': 'float',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -1498,12 +1638,14 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': 2,
             'help': 'Desired dimensionality of output data.',
             'name': 'n_components',
             'type': 'int',
           }),
           dict({
+            'choices': None,
             'default': 0,
             'help': 'Seed for reproducibility.',
             'name': 'random_state',
@@ -1522,6 +1664,7 @@
         'node_type': 'ml.fit_transform',
         'params': list([
           dict({
+            'choices': None,
             'default': 0.0,
             'help': 'Features with variance below this are removed.',
             'name': 'threshold',

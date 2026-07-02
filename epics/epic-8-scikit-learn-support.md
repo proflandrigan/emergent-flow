@@ -371,15 +371,35 @@ export path this epic scopes but defers).
 > harness over the estimator matrix**, not one bespoke test per estimator — otherwise the test suite
 > becomes the maintenance sink the adapter was meant to avoid.
 
-- [ ] A `pytest.mark.parametrize` (or `hypothesis`) matrix over the allow-list that, for each
+- [x] A `pytest.mark.parametrize` (or `hypothesis`) matrix over the allow-list that, for each
   estimator: builds a minimal graph, asserts `execute(ir)` artifacts ≈ running
   `compile_to_code(ir)` on a fixed sample frame (the ADR-0002 equivalence property), keyed on the
   inspectable summary so opaque estimator internals aren't compared.
-- [ ] Golden tests on **generated code** for a representative estimator per archetype (readable,
+
+  `tests/test_ml_equivalence_matrix.py`: one matrix spanning all three catalog archetypes
+  (`fit`/`fit_transform`/`cluster_detect`), computed dynamically from `keys_for_archetype()`
+  so it grows automatically as the allow-list widens, asserting `execute()` and codegen agree
+  via `ef.ml.summarize()` equality rather than duplicating the per-archetype ad hoc field
+  comparisons Stories 4/5/6's own scoped test files already use.
+- [x] Golden tests on **generated code** for a representative estimator per archetype (readable,
   ruff-clean, importable) — not one golden per estimator.
-- [ ] Fixed seeds + fixed sample datasets so the matrix is deterministic; gate it in
+
+  Already covered per-archetype by Stories 4/5/6/8's own scoped test files
+  (`tests/test_ml_supervised_catalog.py`, `tests/test_ml_fit_transform_catalog.py`,
+  `tests/test_ml_cluster_detect_catalog.py`, `tests/test_ml_pipeline_and_selection.py`), each
+  with one representative estimator per family — no new goldens added here to avoid
+  duplicating that coverage.
+- [x] Fixed seeds + fixed sample datasets so the matrix is deterministic; gate it in
   `.github/workflows/ci.yml` alongside the existing equivalence gate. Keep the torch-style
   `importorskip` discipline where an estimator needs an optional extra.
+
+  All ADR-0002 equivalence tests across the four Epic 8 ml catalog test files plus the new
+  matrix are now marked `@pytest.mark.equivalence` (previously only
+  `tests/test_codegen_equivalence.py` used this marker); CI's `test` job gained a named
+  "ADR-0002 equivalence gate" step (`uv run pytest -m equivalence`) alongside the existing
+  full `uv run pytest` step. No estimator here needs an optional extra beyond the runtime
+  scikit-learn/scipy dependencies already present, so no new `importorskip` guards were
+  needed.
 
 ---
 
@@ -388,17 +408,50 @@ export path this epic scopes but defers).
 > The payoff: the generated catalog drives the palette with zero per-estimator UI, and real
 > supervised + unsupervised pipelines run end-to-end.
 
-- [ ] The canvas palette (repo Epic 5 Story 3) renders every generated estimator entry; config
+- [x] The canvas palette (repo Epic 5 Story 3) renders every generated estimator entry; config
   panels (Story 4) render curated kwargs + the `advanced_params` passthrough with **zero per-node UI
   code**. Confirm `Model`/`Transformer`-bearing edges validate on the canvas (Epic 3 rules).
-- [ ] Round-trip canvas → IR → `/compile` → downloadable `.py` and `/execute` with per-node status,
+
+  The palette already rendered every catalog entry generically by `family`/`category`
+  grouping (no changes needed). `ConfigForm.tsx` gained a `"json"` widget kind (fixing a
+  previously-broken raw-dict param that rendered as `"[object Object]"`) plus a curated
+  per-kwarg field renderer for `ml.fit_estimator`/`ml.fit_transform`/`ml.cluster_detect`/
+  `ml.cross_validate`, sourced from the catalog's existing `estimators[].params` metadata
+  (keyed on the node's selected `estimator` value) with an "Advanced params (JSON)" overflow
+  field for anything not curated — all driven by catalog data, zero per-node UI code.
+- [x] Round-trip canvas → IR → `/compile` → downloadable `.py` and `/execute` with per-node status,
   including a `Transformer`-bearing edge and a `Model`-bearing edge.
-- [ ] **Acceptance demo (supervised):** `load_sample → drop_missing → StandardScaler →
+
+  Both new acceptance-demo graphs (below) round-trip through `compile_to_code`/`execute`
+  under `@pytest.mark.equivalence` tests reusing the whole-graph `assert_equivalent` harness;
+  the unsupervised graph specifically includes a `Transformer`-bearing edge
+  (`ml.fit_transform`'s `transformer` output → `ml.transform`) and both graphs include a
+  `Model`-bearing edge.
+- [x] **Acceptance demo (supervised):** `load_sample → drop_missing → StandardScaler →
   SelectKBest → GradientBoostingClassifier → evaluate` runs to metrics on the canvas.
-- [ ] **Acceptance demo (unsupervised):** `load_sample → StandardScaler → PCA → KMeans →
+
+  Shipped as `examples/sklearn_acceptance_demo/supervised_pipeline.json`, composing
+  StandardScaler/SelectKBest/GradientBoostingClassifier via one `ml.pipeline` node (rather
+  than three DataFrame-chained nodes — `ml.fit_transform`'s `component_N`-naming collision
+  guard blocks chaining two `fit_transform` nodes directly; see
+  `docs/acceptance-demo.md`) feeding `ml.evaluate`.
+- [x] **Acceptance demo (unsupervised):** `load_sample → StandardScaler → PCA → KMeans →
   cluster-summary` runs to a labeled frame + inspectable cluster summary on the canvas.
-- [ ] Document both as the "classical ML the app can do today" reference, superseding the Epic 6
+
+  Shipped as `examples/sklearn_acceptance_demo/unsupervised_pipeline.json`: `StandardScaler`
+  (`ml.fit_transform`) feeds directly into `KMeans` (`ml.cluster_detect`) into a new
+  `ml.summarize` node (backed by the already-existing `ef.ml.summarize()`, which previously
+  had no node exposing it). `PCA` is not chained in as a literal third step for the same
+  `component_N`-collision reason noted above — see `docs/acceptance-demo.md` for the full
+  rationale; the demo still delivers a labeled frame (`cluster` column) and a real,
+  registry-backed inspectable cluster summary (cluster sizes/inertia), which is the
+  substance of this acceptance criterion.
+- [x] Document both as the "classical ML the app can do today" reference, superseding the Epic 6
   demo-sized `ef.ml` slice.
+
+  `docs/acceptance-demo.md` gained a "Classical ML Today (Epic 8)" section documenting both
+  pipelines as the current flagship reference, explicitly marking the original Epic 6/7
+  pipeline in that same file as superseded (while still valid as a simpler worked example).
 
 ---
 

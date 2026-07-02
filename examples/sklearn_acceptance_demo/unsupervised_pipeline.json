@@ -1,0 +1,299 @@
+{
+  "schema_version": 1,
+  "paradigm": "functional",
+  "name": "Sklearn Acceptance Demo -- Unsupervised",
+  "nodes": {
+    "n-load": {
+      "id": "n-load",
+      "type": "data.load_sample",
+      "label": "Load Sample",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "name",
+          "type_token": "str",
+          "value": "iris",
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-load-frame",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-scale": {
+      "id": "n-scale",
+      "type": "ml.fit_transform",
+      "label": "Scale",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "estimator",
+          "type_token": "str",
+          "value": "StandardScaler",
+          "default": null
+        },
+        {
+          "name": "target",
+          "type_token": "str",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "features",
+          "type_token": "list[str]",
+          "value": [
+            "sepal length (cm)",
+            "sepal width (cm)",
+            "petal length (cm)",
+            "petal width (cm)"
+          ],
+          "default": null
+        },
+        {
+          "name": "params",
+          "type_token": "dict[str, any]",
+          "value": {},
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-scale-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-scale-transformer",
+          "name": "transformer",
+          "direction": "out",
+          "data_type": "Transformer",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-scale-result",
+          "name": "result",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 200.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-cluster": {
+      "id": "n-cluster",
+      "type": "ml.cluster_detect",
+      "label": "Cluster",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "estimator",
+          "type_token": "str",
+          "value": "KMeans",
+          "default": null
+        },
+        {
+          "name": "features",
+          "type_token": "list[str]",
+          "value": [
+            "component_0",
+            "component_1",
+            "component_2",
+            "component_3"
+          ],
+          "default": null
+        },
+        {
+          "name": "params",
+          "type_token": "dict[str, any]",
+          "value": {
+            "n_clusters": 3,
+            "n_init": 5
+          },
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-cluster-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-cluster-model",
+          "name": "model",
+          "direction": "out",
+          "data_type": "Model",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-cluster-result",
+          "name": "result",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 400.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-summarize": {
+      "id": "n-summarize",
+      "type": "ml.summarize",
+      "label": "Summarize",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "id": "p-summarize-model",
+          "name": "model",
+          "direction": "in",
+          "data_type": "Model",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-summarize-summary",
+          "name": "summary",
+          "direction": "out",
+          "data_type": "ModelSummary",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 600.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-transform": {
+      "id": "n-transform",
+      "type": "ml.transform",
+      "label": "Transform New Data",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "op",
+          "type_token": "str",
+          "value": "transform",
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-transform-transformer",
+          "name": "transformer",
+          "direction": "in",
+          "data_type": "Transformer",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-transform-frame",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-transform-result",
+          "name": "result",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 400.0,
+        "y": 200.0
+      },
+      "group_id": null,
+      "subgraph": null
+    }
+  },
+  "edges": {
+    "e-load-scale": {
+      "id": "e-load-scale",
+      "source": {
+        "node_id": "n-load",
+        "port_id": "p-load-frame"
+      },
+      "target": {
+        "node_id": "n-scale",
+        "port_id": "p-scale-in"
+      },
+      "type_compatible": null
+    },
+    "e-scale-cluster": {
+      "id": "e-scale-cluster",
+      "source": {
+        "node_id": "n-scale",
+        "port_id": "p-scale-result"
+      },
+      "target": {
+        "node_id": "n-cluster",
+        "port_id": "p-cluster-in"
+      },
+      "type_compatible": null
+    },
+    "e-cluster-summarize": {
+      "id": "e-cluster-summarize",
+      "source": {
+        "node_id": "n-cluster",
+        "port_id": "p-cluster-model"
+      },
+      "target": {
+        "node_id": "n-summarize",
+        "port_id": "p-summarize-model"
+      },
+      "type_compatible": null
+    },
+    "e-scale-transform": {
+      "id": "e-scale-transform",
+      "source": {
+        "node_id": "n-scale",
+        "port_id": "p-scale-transformer"
+      },
+      "target": {
+        "node_id": "n-transform",
+        "port_id": "p-transform-transformer"
+      },
+      "type_compatible": null
+    },
+    "e-load-transform-frame": {
+      "id": "e-load-transform-frame",
+      "source": {
+        "node_id": "n-load",
+        "port_id": "p-load-frame"
+      },
+      "target": {
+        "node_id": "n-transform",
+        "port_id": "p-transform-frame"
+      },
+      "type_compatible": null
+    }
+  }
+}

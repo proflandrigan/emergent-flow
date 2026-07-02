@@ -134,6 +134,7 @@ def test_supervised_catalog_codegen_is_ruff_clean(estimator_key: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.equivalence
 @pytest.mark.parametrize("estimator_key", _fit_archetype_keys())
 def test_fit_estimator_equivalence_matrix(estimator_key: str) -> None:
     """ADR 0002: execute == running the emitted code, for every fit-archetype estimator."""
