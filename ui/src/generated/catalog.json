@@ -2246,6 +2246,45 @@
     },
     {
       "category": "LLM",
+      "description": "Merge a labels table onto an eval-run compare table, keyed by (row_id, variant).",
+      "family": "eval",
+      "label": "Eval Label",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The eval-run compare table (ef.eval.run's output) to label.",
+          "label": null,
+          "name": "results",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Label rows keyed by row_id/variant, with a label column and optional score/rubric/note.",
+          "label": null,
+          "name": "labels",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "results, left-joined with labels on (row_id, variant).",
+          "label": null,
+          "name": "labeled",
+          "required": true
+        }
+      ],
+      "type": "eval.label",
+      "version": 1
+    },
+    {
+      "category": "LLM",
       "description": "Run one prompt over N inputs x M model variants for side-by-side compare.",
       "family": "eval",
       "label": "Eval Run",

@@ -89,6 +89,7 @@ lerna-debug.log*
 !.env.example
 *.pem
 secrets.*
+!emergentflow/llm/secrets.py
 credentials.json
 
 # ─────────────────────────────────────────────────────────────

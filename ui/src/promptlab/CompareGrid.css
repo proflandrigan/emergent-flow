@@ -1,0 +1,41 @@
+.ef-promptlab-comparegrid {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.ef-promptlab-comparegrid th,
+.ef-promptlab-comparegrid td {
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+
+.ef-promptlab-comparegrid th {
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.ef-promptlab-comparegrid tbody tr:nth-child(even) td {
+  background: var(--surface-2);
+}
+
+.ef-promptlab-comparegrid__output {
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.ef-promptlab-comparegrid__badge {
+  margin-top: var(--space-1);
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+}

@@ -30,6 +30,7 @@ from emergentflow.ir import (
 from emergentflow.ir.edge import Edge, PortRef
 from emergentflow.ir.schema import ir_json_schema
 from emergentflow.ir.serialize import serialize_graph
+from emergentflow.llm.env import MissingAPIKeyError
 from emergentflow.server import (
     app,
     compile_graph,
@@ -182,6 +183,33 @@ def _fanout_graph(path: str | None = None) -> dict:
         name="server-test-fanout",
         nodes={load.id: load, impute_b.id: impute_b, impute_c.id: impute_c},
         edges={edge_b.id: edge_b, edge_c.id: edge_c},
+    )
+    return json.loads(serialize_graph(graph))
+
+
+def _llm_call_graph(provider: str = "anthropic") -> dict:
+    """A minimal one-node functional graph with an `llm.call` node (requires_client)."""
+    node = Node(
+        id="n-llm",
+        type="llm.call",
+        label="LLM Call",
+        paradigm=Paradigm.FUNCTIONAL,
+        params=[Param(name="provider", type_token="str", value=provider)],
+        ports=[
+            Port(
+                id="p-llm-response",
+                name="response",
+                direction=Direction.OUT,
+                data_type="LLMResponse",
+            ),
+        ],
+        position=Position(x=0.0, y=0.0),
+    )
+    graph = Graph(
+        paradigm=Paradigm.FUNCTIONAL,
+        name="server-test-llm",
+        nodes={node.id: node},
+        edges={},
     )
     return json.loads(serialize_graph(graph))
 
@@ -344,6 +372,23 @@ def test_execute_node_rejects_declarative_node() -> None:
     graph["nodes"]["n-load"]["paradigm"] = "declarative"
     with pytest.raises(Exception):  # noqa: B017,PT011
         execute_node({"graph": graph, "run_node": "n-load"})
+
+
+def test_execute_graph_preflight_rejects_missing_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A missing API key is a graph-LEVEL pre-flight failure (Epic 9 Story 9): it must raise
+    # before any node runs, not surface deep inside GatewayClient.complete() -- and never as
+    # a per-node "error" status.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with pytest.raises(MissingAPIKeyError) as exc_info:
+        execute_graph(_llm_call_graph())
+    assert "ANTHROPIC_API_KEY" in str(exc_info.value)
+
+
+def test_execute_node_preflight_rejects_missing_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with pytest.raises(MissingAPIKeyError) as exc_info:
+        execute_node({"graph": _llm_call_graph(), "run_node": "n-llm"})
+    assert "ANTHROPIC_API_KEY" in str(exc_info.value)
 
 
 def test_get_schema_returns_ir_schema() -> None:

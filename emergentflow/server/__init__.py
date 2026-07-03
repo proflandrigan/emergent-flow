@@ -13,8 +13,11 @@ from emergentflow.server.service import (
     compile_graph,
     execute_graph,
     execute_node,
+    export_eval_set_bytes,
+    export_finetune_bytes,
     get_catalog,
     get_schema,
+    label_eval,
     validate_graph,
 )
 
@@ -25,7 +28,10 @@ __all__ = [
     "compile_graph",
     "execute_graph",
     "execute_node",
+    "export_eval_set_bytes",
+    "export_finetune_bytes",
     "get_catalog",
     "get_schema",
+    "label_eval",
     "validate_graph",
 ]
