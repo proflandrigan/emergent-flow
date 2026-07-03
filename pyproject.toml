@@ -68,6 +68,14 @@ server = [
     "fastapi>=0.110,<1",
     "uvicorn[standard]>=0.29,<1",
 ]
+# `pip install emergentflow[llm]` enables `emergentflow.llm.gateway.GatewayClient`,
+# which routes LLM completion calls through LiteLLM (MIT license, Epic 9 Story 1 /
+# ADR 0017). Kept optional so a bare SDK install stays light (ADR 0007); importing
+# `emergentflow.llm.gateway` without it installed raises a ModuleNotFoundError with
+# an install hint.
+llm = [
+    "litellm>=1,<2",
+]
 
 [project.urls]
 Homepage = "https://github.com/proflandrigan/emergent-flow"
@@ -140,7 +148,19 @@ init_typed = true
 # wrappers themselves remain fully annotated at their public boundary. `torch`
 # is here for a different reason: it is intentionally NOT a dependency (the
 # declarative codegen seam imports it lazily, only when actually running an
-# nn.Module), so it is absent in CI — ignore its missing import.
+# nn.Module), so it is absent in CI — ignore its missing import. `litellm` is
+# the same case as `torch`: it is the optional `emergentflow[llm]` extra
+# (Epic 9 Story 1 / ADR 0017), imported lazily inside `GatewayClient.complete`,
+# so it is absent from the bare `uv sync --locked` CI environment.
 [[tool.mypy.overrides]]
-module = ["pandas.*", "statsmodels.*", "ydata_profiling.*", "sklearn.*", "scipy.*", "torch.*", "matplotlib.*"]
+module = [
+    "pandas.*",
+    "statsmodels.*",
+    "ydata_profiling.*",
+    "sklearn.*",
+    "scipy.*",
+    "torch.*",
+    "matplotlib.*",
+    "litellm.*",
+]
 ignore_missing_imports = true

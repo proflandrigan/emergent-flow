@@ -69,3 +69,30 @@ register_type(
         ),
     )
 )
+register_type(
+    TypeDef(
+        token="PromptSpec",
+        description=(
+            "A rendered LLM prompt ({system, user, messages}) produced by "
+            "ef.llm.prompt and consumed by ef.llm.call (Epic 9)."
+        ),
+    )
+)
+register_type(
+    TypeDef(
+        token="LLMResponse",
+        description=(
+            "The inspectable result of one LLM completion call: text/parsed "
+            "data, usage, cost_usd, latency_ms, finish_reason (Epic 9, ADR 0017)."
+        ),
+    )
+)
+register_type(
+    TypeDef(
+        token="VariableBinding",
+        description=(
+            "One row of variable-name -> value bindings used to render an "
+            "ef.llm.prompt template (Epic 9)."
+        ),
+    )
+)

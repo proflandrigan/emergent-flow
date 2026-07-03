@@ -40,14 +40,24 @@ deliberate and expensive to retrofit.
 The graph IR is the single source of truth; Python is a one-way compiled artifact, never
 re-parsed back into a graph (ADR 0001). Two pure functions consume that IR:
 
-- `ef.compile_to_code(graph) -> str` (`emergentflow/codegen/compiler.py`) — emits a runnable Python module.
-- `ef.execute(graph) -> results` (`emergentflow/codegen/executor.py`) — the in-process reference interpreter.
+- `ef.compile_to_code(graph) -> str` (`emergentflow/codegen/compiler.py`) — emits a runnable Python module. For a graph with a `requires_client` node, the emitted `main()` itself takes a `client` param (ADR 0017) — `compile_to_code` stays a pure function of `graph` alone; only the *emitted code's* entry point is parametrized by a client.
+- `ef.execute(graph, *, client=None) -> results` (`emergentflow/codegen/executor.py`) — the in-process reference interpreter.
 
 **ADR 0002 is the hard invariant the whole product rests on:** running the code from
 `compile_to_code(ir)` must produce artifacts equivalent to `execute(ir)`. This is enforced
 as a CI gate. When you touch a node's `codegen` you must keep its `execute` equivalent (and
 vice versa). Both functions must stay **pure** (no I/O, no global state) so Epic 6 can wrap
-the executor in sandboxing later; all filesystem I/O lives in `emergentflow/codegen/export.py`.
+the executor in sandboxing later — I/O is quarantined at the edges, never inline in the two
+core functions: filesystem export I/O lives in `emergentflow/codegen/export.py`, and network
+I/O for effectful nodes (LLM calls, ADR 0017) lives inside an injected `LLMClient` — `execute`
+takes an optional `client` param and stays a pure function of `(ir, client)`; `compile_to_code`
+stays a pure function of `ir` alone and instead emits a module whose *own* entry point takes
+`client`, so the impurity is pushed one level further out, to whoever runs the compiled code.
+A node sets `requires_client = True` to receive the client either way (see Node contract
+below for the caller-side obligation this creates). `GatewayClient`
+(`emergentflow/llm/gateway.py`) makes the real network call; `ReplayClient`
+(`emergentflow/llm/replay.py`, fixture record/replay keyed by request content-hash) is the
+default in tests and the equivalence gate, so CI never touches the network.
 
 ### Node contract (`emergentflow/nodes/`)
 
@@ -59,7 +69,13 @@ behaviors that must be equivalent by construction:
   variable name bound to each IN port and allocated to each OUT port. Nodes **must not**
   hardcode variable names; they ask `ctx.in_var(port)` / `ctx.out_var(port)`. A `CodeFragment`
   is structured (`imports` + `body`) so the whole-graph compiler can de-duplicate imports.
-- `execute(node, inputs) -> dict` keyed by OUT-port name.
+- `execute(node, inputs) -> dict` keyed by OUT-port name. A node with
+  `requires_client = True` (ADR 0017) instead takes `execute(node, inputs, *, client) -> dict`
+  and its `codegen` threads the compiled module's injected `client` param through — both paths
+  route through the same `emergentflow.llm.call`/`emergentflow.eval.run`-style wrapper so the
+  ADR-0002 equivalence holds by construction. Any caller that walks the node graph directly
+  (the server, a future CLI) must check `requires_client` and pass a client itself; it is not
+  implied by the base `execute(node, inputs)` signature.
 
 Nodes self-register via the `@register` decorator; importing `emergentflow.nodes` fires every
 reference node's registration. Reference nodes live in `emergentflow/nodes/examples/` and route

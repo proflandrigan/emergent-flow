@@ -28,7 +28,7 @@ Epic 6.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from emergentflow.api import public_op
 from emergentflow.codegen.declarative import _prepare_declarative
@@ -49,11 +49,15 @@ def _describe(node: Node) -> str:
 
 
 @public_op(name="ef.execute")
-def execute(graph: Graph) -> dict[str, dict[str, Any]]:
+def execute(graph: Graph, *, client: Any | None = None) -> dict[str, dict[str, Any]]:
     """Run *graph* in-process, node by node, in topological order.
 
     Args:
         graph: The IR graph to execute.
+        client: An injected ``LLMClient`` (ADR 0017), passed to any node whose
+            definition class sets ``requires_client = True``. Graphs with no
+            such node never touch this parameter and behave exactly as before
+            this parameter was added (back-compat gate, Epic 9 Story 1).
 
     Returns:
         A mapping from node id to that node's outputs, themselves keyed by
@@ -139,7 +143,14 @@ def execute(graph: Graph) -> dict[str, dict[str, Any]]:
             inputs[port.name] = results[src.node_id][src_port_name]
 
         definition = get_node_definition(node.type)()
-        results[node.id] = definition.execute(node, inputs)
+        if type(definition).requires_client:
+            # Widen past NodeDefinition.execute's declared (node, inputs)
+            # signature via cast(Any, ...): LLM-call node subclasses accept an
+            # extra `client` keyword, but the abstract base signature stays
+            # unchanged so the ~30 existing node subclasses need no re-typing.
+            results[node.id] = cast(Any, definition.execute)(node, inputs, client=client)
+        else:
+            results[node.id] = definition.execute(node, inputs)
 
     # Step 5: Return collected results
     return results

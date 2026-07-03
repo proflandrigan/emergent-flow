@@ -15,6 +15,7 @@ The following table lists the current runtime dependencies and their licenses.
 | scipy | >=1.10 | BSD-3-Clause | Yes |
 | ydata-profiling | >=4 | MIT | Yes |
 | setuptools | >=68,<81 | MIT | Yes |
+| litellm | >=1,<2 | MIT | Yes |
 
 ## Why permissive-only
 

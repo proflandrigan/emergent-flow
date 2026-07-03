@@ -2245,6 +2245,345 @@
       "version": 1
     },
     {
+      "category": "LLM",
+      "description": "Run one prompt over N inputs x M model variants for side-by-side compare.",
+      "family": "eval",
+      "label": "Eval Run",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "",
+          "help": "System-message template, e.g. 'You are a {{persona}} assistant.'",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "System template",
+          "name": "system",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "",
+          "help": "User-message template, e.g. 'Answer this: {{question}}'",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "User template",
+          "name": "user",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": [],
+          "help": "Model variants, e.g. [{'provider': 'anthropic', 'model': 'claude-sonnet-5'}].",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Variants",
+          "name": "variants",
+          "required": true,
+          "type_token": "list[dict]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "One row per variable-binding to render the prompt template against.",
+          "label": null,
+          "name": "dataset",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Tidy compare table: one row per (input_row, variant).",
+          "label": null,
+          "name": "results",
+          "required": true
+        }
+      ],
+      "type": "eval.run",
+      "version": 1
+    },
+    {
+      "category": "LLM",
+      "description": "Run one completion call against a provider through the unified gateway.",
+      "family": "llm",
+      "label": "LLM Call",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "anthropic",
+          "help": "Gateway provider key, e.g. 'anthropic', 'openai', 'gemini'.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Provider",
+          "name": "provider",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "claude-sonnet-5",
+          "help": "Provider model id, e.g. 'claude-sonnet-5'.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Model",
+          "name": "model",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": [],
+          "help": "Literal [{role, content}] messages (superseded by wired 'prompt' port later).",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Messages",
+          "name": "messages",
+          "required": false,
+          "type_token": "list[dict]"
+        },
+        {
+          "default": 0.0,
+          "help": "Sampling temperature; 0 for reproducible output.",
+          "hints": {
+            "choices": null,
+            "max": 2.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Temperature",
+          "name": "temperature",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Optional output token cap.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Max tokens",
+          "name": "max_tokens",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": "text",
+          "help": "'text' for plain completion, 'json' for structured output.",
+          "hints": {
+            "choices": [
+              "text",
+              "json"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Response format",
+          "name": "response_format",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional JSON Schema the parsed 'json' output must satisfy.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Response schema",
+          "name": "response_schema",
+          "required": false,
+          "type_token": "dict"
+        },
+        {
+          "default": null,
+          "help": "Env-var name holding the provider API key (never the key itself; ADR 0017).",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "API key env var",
+          "name": "api_key_env",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "LLMResponse",
+          "direction": "out",
+          "help": "The inspectable completion result (text/data, usage, cost, latency).",
+          "label": null,
+          "name": "response",
+          "required": true
+        }
+      ],
+      "type": "llm.call",
+      "version": 1
+    },
+    {
+      "category": "LLM",
+      "description": "Render a system + user prompt template with {{variable}} substitution.",
+      "family": "llm",
+      "label": "LLM Prompt",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "",
+          "help": "System-message template, e.g. 'You are a {{persona}} assistant.'",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "System template",
+          "name": "system",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "",
+          "help": "User-message template, e.g. 'Answer this: {{question}}'",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "User template",
+          "name": "user",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": {},
+          "help": "Documentary name -> type-token map shown in the canvas (e.g. {'q': 'str'}).",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Declared variables",
+          "name": "variables",
+          "required": false,
+          "type_token": "dict[str,str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "VariableBinding",
+          "direction": "in",
+          "help": "One row of variable-name -> value bindings used to render the templates.",
+          "label": null,
+          "name": "variables",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PromptSpec",
+          "direction": "out",
+          "help": "The rendered {system, user, messages} prompt, ready for ef.llm.call.",
+          "label": null,
+          "name": "prompt",
+          "required": true
+        }
+      ],
+      "type": "llm.prompt",
+      "version": 1
+    },
+    {
       "category": "Machine Learning",
       "description": "Apply a fitted Model to data via predict or score_samples.",
       "family": "ml",

@@ -40,6 +40,14 @@ The following decision revisits the repo/packaging topology set out in §A5 of t
 | :-- | :------- | :----- |
 | [0013](./0013-single-repo-bundled-ui-topology.md) | Single repo, single package: bundle the canvas UI with the SDK (JupyterLab model), preserving the coupling invariant | Accepted |
 
+The following decision reconciles non-deterministic LLM/network nodes with the ADR-0002 purity/
+equivalence invariant; it governs [Epic 9](../../epics/epic-9-ai-engineering-playground-prompt-lab.md)
+(the Prompt Lab / AI-engineering-playground wedge) and the GenAI/agent epics that follow.
+
+| ADR | Decision | Status |
+| :-- | :------- | :----- |
+| [0017](./0017-llm-nodes-injected-effectful-client.md) | LLM/network nodes call an injected `LLMClient` seam; the effect lives at the edge, so the pure core and the equivalence gate stay intact | Accepted |
+
 ## Conventions
 
 - Filenames: `NNNN-kebab-case-title.md`, numbered sequentially from `0001`.

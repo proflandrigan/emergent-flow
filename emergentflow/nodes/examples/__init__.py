@@ -22,12 +22,15 @@ from .correlation import Correlation
 from .cross_validate import CrossValidate
 from .describe import Describe
 from .drop_missing import DropMissing
+from .eval_run import EvalRun
 from .evaluate import Evaluate
 from .filter_rows import FilterRows
 from .fit_estimator import FitEstimator
 from .fit_transform import FitTransform
 from .grid_search import GridSearch
 from .impute import ImputeMissing
+from .llm_call import LlmCall
+from .llm_prompt import LlmPrompt
 from .load_csv import LoadCsv
 from .load_json import LoadJson
 from .load_parquet import LoadParquet
@@ -56,6 +59,7 @@ __all__ = [
     "CrossValidate",
     "Describe",
     "DropMissing",
+    "EvalRun",
     "Evaluate",
     "FilterRows",
     "FitEstimator",
@@ -63,6 +67,8 @@ __all__ = [
     "GenerateHtmlSummary",
     "GridSearch",
     "ImputeMissing",
+    "LlmCall",
+    "LlmPrompt",
     "LoadCsv",
     "LoadJson",
     "LoadParquet",

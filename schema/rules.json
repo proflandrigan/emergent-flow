@@ -13,12 +13,15 @@
     "DataFrame",
     "EvaluationResult",
     "HTML",
+    "LLMResponse",
     "Model",
     "ModelSummary",
     "Predictions",
+    "PromptSpec",
     "TTestResult",
     "Tensor",
     "Transformer",
+    "VariableBinding",
     "any"
   ],
   "version": 1

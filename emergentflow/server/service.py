@@ -19,7 +19,7 @@ import json
 import time
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from emergentflow import __version__, compile_to_code, execute, export_catalog, validate
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
@@ -29,10 +29,23 @@ from emergentflow.codegen.wiring import WiringMap, build_wiring_map
 from emergentflow.ir import Direction, Graph, Node, Paradigm
 from emergentflow.ir.schema import ir_json_schema
 from emergentflow.ir.serialize import deserialize_graph
+from emergentflow.llm.gateway import GatewayClient
 from emergentflow.nodes import get as get_node_definition
 from emergentflow.server.cache import get_default_cache
 from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
 from emergentflow.server.reports import get_default_store
+
+
+# Server-run nodes that declare `requires_client = True` (Epic 9, ADR 0017) get a
+# real `GatewayClient` so "run this graph"/"run this node" over the local server
+# actually reaches the provider, mirroring `emergentflow.codegen.executor.execute`'s
+# `client` threading. `GatewayClient` itself only imports `litellm` lazily inside
+# `complete()`, so importing the class here adds no hard dependency on the `llm` extra.
+def _execute_node(definition: Any, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
+    if type(definition).requires_client:
+        return cast(Any, definition.execute)(node, inputs, client=GatewayClient())
+    return cast(dict[str, Any], definition.execute(node, inputs))
+
 
 # Per-node execution status reported to the canvas (Epic 4 Story 2). A node is
 # "ok" if it ran, "error" if its execute() raised, "skipped" if an upstream node
@@ -265,7 +278,7 @@ def _execute_functional_stream(
                 assert cached_outputs is not None  # mypy: narrowed by is_cache_hit above
                 outputs = cached_outputs
             else:
-                outputs = definition.execute(node, inputs)
+                outputs = _execute_node(definition, node, inputs)
                 if cache_hash is not None:
                     # A cache-write failure (e.g. an unpicklable output, a full
                     # disk) must not turn a successful execute() into a
@@ -581,7 +594,7 @@ def execute_node(payload: dict[str, Any]) -> dict[str, Any]:
     results: dict[str, dict[str, Any]] = {}
     try:
         definition = get_node_definition(node.type)()
-        results[node_id] = definition.execute(node, inputs)
+        results[node_id] = _execute_node(definition, node, inputs)
         status: dict[str, Any] = {"status": _STATUS_OK}
     except Exception as exc:  # noqa: BLE001 - any node-runtime failure -> error status
         status = {"status": _STATUS_ERROR, "error": f"{type(exc).__name__}: {exc}"}

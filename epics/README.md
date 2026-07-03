@@ -33,6 +33,9 @@ generally roadmap-Epic-N.
 | **Epic 6** | [`epic-6-node-library.md`](./epic-6-node-library.md) | **Epic 4** | Node Library & Configuration UX | Python SDK (`emergentflow/`) owns the catalog; `ui/` renders palette/panels |
 | **Epic 7** | [`epic-7-live-iteration.md`](./epic-7-live-iteration.md) | **Epics 6 (remaining) + 7 + 8 (partial)** | Live Iteration & Visual Results | `emergentflow/server/` (FastAPI, cache) + `ui/` (streaming, Results tab) |
 | **Epic 8** | [`epic-8-scikit-learn-support.md`](./epic-8-scikit-learn-support.md) | **Epic 4** (deep ML build-out) | Complete scikit-learn Support (Supervised & Unsupervised) | Python SDK — `emergentflow/` (estimator adapter, node archetypes, generated catalog) |
+| **Epic 9** | [`epic-9-ai-engineering-playground-prompt-lab.md`](./epic-9-ai-engineering-playground-prompt-lab.md) | **Epic 11** (partial — LLM/Prompt Lab foundation) | AI Engineering Playground: Prompt Lab (LLM Foundation) | Python SDK — `emergentflow/` (LLM client seam, node families, eval/label/export) **+** `ui/` (Prompt Lab panel) |
+| **Epic 10** *(stub)* | [`epic-10-agentic-flows.md`](./epic-10-agentic-flows.md) | **Epic 11** (multi-agent remainder) + **Epic 12** (partial) | Agentic Flows (Multi-Step Orchestration) | Python SDK — `emergentflow/` (agent nodes, declarative/LangGraph codegen) **+** `ui/` (message/token viz) |
+| **Epic 11** *(stub)* | [`epic-11-rag.md`](./epic-11-rag.md) | **Epic 11** (RAG facet of the GenAI stack) | RAG (Retrieval-Augmented Generation) | Python SDK — `emergentflow/` (`ef.rag.*`, embedding/vector-store adapters) **+** `ui/` (retrieval inspector) |
 
 > **Delivery vs. roadmap order.** Repo Epics 4 (local server) and 5 (canvas) are *planned*
 > (Epic 4's v0 server has shipped; Epic 5 is not started). The server was front-loaded ahead of
