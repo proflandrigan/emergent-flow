@@ -92,6 +92,34 @@ test("throws on a non-2xx response", async () => {
   await expect(runEval(baseInput)).rejects.toThrow("bad graph");
 });
 
+test("throws when the table payload is truncated", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, opts) => {
+    const body = JSON.parse((opts as RequestInit).body as string);
+    const nodeId = body.run_node as string;
+    return new Response(
+      JSON.stringify({
+        payload_version: 2,
+        results: {
+          [nodeId]: {
+            results: {
+              kind: "table",
+              columns: [],
+              dtypes: [],
+              shape: [60, 2],
+              head: [],
+              truncated: true,
+            },
+          },
+        },
+        statuses: { [nodeId]: { status: "ok" } },
+      }),
+      { status: 200 },
+    );
+  });
+
+  await expect(runEval(baseInput)).rejects.toThrow("60");
+});
+
 test('throws when the node status is "error"', async () => {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, opts) => {
     const body = JSON.parse((opts as RequestInit).body as string);

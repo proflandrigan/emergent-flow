@@ -58,6 +58,17 @@ export async function runEval(input: RunEvalInput): Promise<EvalRunRow[]> {
   if (!payload || payload.kind !== "table") {
     throw new Error("Unexpected response shape from /execute_node");
   }
+  if (payload.truncated) {
+    // The server caps table payloads at MAX_HEAD_ROWS (server/payload.py) -- silently
+    // rendering/exporting only the first N rows would misrepresent the run's actual
+    // results, so surface it as an error rather than a partial compare grid.
+    const [rowCount] = payload.shape ?? [];
+    throw new Error(
+      `This run produced ${rowCount ?? "too many"} result rows, which exceeds what ` +
+        "the compare grid can display. Reduce the dataset size or number of variants " +
+        "and run again.",
+    );
+  }
 
   return payload.head as EvalRunRow[];
 }

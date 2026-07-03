@@ -82,10 +82,16 @@ def export_eval_set(df: pd.DataFrame, path: str | pathlib.Path) -> DatasetExport
             "output": record["output"],
             "label": record["label"],
         }
-        if pd.notna(record["score"]):
-            out["score"] = float(record["score"])
-        if pd.notna(record["rubric"]):
-            out["rubric"] = str(record["rubric"])
+        # `score`/`rubric` are optional columns (only guaranteed present when *df*
+        # came from `ef.eval.label`, which fills them with `None`); a caller posting
+        # rows straight to this function (e.g. the `/export/eval_set` route) may omit
+        # them entirely, so read via `.get` rather than assuming the key exists.
+        score = record.get("score")
+        if pd.notna(score):
+            out["score"] = float(score)
+        rubric = record.get("rubric")
+        if pd.notna(rubric):
+            out["rubric"] = str(rubric)
         rows.append(out)
 
     return _write_jsonl(path, rows)

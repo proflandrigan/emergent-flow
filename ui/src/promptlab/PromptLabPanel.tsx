@@ -32,6 +32,11 @@ export function PromptLabPanel(): JSX.Element {
     setRunning(true);
     setError(null);
     try {
+      // A variable-less prompt has no rows to bind (InputSetTable hides its
+      // add-row UI in that case, per its "single run mode" note) -- send one
+      // empty-binding row so eval.run's `for row_id, row in enumerate(dataset)`
+      // actually executes once instead of silently producing zero rows.
+      const effectiveDataset = variables.length === 0 ? [{}] : dataset;
       const newRows = await runEval({
         system,
         user,
@@ -39,7 +44,7 @@ export function PromptLabPanel(): JSX.Element {
           provider: v.provider,
           model: v.model,
         })),
-        dataset,
+        dataset: effectiveDataset,
       });
       setRows(newRows);
       setLabels([]);
@@ -52,7 +57,7 @@ export function PromptLabPanel(): JSX.Element {
           provider: v.provider,
           model: v.model,
         })),
-        dataset,
+        dataset: effectiveDataset,
         rows: newRows,
         labels: [],
       };
@@ -124,7 +129,7 @@ export function PromptLabPanel(): JSX.Element {
         <button
           type="button"
           onClick={() => void handleExport("eval_set")}
-          disabled={rows.length === 0}
+          disabled={labels.length === 0}
           data-testid="prompt-lab-export-eval-set"
         >
           Export eval set
@@ -132,7 +137,7 @@ export function PromptLabPanel(): JSX.Element {
         <button
           type="button"
           onClick={() => void handleExport("finetune")}
-          disabled={rows.length === 0}
+          disabled={labels.length === 0}
           data-testid="prompt-lab-export-finetune"
         >
           Export fine-tune set

@@ -244,3 +244,27 @@ def test_export_finetune_rejects_empty_messages(tmp_path: pathlib.Path) -> None:
 
     with pytest.raises(ValueError):
         export_finetune(df, tmp_path / "x.jsonl")
+
+
+def test_export_eval_set_tolerates_missing_optional_columns(tmp_path: pathlib.Path) -> None:
+    """Rows lacking 'score'/'rubric' columns entirely (not just null) still export.
+
+    Regression test: `export_eval_set` is reachable directly via the `/export/eval_set`
+    server route with caller-supplied rows that were never merged through `ef.eval.label`
+    (which is what normally guarantees these optional columns exist, filled with `None`).
+    A DataFrame missing the columns outright used to raise an unhandled `KeyError` instead
+    of treating the fields as simply absent, per the exporter's own documented contract
+    ("only when present").
+    """
+    df = pd.DataFrame(
+        [{"input": {"question": "2+2?"}, "output": "4", "label": "pass"}],
+    )
+
+    manifest = export_eval_set(df, tmp_path / "x.jsonl")
+
+    assert manifest.row_count == 1
+    lines = (tmp_path / "x.jsonl").read_text().splitlines()
+    obj = json.loads(lines[0])
+    assert obj == {"input": {"question": "2+2?"}, "output": "4", "label": "pass"}
+    assert "score" not in obj
+    assert "rubric" not in obj

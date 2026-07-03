@@ -316,6 +316,29 @@ def test_llm_graph_docstring_hints_deduped_across_variants() -> None:
     assert source.count("export ANTHROPIC_API_KEY=...") == 1
 
 
+def test_llm_graph_docstring_hint_escapes_triple_quote_breakout() -> None:
+    """A malicious api_key_env can't break out of the generated docstring and inject code.
+
+    Regression test: `compile_to_code` used to splice the resolved env-var name into the
+    module docstring unescaped, so an `api_key_env` value containing `\"\"\"` would terminate
+    the docstring early and turn the rest of the value into live top-level statements in the
+    emitted module.
+    """
+    node = LlmCall().instantiate(
+        messages=[{"role": "user", "content": "hi"}],
+        provider="anthropic",
+        api_key_env='X"""\nimport os\nos.system("echo pwned")\n#',
+    )
+    graph = _graph([node])
+    source = compile_to_code(graph)
+
+    # The malicious text is preserved verbatim as inert docstring *content* (its quotes
+    # escaped) rather than disappearing -- what must not happen is it executing as code.
+    namespace: dict[str, Any] = {}
+    exec(compile(source, "<compiled_injection_check>", "exec"), namespace)
+    assert "os" not in namespace
+
+
 def test_non_llm_graph_docstring_unchanged() -> None:
     """A graph with no client-requiring node keeps the plain, byte-for-byte docstring."""
     graph = _vertical_slice_graph()
