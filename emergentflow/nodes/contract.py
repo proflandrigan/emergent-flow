@@ -118,6 +118,14 @@ class NodeDefinition(ABC):
         params and inputs (e.g. non-deterministic LLM nodes, deferred to a
         later epic) — a cache hit for such a node would silently serve a
         stale/wrong result.
+    requires_client:
+        Whether this node's ``execute`` needs an injected ``LLMClient``
+        (ADR 0017). Default ``False`` for every ordinary, pure node. LLM-call
+        nodes (Epic 9) set this ``True``; ``emergentflow.codegen.executor.execute``
+        then calls their ``execute`` with a ``client=`` keyword argument, and
+        ``emergentflow.codegen.compiler.compile_to_code`` emits a ``main()``
+        entry point that accepts a ``client`` parameter. Graphs containing no
+        such node are completely unaffected — this is an opt-in, additive flag.
     ports:
         Declared :class:`PortSpec` list.
     params:
@@ -132,6 +140,7 @@ class NodeDefinition(ABC):
     description: ClassVar[str] = ""
     paradigm: ClassVar[Paradigm] = Paradigm.FUNCTIONAL
     cacheable: ClassVar[bool] = True
+    requires_client: ClassVar[bool] = False
     ports: ClassVar[list[PortSpec]] = []
     params: ClassVar[list[ParamSpec]] = []
 
