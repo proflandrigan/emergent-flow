@@ -29,6 +29,22 @@ from emergentflow.llm import call
 from emergentflow.llm.protocol import LLMClient
 from emergentflow.llm.templating import render_prompt
 
+# Kept in sync with the dict built per-row below so an empty `dataset`/`variants`
+# still produces a DataFrame with this exact column shape (Epic 9 Story 4's
+# `summarize_run` requires `cost_usd`/`input_tokens`/`output_tokens`/`latency_ms`
+# to exist as columns, not just be absent because there were zero rows).
+_RESULT_COLUMNS = (
+    "input",
+    "provider",
+    "model",
+    "output",
+    "input_tokens",
+    "output_tokens",
+    "cost_usd",
+    "latency_ms",
+    "finish_reason",
+)
+
 
 @public_op(name="ef.eval.run")
 def run(
@@ -97,4 +113,4 @@ def run(
                     "finish_reason": response.finish_reason,
                 }
             )
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=list(_RESULT_COLUMNS))

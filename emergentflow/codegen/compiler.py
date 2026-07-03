@@ -197,8 +197,18 @@ def compile_to_code(graph: Graph) -> str:
     # Story 1): only graphs with an LLM node (Story 2+) get a `client` param.
     if assembled.needs_client:
         main_signature = "def main(*, client: object | None = None) -> dict[str, object]:"
+        # A standalone run of this script needs a real client to reach an LLM
+        # provider (ADR 0017), so the boilerplate constructs a `GatewayClient`
+        # rather than calling `main()` with no arguments -- otherwise every
+        # exported script for an LLM graph would raise `MissingClientError`
+        # unconditionally when run directly.
+        main_call = (
+            "    from emergentflow.llm.gateway import GatewayClient\n\n"
+            "    _results = main(client=GatewayClient())"
+        )
     else:
         main_signature = "def main() -> dict[str, object]:"
+        main_call = "    _results = main()"
 
     # Step 7: Module assembly
     module_source = f'''
@@ -210,7 +220,7 @@ def compile_to_code(graph: Graph) -> str:
 {main_body}
 
 if __name__ == "__main__":
-    _results = main()
+{main_call}
     for _name, _value in _results.items():
         print(f"{{_name}} = {{_value!r}}")
 '''

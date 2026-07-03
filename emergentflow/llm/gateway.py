@@ -123,11 +123,23 @@ class GatewayClient:
         choice = response.choices[0]
         content = choice.message.content
         finish_reason = choice.finish_reason or "stop"
+        response_usage = getattr(response, "usage", None)
+        if response_usage is None:
+            raise GatewayResponseError(
+                "Provider response did not include token usage; "
+                "cannot compute cost/tokens for this call."
+            )
         usage = Usage(
-            input_tokens=response.usage.prompt_tokens,
-            output_tokens=response.usage.completion_tokens,
+            input_tokens=response_usage.prompt_tokens,
+            output_tokens=response_usage.completion_tokens,
         )
-        model = getattr(response, "model", None) or request.model
+        # `request.model` (bare, unprefixed) is what `PRICE_TABLE_PER_1K_TOKENS`
+        # (emergentflow.llm.pricing) is keyed by. LiteLLM's `response.model` can
+        # come back prefixed with the provider (the same `f"{provider}/{model}"`
+        # string sent as the request's `model` kwarg above), which would silently
+        # miss the price table and report `cost_usd=0.0` for a real, billed call.
+        # Always report the bare model id `call()` was asked for.
+        model = request.model
 
         text: str | None = content
         data: dict | None = None

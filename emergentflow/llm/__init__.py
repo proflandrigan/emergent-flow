@@ -25,6 +25,7 @@ from __future__ import annotations
 import dataclasses
 from typing import Any
 
+from emergentflow.api import public_op
 from emergentflow.llm.aggregate import summarize_run
 from emergentflow.llm.pricing import compute_cost
 from emergentflow.llm.protocol import LLMClient, LLMRequest, LLMResponse
@@ -58,6 +59,7 @@ class StructuredOutputValidationError(ValueError):
     """
 
 
+@public_op(name="ef.llm.call")
 def call(
     messages: list[dict[str, str]] | tuple[dict[str, str], ...],
     *,
@@ -122,6 +124,7 @@ def call(
     return response
 
 
+@public_op(name="ef.llm.prompt")
 def prompt(system: str, user: str, variables: dict[str, object]) -> PromptSpec:
     """Render *system*/*user* templates against *variables* (the ``ef.llm.prompt`` node wrapper).
 
@@ -153,7 +156,7 @@ def _matches_type(data: Any, schema_type: str) -> bool:
     expected = _TYPE_MAP.get(schema_type)
     if expected is None:
         return True  # unknown type keyword -- don't enforce
-    if schema_type == "integer" and isinstance(data, bool):
+    if schema_type in ("integer", "number") and isinstance(data, bool):
         return False  # bool is a subclass of int; exclude explicitly
     return isinstance(data, expected)
 
