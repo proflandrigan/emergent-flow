@@ -1,4 +1,5 @@
 import { buildEvalGraph, type EvalVariantParams } from "./buildEvalGraph";
+import { postJson } from "./httpJson";
 
 export interface EvalRunRow {
   row_id: number;
@@ -33,20 +34,11 @@ export async function runEval(input: RunEvalInput): Promise<EvalRunRow[]> {
     variants: input.variants,
   });
 
-  const res = await fetch("/execute_node", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      graph,
-      run_node: nodeId,
-      inputs: { dataset: input.dataset },
-    }),
+  const res = await postJson("/execute_node", {
+    graph,
+    run_node: nodeId,
+    inputs: { dataset: input.dataset },
   });
-
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error ?? `Server error ${res.status}`);
-  }
 
   const body = await res.json();
   const status = body.statuses?.[nodeId];

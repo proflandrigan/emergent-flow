@@ -1,4 +1,5 @@
 import type { CompareGridLabel } from "./CompareGrid";
+import { postJson } from "./httpJson";
 import type { EvalRunRow } from "./runEval";
 
 export type ExportFormat = "eval_set" | "finetune";
@@ -9,15 +10,7 @@ export async function labelRun(
   results: EvalRunRow[],
   labels: CompareGridLabel[],
 ): Promise<Record<string, unknown>[]> {
-  const res = await fetch("/eval/label", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ results, labels }),
-  });
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error ?? `Server error ${res.status}`);
-  }
+  const res = await postJson("/eval/label", { results, labels });
   const body = await res.json();
   return body.labeled;
 }
@@ -31,15 +24,7 @@ export async function downloadDataset(
   const path = format === "eval_set" ? "/export/eval_set" : "/export/finetune";
   const filename = format === "eval_set" ? "eval_set.jsonl" : "finetune.jsonl";
 
-  const res = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ rows: labeledRows }),
-  });
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new Error(errBody.error ?? `Server error ${res.status}`);
-  }
+  const res = await postJson(path, { rows: labeledRows });
 
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);

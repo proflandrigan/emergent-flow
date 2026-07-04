@@ -16,10 +16,8 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
-import pathlib
-import tempfile
 import time
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -30,8 +28,8 @@ from emergentflow.codegen.errors import CodegenError, UnboundInputError
 from emergentflow.codegen.traversal import topological_sort
 from emergentflow.codegen.validation import enforce_validation_gate
 from emergentflow.codegen.wiring import WiringMap, build_wiring_map
-from emergentflow.eval import export_eval_set, export_finetune
 from emergentflow.eval import label as eval_label
+from emergentflow.eval.export import build_eval_set_rows, build_finetune_rows, rows_to_jsonl_bytes
 from emergentflow.ir import Direction, Graph, Node, Paradigm
 from emergentflow.ir.schema import ir_json_schema
 from emergentflow.ir.serialize import deserialize_graph
@@ -97,33 +95,22 @@ def label_eval(payload: dict[str, Any]) -> dict[str, Any]:
     return {"labeled": labeled_df.to_dict(orient="records")}
 
 
-def _export_dataset_bytes(
-    payload: dict[str, Any], export_fn: Callable[[pd.DataFrame, pathlib.Path], object]
-) -> bytes:
-    """Write ``payload["rows"]`` to a throwaway temp file via *export_fn*, return its bytes.
-
-    ``export_eval_set``/``export_finetune`` (Epic 9 Story 7) only know how to write to a
-    filesystem path -- there is no in-memory variant -- so this is the one place a server
-    handler does its own throwaway temp-file I/O to bridge that to an HTTP download response.
-    The temp directory (and file) is removed once the bytes are read back, per
-    ``tempfile.TemporaryDirectory``'s context-manager cleanup.
-    """
-    rows = payload.get("rows", [])
-    df = pd.DataFrame(rows)
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_path = pathlib.Path(tmp_dir) / "export.jsonl"
-        export_fn(df, tmp_path)
-        return tmp_path.read_bytes()
-
-
 def export_eval_set_bytes(payload: dict[str, Any]) -> bytes:
-    """``POST /export/eval_set``: ``{"rows": [...]}`` -> raw eval-set JSONL bytes."""
-    return _export_dataset_bytes(payload, export_eval_set)
+    """``POST /export/eval_set``: ``{"rows": [...]}`` -> raw eval-set JSONL bytes.
+
+    ``build_eval_set_rows``/``rows_to_jsonl_bytes`` (``emergentflow.eval.export``) build the
+    JSONL payload entirely in memory -- no filesystem access needed to answer an HTTP request,
+    unlike ``export_eval_set``, which additionally writes those same bytes to a path for the
+    SDK/CLI-facing use case.
+    """
+    df = pd.DataFrame(payload.get("rows", []))
+    return rows_to_jsonl_bytes(build_eval_set_rows(df))
 
 
 def export_finetune_bytes(payload: dict[str, Any]) -> bytes:
     """``POST /export/finetune``: ``{"rows": [...]}`` -> raw fine-tune JSONL bytes."""
-    return _export_dataset_bytes(payload, export_finetune)
+    df = pd.DataFrame(payload.get("rows", []))
+    return rows_to_jsonl_bytes(build_finetune_rows(df))
 
 
 def get_schema() -> dict[str, Any]:

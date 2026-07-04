@@ -38,35 +38,32 @@ class DatasetExportManifest:
     byte_size: int
 
 
+def rows_to_jsonl_bytes(rows: list[dict]) -> bytes:
+    """Encode *rows* as UTF-8 JSONL bytes, one JSON object per line. No I/O."""
+    text = "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows)
+    return text.encode("utf-8")
+
+
 def _write_jsonl(path: str | pathlib.Path, rows: list[dict]) -> DatasetExportManifest:
     """Write *rows* as JSONL to *path*, creating parent directories as needed."""
     out_path = pathlib.Path(path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    text = "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows)
-    data = text.encode("utf-8")
+    data = rows_to_jsonl_bytes(rows)
     out_path.write_bytes(data)
 
     return DatasetExportManifest(path=out_path, row_count=len(rows), byte_size=len(data))
 
 
-@public_op(name="ef.export_eval_set")
-def export_eval_set(df: pd.DataFrame, path: str | pathlib.Path) -> DatasetExportManifest:
-    """Export labeled rows of *df* (`ef.eval.label`'s output) as a judged eval set.
+def build_eval_set_rows(df: pd.DataFrame) -> list[dict]:
+    """Filter *df* to labeled rows and shape each as an eval-set JSON record.
 
-    Only rows with a non-null `label` are exported (see module docstring for the
-    rationale); unlabeled rows are silently skipped.
-
-    Each exported row is a JSON object with keys `input`, `output`, `label`, and
-    (only when present) `score` and `rubric`, written one per line to *path* as
-    UTF-8 JSONL. Parent directories of *path* are created if missing.
+    Only rows with a non-null `label` are kept (see module docstring for the
+    rationale); unlabeled rows are silently skipped. Each record has keys
+    `input`, `output`, `label`, and (only when present) `score` and `rubric`.
 
     Raises:
-        ValueError: If, after filtering to labeled rows, any row's `input` is
-            not a `dict`.
-
-    Returns:
-        A `DatasetExportManifest` describing what was written.
+        ValueError: If any labeled row's `input` is not a `dict`.
     """
     labeled = df[df["label"].notna()]
 
@@ -94,7 +91,59 @@ def export_eval_set(df: pd.DataFrame, path: str | pathlib.Path) -> DatasetExport
             out["rubric"] = str(rubric)
         rows.append(out)
 
-    return _write_jsonl(path, rows)
+    return rows
+
+
+def build_finetune_rows(df: pd.DataFrame) -> list[dict]:
+    """Filter *df* to labeled rows and shape each as a fine-tune JSON record.
+
+    Only rows with a non-null `label` are kept (same rule as
+    `build_eval_set_rows`; see module docstring for the rationale). Each
+    record is `{"messages": [...]}`: the row's `messages` list with one
+    appended `{"role": "assistant", "content": ...}` message, where the
+    content is the row's `output` directly if it is a `str`, or a
+    JSON-encoded string if it is a `dict`.
+
+    Raises:
+        ValueError: If any labeled row's `messages` is not a non-empty list.
+    """
+    labeled = df[df["label"].notna()]
+
+    rows: list[dict] = []
+    for record in labeled.to_dict(orient="records"):
+        messages = record["messages"]
+        if not isinstance(messages, list) or len(messages) == 0:
+            raise ValueError(
+                f"export_finetune: row {record.get('row_id')!r} has non-list or "
+                f"empty 'messages': {messages!r}"
+            )
+        output = record["output"]
+        content = output if isinstance(output, str) else json.dumps(output, ensure_ascii=False)
+        assistant_message = {"role": "assistant", "content": content}
+        rows.append({"messages": [*messages, assistant_message]})
+
+    return rows
+
+
+@public_op(name="ef.export_eval_set")
+def export_eval_set(df: pd.DataFrame, path: str | pathlib.Path) -> DatasetExportManifest:
+    """Export labeled rows of *df* (`ef.eval.label`'s output) as a judged eval set.
+
+    Only rows with a non-null `label` are exported (see module docstring for the
+    rationale); unlabeled rows are silently skipped.
+
+    Each exported row is a JSON object with keys `input`, `output`, `label`, and
+    (only when present) `score` and `rubric`, written one per line to *path* as
+    UTF-8 JSONL. Parent directories of *path* are created if missing.
+
+    Raises:
+        ValueError: If, after filtering to labeled rows, any row's `input` is
+            not a `dict`.
+
+    Returns:
+        A `DatasetExportManifest` describing what was written.
+    """
+    return _write_jsonl(path, build_eval_set_rows(df))
 
 
 @public_op(name="ef.export_finetune")
@@ -117,19 +166,4 @@ def export_finetune(df: pd.DataFrame, path: str | pathlib.Path) -> DatasetExport
     Returns:
         A `DatasetExportManifest` describing what was written.
     """
-    labeled = df[df["label"].notna()]
-
-    rows: list[dict] = []
-    for record in labeled.to_dict(orient="records"):
-        messages = record["messages"]
-        if not isinstance(messages, list) or len(messages) == 0:
-            raise ValueError(
-                f"export_finetune: row {record.get('row_id')!r} has non-list or "
-                f"empty 'messages': {messages!r}"
-            )
-        output = record["output"]
-        content = output if isinstance(output, str) else json.dumps(output, ensure_ascii=False)
-        assistant_message = {"role": "assistant", "content": content}
-        rows.append({"messages": [*messages, assistant_message]})
-
-    return _write_jsonl(path, rows)
+    return _write_jsonl(path, build_finetune_rows(df))
