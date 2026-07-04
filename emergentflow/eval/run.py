@@ -34,7 +34,9 @@ from emergentflow.llm.templating import render_prompt
 # `summarize_run` requires `cost_usd`/`input_tokens`/`output_tokens`/`latency_ms`
 # to exist as columns, not just be absent because there were zero rows).
 _RESULT_COLUMNS = (
+    "row_id",
     "input",
+    "messages",
     "provider",
     "model",
     "output",
@@ -75,10 +77,12 @@ def run(
     Returns
     -------
     pd.DataFrame
-        One row per `(input_row, variant)`, columns: `input` (the row dict),
-        `provider`, `model`, `output` (text or parsed structured data),
-        `input_tokens`, `output_tokens`, `cost_usd`, `latency_ms`,
-        `finish_reason`.
+        One row per `(input_row, variant)`, columns: `row_id` (0-based index of
+        the row's position in `dataset`; shared by every variant of that row),
+        `input` (the row dict), `messages` (the exact rendered
+        `list[dict[str, str]]` messages this cell's call used), `provider`,
+        `model`, `output` (text or parsed structured data), `input_tokens`,
+        `output_tokens`, `cost_usd`, `latency_ms`, `finish_reason`.
 
     Raises
     ------
@@ -89,7 +93,7 @@ def run(
         reference (propagated from `render_prompt`).
     """
     rows: list[dict[str, Any]] = []
-    for row in dataset:
+    for row_id, row in enumerate(dataset):
         prompt_spec = render_prompt(system, user, row)
         for variant in variants:
             variant_kwargs = {k: v for k, v in variant.items() if k not in ("provider", "model")}
@@ -102,7 +106,9 @@ def run(
             )
             rows.append(
                 {
+                    "row_id": row_id,
                     "input": row,
+                    "messages": list(prompt_spec.messages),
                     "provider": variant["provider"],
                     "model": variant["model"],
                     "output": response.text if response.text is not None else response.data,

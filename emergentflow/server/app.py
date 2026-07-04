@@ -16,9 +16,12 @@ Routes:
 - ``GET  /reports/{hash}``   -- a stored HTML report blob (Epic 7 Story 3)
 - ``POST /cache/clear``      -- ``{"status": "ok"}``
 - ``POST /compile``          -- IR JSON -> ``{"code": ...}``
+- ``POST /eval/label``       -- ``{"results", "labels"}`` -> ``{"labeled": [...]}`` (Epic 9 Story 6)
 - ``POST /execute``          -- IR JSON -> ``{"payload_version", "results", "statuses"}``
 - ``POST /execute/stream``    -- IR JSON -> Server-Sent Events of per-node progress
 - ``POST /execute_node``     -- ``{"graph", "run_node", "inputs"}`` -> single-node run
+- ``POST /export/eval_set``  -- ``{"rows": [...]}`` -> eval-set JSONL file download (Epic 9 Story 7)
+- ``POST /export/finetune``  -- ``{"rows": [...]}`` -> fine-tune JSONL download (Epic 9 Story 7)
 - ``POST /validate``         -- IR JSON -> ``{"diagnostics": ...}``
 """
 
@@ -48,8 +51,11 @@ from emergentflow.server.service import (
     execute_graph,
     execute_graph_stream,
     execute_node,
+    export_eval_set_bytes,
+    export_finetune_bytes,
     get_catalog,
     get_schema,
+    label_eval,
     validate_graph,
 )
 
@@ -118,6 +124,7 @@ _INDEX_HTML = """<!doctype html>
 _POST_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "/cache/clear": clear_cache,
     "/compile": compile_graph,
+    "/eval/label": label_eval,
     "/execute": execute_graph,
     "/execute_node": execute_node,
     "/validate": validate_graph,
@@ -149,6 +156,24 @@ async def _safe_json(fn: Callable[[], dict[str, Any]]) -> Response:
     except Exception as exc:  # noqa: BLE001 - any ef.* failure -> 422, never crash the server
         return _error_json(422, f"{type(exc).__name__}: {exc}")
     return JSONResponse(content=result)
+
+
+async def _safe_download(fn: Callable[[], bytes], filename: str) -> Response:
+    """Run *fn* off the event loop; map any exception to the project's 422 contract,
+    else return its bytes as a ``Content-Disposition: attachment`` file download.
+
+    Mirrors ``_safe_json`` but for a binary payload instead of a JSON dict -- used by the
+    dataset-export routes, which stream a JSONL file rather than a JSON response body.
+    """
+    try:
+        content = await _run_sync(fn)
+    except Exception as exc:  # noqa: BLE001 - any ef.* failure -> 422, never crash the server
+        return _error_json(422, f"{type(exc).__name__}: {exc}")
+    return Response(
+        content=content,
+        media_type="application/x-ndjson",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 def _sse_frame(event: dict[str, Any]) -> bytes:
@@ -302,6 +327,22 @@ def create_app() -> FastAPI:
         except (ValueError, json.JSONDecodeError) as exc:
             return _error_json(400, f"invalid JSON body: {exc}")
         return await _execute_stream_response(body_dict)
+
+    @application.post("/export/eval_set")
+    async def export_eval_set_route(request: Request) -> Response:
+        try:
+            body_dict = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+        return await _safe_download(lambda: export_eval_set_bytes(body_dict), "eval_set.jsonl")
+
+    @application.post("/export/finetune")
+    async def export_finetune_route(request: Request) -> Response:
+        try:
+            body_dict = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+        return await _safe_download(lambda: export_finetune_bytes(body_dict), "finetune.jsonl")
 
     for path, fn in _POST_ROUTES.items():
         application.add_api_route(path, _make_post_handler(fn), methods=["POST"])

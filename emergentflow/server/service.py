@@ -21,15 +21,20 @@ from collections.abc import Generator, Iterator
 from dataclasses import dataclass
 from typing import Any, cast
 
+import pandas as pd
+
 from emergentflow import __version__, compile_to_code, execute, export_catalog, validate
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
 from emergentflow.codegen.traversal import topological_sort
 from emergentflow.codegen.validation import enforce_validation_gate
 from emergentflow.codegen.wiring import WiringMap, build_wiring_map
+from emergentflow.eval import label as eval_label
+from emergentflow.eval.export import build_eval_set_rows, build_finetune_rows, rows_to_jsonl_bytes
 from emergentflow.ir import Direction, Graph, Node, Paradigm
 from emergentflow.ir.schema import ir_json_schema
 from emergentflow.ir.serialize import deserialize_graph
 from emergentflow.llm.gateway import GatewayClient
+from emergentflow.llm.secrets import validate_api_keys_present
 from emergentflow.nodes import get as get_node_definition
 from emergentflow.server.cache import get_default_cache
 from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
@@ -73,6 +78,39 @@ def compile_graph(payload: dict[str, Any]) -> dict[str, Any]:
 def validate_graph(payload: dict[str, Any]) -> dict[str, Any]:
     """IR graph (as a dict) -> ``{"diagnostics": <Diagnostics, JSON-native>}``."""
     return {"diagnostics": validate(_to_graph(payload)).model_dump(mode="json")}
+
+
+def label_eval(payload: dict[str, Any]) -> dict[str, Any]:
+    """``POST /eval/label``: ``{"results": [...], "labels": [...]}`` -> ``{"labeled": [...]}``.
+
+    Builds a DataFrame from each of ``payload["results"]``/``payload["labels"]`` (lists of
+    row dicts, e.g. what the Prompt Lab compare grid already holds client-side after an
+    ``ef.eval.run`` run and a batch of label clicks), merges them via
+    ``emergentflow.eval.label.label`` (Epic 9 Story 6), and returns the merged rows as a
+    JSON-native list of dicts (``DataFrame.to_dict(orient="records")``).
+    """
+    results_df = pd.DataFrame(payload.get("results", []))
+    labels_df = pd.DataFrame(payload.get("labels", []))
+    labeled_df = eval_label(results_df, labels_df)
+    return {"labeled": labeled_df.to_dict(orient="records")}
+
+
+def export_eval_set_bytes(payload: dict[str, Any]) -> bytes:
+    """``POST /export/eval_set``: ``{"rows": [...]}`` -> raw eval-set JSONL bytes.
+
+    ``build_eval_set_rows``/``rows_to_jsonl_bytes`` (``emergentflow.eval.export``) build the
+    JSONL payload entirely in memory -- no filesystem access needed to answer an HTTP request,
+    unlike ``export_eval_set``, which additionally writes those same bytes to a path for the
+    SDK/CLI-facing use case.
+    """
+    df = pd.DataFrame(payload.get("rows", []))
+    return rows_to_jsonl_bytes(build_eval_set_rows(df))
+
+
+def export_finetune_bytes(payload: dict[str, Any]) -> bytes:
+    """``POST /export/finetune``: ``{"rows": [...]}`` -> raw fine-tune JSONL bytes."""
+    df = pd.DataFrame(payload.get("rows", []))
+    return rows_to_jsonl_bytes(build_finetune_rows(df))
 
 
 def get_schema() -> dict[str, Any]:
@@ -423,6 +461,7 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     """
     graph_payload, run_to = _split_request(payload)
     graph = _to_graph(graph_payload)
+    validate_api_keys_present(graph)
     if graph.paradigm is Paradigm.FUNCTIONAL:
         only, wiring_map = _resolve_run_to(graph, run_to)
         results, statuses = _execute_functional_with_status(graph, only=only, wiring_map=wiring_map)
@@ -471,6 +510,7 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
     """
     graph_payload, run_to = _split_request(payload)
     graph = _to_graph(graph_payload)
+    validate_api_keys_present(graph)
     start_time = time.monotonic()
     try:
         if graph.paradigm is Paradigm.FUNCTIONAL:
@@ -556,6 +596,28 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
     }
 
 
+def _coerce_json_inputs(node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
+    """Coerce JSON-transported ``inputs`` values to the native type each IN port expects.
+
+    ``execute_node``'s ``inputs`` arrive over HTTP as plain JSON, but a node's ``execute()``
+    expects native Python objects for non-JSON-native port types (e.g. a ``DataFrame`` IN port
+    -- ``eval.run``'s ``dataset``, ``eval.label``'s ``results``/``labels``) exactly like it
+    would receive from an upstream node in a full graph run. A JSON body can only carry a
+    ``list[dict]`` for a table, so this converts that shape to a real `pd.DataFrame` for any
+    port declared ``data_type == "DataFrame"``, leaving every other port's value untouched.
+    """
+    coerced = dict(inputs)
+    for port in node.ports:
+        if (
+            port.direction == Direction.IN
+            and port.data_type == "DataFrame"
+            and port.name in coerced
+            and isinstance(coerced[port.name], list)
+        ):
+            coerced[port.name] = pd.DataFrame(coerced[port.name])
+    return coerced
+
+
 def execute_node(payload: dict[str, Any]) -> dict[str, Any]:
     """Execute a single node ("run this node", Epic 4 Story 6).
 
@@ -586,10 +648,12 @@ def execute_node(payload: dict[str, Any]) -> dict[str, Any]:
     if node_id not in graph.nodes:
         raise CodegenError(f"run_node not in graph: {node_id!r}")
     node = graph.nodes[node_id]
+    validate_api_keys_present(graph, node_ids=[node_id])
     if node.paradigm is not Paradigm.FUNCTIONAL:
         raise CodegenError(
             f"execute_node only supports FUNCTIONAL nodes, got {node.paradigm} for {node_id!r}"
         )
+    inputs = _coerce_json_inputs(node, inputs)
 
     results: dict[str, dict[str, Any]] = {}
     try:

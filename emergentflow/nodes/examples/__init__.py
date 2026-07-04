@@ -22,6 +22,7 @@ from .correlation import Correlation
 from .cross_validate import CrossValidate
 from .describe import Describe
 from .drop_missing import DropMissing
+from .eval_label import EvalLabel
 from .eval_run import EvalRun
 from .evaluate import Evaluate
 from .filter_rows import FilterRows
@@ -59,6 +60,7 @@ __all__ = [
     "CrossValidate",
     "Describe",
     "DropMissing",
+    "EvalLabel",
     "EvalRun",
     "Evaluate",
     "FilterRows",

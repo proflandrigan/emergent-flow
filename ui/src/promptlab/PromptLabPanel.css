@@ -1,0 +1,15 @@
+.ef-promptlab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.ef-promptlab-panel__error {
+  color: var(--danger);
+}
+
+.ef-promptlab-panel__export-actions {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-3);
+}

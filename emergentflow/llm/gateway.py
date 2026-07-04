@@ -21,24 +21,8 @@ from __future__ import annotations
 import os
 import time
 
+from emergentflow.llm.env import MissingAPIKeyError, resolve_api_key_env_name
 from emergentflow.llm.protocol import LLMRequest, LLMResponse, Usage
-
-#: Provider -> conventional env-var name, used when a request does not set
-#: `api_key_env` explicitly. Extend as new providers are added.
-_DEFAULT_API_KEY_ENV = {
-    "anthropic": "ANTHROPIC_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "gemini": "GEMINI_API_KEY",
-}
-
-
-class MissingAPIKeyError(RuntimeError):
-    """Raised when the resolved API key env var is unset (or has no default).
-
-    The message names the *env var*, never a key value — there is none to
-    leak here (the whole point is the lookup failed), but this class exists
-    so callers can catch exactly this failure mode.
-    """
 
 
 class GatewayResponseError(RuntimeError):
@@ -47,24 +31,6 @@ class GatewayResponseError(RuntimeError):
     E.g. `response_format == "json"` was requested but the provider's
     content was not valid JSON.
     """
-
-
-def _resolve_api_key_env(request: LLMRequest) -> str:
-    """Return the env-var name to read the API key from for *request*.
-
-    Raises `MissingAPIKeyError` if `request.api_key_env` is unset and the
-    provider has no conventional default.
-    """
-    if request.api_key_env:
-        return request.api_key_env
-    default = _DEFAULT_API_KEY_ENV.get(request.provider)
-    if default is None:
-        raise MissingAPIKeyError(
-            f"LLMRequest.api_key_env was not set and provider {request.provider!r} "
-            "has no conventional default env-var name. Set api_key_env explicitly "
-            f"(known defaults: {sorted(_DEFAULT_API_KEY_ENV)})."
-        )
-    return default
 
 
 class GatewayClient:
@@ -96,7 +62,7 @@ class GatewayClient:
                 "Install it with:  pip install 'emergentflow[llm]'"
             ) from exc
 
-        env_name = _resolve_api_key_env(request)
+        env_name = resolve_api_key_env_name(request.provider, request.api_key_env)
         api_key = os.environ.get(env_name)
         if not api_key:
             raise MissingAPIKeyError(

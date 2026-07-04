@@ -1,0 +1,98 @@
+.ef-promptlab-inputset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.ef-promptlab-inputset__table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.ef-promptlab-inputset__table th,
+.ef-promptlab-inputset__table td {
+  padding: var(--space-2);
+  border: 1px solid var(--border-subtle);
+  text-align: left;
+}
+
+.ef-promptlab-inputset__table th {
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.ef-promptlab-inputset__table td {
+  color: var(--text-primary);
+}
+
+.ef-promptlab-inputset__table input {
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--space-2);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  outline: none;
+  box-sizing: border-box;
+  transition:
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-fast) var(--motion-ease);
+}
+
+.ef-promptlab-inputset__table input:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: 2px;
+}
+
+.ef-promptlab-inputset__table button {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: var(--text-md);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: color var(--motion-fast) var(--motion-ease);
+}
+
+.ef-promptlab-inputset__table button:hover {
+  color: var(--danger);
+}
+
+.ef-promptlab-inputset__add-row {
+  align-self: flex-start;
+  padding: var(--space-1) var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease);
+}
+
+.ef-promptlab-inputset__add-row:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+.ef-promptlab-inputset__empty-note {
+  color: var(--text-tertiary);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-style: italic;
+}

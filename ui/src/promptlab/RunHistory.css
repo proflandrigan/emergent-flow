@@ -1,0 +1,51 @@
+.ef-promptlab-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.ef-promptlab-history__entry {
+  display: block;
+  width: 100%;
+}
+
+.ef-promptlab-history__button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-2);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  text-align: left;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--motion-ease);
+}
+
+.ef-promptlab-history__button:hover {
+  background: var(--surface-2);
+}
+
+.ef-promptlab-history__timestamp {
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.ef-promptlab-history__summary {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.ef-promptlab-history__empty-note {
+  color: var(--text-tertiary);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-style: italic;
+}
