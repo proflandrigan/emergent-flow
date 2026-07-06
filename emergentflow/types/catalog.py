@@ -112,7 +112,7 @@ register_type(
     TypeDef(
         token="PlotSpec",
         description=(
-            "A terminal render payload: the plotly figure JSON (fig.to_plotly_json()) produced "
+            "A terminal render payload: the plotly figure JSON (fig.to_json()) produced "
             "by ef.viz.plot (Epic 12). JSON-native by construction; a terminal output that is "
             "rendered by the Results tab and does not wire downstream."
         ),

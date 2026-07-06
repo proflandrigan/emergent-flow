@@ -21,6 +21,7 @@ import statsmodels.formula.api as smf
 
 from emergentflow.stats.models import FittedStatsModel
 from emergentflow.stats.registry import ModelSpec, register_model
+from emergentflow.stats.shapes import DIAGNOSTIC_COLUMNS
 from emergentflow.stats.summaries import ols_coefficient_frame, ols_fit_stats
 
 
@@ -45,7 +46,7 @@ def _fit_ols(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
         model="OLS",
         spec=dict(spec),
         coefficients=ols_coefficient_frame(results),
-        diagnostics=pd.DataFrame(columns=["diagnostic", "statistic", "p_value", "detail"]),
+        diagnostics=pd.DataFrame(columns=list(DIAGNOSTIC_COLUMNS)),
         fit_stats=ols_fit_stats(results),
         results=results,
     )

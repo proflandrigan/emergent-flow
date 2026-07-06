@@ -55,7 +55,7 @@ extras).
 `plotly` (MIT) covers the interactive-charting surface Epic 12 needs, so **seaborn is intentionally
 not a dependency**. Beyond avoiding a redundant charting stack, a `seaborn` dependency would drag
 `matplotlib` into the render path and invite a PNG/raster "just one chart" escape hatch — exactly
-the binary-artifact problem the `PlotSpec` (`fig.to_plotly_json()`, JSON-native) contract is
+the binary-artifact problem the `PlotSpec` (`fig.to_json()`, JSON-native) contract is
 designed to avoid. The pingouin GPL ban recorded above likewise still stands: it is not
 reintroduced for any convenience.
 

@@ -32,7 +32,7 @@ from emergentflow.stats.errors import (
     UnknownModelError,
 )
 from emergentflow.stats.models import FittedStatsModel
-from emergentflow.stats.registry import keys_for_archetype, known_model_keys
+from emergentflow.stats.registry import ModelSpec, keys_for_archetype, known_model_keys
 from emergentflow.stats.spec import _prepare_model_spec
 
 __all__ = [
@@ -44,6 +44,7 @@ __all__ = [
     "ttest",
     "TTestResult",
     "FittedStatsModel",
+    "ModelSpec",
     "StatsError",
     "UnknownModelError",
     "InvalidModelSpecError",

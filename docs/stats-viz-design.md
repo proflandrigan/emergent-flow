@@ -47,7 +47,7 @@ precedent from repo Epic 8.
 string, a structured spec echo, a tidy `coefficients` frame, a `diagnostics` frame, a `fit_stats`
 dict (AIC/BIC/loglik/`converged`), and a live-model field that degrades to
 `{"kind": "unsupported"}` on the result-payload contract — mirroring Epic 8's `FittedModel`. In
-parallel, `PlotSpec` is a thin wrapper over `fig.to_plotly_json()`, JSON-native by construction,
+parallel, `PlotSpec` is a thin wrapper over `fig.to_json()` (parsed back with `json.loads`), JSON-native by construction,
 the terminal render payload every viz node emits.
 
 We fix one shared representation per family rather than per-model or per-chart classes because

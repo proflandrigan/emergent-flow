@@ -2,7 +2,7 @@
 emergentflow.viz
 ~~~~~~~~~~~~~~~~~
 Visualization operations (Epic 12): one ``viz.plot`` archetype over a curated, generated chart
-catalog, each returning a JSON-native ``PlotSpec`` (``fig.to_plotly_json()``-shaped). Mirrors the
+catalog, each returning a JSON-native ``PlotSpec`` (``fig.to_json()``-derived). Mirrors the
 Epic 8 estimator-adapter move -- breadth as data over one archetype -- so ADR-0002 equivalence and
 the ``@public_op`` inspectable contract hold by construction across the whole chart surface.
 
