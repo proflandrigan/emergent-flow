@@ -96,3 +96,25 @@ register_type(
         ),
     )
 )
+register_type(
+    TypeDef(
+        token="StatsModel",
+        description=(
+            "A fitted statistical model (OLS/GLM/MixedLM/GAM and their Bayesian "
+            "counterparts) produced by ef.stats.fit_model (Epic 12). Distinct from Epic 8's "
+            "'Model' predictor and 'Transformer': it carries a tidy coefficient/summary frame "
+            "and diagnostics, and wires into coefficient-plot and diagnostic nodes, not into a "
+            "DataFrame input."
+        ),
+    )
+)
+register_type(
+    TypeDef(
+        token="PlotSpec",
+        description=(
+            "A terminal render payload: the plotly figure JSON (fig.to_plotly_json()) produced "
+            "by ef.viz.plot (Epic 12). JSON-native by construction; a terminal output that is "
+            "rendered by the Results tab and does not wire downstream."
+        ),
+    )
+)

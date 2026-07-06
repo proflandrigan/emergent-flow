@@ -46,6 +46,12 @@ dependencies = [
     # Apache-2.0 is compatible with this SDK's license (see docs/licensing-and-dependencies.md);
     # it is NOT a GPL dep. pandas.read_parquet needs an engine, so this is a hard dependency.
     "pyarrow>=15",
+    # plotly (MIT) is the viz backend for Epic 12's ef.viz.plot: fig.to_plotly_json()
+    # is JSON-native, so a PlotSpec rides the result-payload contract with no binary-artifact
+    # escape hatch (see docs/licensing-and-dependencies.md). MIT is compatible with this SDK's
+    # Apache-2.0 license; it is NOT a GPL dep. seaborn is deliberately NOT pulled (it would drag
+    # matplotlib into the render path). A hard dependency because the viz family always needs it.
+    "plotly>=5,<7",
     "ydata-profiling>=4",
     # ydata-profiling imports pkg_resources at runtime but does not declare
     # setuptools as a dependency. Pin it explicitly, and below 81 where
@@ -75,6 +81,16 @@ server = [
 # an install hint.
 llm = [
     "litellm>=1,<2",
+]
+# `pip install emergentflow[bayes]` enables the optional Bayesian modeling family
+# (Epic 12 Story 7): pymc (Apache-2.0) for sampling, bambi (MIT) for the formula/structured-spec
+# frontend, and arviz (Apache-2.0) for posterior summaries. Kept optional so a bare SDK install
+# stays light (ADR 0007) and never pulls pytensor + a C toolchain. A Bayesian node in a base
+# install raises a typed MissingOptionalDependencyError, never an opaque ImportError.
+bayes = [
+    "pymc>=5,<6",
+    "bambi>=0.13,<1",
+    "arviz>=0.17,<1",
 ]
 
 [project.urls]
@@ -162,5 +178,14 @@ module = [
     "torch.*",
     "matplotlib.*",
     "litellm.*",
+    # plotly (MIT) ships no py.typed marker; it is the Epic 12 viz backend, imported
+    # lazily inside `ef.viz.plot`. The wrapper stays fully annotated at its boundary.
+    "plotly.*",
+    # The optional `emergentflow[bayes]` extra (Epic 12 Story 7): pymc/bambi/arviz are
+    # imported lazily and are absent from the bare `uv sync --locked` CI env (like torch/
+    # litellm), so ignore their missing imports.
+    "pymc.*",
+    "bambi.*",
+    "arviz.*",
 ]
 ignore_missing_imports = true
