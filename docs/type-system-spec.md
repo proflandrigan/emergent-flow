@@ -12,7 +12,7 @@ for compatibility and structural integrity.
 The Emergent Flow type system is **nominal**. A type is a string token; the only relationships are token equality and declared subtype/supertype relations. `"any"` is the explicit TOP / wildcard type, which is a supertype of all registered types and a subtype of nothing else. Every type is implicitly a subtype of `"any"`.
 
 Registered tokens today: `DataFrame`, `ClassifierResult`, `AnovaResult`, `HTML`, `Tensor`,
-`Model`, `Transformer`, and `any`.
+`Model`, `Transformer`, `StatsModel`, `PlotSpec`, and `any`.
 
 The registry lives in `emergentflow/types/` and supports declarative extensibility: an out-of-core package can register new type tokens, mirroring the node registry plugin pattern (ADR 0006). An example stub is provided at `examples/type_plugin_stub/`. The registry and its subtype table serialize to JSON so the frontend requires no Python.
 
@@ -39,11 +39,20 @@ Compatibility is decided by a pure function `is_compatible(source_type, target_t
 | `Mystery`          | `DataFrame`    | UNKNOWN        |
 | `TimeSeries`       | `DataFrame`    | COMPATIBLE (subtype) † |
 | `Transformer`      | `Model`        | INCOMPATIBLE   |
+| `StatsModel`       | `StatsModel`   | COMPATIBLE     |
+| `StatsModel`       | `DataFrame`    | INCOMPATIBLE   |
+| `PlotSpec`         | `PlotSpec`     | COMPATIBLE     |
+| `PlotSpec`         | `DataFrame`    | INCOMPATIBLE   |
 
 † The `TimeSeries → DataFrame` row assumes `TimeSeries` has been registered as a subtype of
 `DataFrame` (e.g. `registry.register(TypeDef(token="TimeSeries", supertypes=("DataFrame",)))`).
 It is **not** in the shipped default catalog — against the default registry an unregistered
 token like `TimeSeries` resolves to `UNKNOWN` (a non-blocking warning), exactly like `Mystery`.
+
+`StatsModel` and `Model`/`Transformer` are sibling tokens with no declared subtype edge, so a
+fitted statistical model does not satisfy an sklearn-style `Model` port and vice versa;
+`PlotSpec` is a terminal render output consumed by the Results tab and is not intended to wire
+downstream into any other node.
 
 ## Cardinality
 

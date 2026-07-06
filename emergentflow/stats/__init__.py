@@ -15,7 +15,9 @@ See ``docs/public-api-conventions.md`` and ``docs/sdk-design-philosophy.md``.
 
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import dataclass
+from typing import Any
 
 import pandas as pd
 import statsmodels.api as sm
@@ -23,6 +25,15 @@ from scipy.stats import ttest_ind
 from statsmodels.formula.api import ols
 
 from emergentflow.api import public_op
+from emergentflow.stats.errors import (
+    InvalidModelSpecError,
+    MissingOptionalDependencyError,
+    StatsError,
+    UnknownModelError,
+)
+from emergentflow.stats.models import FittedStatsModel
+from emergentflow.stats.registry import ModelSpec, keys_for_archetype, known_model_keys
+from emergentflow.stats.spec import _prepare_model_spec
 
 __all__ = [
     "anova",
@@ -32,6 +43,15 @@ __all__ = [
     "describe",
     "ttest",
     "TTestResult",
+    "FittedStatsModel",
+    "ModelSpec",
+    "StatsError",
+    "UnknownModelError",
+    "InvalidModelSpecError",
+    "MissingOptionalDependencyError",
+    "known_model_keys",
+    "keys_for_archetype",
+    "fit_model",
 ]
 
 CORR_METHODS = ("pearson", "spearman", "kendall")
@@ -210,3 +230,42 @@ def correlation(
         target = df.select_dtypes(include="number")
     result = target.corr(method=method).reset_index(names="column")
     return result
+
+
+#: Maps an optional pip-extra target to every module whose presence proves the extra is fully
+#: installed, so fit_model can raise a typed MissingOptionalDependencyError (never an opaque
+#: ImportError) before attempting to fit an optional-dependency model (Epic 12 Story 1's hard
+#: optional boundary). All modules must be importable -- a partial install (e.g. bambi present but
+#: pymc/arviz absent) must still raise, not silently proceed into a bare ImportError later.
+_EXTRA_PROBE_MODULES = {"emergentflow[bayes]": ("bambi", "pymc", "arviz")}
+
+
+def _require_extra(extra: str) -> None:
+    """Raise MissingOptionalDependencyError(extra) unless all of *extra*'s probe modules import."""
+    probes = _EXTRA_PROBE_MODULES.get(extra)
+    if not probes or any(importlib.util.find_spec(probe) is None for probe in probes):
+        raise MissingOptionalDependencyError(extra)
+
+
+@public_op(name="ef.stats.fit_model")
+def fit_model(df: pd.DataFrame, *, model: str, spec: dict[str, Any]) -> FittedStatsModel:
+    """Fit a curated, allow-listed statistical model and return an inspectable FittedStatsModel.
+
+    The single seam every fit-model node routes through (Epic 12, Story 2). ``model`` is validated
+    against the allow-list registry and ``spec`` against the shared ``_prepare_model_spec`` gate
+    (raising :class:`~emergentflow.stats.errors.UnknownModelError` /
+    :class:`~emergentflow.stats.errors.InvalidModelSpecError`); a model requiring an optional
+    dependency extra that is absent raises
+    :class:`~emergentflow.stats.errors.MissingOptionalDependencyError`. The resolved model's own
+    per-family ``fitter`` assembles the backend call and builds the ``FittedStatsModel`` (the tidy
+    coefficient/diagnostic frames + fit_stats + the live results object). Because both
+    ``compile_to_code``'s emitted code and ``execute`` reach a model only through this function,
+    ADR-0002 equivalence holds by construction. Never mutates ``df``.
+    """
+    model_spec, resolved_spec = _prepare_model_spec(df, model, spec)
+    if model_spec.requires_extra is not None:
+        _require_extra(model_spec.requires_extra)
+    return model_spec.fitter(df, resolved_spec)
+
+
+from emergentflow.stats import catalog  # noqa: E402, F401

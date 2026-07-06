@@ -16,6 +16,7 @@ The following table lists the current runtime dependencies and their licenses.
 | ydata-profiling | >=4 | MIT | Yes |
 | setuptools | >=68,<81 | MIT | Yes |
 | litellm | >=1,<2 | MIT | Yes |
+| plotly | >=5,<7 | MIT | Yes |
 
 ## Why permissive-only
 
@@ -28,6 +29,35 @@ For more details on the distinction between the SDK and proprietary components, 
 Previously, `pingouin` was used as the backend for `ef.stats.anova`. However, `pingouin` is licensed under GPL-3.0, a strong copyleft license whose obligations are incompatible with shipping a permissively licensed (Apache-2.0) SDK that requires it as a dependency.
 
 To resolve this, `pingouin` was replaced by `statsmodels` (BSD-3-Clause). `statsmodels` provides one-way ANOVA via `OLS` (Ordinary Least Squares) and `anova_lm`, and it returns tidy `DataFrame`s. This satisfies the SDK's "returns inspectable structured data" selection rule. The public `anova` wrapper interface (`AnovaResult`) was preserved during this transition to ensure no breaking changes for users.
+
+## Optional extra: `[bayes]` (pymc / bambi / arviz)
+
+Epic 12's Bayesian modeling family (Story 7) is shipped as an **optional extra**, installed with
+`pip install emergentflow[bayes]`, never as part of the base install. Its three dependencies are
+all permissively licensed and compatible with Apache-2.0:
+
+| Dependency | Version constraint | License | Compatible with Apache-2.0? |
+|---|---|---|---|
+| pymc | >=5,<6 | Apache-2.0 | Yes |
+| bambi | >=0.13,<1 | MIT | Yes |
+| arviz | >=0.17,<1 | Apache-2.0 | Yes |
+
+The extra is kept optional for two reasons beyond licensing: `pymc` pulls `pytensor` and a C
+toolchain, which would slow every base install and CI run, and a large fraction of users never
+touch Bayesian modeling. The base package must import and run with all three absent; a Bayesian
+node invoked in a base install raises a typed `MissingOptionalDependencyError("emergentflow[bayes]")`
+rather than an opaque `ImportError`. This mirrors the repo's existing optional-dependency
+discipline (the `torch`-style `pytest.importorskip` pattern and the existing `[server]`/`[llm]`
+extras).
+
+## Deliberately not added: seaborn
+
+`plotly` (MIT) covers the interactive-charting surface Epic 12 needs, so **seaborn is intentionally
+not a dependency**. Beyond avoiding a redundant charting stack, a `seaborn` dependency would drag
+`matplotlib` into the render path and invite a PNG/raster "just one chart" escape hatch — exactly
+the binary-artifact problem the `PlotSpec` (`fig.to_json()`, JSON-native) contract is
+designed to avoid. The pingouin GPL ban recorded above likewise still stands: it is not
+reintroduced for any convenience.
 
 ## Policy
 
