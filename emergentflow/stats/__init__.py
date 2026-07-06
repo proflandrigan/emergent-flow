@@ -232,16 +232,18 @@ def correlation(
     return result
 
 
-#: Maps an optional pip-extra target to a module whose presence proves the extra is installed, so
-#: fit_model can raise a typed MissingOptionalDependencyError (never an opaque ImportError) before
-#: attempting to fit an optional-dependency model (Epic 12 Story 1's hard optional boundary).
-_EXTRA_PROBE_MODULE = {"emergentflow[bayes]": "bambi"}
+#: Maps an optional pip-extra target to every module whose presence proves the extra is fully
+#: installed, so fit_model can raise a typed MissingOptionalDependencyError (never an opaque
+#: ImportError) before attempting to fit an optional-dependency model (Epic 12 Story 1's hard
+#: optional boundary). All modules must be importable -- a partial install (e.g. bambi present but
+#: pymc/arviz absent) must still raise, not silently proceed into a bare ImportError later.
+_EXTRA_PROBE_MODULES = {"emergentflow[bayes]": ("bambi", "pymc", "arviz")}
 
 
 def _require_extra(extra: str) -> None:
-    """Raise MissingOptionalDependencyError(extra) unless *extra*'s probe module is importable."""
-    probe = _EXTRA_PROBE_MODULE.get(extra)
-    if probe is None or importlib.util.find_spec(probe) is None:
+    """Raise MissingOptionalDependencyError(extra) unless all of *extra*'s probe modules import."""
+    probes = _EXTRA_PROBE_MODULES.get(extra)
+    if not probes or any(importlib.util.find_spec(probe) is None for probe in probes):
         raise MissingOptionalDependencyError(extra)
 
 

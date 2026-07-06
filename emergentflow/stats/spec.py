@@ -18,6 +18,7 @@ column-bearing fields (``target`` / ``fixed_effects`` / ``random_effects`` / ``g
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pandas as pd
@@ -72,11 +73,24 @@ def _prepare_model_spec(
             )
 
     for field in _LIST_COLUMN_FIELDS:
-        for col in spec.get(field) or []:
+        value = spec.get(field)
+        if value is not None and not isinstance(value, (list, tuple)):
+            raise InvalidModelSpecError(
+                f"spec {field!r} must be a list of column names, got {type(value).__name__}."
+            )
+        for col in value or []:
             if col not in columns:
                 raise InvalidModelSpecError(
                     f"spec {field!r} references column {col!r}, which is not in the input "
                     f"frame; available columns: {sorted(columns)!r}."
                 )
 
-    return model_spec, dict(spec)
+    normalized = dict(spec)
+    try:
+        json.dumps(normalized)
+    except TypeError as exc:
+        raise InvalidModelSpecError(
+            f"spec for model {model!r} must be JSON-native (got a non-serializable value: {exc})."
+        ) from exc
+
+    return model_spec, normalized

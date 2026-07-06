@@ -50,7 +50,12 @@ def _prepare_chart_spec(
 
     columns = set(df.columns)
     for key, value in encoding.items():
-        refs = value if isinstance(value, (list, tuple)) else [value]
+        if isinstance(value, dict):
+            refs: list[Any] = list(value.keys())
+        elif isinstance(value, (list, tuple)):
+            refs = list(value)
+        else:
+            refs = [value]
         for ref in refs:
             if isinstance(ref, str) and ref not in columns:
                 raise InvalidEncodingError(

@@ -72,6 +72,14 @@ def test_encoding_column_not_in_frame_raises():
         plot(df, chart="scatter", encoding={"x": "missing", "y": "b"})
 
 
+def test_dict_valued_encoding_column_not_in_frame_raises():
+    # hover_data legitimately accepts a dict mapping column -> bool/format; a missing column
+    # referenced as a dict key must be caught by the validation gate, not left to plotly to raise.
+    df = _make_df()
+    with pytest.raises(InvalidEncodingError):
+        plot(df, chart="scatter", encoding={"x": "a", "y": "b", "hover_data": {"missing": True}})
+
+
 def test_plot_is_deterministic():
     df = _make_df()
     a = plot(df, chart="scatter", encoding={"x": "a", "y": "b"}, options={"trendline": "ols"})

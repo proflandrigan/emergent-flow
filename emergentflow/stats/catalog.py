@@ -25,6 +25,18 @@ from emergentflow.stats.shapes import DIAGNOSTIC_COLUMNS
 from emergentflow.stats.summaries import ols_coefficient_frame, ols_fit_stats
 
 
+def _patsy_term(column: str) -> str:
+    """Render *column* as a Patsy formula term, quoting via ``Q()`` only when required.
+
+    A bare identifier-like column name (e.g. ``"x"``) is used as-is so the fitted term name
+    matches the column name exactly (the coefficient frame and callers key on it). A column name
+    containing spaces or Patsy operator characters (``+ - * / ~ ( )``) is not a valid bare
+    identifier and would otherwise be silently misparsed as formula syntax even though it passed
+    the "column exists in the frame" check; ``Q(repr(column))`` treats it as a literal reference.
+    """
+    return column if column.isidentifier() else f"Q({column!r})"
+
+
 def _ols_formula(spec: dict[str, Any]) -> str:
     """Assemble a Patsy formula ``target ~ f1 + f2 + ...`` from the structured spec.
 
@@ -34,18 +46,24 @@ def _ols_formula(spec: dict[str, Any]) -> str:
     """
     target = spec["target"]
     fixed = spec.get("fixed_effects") or []
-    rhs = " + ".join(fixed) if fixed else "1"
-    return f"{target} ~ {rhs}"
+    rhs = " + ".join(_patsy_term(col) for col in fixed) if fixed else "1"
+    return f"{_patsy_term(target)} ~ {rhs}"
 
 
 def _fit_ols(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
     """Fit an OLS model from a validated structured spec and wrap it in a FittedStatsModel."""
     formula = _ols_formula(spec)
     results = smf.ols(formula, data=df).fit()
+    fixed = spec.get("fixed_effects") or []
+    # Undo Q()-quoting in the fitted term names so the tidy coefficient frame reports the raw
+    # column name a caller passed in, not the internal Patsy formula artifact.
+    term_map = {_patsy_term(col): col for col in fixed}
+    coefficients = ols_coefficient_frame(results)
+    coefficients["term"] = coefficients["term"].map(lambda t: term_map.get(t, t))
     return FittedStatsModel(
         model="OLS",
         spec=dict(spec),
-        coefficients=ols_coefficient_frame(results),
+        coefficients=coefficients,
         diagnostics=pd.DataFrame(columns=list(DIAGNOSTIC_COLUMNS)),
         fit_stats=ols_fit_stats(results),
         results=results,
