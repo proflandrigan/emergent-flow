@@ -205,3 +205,21 @@ downstream.
 - Time-series/forecasting models (ARIMA/state-space), survival analysis, causal inference
   (DoWhy), geospatial visualization, dashboard/report layout composition, and the raw-code escape
   hatch — all explicitly out of scope per the epic's Definition of Done.
+
+## EDA: `auto_eda` vs. the full HTML profile
+
+Story 11 ships two ways to explore a frame, and they are complements, not competitors.
+`ef.stats.auto_eda` / the `stats.auto_eda` node is the **fast, canvas-native** EDA path: it
+returns tidy summary frames (`profile`/`missingness`/`co_missingness`/`distribution_summary`/
+`correlation`) plus a curated set of JSON-native `PlotSpec`s (distributions, correlation heatmap,
+co-missingness heatmap), all
+riding the same `ADR-0002` equivalence and `@public_op` inspectable-result-payload contracts as
+every other node, composed from the existing `ef.stats`/`ef.viz` seams rather than a parallel
+implementation. `ef.reports.generate_html_summary` (the ydata-profiling `report` node) remains
+the **heavyweight, full-profile** option: a complete standalone HTML report, best for deep one-off
+exploration outside the canvas result flow.
+
+- Reach for `auto_eda` inside a graph/pipeline, and whenever you want inspectable frames + plots
+  that the Results tab can render directly.
+- Reach for the HTML profile when you want an exhaustive, shareable standalone report and don't
+  need the output to flow into downstream nodes.

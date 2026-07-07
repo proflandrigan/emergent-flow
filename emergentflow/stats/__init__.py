@@ -26,6 +26,15 @@ from statsmodels.formula.api import ols
 
 from emergentflow.api import public_op
 from emergentflow.stats.diagnostics import DiagnosticSpec, known_diagnostic_keys
+from emergentflow.stats.eda import (
+    AutoEdaResult,
+    auto_eda,
+    co_missingness,
+    distribution_summary,
+    group_by_aggregate,
+    missingness,
+    profile,
+)
 from emergentflow.stats.errors import (
     InvalidModelSpecError,
     MissingOptionalDependencyError,
@@ -40,11 +49,18 @@ from emergentflow.stats.spec import _prepare_diagnostic_spec, _prepare_model_spe
 __all__ = [
     "anova",
     "AnovaResult",
+    "auto_eda",
+    "AutoEdaResult",
+    "co_missingness",
     "correlation",
     "CORR_METHODS",
     "describe",
     "diagnostic",
     "DiagnosticSpec",
+    "distribution_summary",
+    "group_by_aggregate",
+    "missingness",
+    "profile",
     "ttest",
     "TTestResult",
     "FittedStatsModel",

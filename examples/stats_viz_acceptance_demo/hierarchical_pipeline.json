@@ -1,0 +1,286 @@
+{
+  "schema_version": 1,
+  "paradigm": "functional",
+  "name": "Stats/Viz Acceptance Demo -- Hierarchical",
+  "nodes": {
+    "n-load": {
+      "id": "n-load",
+      "type": "data.load_sample",
+      "label": "Load Sample",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "name",
+          "type_token": "str",
+          "value": "iris",
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-load-frame",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-eda": {
+      "id": "n-eda",
+      "type": "stats.auto_eda",
+      "label": "Auto EDA",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "id": "p-eda-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-eda-frame",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-eda-profile",
+          "name": "profile",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-eda-missingness",
+          "name": "missingness",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-eda-correlation",
+          "name": "correlation",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-eda-distribution-plot",
+          "name": "distribution_plot",
+          "direction": "out",
+          "data_type": "PlotSpec",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-eda-correlation-heatmap",
+          "name": "correlation_heatmap",
+          "direction": "out",
+          "data_type": "PlotSpec",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-eda-missingness-plot",
+          "name": "missingness_plot",
+          "direction": "out",
+          "data_type": "PlotSpec",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 200.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-vif": {
+      "id": "n-vif",
+      "type": "stats.diagnostic_frame",
+      "label": "VIF",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "diagnostic",
+          "type_token": "str",
+          "value": "vif",
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-vif-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-vif-diagnostics",
+          "name": "diagnostics",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 400.0,
+        "y": -100.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-mixed": {
+      "id": "n-mixed",
+      "type": "stats.fit_model",
+      "label": "Mixed-Effects Model",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "model",
+          "type_token": "str",
+          "value": "MixedLM",
+          "default": null
+        },
+        {
+          "name": "target",
+          "type_token": "str",
+          "value": "sepal width (cm)",
+          "default": null
+        },
+        {
+          "name": "fixed_effects",
+          "type_token": "list[str]",
+          "value": [
+            "petal length (cm)"
+          ],
+          "default": null
+        },
+        {
+          "name": "random_effects",
+          "type_token": "list[str]",
+          "value": [
+            "petal length (cm)"
+          ],
+          "default": null
+        },
+        {
+          "name": "groups",
+          "type_token": "str",
+          "value": "target",
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-mixed-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-mixed-model",
+          "name": "model",
+          "direction": "out",
+          "data_type": "StatsModel",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 400.0,
+        "y": 100.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-forest": {
+      "id": "n-forest",
+      "type": "viz.plot_coefficients",
+      "label": "Plot Coefficients",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "id": "p-forest-model",
+          "name": "model",
+          "direction": "in",
+          "data_type": "StatsModel",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-forest-plot",
+          "name": "plot",
+          "direction": "out",
+          "data_type": "PlotSpec",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 600.0,
+        "y": 100.0
+      },
+      "group_id": null,
+      "subgraph": null
+    }
+  },
+  "edges": {
+    "e-load-eda": {
+      "id": "e-load-eda",
+      "source": {
+        "node_id": "n-load",
+        "port_id": "p-load-frame"
+      },
+      "target": {
+        "node_id": "n-eda",
+        "port_id": "p-eda-in"
+      },
+      "type_compatible": null
+    },
+    "e-eda-vif": {
+      "id": "e-eda-vif",
+      "source": {
+        "node_id": "n-eda",
+        "port_id": "p-eda-frame"
+      },
+      "target": {
+        "node_id": "n-vif",
+        "port_id": "p-vif-in"
+      },
+      "type_compatible": null
+    },
+    "e-eda-mixed": {
+      "id": "e-eda-mixed",
+      "source": {
+        "node_id": "n-eda",
+        "port_id": "p-eda-frame"
+      },
+      "target": {
+        "node_id": "n-mixed",
+        "port_id": "p-mixed-in"
+      },
+      "type_compatible": null
+    },
+    "e-mixed-forest": {
+      "id": "e-mixed-forest",
+      "source": {
+        "node_id": "n-mixed",
+        "port_id": "p-mixed-model"
+      },
+      "target": {
+        "node_id": "n-forest",
+        "port_id": "p-forest-model"
+      },
+      "type_compatible": null
+    }
+  }
+}

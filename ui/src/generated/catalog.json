@@ -4229,6 +4229,109 @@
     },
     {
       "category": "Statistics",
+      "description": "One-shot exploratory data analysis: summary frames + curated plots.",
+      "family": "stats",
+      "label": "Auto EDA",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Columns to analyze; empty/unset analyzes all columns.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": false,
+          "type_token": "list[str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame to analyze.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input DataFrame, passed through unchanged so this node can sit inline.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Per-column profile (dtype, missingness, cardinality, skew/kurtosis).",
+          "label": null,
+          "name": "profile",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Per-column null counts and percentages.",
+          "label": null,
+          "name": "missingness",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Pairwise correlation matrix (tidy).",
+          "label": null,
+          "name": "correlation",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "Per-column distribution histograms (faceted).",
+          "label": null,
+          "name": "distribution_plot",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "Correlation heatmap.",
+          "label": null,
+          "name": "correlation_heatmap",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "Co-missingness heatmap (which columns tend to go missing together).",
+          "label": null,
+          "name": "missingness_plot",
+          "required": true
+        }
+      ],
+      "type": "stats.auto_eda",
+      "version": 1
+    },
+    {
+      "category": "Statistics",
       "description": "Compute a pairwise correlation matrix.",
       "family": "stats",
       "label": "Correlation",
@@ -4471,6 +4574,104 @@
     },
     {
       "category": "Statistics",
+      "description": "Per-numeric-column quantiles and spread (min/p05/p25/p50/p75/p95/max/IQR).",
+      "family": "stats",
+      "label": "Distribution Summary",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Columns to summarize; empty/unset summarizes all numeric columns.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": false,
+          "type_token": "list[str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame whose numeric columns should be summarized.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Per-numeric-column distribution summary as a tidy DataFrame.",
+          "label": null,
+          "name": "summary",
+          "required": true
+        }
+      ],
+      "type": "stats.distribution_summary",
+      "version": 1
+    },
+    {
+      "category": "Statistics",
+      "description": "Per-column profile: dtype, missingness, cardinality, skew/kurtosis.",
+      "family": "stats",
+      "label": "Profile",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Columns to profile; empty/unset profiles all columns.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": false,
+          "type_token": "list[str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame whose columns should be profiled.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Per-column profile as a tidy DataFrame.",
+          "label": null,
+          "name": "summary",
+          "required": true
+        }
+      ],
+      "type": "stats.eda_profile",
+      "version": 1
+    },
+    {
+      "category": "Statistics",
       "description": "Fit a curated, allow-listed statistical model (regression/GLM/...).",
       "family": "stats",
       "label": "Fit Statistical Model",
@@ -4605,6 +4806,139 @@
         }
       ],
       "type": "stats.fit_model",
+      "version": 1
+    },
+    {
+      "category": "Statistics",
+      "description": "Split-apply-combine: group by column(s) and aggregate.",
+      "family": "stats",
+      "label": "Group By Aggregate",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Grouping column(s).",
+          "hints": null,
+          "label": "Group by",
+          "name": "by",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "mean",
+          "help": "Aggregation function.",
+          "hints": {
+            "choices": [
+              "mean",
+              "sum",
+              "min",
+              "max",
+              "median",
+              "count",
+              "std"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Aggregation",
+          "name": "agg",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to aggregate; unset aggregates all numeric non-group columns.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Value columns",
+          "name": "columns",
+          "required": false,
+          "type_token": "list[str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame to group and aggregate.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Aggregated result as a tidy DataFrame.",
+          "label": null,
+          "name": "summary",
+          "required": true
+        }
+      ],
+      "type": "stats.group_by_aggregate",
+      "version": 1
+    },
+    {
+      "category": "Statistics",
+      "description": "Per-column null counts and percentages.",
+      "family": "stats",
+      "label": "Missingness",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Columns to analyze; empty/unset analyzes all columns.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": false,
+          "type_token": "list[str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame whose columns should be analyzed for nulls.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Per-column null analysis as a tidy DataFrame.",
+          "label": null,
+          "name": "summary",
+          "required": true
+        }
+      ],
+      "type": "stats.missingness",
       "version": 1
     },
     {

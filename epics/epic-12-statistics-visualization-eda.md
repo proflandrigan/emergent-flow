@@ -87,14 +87,14 @@ that the Results tab renders), and raises the quality ceiling of the roadmap Epi
 - [ ] **New type tokens registered** (`StatsModel`, `PlotSpec`) with Epic 3 compatibility rules so a
   fitted model wires into a coefficient-plot / diagnostic node but not into a `DataFrame` input, and
   a `PlotSpec` is a terminal render output.
-- [ ] **First-class EDA layer:** richer describe/profile, missingness analysis, distribution &
+- [x] **First-class EDA layer:** richer describe/profile, missingness analysis, distribution &
   group-by summaries returning tidy frames, and a one-shot "auto-EDA" node returning tidy frames + a
   small set of `PlotSpec`s — reusing the existing `ef.reports` (ydata-profiling) node, not replacing
   it.
 - [ ] **License hygiene:** statsmodels/scipy/scikit-learn (BSD), plotly (MIT), and the optional
   pymc/bambi/arviz (Apache-2.0/MIT/Apache-2.0) — **no GPL** deps
   (`docs/licensing-and-dependencies.md`); no seaborn-forced/statsmodels-GPL-adjacent pulls.
-- [ ] **Acceptance demos (Story 12):** (a) a **hierarchical-modeling** flow — `load → EDA →
+- [x] **Acceptance demos (Story 12):** (a) a **hierarchical-modeling** flow — `load → EDA →
   VIF → mixed-effects model → coefficient/forest plot` — and (b) an **exploratory** flow —
   `load → describe → correlation heatmap → faceted scatter w/ OLS trendline` — both build on the
   canvas, compile to `.py`, and execute end-to-end.
@@ -335,15 +335,15 @@ that the Results tab renders), and raises the quality ceiling of the roadmap Epi
 > bespoke test per model or chart (the maintenance sink the archetypes exist to avoid). Mirror Epic 8
 > Story 9.
 
-- [ ] A `pytest.mark.parametrize` matrix that, per model/chart, builds a minimal graph and asserts
+- [x] A `pytest.mark.parametrize` matrix that, per model/chart, builds a minimal graph and asserts
   `execute(ir)` artifacts ≈ running `compile_to_code(ir)` on a fixed sample frame — keyed on the
   tidy summary frame / posterior summary / `PlotSpec` JSON (so opaque model internals and plotly
   object identity aren't compared). Compute the matrix dynamically from the registries (it grows as
   the allow-lists widen — the Epic 8 `keys_for_archetype()` pattern).
-- [ ] Fixed seeds + fixed sample datasets for determinism; mark every equivalence test
+- [x] Fixed seeds + fixed sample datasets for determinism; mark every equivalence test
   `@pytest.mark.equivalence` and gate it in `.github/workflows/ci.yml` alongside the existing
   equivalence gate. Bayesian equivalence runs under the separate `[bayes]` job with fixed draws/seed.
-- [ ] Golden tests on **generated code** for a representative model per archetype and chart per kind
+- [x] Golden tests on **generated code** for a representative model per archetype and chart per kind
   (readable, ruff-clean, importable) — not one golden per entry.
 
 ## Story 11 — First-class exploratory data analysis layer
@@ -351,38 +351,38 @@ that the Results tab renders), and raises the quality ceiling of the roadmap Epi
 > The everyday analyst loop: understand a dataset fast. Extend the `ef.stats`/`ef.reports` seams
 > rather than replacing the existing ydata-profiling report node.
 
-- [ ] EDA nodes returning tidy frames: **richer describe/profile** (numeric + categorical, skew/
+- [x] EDA nodes returning tidy frames: **richer describe/profile** (numeric + categorical, skew/
   kurtosis, cardinality), **missingness analysis** (per-column null counts/%, and the co-missingness
   data a missingness-heatmap needs), **distribution summary**, and **group-by aggregation** (split /
   agg / pivot returning a tidy frame).
-- [ ] An **auto-EDA** one-shot node returning a small bundle: tidy summary frames **+** a curated set
+- [x] An **auto-EDA** one-shot node returning a small bundle: tidy summary frames **+** a curated set
   of `PlotSpec`s (distributions, correlation heatmap, missingness) — composed from Story 8/9 nodes so
   it inherits their equivalence, not a parallel implementation.
-- [ ] Confirm the existing `ef.reports.generate_html_summary` (ydata-profiling) node still stands as
+- [x] Confirm the existing `ef.reports.generate_html_summary` (ydata-profiling) node still stands as
   the heavyweight full-profile option; document when to reach for auto-EDA (fast, canvas-native tidy
   frames + plots) vs. the full HTML profile.
-- [ ] Golden + equivalence via the Story 10 harness for the tidy-frame outputs.
+- [x] Golden + equivalence via the Story 10 harness for the tidy-frame outputs.
 
 ## Story 12 — Wire into the canvas + acceptance demos
 
 > The payoff: the generated catalog drives the palette and config panels with zero per-node UI, and
 > real analyst workflows run end-to-end. Mirror Epic 8 Story 10.
 
-- [ ] The canvas palette (repo Epic 5) renders every generated chart entry and the model/EDA nodes by
+- [x] The canvas palette (repo Epic 5) renders every generated chart entry and the model/EDA nodes by
   `family`/`category` grouping; config panels render the structured model spec (`target`/
   `fixed_effects`/`random_effects`/`groups`/`family`) and chart encoding from catalog data with
   **zero per-node UI code** (reuse/extend the Epic 8 Story 10 curated-per-field config renderer).
   Confirm `StatsModel`- and `PlotSpec`-bearing edges validate on the canvas (Epic 3 rules), and that
   a `PlotSpec` output renders in the Results tab (roadmap Epic 8 renderer).
-- [ ] Round-trip canvas → IR → `/compile` → downloadable `.py` and `/execute` with per-node status,
+- [x] Round-trip canvas → IR → `/compile` → downloadable `.py` and `/execute` with per-node status,
   including a `StatsModel`-bearing edge (model → coefficient plot) and a `PlotSpec`-terminal edge.
-- [ ] **Acceptance demo (hierarchical):** `load_sample → auto-EDA → VIF → MixedLM (random intercept +
+- [x] **Acceptance demo (hierarchical):** `load_sample → auto-EDA → VIF → MixedLM (random intercept +
   slope, grouped) → coefficient/forest plot` builds on the canvas, compiles, and executes to a fixed-
   effects table + variance components + a rendered forest plot.
-- [ ] **Acceptance demo (exploratory):** `load_sample → describe → correlation heatmap → faceted
+- [x] **Acceptance demo (exploratory):** `load_sample → describe → correlation heatmap → faceted
   scatter with OLS trendline` builds on the canvas, compiles, and executes to tidy summaries + two
   rendered `PlotSpec`s.
-- [ ] Document both under `docs/acceptance-demo.md` as the "statistics, viz & EDA the app can do
+- [x] Document both under `docs/acceptance-demo.md` as the "statistics, viz & EDA the app can do
   today" reference, and add an example graph pair under `examples/stats_viz_acceptance_demo/` (the
   Epic 8 `examples/sklearn_acceptance_demo/` precedent).
 

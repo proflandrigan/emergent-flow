@@ -103,6 +103,15 @@ def _canon(obj):
         return {str(k): _canon(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
         return [_canon(v) for v in obj]
+    # Last resort: a repr -- but only when the class defines its own (stable, meaningful) one.
+    # An object relying on the default object.__repr__ embeds a per-process memory address
+    # (e.g. statsmodels' *ResultsWrapper carried in FittedStatsModel.results, an Any-typed live
+    # model object the result-payload contract explicitly degrades to {"kind": "unsupported"}),
+    # which differs between the in-process execute side and the compiled-code subprocess even for
+    # a bit-identical fit. Degrade those to a stable, address-free sentinel mirroring that same
+    # contract -- so opaque live-model internals are never compared, exactly as intended.
+    if type(obj).__repr__ is object.__repr__:
+        return {"__unsupported__": type(obj).__name__}
     return repr(obj)
 """
 
