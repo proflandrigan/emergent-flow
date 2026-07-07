@@ -19,8 +19,29 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.stats.stattools import durbin_watson, jarque_bera
 
 from emergentflow.stats.diagnostics import DiagnosticSpec, register_diagnostic
+from emergentflow.stats.errors import InvalidModelSpecError
 from emergentflow.stats.models import FittedStatsModel
 from emergentflow.stats.shapes import DIAGNOSTIC_COLUMNS
+
+
+def _model_resid(model: FittedStatsModel) -> Any:
+    """Residuals for a fitted model, tolerating GLM-family results.
+
+    OLS/WLS/GLS/MixedLM results expose ``.resid`` directly; GLM/GAM results (``GLMResults``/
+    ``GLMGamResults``) don't define ``.resid`` at all and instead expose ``.resid_response``.
+    Bayesian results (an ArviZ ``InferenceData``) expose neither, so this raises a typed error
+    rather than letting an ``AttributeError`` leak from deep inside statsmodels.
+    """
+    results = model.results
+    resid = getattr(results, "resid", None)
+    if resid is None:
+        resid = getattr(results, "resid_response", None)
+    if resid is None:
+        raise InvalidModelSpecError(
+            f"model {model.model!r} does not expose residuals; this diagnostic requires a "
+            "fitted OLS/WLS/GLS/GLM/MixedLM/GAM model."
+        )
+    return resid
 
 
 def _vif(
@@ -61,7 +82,7 @@ def _normality(
     df: pd.DataFrame | None, model: FittedStatsModel | None, spec: dict[str, Any]
 ) -> pd.DataFrame:
     assert model is not None  # enforced by the shared gate (needs_model=True)
-    resid = model.results.resid
+    resid = _model_resid(model)
     stat, pvalue, skew, kurtosis = jarque_bera(resid)
     row = {
         "diagnostic": "Jarque-Bera",
@@ -87,7 +108,7 @@ def _heteroscedasticity(
     df: pd.DataFrame | None, model: FittedStatsModel | None, spec: dict[str, Any]
 ) -> pd.DataFrame:
     assert model is not None  # enforced by the shared gate (needs_model=True)
-    resid = model.results.resid
+    resid = _model_resid(model)
     exog = model.results.model.exog
     lm_stat, lm_pvalue, f_stat, f_pvalue = het_breuschpagan(resid, exog)
     row = {
@@ -114,7 +135,7 @@ def _autocorrelation(
     df: pd.DataFrame | None, model: FittedStatsModel | None, spec: dict[str, Any]
 ) -> pd.DataFrame:
     assert model is not None  # enforced by the shared gate (needs_model=True)
-    resid = model.results.resid
+    resid = _model_resid(model)
     dw = durbin_watson(resid)
     row = {
         "diagnostic": "Durbin-Watson",

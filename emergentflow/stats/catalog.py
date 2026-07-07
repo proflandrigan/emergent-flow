@@ -205,7 +205,7 @@ def _fit_glm(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
     link_cls = _GLM_LINKS[family_key][link_key]
     glm_kwargs: dict[str, Any] = {"family": family_cls(link=link_cls())}
     if "weights" in spec and spec["weights"] is not None:
-        glm_kwargs["freq_weights"] = df[spec["weights"]]
+        glm_kwargs["var_weights"] = df[spec["weights"]]
     results = smf.glm(formula, data=df, **glm_kwargs).fit()
     fixed = spec.get("fixed_effects") or []
     term_map = {_patsy_term(col): col for col in fixed}

@@ -30,7 +30,7 @@ from emergentflow.stats.registry import ModelSpec, get_model_spec
 #: Structured-spec fields whose value is a single column name (validated against df.columns).
 _SCALAR_COLUMN_FIELDS = ("target", "groups", "weights")
 #: Structured-spec fields whose value is a list of column names.
-_LIST_COLUMN_FIELDS = ("fixed_effects", "random_effects")
+_LIST_COLUMN_FIELDS = ("fixed_effects", "random_effects", "linear_terms")
 
 
 def _prepare_model_spec(
@@ -103,8 +103,8 @@ def _prepare_model_spec(
 
     normalized = dict(spec)
     try:
-        json.dumps(normalized)
-    except TypeError as exc:
+        json.dumps(normalized, allow_nan=False)
+    except (TypeError, ValueError) as exc:
         raise InvalidModelSpecError(
             f"spec for model {model!r} must be JSON-native (got a non-serializable value: {exc})."
         ) from exc
@@ -167,8 +167,8 @@ def _prepare_diagnostic_spec(
 
     normalized = dict(spec)
     try:
-        json.dumps(normalized)
-    except TypeError as exc:
+        json.dumps(normalized, allow_nan=False)
+    except (TypeError, ValueError) as exc:
         raise InvalidModelSpecError(
             f"spec for diagnostic {diagnostic!r} must be JSON-native "
             f"(got a non-serializable value: {exc})."
