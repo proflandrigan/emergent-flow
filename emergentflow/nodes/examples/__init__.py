@@ -53,6 +53,13 @@ from .train_regressor import TrainRegressor
 from .train_test_split import TrainTestSplit
 from .transform import Transform
 from .ttest import TTest
+from .viz_plot import VizPlot
+from .viz_plot_acf import VizPlotAcf
+from .viz_plot_coefficients import VizPlotCoefficients
+from .viz_plot_confusion_matrix import VizPlotConfusionMatrix
+from .viz_plot_correlation_heatmap import VizPlotCorrelationHeatmap
+from .viz_plot_qq import VizPlotQQ
+from .viz_plot_residuals import VizPlotResiduals
 
 __all__ = [
     "Anova",
@@ -94,4 +101,11 @@ __all__ = [
     "TrainTestSplit",
     "Transform",
     "TTest",
+    "VizPlot",
+    "VizPlotAcf",
+    "VizPlotCoefficients",
+    "VizPlotConfusionMatrix",
+    "VizPlotCorrelationHeatmap",
+    "VizPlotQQ",
+    "VizPlotResiduals",
 ]

@@ -21,25 +21,32 @@ from emergentflow.ml.generator import generate_estimator_catalog_entries
 from emergentflow.ml.registry import get_estimator_spec, known_estimator_keys
 from emergentflow.nodes.registry import NodeRegistry
 from emergentflow.nodes.registry import registry as default_registry
+from emergentflow.viz.generator import generate_chart_catalog_entries
+from emergentflow.viz.registry import get_chart_spec, known_chart_keys
 
 #: Version of the catalog artifact *shape*. Bump on a breaking change to the artifact
 #: structure (new/removed/renamed top-level or per-node fields). Distinct from
 #: ``Graph.schema_version`` (IR wire format) and each node's contract ``version``.
-CATALOG_VERSION = 2
+CATALOG_VERSION = 3
 
 
 @public_op(name="ef.export_catalog")
 def export_catalog(registry: NodeRegistry = default_registry) -> dict[str, Any]:
     """Build the versioned node-catalog artifact from *registry*.
 
-    Pure function of *registry* and the live estimator registry: no I/O, no global mutation.
-    Nodes are emitted in ``type``-sorted order (``registry.specs()`` already sorts); the
-    ``"estimators"`` list (Epic 8 prerequisite) is generated from the curated allow-list via
-    :func:`~emergentflow.ml.generator.generate_estimator_catalog_entries`, sorted by ``key``.
+    Pure function of *registry*, the live estimator registry, and the live chart registry:
+    no I/O, no global mutation. Nodes are emitted in ``type``-sorted order
+    (``registry.specs()`` already sorts); the ``"estimators"`` list (Epic 8 prerequisite) is
+    generated from the curated estimator allow-list via
+    :func:`~emergentflow.ml.generator.generate_estimator_catalog_entries`, sorted by ``key``;
+    the ``"charts"`` list (Epic 12, Story 8) is generated from the curated viz chart allow-list
+    via :func:`~emergentflow.viz.generator.generate_chart_catalog_entries`, sorted by ``key``.
     """
     estimator_specs = [get_estimator_spec(key) for key in known_estimator_keys()]
+    chart_specs = [get_chart_spec(key) for key in known_chart_keys()]
     return {
         "catalog_version": CATALOG_VERSION,
         "nodes": [spec.model_dump(mode="json") for spec in registry.specs()],
         "estimators": generate_estimator_catalog_entries(estimator_specs),
+        "charts": generate_chart_catalog_entries(chart_specs),
     }
