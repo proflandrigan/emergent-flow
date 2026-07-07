@@ -12,10 +12,10 @@ by ``codegen`` calls the same wrapper via the ``ef.`` alias, so the two paths ar
 construction (ADR 0002).
 
 Structured spec fields common across model families (``target``/``fixed_effects``/
-``random_effects``/``groups``/``family``/``link``/``weights``) are lifted out as explicit,
-canvas-configurable params (Epic 12 Story 1 Decision 4: structured params, not formula
-strings). ``spec_extra`` is a catch-all for family-specific fields not covered above (e.g. a
-future GAM's ``smooth_terms`` or a Bayesian model's ``seed``/``draws``) so this node never needs
+``random_effects``/``linear_terms``/``groups``/``family``/``link``/``weights``) are lifted out
+as explicit, canvas-configurable params (Epic 12 Story 1 Decision 4: structured params, not
+formula strings). ``spec_extra`` is a catch-all for family-specific fields not covered above
+(e.g. GAM's ``smooth_terms`` or a Bayesian model's ``seed``/``draws``) so this node never needs
 editing again as new fit-model families are curated.
 """
 
@@ -99,6 +99,14 @@ class FitModel(NodeDefinition):
             help="Random-effect columns (mixed-effects models only).",
         ),
         ParamSpec(
+            name="linear_terms",
+            type_token="list[str]",
+            default=None,
+            label="Linear terms",
+            help="Unpenalized linear predictor columns (GAM only; smooth terms are configured "
+            "via 'Additional spec fields').",
+        ),
+        ParamSpec(
             name="groups",
             type_token="str",
             default=None,
@@ -142,6 +150,7 @@ class FitModel(NodeDefinition):
             "target",
             "fixed_effects",
             "random_effects",
+            "linear_terms",
             "groups",
             "family",
             "link",

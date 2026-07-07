@@ -4291,6 +4291,15 @@
         },
         {
           "default": null,
+          "help": "Unpenalized linear predictor columns (GAM only; smooth terms are configured via 'Additional spec fields').",
+          "hints": null,
+          "label": "Linear terms",
+          "name": "linear_terms",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
           "help": "Grouping-factor column (mixed-effects models only).",
           "hints": null,
           "label": "Grouping factor",

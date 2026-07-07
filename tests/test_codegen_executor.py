@@ -10,6 +10,7 @@ import pytest
 
 import emergentflow as ef
 from emergentflow.api import is_inspectable
+from emergentflow.codegen.compiler import compile_to_code
 from emergentflow.codegen.errors import CodegenError, GraphValidationError
 from emergentflow.codegen.executor import execute
 from emergentflow.ir import Direction, Edge, Graph, Node, Paradigm, Port, PortRef
@@ -54,6 +55,28 @@ class _ExecDouble(NodeDefinition):
         return {"out": inputs["in_"] * 2}
 
 
+@register
+class _ExecOptionalAdd(NodeDefinition):
+    """Test fixture: 1 required in, 1 optional in, 1 out. out = in_ + (bonus or 0)."""
+
+    type = "test.exec_optional_add"
+    family = "test"
+    label = "OptionalAdd"
+    ports = [
+        PortSpec(name="in_", direction=Direction.IN, data_type="int"),
+        PortSpec(name="bonus", direction=Direction.IN, data_type="int", required=False),
+        PortSpec(name="out", direction=Direction.OUT, data_type="int"),
+    ]
+
+    def codegen(self, node: Node, ctx: Any) -> CodeFragment:
+        return CodeFragment(
+            body=f"{ctx.out_var('out')} = {ctx.in_var('in_')} + ({ctx.in_var('bonus')} or 0)"
+        )
+
+    def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
+        return {"out": inputs["in_"] + (inputs.get("bonus") or 0)}
+
+
 def _out_port(node: Node, name: str) -> Port:
     return next(p for p in node.ports if p.direction == Direction.OUT and p.name == name)
 
@@ -83,6 +106,19 @@ def _double_node(node_id: str) -> Node:
         label=_ExecDouble.label,
         ports=[
             Port(id=f"{node_id}-in", name="in_", direction=Direction.IN, data_type="int"),
+            Port(id=f"{node_id}-out", name="out", direction=Direction.OUT, data_type="int"),
+        ],
+    )
+
+
+def _optional_add_node(node_id: str) -> Node:
+    return Node(
+        id=node_id,
+        type=_ExecOptionalAdd.type,
+        label=_ExecOptionalAdd.label,
+        ports=[
+            Port(id=f"{node_id}-in", name="in_", direction=Direction.IN, data_type="int"),
+            Port(id=f"{node_id}-bonus", name="bonus", direction=Direction.IN, data_type="int"),
             Port(id=f"{node_id}-out", name="out", direction=Direction.OUT, data_type="int"),
         ],
     )
@@ -153,6 +189,28 @@ def test_dangling_required_in_port_is_error() -> None:
 
     assert "required_input_unconnected" in str(exc_info.value)
     assert "in_" in str(exc_info.value)
+
+
+def test_unconnected_optional_in_port_is_not_an_error() -> None:
+    """An unconnected *optional* (`required=False`) IN port is not rejected.
+
+    `execute` receives `None` for the dangling optional port; `compile_to_code`
+    binds it to the `None` literal -- both paths agree (ADR 0002 equivalence).
+    """
+    src = _source_node()
+    add = _optional_add_node("add")
+    edge = _edge(src, "out", add, "in_")
+    graph = _graph([src, add], [edge])
+
+    results = execute(graph)
+    assert results["add"] == {"out": 1}
+
+    code = compile_to_code(graph)
+    assert "None or 0" in code
+
+    namespace: dict[str, Any] = {}
+    exec(compile(code, "<generated>", "exec"), namespace)
+    assert namespace["main"]()["optionaladd_out"] == 1
 
 
 def test_non_functional_graph_rejected() -> None:

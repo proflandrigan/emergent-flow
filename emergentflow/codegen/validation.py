@@ -98,6 +98,25 @@ class Diagnostics(BaseModel):
         return not self.errors
 
 
+def required_in_port_names(node_type: str, node_registry: NodeRegistry) -> set[str]:
+    """Names of *node_type*'s required IN ports, per its registered `PortSpec`s.
+
+    Returns an empty set when *node_type* isn't registered -- its required-ness
+    is unknown, so no port of an unregistered type is treated as required here.
+    Shared by `_collect_structural_diagnostics` and the codegen/executor
+    dangling-input guards, so all three agree on which unconnected IN ports are
+    actually errors (ADR 0002 extends to rejection).
+    """
+    definition_cls = node_registry.try_get(node_type)
+    if definition_cls is None:
+        return set()
+    return {
+        spec.name
+        for spec in definition_cls.ports
+        if spec.direction == Direction.IN and spec.required
+    }
+
+
 def _collect_structural_diagnostics(
     graph: Graph,
     node_registry: NodeRegistry,
@@ -107,9 +126,9 @@ def _collect_structural_diagnostics(
 
     Pure: counts inbound edges per IN port directly from `graph.edges` (so it
     never raises the way the codegen wiring map does), and reads each node
-    definition's `PortSpec.required` from the registry. A node whose type is not
-    registered contributes no required-input check (its required-ness is
-    unknown).
+    definition's `PortSpec.required` from the registry via
+    `required_in_port_names`. A node whose type is not registered contributes no
+    required-input check (its required-ness is unknown).
 
     Deterministic: nodes are visited in ascending node-id order (ports are
     already in declared list order), mirroring `wiring.py`'s tie-break, so the
@@ -125,13 +144,7 @@ def _collect_structural_diagnostics(
         inbound_count[key] = inbound_count.get(key, 0) + 1
 
     for node in sorted(graph.nodes.values(), key=lambda n: n.id):
-        # Names of this node type's required IN ports, when the type is registered.
-        definition_cls = node_registry.try_get(node.type)
-        required_in_names: set[str] = set()
-        if definition_cls is not None:
-            for spec in definition_cls.ports:
-                if spec.direction == Direction.IN and spec.required:
-                    required_in_names.add(spec.name)
+        required_in_names = required_in_port_names(node.type, node_registry)
 
         for port in node.ports:
             if port.direction != Direction.IN:

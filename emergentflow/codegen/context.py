@@ -79,8 +79,13 @@ def build_codegen_context(node: Node, name_map: NameMap, wiring_map: WiringMap) 
     up the source OUT port's variable in ``name_map``:
 
       * exactly one source  -> that source's variable name;
-      * no source (dangling) -> fall back to the IN port's own name (mirrors the
-        preview fallback; whole-graph dangling policy is Story 5);
+      * no source (dangling) -> bind to the ``"None"`` literal. The whole-graph
+        dangling-input guard (``compiler.py``) already rejects an unconnected
+        *required* IN port before this runs (Story 5/6), so a port reaching
+        this branch is genuinely optional (``PortSpec.required=False``) --
+        splicing the ``None`` literal into the emitted call is the correct,
+        equivalence-preserving binding (mirrors ``execute``'s ``inputs[name] =
+        None`` for the same case), not a placeholder for a missing wire;
       * more than one source (fan-in, Cardinality.MANY) -> raise ValueError
         naming the port. None of the reference nodes use MANY inputs;
         supporting multi-source fan-in is deferred.
@@ -94,7 +99,7 @@ def build_codegen_context(node: Node, name_map: NameMap, wiring_map: WiringMap) 
         elif port.direction == Direction.IN:
             sources = wiring_map.upstream(node.id, port.id)
             if len(sources) == 0:
-                in_vars[port.name] = port.name
+                in_vars[port.name] = "None"
             elif len(sources) == 1:
                 source = sources[0]
                 in_vars[port.name] = name_map.var_for(source.node_id, source.port_id)

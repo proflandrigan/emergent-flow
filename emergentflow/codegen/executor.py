@@ -34,10 +34,11 @@ from emergentflow.api import public_op
 from emergentflow.codegen.declarative import _prepare_declarative
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
 from emergentflow.codegen.traversal import topological_sort
-from emergentflow.codegen.validation import enforce_validation_gate
+from emergentflow.codegen.validation import enforce_validation_gate, required_in_port_names
 from emergentflow.codegen.wiring import build_wiring_map
 from emergentflow.ir import Direction, Graph, Node, Paradigm
 from emergentflow.nodes import get as get_node_definition
+from emergentflow.nodes import registry as default_node_registry
 
 
 def _describe(node: Node) -> str:
@@ -70,8 +71,10 @@ def execute(graph: Graph, *, client: Any | None = None) -> dict[str, dict[str, A
                       target — see `_execute_declarative`). For
                       `Paradigm.FUNCTIONAL` graphs, if the graph or any node
                       has a non-FUNCTIONAL paradigm.
-        UnboundInputError: If any input port in the graph is not connected to
-                           an upstream output port.
+        UnboundInputError: If a *required* input port (per its `PortSpec`) is
+                           not connected to an upstream output port. An
+                           optional (`required=False`) IN port left
+                           unconnected instead receives `None`.
         CycleError: If the graph contains a cycle (propagated from
                     `topological_sort`).
         GraphValidationError: If the graph fails the shared validation gate —
@@ -106,12 +109,16 @@ def execute(graph: Graph, *, client: Any | None = None) -> dict[str, dict[str, A
     # Step 2: Topological order
     topo_order_ids = topological_sort(graph)
 
-    # Step 3: Dangling-input guard
+    # Step 3: Dangling-input guard (required IN ports only -- optional IN ports
+    # may legitimately be unconnected; Step 4 below passes `None` for those).
     wiring_map = build_wiring_map(graph)
     for node_id in topo_order_ids:
         node = graph.nodes[node_id]
+        required_in_names = required_in_port_names(node.type, default_node_registry)
         for port in node.ports:
             if port.direction != Direction.IN:
+                continue
+            if port.name not in required_in_names:
                 continue
             if not wiring_map.upstream(node.id, port.id):
                 raise UnboundInputError(
@@ -135,8 +142,14 @@ def execute(graph: Graph, *, client: Any | None = None) -> dict[str, dict[str, A
                     "sources; multi-source fan-in is not yet supported by codegen "
                     "context."
                 )
-            # Zero sources cannot occur here: the dangling-input guard above
-            # already raised UnboundInputError for any unbound IN port.
+            if not sources:
+                # The dangling-input guard above only rejects unconnected
+                # *required* ports, so a zero-source port reaching here is a
+                # genuinely optional one (PortSpec.required=False) -- pass
+                # `None`, mirroring `build_codegen_context`'s `None`-literal
+                # binding for the same case (ADR 0002 equivalence).
+                inputs[port.name] = None
+                continue
             src = sources[0]
             src_node = graph.nodes[src.node_id]
             src_port_name = next(p.name for p in src_node.ports if p.id == src.port_id)

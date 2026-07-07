@@ -102,7 +102,10 @@ def test_build_codegen_context_resolves_upstream_and_own_out_vars() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_build_codegen_context_dangling_in_port_falls_back_to_port_name() -> None:
+def test_build_codegen_context_dangling_in_port_binds_to_none_literal() -> None:
+    """An unconnected IN port binds to the `None` literal (compiler.py's dangling-input
+    guard already rejects this for *required* ports, so build_codegen_context only ever
+    sees this case for a genuinely optional, unconnected port)."""
     anova_node = Anova().instantiate(group_col="g", value_col="v")
     graph = _graph([anova_node], [])
     name_map = build_name_map(graph)
@@ -110,7 +113,7 @@ def test_build_codegen_context_dangling_in_port_falls_back_to_port_name() -> Non
 
     ctx = build_codegen_context(anova_node, name_map, wiring_map)
 
-    assert ctx.in_var("frame") == "frame"
+    assert ctx.in_var("frame") == "None"
 
 
 # ---------------------------------------------------------------------------

@@ -47,7 +47,8 @@ def _model_resid(model: FittedStatsModel) -> Any:
 def _vif(
     df: pd.DataFrame | None, model: FittedStatsModel | None, spec: dict[str, Any]
 ) -> pd.DataFrame:
-    assert df is not None  # enforced by the shared gate (needs_frame=True)
+    if df is None:
+        raise InvalidModelSpecError("diagnostic 'vif' requires a DataFrame input.")
     columns = spec.get("columns") or list(df.select_dtypes(include="number").columns)
     threshold = float(spec.get("threshold", 5.0))
     exog = sm.add_constant(df[columns]).to_numpy()
@@ -81,7 +82,8 @@ register_diagnostic(
 def _normality(
     df: pd.DataFrame | None, model: FittedStatsModel | None, spec: dict[str, Any]
 ) -> pd.DataFrame:
-    assert model is not None  # enforced by the shared gate (needs_model=True)
+    if model is None:
+        raise InvalidModelSpecError("diagnostic 'normality' requires a fitted StatsModel input.")
     resid = _model_resid(model)
     stat, pvalue, skew, kurtosis = jarque_bera(resid)
     row = {
@@ -107,7 +109,10 @@ register_diagnostic(
 def _heteroscedasticity(
     df: pd.DataFrame | None, model: FittedStatsModel | None, spec: dict[str, Any]
 ) -> pd.DataFrame:
-    assert model is not None  # enforced by the shared gate (needs_model=True)
+    if model is None:
+        raise InvalidModelSpecError(
+            "diagnostic 'heteroscedasticity' requires a fitted StatsModel input."
+        )
     resid = _model_resid(model)
     exog = model.results.model.exog
     lm_stat, lm_pvalue, f_stat, f_pvalue = het_breuschpagan(resid, exog)
@@ -134,7 +139,10 @@ register_diagnostic(
 def _autocorrelation(
     df: pd.DataFrame | None, model: FittedStatsModel | None, spec: dict[str, Any]
 ) -> pd.DataFrame:
-    assert model is not None  # enforced by the shared gate (needs_model=True)
+    if model is None:
+        raise InvalidModelSpecError(
+            "diagnostic 'autocorrelation' requires a fitted StatsModel input."
+        )
     resid = _model_resid(model)
     dw = durbin_watson(resid)
     row = {
