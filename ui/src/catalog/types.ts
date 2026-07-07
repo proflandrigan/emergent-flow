@@ -68,8 +68,20 @@ export interface CatalogEstimator {
   params: CatalogEstimatorParam[];
 }
 
+export interface CatalogChart {
+  key: string;
+  node_type: string;
+  label: string;
+  category: string;
+  description: string;
+  px_function: string;
+  encodings: string[];
+  options: string[];
+}
+
 export interface Catalog {
   catalog_version: number;
   nodes: CatalogNode[];
   estimators: CatalogEstimator[];
+  charts: CatalogChart[];
 }

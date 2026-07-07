@@ -129,7 +129,8 @@ def get_catalog() -> dict[str, Any]:
     ``GET /catalog``, the committed ``ui/src/generated/catalog.json``, and the SDK's
     ``ef.export_catalog()`` all serve byte-identical data -- one source of truth, no
     two-tier palette. Shape: ``{"catalog_version": <int>, "nodes": [<NodeSpec as JSON>, ...],
-    "estimators": [<estimator catalog entry, Epic 8>, ...]}``, both lists sorted by their
+    "estimators": [<estimator catalog entry, Epic 8>, ...],
+    "charts": [<chart catalog entry, Epic 12>, ...]}``, all three lists sorted by their
     ``type``/``key``. The palette (Epic 5 Story 3) and the schema-driven config panels
     (Story 4) render entirely from this -- no Python in the client.
     """
