@@ -180,6 +180,15 @@ def test_group_by_aggregate_one_row_per_group():
     assert set(result["b"]) == set(df["b"].unique())
 
 
+def test_group_by_aggregate_dict_agg_honors_columns_filter():
+    # Regression: with a dict ``agg``, the ``columns`` filter must still restrict which value
+    # columns are aggregated (it previously only applied on the str-agg path).
+    df = _make_df()
+    result = group_by_aggregate(df, by="b", agg={"a": "mean", "c": "sum"}, columns=["a"])
+    assert "a" in result.columns
+    assert "c" not in result.columns
+
+
 def test_distribution_summary_skips_non_numeric_column():
     df = _make_df()
     result = distribution_summary(df)

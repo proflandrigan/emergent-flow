@@ -220,6 +220,8 @@ def group_by_aggregate(
             value_cols = [c for c in df.columns if c not in by_cols and is_numeric_dtype(df[c])]
         target = df[by_cols + value_cols]
     else:
+        if columns is not None:
+            agg = {k: v for k, v in agg.items() if k in columns}
         target = df[by_cols + list(agg.keys())]
     grouped = target.groupby(by_cols).agg(agg)
 
