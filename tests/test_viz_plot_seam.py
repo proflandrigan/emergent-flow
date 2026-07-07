@@ -2,7 +2,9 @@
 
 Covers the single viz seam every chart node routes through: typed errors on bad chart/encoding,
 determinism, no input-frame mutation, and the JSON-native ``PlotSpec`` contract (no live plotly
-Figure ever escapes). The seed chart is ``"scatter"``; the fuller catalog is Story 8.
+Figure ever escapes), using ``"scatter"`` as the representative chart. The full curated chart
+catalog is registered in ``emergentflow.viz.catalog`` (Story 8); its own coverage lives in
+``tests/test_viz_catalog.py``.
 """
 
 from __future__ import annotations
@@ -26,8 +28,8 @@ def test_plot_is_registered_public_op():
     assert "ef.viz.plot" in PUBLIC_OPS
 
 
-def test_scatter_is_seed_chart():
-    assert known_chart_keys() == ["scatter"]
+def test_scatter_is_a_known_chart():
+    assert "scatter" in known_chart_keys()
 
 
 def test_plot_returns_json_native_inspectable_plotspec():

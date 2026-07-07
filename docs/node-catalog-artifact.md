@@ -75,6 +75,8 @@ registered `NodeDefinition` to a visible palette entry.
 | :---------------- | :------- | :------ |
 | `catalog_version` | `int`    | The artifact's own version (see Versioning below). |
 | `nodes`           | `list`   | One entry per registered `NodeDefinition`, sorted by `type` (see Ordering below). |
+| `estimators`      | `list`   | The generated scikit-learn estimator allow-list, sorted by `key` (Epic 8 Story 7, below). |
+| `charts`          | `list`   | The generated chart allow-list, sorted by `key` (Epic 12 Story 8, below). |
 
 ### Per-node fields
 
@@ -220,3 +222,46 @@ automatic:
 4. Review the diff (new/changed catalog entries, updated snapshots) like any other change —
    this is the reviewed-change discipline ADR 0016 commits to; there is no automatic discovery
    path from an installed sklearn version into the catalog.
+
+## Generating & curating the chart catalog (Epic 12, Story 8)
+
+The `"charts"` top-level key (see the artifact shape above) mirrors the `"estimators"` key's
+"breadth is data, not code" strategy, applied to the `viz.plot` archetype node instead of an
+`ef.*` estimator wrapper:
+
+1. `emergentflow/viz/registry.py` defines `ChartSpec` — one curated allow-list entry (chart
+   key, `plotly.express` function name, accepted `encodings`/`options`, a curated one-line
+   `description`).
+2. `emergentflow/viz/catalog.py` registers every curated chart via `register_chart(ChartSpec(...))`
+   calls, importing this module for its registration side effect (mirroring
+   `emergentflow.ml.catalog` and `emergentflow.types.catalog`).
+3. `emergentflow/viz/generator.py`'s pure `generate_chart_catalog_entries()` maps the live chart
+   registry into JSON-native catalog-entry dicts (`key`, `node_type`, `label`, `category`,
+   `description`, `px_function`, `encodings`, `options`), sorted by `key`.
+4. `ef.export_catalog()` (`emergentflow/nodes/catalog.py`) calls the generator over
+   `known_chart_keys()` and merges its output into the `"charts"` key of the artifact this
+   document specifies.
+
+Every `charts` entry's `node_type` is `"viz.plot"` — unlike the estimator catalog (one entry per
+estimator, each backing its own generic `ml.*` node), the chart catalog widens a single archetype
+node's `chart` param choice list rather than minting a node per chart kind. The six Story 9
+model-aware plots (`viz.plot_coefficients`, `viz.plot_residuals`, `viz.plot_qq`, `viz.plot_acf`,
+`viz.plot_correlation_heatmap`, `viz.plot_confusion_matrix`) are each their own bespoke node, so
+they appear in `nodes`, not `charts`.
+
+**Curated, not enumerated.** The generated set is always exactly the curated allow-list
+(`known_chart_keys()`), never the full set of `plotly.express` chart functions — this keeps the
+catalog deterministic and independent of whichever plotly version happens to be installed,
+mirroring ADR 0016's estimator curation policy. `tests/test_viz_generator.py` and
+`tests/test_catalog.py::test_charts_present_and_sorted` enforce the shape; `test_catalog_golden`
+enforces the golden snapshot.
+
+**How to add a chart.** Widening the chart allow-list is a reviewed data change, not automatic:
+
+1. Add a `register_chart(ChartSpec(...))` call to `emergentflow/viz/catalog.py`, including a
+   curated `description` and the chart's accepted `encodings`/`options`.
+2. Regenerate the golden snapshots:
+   `uv run pytest tests/test_viz_generator.py tests/test_catalog.py --snapshot-update`.
+3. Regenerate the committed UI contracts artifact so the bundled canvas stays in sync:
+   `uv run python scripts/export_ui_contracts.py`.
+4. Review the diff like any other reviewed catalog change.

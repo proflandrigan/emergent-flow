@@ -1,5 +1,245 @@
 {
-  "catalog_version": 2,
+  "catalog_version": 3,
+  "charts": [
+    {
+      "category": "Visualization",
+      "description": "A bar chart (plotly.express.bar), grouped/stacked via 'barmode'.",
+      "encodings": [
+        "color",
+        "facet_col",
+        "facet_row",
+        "hover_data",
+        "x",
+        "y"
+      ],
+      "key": "bar",
+      "label": "Bar",
+      "node_type": "viz.plot",
+      "options": [
+        "barmode",
+        "log_x",
+        "log_y"
+      ],
+      "px_function": "bar"
+    },
+    {
+      "category": "Visualization",
+      "description": "A box plot (plotly.express.box) summarizing a distribution per group.",
+      "encodings": [
+        "color",
+        "facet_col",
+        "facet_row",
+        "hover_data",
+        "x",
+        "y"
+      ],
+      "key": "box",
+      "label": "Box",
+      "node_type": "viz.plot",
+      "options": [
+        "log_x",
+        "log_y",
+        "notched",
+        "points"
+      ],
+      "px_function": "box"
+    },
+    {
+      "category": "Visualization",
+      "description": "A 2-D density contour plot (plotly.express.density_contour).",
+      "encodings": [
+        "color",
+        "facet_col",
+        "facet_row",
+        "x",
+        "y",
+        "z"
+      ],
+      "key": "density_contour",
+      "label": "Density Contour",
+      "node_type": "viz.plot",
+      "options": [
+        "histfunc",
+        "log_x",
+        "log_y",
+        "nbinsx",
+        "nbinsy"
+      ],
+      "px_function": "density_contour"
+    },
+    {
+      "category": "Visualization",
+      "description": "A 2-D binned density heatmap (plotly.express.density_heatmap).",
+      "encodings": [
+        "facet_col",
+        "facet_row",
+        "x",
+        "y",
+        "z"
+      ],
+      "key": "density_heatmap",
+      "label": "Density Heatmap",
+      "node_type": "viz.plot",
+      "options": [
+        "histfunc",
+        "log_x",
+        "log_y",
+        "nbinsx",
+        "nbinsy"
+      ],
+      "px_function": "density_heatmap"
+    },
+    {
+      "category": "Visualization",
+      "description": "An empirical cumulative distribution plot (plotly.express.ecdf).",
+      "encodings": [
+        "color",
+        "facet_col",
+        "facet_row",
+        "hover_data",
+        "x"
+      ],
+      "key": "ecdf",
+      "label": "ECDF",
+      "node_type": "viz.plot",
+      "options": [
+        "ecdfnorm",
+        "log_x"
+      ],
+      "px_function": "ecdf"
+    },
+    {
+      "category": "Visualization",
+      "description": "A histogram (plotly.express.histogram) of a numeric or categorical column.",
+      "encodings": [
+        "color",
+        "facet_col",
+        "facet_row",
+        "hover_data",
+        "x",
+        "y"
+      ],
+      "key": "histogram",
+      "label": "Histogram",
+      "node_type": "viz.plot",
+      "options": [
+        "barmode",
+        "histnorm",
+        "log_x",
+        "log_y",
+        "marginal",
+        "nbins"
+      ],
+      "px_function": "histogram"
+    },
+    {
+      "category": "Visualization",
+      "description": "A line chart (plotly.express.line) over ordered/continuous x.",
+      "encodings": [
+        "color",
+        "facet_col",
+        "facet_row",
+        "hover_data",
+        "line_dash",
+        "x",
+        "y"
+      ],
+      "key": "line",
+      "label": "Line",
+      "node_type": "viz.plot",
+      "options": [
+        "line_shape",
+        "log_x",
+        "log_y"
+      ],
+      "px_function": "line"
+    },
+    {
+      "category": "Visualization",
+      "description": "A 2-D scatter plot (plotly.express.scatter), optional OLS/lowess trendline.",
+      "encodings": [
+        "color",
+        "facet_col",
+        "facet_row",
+        "hover_data",
+        "size",
+        "symbol",
+        "x",
+        "y"
+      ],
+      "key": "scatter",
+      "label": "Scatter",
+      "node_type": "viz.plot",
+      "options": [
+        "log_x",
+        "log_y",
+        "marginal_x",
+        "marginal_y",
+        "opacity",
+        "trendline"
+      ],
+      "px_function": "scatter"
+    },
+    {
+      "category": "Visualization",
+      "description": "A scatter-plot matrix / pair plot across several numeric dimensions (plotly.express.scatter_matrix).",
+      "encodings": [
+        "color",
+        "dimensions",
+        "hover_data",
+        "symbol"
+      ],
+      "key": "scatter_matrix",
+      "label": "Scatter Matrix",
+      "node_type": "viz.plot",
+      "options": [
+        "opacity"
+      ],
+      "px_function": "scatter_matrix"
+    },
+    {
+      "category": "Visualization",
+      "description": "A strip plot (plotly.express.strip) of individual points per group.",
+      "encodings": [
+        "color",
+        "facet_col",
+        "facet_row",
+        "hover_data",
+        "x",
+        "y"
+      ],
+      "key": "strip",
+      "label": "Strip",
+      "node_type": "viz.plot",
+      "options": [
+        "log_x",
+        "log_y"
+      ],
+      "px_function": "strip"
+    },
+    {
+      "category": "Visualization",
+      "description": "A violin plot (plotly.express.violin) showing distribution shape per group.",
+      "encodings": [
+        "color",
+        "facet_col",
+        "facet_row",
+        "hover_data",
+        "x",
+        "y"
+      ],
+      "key": "violin",
+      "label": "Violin",
+      "node_type": "viz.plot",
+      "options": [
+        "box",
+        "log_x",
+        "log_y",
+        "points"
+      ],
+      "px_function": "violin"
+    }
+  ],
   "estimators": [
     {
       "archetype": "fit",
@@ -4450,6 +4690,305 @@
         }
       ],
       "type": "stats.ttest",
+      "version": 1
+    },
+    {
+      "category": "Visualization",
+      "description": "Render a curated, allow-listed chart (plotly.express) from a DataFrame.",
+      "family": "viz",
+      "label": "Plot",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which allow-listed chart type to render.",
+          "hints": {
+            "choices": [
+              "bar",
+              "box",
+              "density_contour",
+              "density_heatmap",
+              "ecdf",
+              "histogram",
+              "line",
+              "scatter",
+              "scatter_matrix",
+              "strip",
+              "violin"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Chart",
+          "name": "chart",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": {},
+          "help": "Column-reference kwargs for the chosen chart (x/y/color/facet_row/...).",
+          "hints": null,
+          "label": "Encoding",
+          "name": "encoding",
+          "required": false,
+          "type_token": "dict[str, any]"
+        },
+        {
+          "default": {},
+          "help": "Non-column-reference kwargs for the chosen chart (trendline/log_x/nbins/...).",
+          "hints": null,
+          "label": "Options",
+          "name": "options",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame to chart.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered chart as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "viz.plot",
+      "version": 1
+    },
+    {
+      "category": "Visualization",
+      "description": "Render an ACF or PACF bar plot of a fitted StatsModel's residuals.",
+      "family": "viz",
+      "label": "Plot ACF/PACF",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "acf",
+          "help": "Whether to plot the autocorrelation (acf) or partial autocorrelation (pacf).",
+          "hints": {
+            "choices": [
+              "acf",
+              "pacf"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Kind",
+          "name": "kind",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 20,
+          "help": "Maximum lag to plot (clamped to the residual series length if too large).",
+          "hints": null,
+          "label": "Max lags",
+          "name": "nlags",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "StatsModel",
+          "direction": "in",
+          "help": "The fitted statistical model to plot residual autocorrelation for.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered ACF/PACF plot as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "viz.plot_acf",
+      "version": 1
+    },
+    {
+      "category": "Visualization",
+      "description": "Render a coefficient / forest plot from a fitted StatsModel.",
+      "family": "viz",
+      "label": "Plot Coefficients",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "StatsModel",
+          "direction": "in",
+          "help": "The fitted statistical model whose coefficients to plot.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered coefficient/forest plot as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "viz.plot_coefficients",
+      "version": 1
+    },
+    {
+      "category": "Visualization",
+      "description": "Render a confusion-matrix heatmap for a fitted classifier.",
+      "family": "viz",
+      "label": "Plot Confusion Matrix",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted classifier to score.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Labeled data to score the classifier against.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered confusion-matrix heatmap as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "viz.plot_confusion_matrix",
+      "version": 1
+    },
+    {
+      "category": "Visualization",
+      "description": "Render a heatmap from a tidy correlation matrix (stats.correlation's output).",
+      "family": "viz",
+      "label": "Plot Correlation Heatmap",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "A tidy correlation matrix (e.g. from stats.correlation): a leading 'column' field of row labels, plus one column per correlated variable.",
+          "label": null,
+          "name": "matrix",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered correlation heatmap as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "viz.plot_correlation_heatmap",
+      "version": 1
+    },
+    {
+      "category": "Visualization",
+      "description": "Render a Q-Q plot of a fitted StatsModel's residuals against a normal.",
+      "family": "viz",
+      "label": "Plot Q-Q",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "StatsModel",
+          "direction": "in",
+          "help": "The fitted statistical model to plot a Q-Q plot for.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered Q-Q plot as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "viz.plot_qq",
+      "version": 1
+    },
+    {
+      "category": "Visualization",
+      "description": "Render a fitted-values-vs-residuals scatter plot from a fitted StatsModel.",
+      "family": "viz",
+      "label": "Plot Residuals",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "StatsModel",
+          "direction": "in",
+          "help": "The fitted statistical model to plot residuals for.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered residual plot as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "viz.plot_residuals",
       "version": 1
     }
   ]

@@ -29,6 +29,7 @@ from emergentflow.nodes.examples import (
     TrainRegressor,
     TrainTestSplit,
     TTest,
+    VizPlot,
 )
 from emergentflow.nodes.registry import NodeRegistry
 
@@ -56,6 +57,7 @@ REFERENCE_NODES = [
     NnLinear,
     NnReLU,
     NnModule,
+    VizPlot,
 ]
 
 _NODE_KEYS = {
@@ -82,11 +84,11 @@ def ref_registry() -> NodeRegistry:
 
 
 def test_catalog_version_constant():
-    assert CATALOG_VERSION == 2
+    assert CATALOG_VERSION == 3
 
 
 def test_top_level_keys(ref_registry: NodeRegistry):
-    assert set(export_catalog(ref_registry)) == {"catalog_version", "nodes", "estimators"}
+    assert set(export_catalog(ref_registry)) == {"catalog_version", "nodes", "estimators", "charts"}
 
 
 def test_version_in_artifact(ref_registry: NodeRegistry):
@@ -114,6 +116,24 @@ def test_estimators_present_and_sorted(ref_registry: NodeRegistry):
             "description",
             "import_path",
             "params",
+        }
+
+
+def test_charts_present_and_sorted(ref_registry: NodeRegistry):
+    charts = export_catalog(ref_registry)["charts"]
+    assert charts  # the curated catalog is non-empty
+    keys = [c["key"] for c in charts]
+    assert keys == sorted(keys)
+    for entry in charts:
+        assert set(entry) >= {
+            "key",
+            "node_type",
+            "label",
+            "category",
+            "description",
+            "px_function",
+            "encodings",
+            "options",
         }
 
 
