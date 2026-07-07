@@ -201,7 +201,10 @@ def group_by_aggregate(
     function(s), passed straight to ``DataFrame.groupby(by).agg(agg)``. With ``columns`` given,
     only those value columns are aggregated (each must exist); if ``agg`` is a str and ``columns``
     is ``None``, all numeric non-``by`` columns are aggregated. After aggregation, group keys are
-    restored as leading columns via ``reset_index`` so the result is tidy. Never mutates ``df``.
+    restored as leading columns via ``reset_index`` so the result is tidy; when a dict ``agg``
+    maps a column to a *list* of aggregation functions, pandas emits ``MultiIndex`` columns
+    (e.g. ``("x", "mean")``), which are flattened to single ``"x_mean"``-style names so the
+    result stays a genuinely tidy, JSON-round-trippable frame. Never mutates ``df``.
     """
     by_cols = [by] if isinstance(by, str) else list(by)
     unknown_by = [c for c in by_cols if c not in df.columns]
@@ -224,6 +227,10 @@ def group_by_aggregate(
             agg = {k: v for k, v in agg.items() if k in columns}
         target = df[by_cols + list(agg.keys())]
     grouped = target.groupby(by_cols).agg(agg)
+    if isinstance(grouped.columns, pd.MultiIndex):
+        grouped.columns = [
+            "_".join(str(level) for level in col if level) for col in grouped.columns
+        ]
 
     return grouped.reset_index()
 

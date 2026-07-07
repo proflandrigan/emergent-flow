@@ -189,6 +189,19 @@ def test_group_by_aggregate_dict_agg_honors_columns_filter():
     assert "c" not in result.columns
 
 
+def test_group_by_aggregate_list_valued_agg_flattens_multiindex_columns():
+    # Regression: a dict ``agg`` mapping a column to a *list* of aggregation functions makes
+    # pandas emit MultiIndex columns (e.g. ("a", "mean")); these must be flattened to single
+    # tidy names (e.g. "a_mean") rather than leaking a MultiIndex into the result.
+    df = _make_df()
+    result = group_by_aggregate(df, by="b", agg={"a": ["mean", "sum"], "c": "sum"})
+    assert not isinstance(result.columns, pd.MultiIndex)
+    assert set(result.columns) == {"b", "a_mean", "a_sum", "c_sum"}
+    assert is_inspectable(result)
+    payload = to_payload(result)
+    assert payload["columns"] == ["b", "a_mean", "a_sum", "c_sum"]
+
+
 def test_distribution_summary_skips_non_numeric_column():
     df = _make_df()
     result = distribution_summary(df)
