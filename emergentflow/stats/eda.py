@@ -1,0 +1,305 @@
+"""
+emergentflow.stats.eda
+~~~~~~~~~~~~~~~~~~~~~~~
+Exploratory-data-analysis wrapper operations (Epic 12, Story 11).
+
+The seam every EDA node (Task 5) routes through, mirroring ``fit_model``/``diagnostic``: each
+function here is a ``@public_op`` that validates its inputs at the boundary (fail fast, clear
+typed errors), never mutates the input ``df``, and returns a tidy, JSON-native ``DataFrame`` so
+both ``compile_to_code``'s emitted code and ``execute`` reach identical results (ADR-0002). No
+heavyweight reporting library is used here (see ``emergentflow/reports/`` for the ydata-profiling
+based report node, which is explicitly kept separate).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+import pandas as pd
+from pandas.api.types import is_numeric_dtype
+
+from emergentflow.api import public_op
+
+# ``PlotSpec`` (emergentflow.viz.models) is a standalone dataclass that imports nothing from
+# ``emergentflow.stats``, so importing it here is cycle-free -- unlike ``emergentflow.viz`` itself
+# (whose ``__init__`` imports ``emergentflow.stats.models``), which ``auto_eda`` imports lazily.
+from emergentflow.viz.models import PlotSpec
+
+
+@public_op(name="ef.stats.profile")
+def profile(df: pd.DataFrame, *, columns: list[str] | None = None) -> pd.DataFrame:
+    """Per-column profile (numeric + categorical), one row per column, as a tidy DataFrame.
+
+    With ``columns`` given, only those columns are profiled (each must exist). Every column gets
+    ``column``/``dtype``/``count``/``n_missing``/``pct_missing``/``n_unique``/``cardinality``;
+    numeric columns additionally get ``mean``/``std``/``min``/``max``/``skew``/``kurtosis`` (NaN
+    for non-numeric columns). Never mutates ``df``.
+    """
+    if columns is not None:
+        unknown = [c for c in columns if c not in df.columns]
+        if unknown:
+            raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+        target = df[columns]
+    else:
+        target = df
+
+    rows: list[dict[str, Any]] = []
+    for col in target.columns:
+        series = target[col]
+        count = int(series.count())
+        n_missing = int(series.isna().sum())
+        pct_missing = round(float(n_missing / len(series) * 100) if len(series) else 0.0, 4)
+        n_unique = int(series.nunique())
+        cardinality = float(n_unique / count) if count else 0.0
+        row: dict[str, Any] = {
+            "column": col,
+            "dtype": str(series.dtype),
+            "count": count,
+            "n_missing": n_missing,
+            "pct_missing": pct_missing,
+            "n_unique": n_unique,
+            "cardinality": cardinality,
+        }
+        if is_numeric_dtype(series):
+            row["mean"] = float(series.mean())
+            row["std"] = float(series.std())
+            row["min"] = float(series.min())
+            row["max"] = float(series.max())
+            row["skew"] = float(series.skew())
+            row["kurtosis"] = float(series.kurtosis())
+        else:
+            row["mean"] = float("nan")
+            row["std"] = float("nan")
+            row["min"] = float("nan")
+            row["max"] = float("nan")
+            row["skew"] = float("nan")
+            row["kurtosis"] = float("nan")
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+@public_op(name="ef.stats.missingness")
+def missingness(df: pd.DataFrame, *, columns: list[str] | None = None) -> pd.DataFrame:
+    """Per-column null analysis, one row per column, as a tidy DataFrame.
+
+    With ``columns`` given, only those columns are analyzed (each must exist). Columns:
+    ``column``/``n_missing``/``n_present``/``pct_missing``. Rows are sorted by ``pct_missing``
+    descending, then ``column`` ascending. Never mutates ``df``.
+    """
+    if columns is not None:
+        unknown = [c for c in columns if c not in df.columns]
+        if unknown:
+            raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+        target = df[columns]
+    else:
+        target = df
+
+    n_rows = len(target)
+    rows: list[dict[str, Any]] = []
+    for col in target.columns:
+        n_missing = int(target[col].isna().sum())
+        n_present = int(n_rows - n_missing)
+        pct_missing = round(float(n_missing / n_rows * 100) if n_rows else 0.0, 4)
+        rows.append(
+            {
+                "column": col,
+                "n_missing": n_missing,
+                "n_present": n_present,
+                "pct_missing": pct_missing,
+            }
+        )
+    result = pd.DataFrame(rows)
+    result = result.sort_values(by=["pct_missing", "column"], ascending=[False, True]).reset_index(
+        drop=True
+    )
+    return result
+
+
+@public_op(name="ef.stats.co_missingness")
+def co_missingness(df: pd.DataFrame, *, columns: list[str] | None = None) -> pd.DataFrame:
+    """Pairwise co-missingness matrix, tidy like ``correlation``'s output.
+
+    With ``columns`` given, only those columns are included (each must exist). Cell (i, j) is the
+    fraction of rows where both column i and column j are null; the diagonal is each column's own
+    missing fraction. Row labels are moved into a leading ``column`` field. Never mutates ``df``.
+    """
+    if columns is not None:
+        unknown = [c for c in columns if c not in df.columns]
+        if unknown:
+            raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+        target = df[columns]
+    else:
+        target = df
+
+    mask = target.isna()
+    cols = list(target.columns)
+    data = {j: [float((mask[i] & mask[j]).mean()) for i in cols] for j in cols}
+    matrix = pd.DataFrame(data, index=cols, columns=cols)
+    return matrix.reset_index(names="column")
+
+
+@public_op(name="ef.stats.distribution_summary")
+def distribution_summary(df: pd.DataFrame, *, columns: list[str] | None = None) -> pd.DataFrame:
+    """Per-numeric-column distribution/spread summary, one row per numeric column.
+
+    With ``columns`` given, each named column must exist (raises otherwise), but a
+    present-but-non-numeric named column is simply omitted from the output. Columns:
+    ``column``/``count``/``mean``/``std``/``min``/``p05``/``p25``/``p50``/``p75``/``p95``/
+    ``max``/``iqr``. Never mutates ``df``.
+    """
+    if columns is not None:
+        unknown = [c for c in columns if c not in df.columns]
+        if unknown:
+            raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+        target = df[columns]
+    else:
+        target = df
+
+    rows: list[dict[str, Any]] = []
+    for col in target.columns:
+        series = target[col]
+        if not is_numeric_dtype(series):
+            continue
+        quantiles = series.quantile([0.05, 0.25, 0.5, 0.75, 0.95])
+        p05 = float(quantiles.loc[0.05])
+        p25 = float(quantiles.loc[0.25])
+        p50 = float(quantiles.loc[0.5])
+        p75 = float(quantiles.loc[0.75])
+        p95 = float(quantiles.loc[0.95])
+        rows.append(
+            {
+                "column": col,
+                "count": int(series.count()),
+                "mean": float(series.mean()),
+                "std": float(series.std()),
+                "min": float(series.min()),
+                "p05": p05,
+                "p25": p25,
+                "p50": p50,
+                "p75": p75,
+                "p95": p95,
+                "max": float(series.max()),
+                "iqr": p75 - p25,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+@public_op(name="ef.stats.group_by_aggregate")
+def group_by_aggregate(
+    df: pd.DataFrame,
+    *,
+    by: str | list[str],
+    agg: str | dict[str, str | list[str]],
+    columns: list[str] | None = None,
+) -> pd.DataFrame:
+    """Split/agg/pivot returning a tidy DataFrame, one row per group.
+
+    ``by`` is a grouping column or list of grouping columns (each must exist). ``agg`` is either a
+    single aggregation name (e.g. ``"mean"``) or a dict mapping value columns to aggregation
+    function(s), passed straight to ``DataFrame.groupby(by).agg(agg)``. With ``columns`` given,
+    only those value columns are aggregated (each must exist); if ``agg`` is a str and ``columns``
+    is ``None``, all numeric non-``by`` columns are aggregated. After aggregation, group keys are
+    restored as leading columns via ``reset_index`` so the result is tidy. Never mutates ``df``.
+    """
+    by_cols = [by] if isinstance(by, str) else list(by)
+    unknown_by = [c for c in by_cols if c not in df.columns]
+    if unknown_by:
+        raise ValueError(f"unknown columns {unknown_by!r}; expected one of {list(df.columns)!r}.")
+
+    if columns is not None:
+        unknown = [c for c in columns if c not in df.columns]
+        if unknown:
+            raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+
+    if isinstance(agg, str):
+        if columns is not None:
+            value_cols = [c for c in columns if c not in by_cols]
+        else:
+            value_cols = [c for c in df.columns if c not in by_cols and is_numeric_dtype(df[c])]
+        target = df[by_cols + value_cols]
+    else:
+        target = df[by_cols + list(agg.keys())]
+    grouped = target.groupby(by_cols).agg(agg)
+
+    return grouped.reset_index()
+
+
+@dataclass
+class AutoEdaResult:
+    """A one-shot exploratory-data-analysis bundle: tidy summary frames + curated plots.
+
+    ``frames`` and ``plots`` are string-keyed dicts of inspectable values (tidy DataFrames and
+    :class:`~emergentflow.viz.models.PlotSpec`s), so an ``AutoEdaResult`` is itself inspectable
+    under the ``@public_op`` contract and rides the result-payload contract untouched (every leaf
+    is JSON-native). The bundle is *composed* from the existing ``ef.stats``/``ef.viz`` seams, so
+    it inherits their ADR-0002 equivalence rather than reimplementing any analysis.
+
+    Attributes
+    ----------
+    frames: ``profile`` / ``missingness`` / ``distribution_summary`` / ``correlation`` tidy frames.
+    plots: ``distributions`` (per-column histograms) / ``correlation_heatmap`` / ``missingness``.
+    """
+
+    frames: dict[str, pd.DataFrame]
+    plots: dict[str, PlotSpec]
+
+
+@public_op(name="ef.stats.auto_eda")
+def auto_eda(df: pd.DataFrame, *, columns: list[str] | None = None) -> AutoEdaResult:
+    """Run a one-shot EDA pass and return an inspectable :class:`AutoEdaResult` bundle.
+
+    With ``columns`` given, the pass is restricted to those columns (each must exist). The bundle's
+    tidy frames come from ``profile``/``missingness``/``distribution_summary`` (this module) and
+    ``ef.stats.correlation``; its plots come from ``ef.viz.plot`` and
+    ``ef.viz.plot_correlation_heatmap``
+    -- so ``auto_eda`` is a *composition* of already-equivalent seams (Epic 12 Story 11), never a
+    parallel implementation. Never mutates ``df``. ``ef.stats.correlation`` and the viz seams are
+    imported lazily to keep this module free of the ``emergentflow.viz`` import cycle.
+    """
+    if columns is not None:
+        unknown = [c for c in columns if c not in df.columns]
+        if unknown:
+            raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+        work = df[columns]
+    else:
+        work = df
+
+    from emergentflow.stats import correlation
+    from emergentflow.viz import plot, plot_correlation_heatmap
+
+    profile_frame = profile(work)
+    missingness_frame = missingness(work)
+    distribution_frame = distribution_summary(work)
+    correlation_frame = correlation(work)
+
+    # Per-column distribution histograms: melt the numeric columns to long form (private column
+    # names so a real "value"/"variable" column can't collide), one faceted histogram per column.
+    numeric = work.select_dtypes(include="number")
+    long = numeric.melt(var_name="__variable__", value_name="__value__")
+    distributions_plot = plot(
+        long,
+        chart="histogram",
+        encoding={"x": "__value__", "facet_col": "__variable__"},
+    )
+    missingness_plot = plot(
+        missingness_frame,
+        chart="bar",
+        encoding={"x": "column", "y": "pct_missing"},
+    )
+    correlation_heatmap = plot_correlation_heatmap(correlation_frame)
+
+    return AutoEdaResult(
+        frames={
+            "profile": profile_frame,
+            "missingness": missingness_frame,
+            "distribution_summary": distribution_frame,
+            "correlation": correlation_frame,
+        },
+        plots={
+            "distributions": distributions_plot,
+            "correlation_heatmap": correlation_heatmap,
+            "missingness": missingness_plot,
+        },
+    )

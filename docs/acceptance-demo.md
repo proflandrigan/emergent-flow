@@ -96,3 +96,60 @@ what the builder function produces (a drift guard), the graph's node/edge counts
 are as expected, and an `@pytest.mark.equivalence` test (reusing
 `tests/test_codegen_equivalence.py`'s `assert_equivalent` harness) that `execute(graph)` and
 running the code `compile_to_code(graph)` emits produce equivalent results end to end.
+
+## Statistics, Visualization & EDA Today (Epic 12) — the analyst surface
+
+Epic 12 deepened `ef.stats`/`ef.viz` into the working-analyst surface — regression/GLM,
+mixed-effects (`MixedLM`), GAMs, diagnostics (VIF/residual/normality), a generated `viz.plot`
+chart catalog + model-aware plots, and a first-class EDA layer (`stats.auto_eda` one-shot
+bundle). Two pipelines under `examples/stats_viz_acceptance_demo/` are the acceptance criteria
+and demonstrate the stats+viz+EDA halves meeting end to end. Note both ride the same
+inspectable-payload + ADR-0002 contracts as everything else (a `StatsModel`-bearing edge into a
+coefficient plot; a `PlotSpec`-terminal edge the Results tab renders).
+
+### Hierarchical: auto-EDA → VIF → mixed-effects → forest plot
+
+```
+load_sample(iris) ─→ stats.auto_eda ──(frame)──→ stats.diagnostic_frame(VIF)
+                                     └─(frame)──→ stats.fit_model(MixedLM) ──(StatsModel)──→ viz.plot_coefficients
+```
+
+`stats.auto_eda` returns tidy `profile`/`missingness`/`correlation` frames + curated `PlotSpec`s
+AND passes the frame through so VIF (multicollinearity) and the `MixedLM` fit both read it;
+`MixedLM` fits fixed + random effects on `petal length (cm)` grouped by `target`, emitting a
+`FittedStatsModel` (fixed-effect coefficients + variance components) that flows over a
+`StatsModel` edge into the coefficient/forest plot (a `PlotSpec`). Non-convergence is a
+first-class, reported result (`fit_stats.converged`), not a swallowed exception.
+
+### Exploratory: describe → correlation heatmap → faceted scatter w/ OLS trendline
+
+```
+load_sample(iris) ─→ stats.describe
+                 ├─→ stats.correlation ──(matrix)──→ viz.plot_correlation_heatmap
+                 └─→ viz.plot(scatter, facet_col=target, trendline="ols")
+```
+
+The everyday EDA loop — tidy `describe` summary, a correlation matrix rendered as a `PlotSpec`
+heatmap, and a faceted scatter with a statsmodels OLS trendline (via the generated `viz.plot`
+catalog's `scatter` chart + `trendline` option), each output a JSON-native `PlotSpec` or tidy
+frame.
+
+### Where they live
+
+- **`examples/stats_viz_acceptance_demo/hierarchical_pipeline.json`** /
+  **`examples/stats_viz_acceptance_demo/exploratory_pipeline.json`** — the IR graphs in canonical
+  form, generated and validated by `tests/test_stats_viz_acceptance_demo.py`.
+- Both load in the canvas palette (via `ef.export_catalog()`'s generated catalog entries — the
+  new `stats.*` model/EDA nodes and `viz.*` chart/plot nodes), compile through `/compile` to
+  downloadable Python, and execute via `/execute` — the same data-driven catalog path, now
+  exercising the stats + viz + EDA surface with zero per-node UI.
+
+### How they're verified
+
+`tests/test_stats_viz_acceptance_demo.py` proves, for each pipeline: the committed JSON matches
+the builder (drift guard), the node/edge counts and node types are as expected, and an
+`@pytest.mark.equivalence` test (reusing `assert_equivalent`) that `execute(graph)` and running
+the `compile_to_code(graph)` output produce equivalent results end to end — keyed on the
+canonical inspectable payloads (tidy frames / `PlotSpec` JSON / the `FittedStatsModel` summary,
+whose live results object degrades to `{"kind": "unsupported"}`), so opaque model internals are
+never compared.

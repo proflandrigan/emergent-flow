@@ -16,6 +16,7 @@ re-implementing them inline.
 
 from .anova import Anova
 from .apply_estimator import ApplyEstimator
+from .auto_eda import AutoEda
 from .cast_types import CastTypes
 from .cluster_detect import ClusterDetect
 from .correlation import Correlation
@@ -23,7 +24,9 @@ from .cross_validate import CrossValidate
 from .describe import Describe
 from .diagnostic_frame import DiagnosticFrame
 from .diagnostic_model import DiagnosticModel
+from .distribution_summary import DistributionSummary
 from .drop_missing import DropMissing
+from .eda_profile import EdaProfile
 from .eval_label import EvalLabel
 from .eval_run import EvalRun
 from .evaluate import Evaluate
@@ -32,6 +35,7 @@ from .fit_estimator import FitEstimator
 from .fit_model import FitModel
 from .fit_transform import FitTransform
 from .grid_search import GridSearch
+from .group_by_aggregate import GroupByAggregate
 from .impute import ImputeMissing
 from .llm_call import LlmCall
 from .llm_prompt import LlmPrompt
@@ -39,6 +43,7 @@ from .load_csv import LoadCsv
 from .load_json import LoadJson
 from .load_parquet import LoadParquet
 from .load_sample import LoadSample
+from .missingness import Missingness
 from .nn_linear import NnLinear
 from .nn_module import NnModule
 from .nn_relu import NnReLU
@@ -64,6 +69,7 @@ from .viz_plot_residuals import VizPlotResiduals
 __all__ = [
     "Anova",
     "ApplyEstimator",
+    "AutoEda",
     "CastTypes",
     "ClusterDetect",
     "Correlation",
@@ -71,7 +77,9 @@ __all__ = [
     "Describe",
     "DiagnosticFrame",
     "DiagnosticModel",
+    "DistributionSummary",
     "DropMissing",
+    "EdaProfile",
     "EvalLabel",
     "EvalRun",
     "Evaluate",
@@ -81,6 +89,7 @@ __all__ = [
     "FitTransform",
     "GenerateHtmlSummary",
     "GridSearch",
+    "GroupByAggregate",
     "ImputeMissing",
     "LlmCall",
     "LlmPrompt",
@@ -88,6 +97,7 @@ __all__ = [
     "LoadJson",
     "LoadParquet",
     "LoadSample",
+    "Missingness",
     "NnLinear",
     "NnModule",
     "NnReLU",
