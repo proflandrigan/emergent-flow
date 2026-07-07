@@ -210,8 +210,9 @@ downstream.
 
 Story 11 ships two ways to explore a frame, and they are complements, not competitors.
 `ef.stats.auto_eda` / the `stats.auto_eda` node is the **fast, canvas-native** EDA path: it
-returns tidy summary frames (`profile`/`missingness`/`distribution_summary`/`correlation`) plus a
-curated set of JSON-native `PlotSpec`s (distributions, correlation heatmap, missingness), all
+returns tidy summary frames (`profile`/`missingness`/`co_missingness`/`distribution_summary`/
+`correlation`) plus a curated set of JSON-native `PlotSpec`s (distributions, correlation heatmap,
+co-missingness heatmap), all
 riding the same `ADR-0002` equivalence and `@public_op` inspectable-result-payload contracts as
 every other node, composed from the existing `ef.stats`/`ef.viz` seams rather than a parallel
 implementation. `ef.reports.generate_html_summary` (the ydata-profiling `report` node) remains

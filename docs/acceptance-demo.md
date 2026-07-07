@@ -115,7 +115,8 @@ load_sample(iris) ─→ stats.auto_eda ──(frame)──→ stats.diagnostic_
 ```
 
 `stats.auto_eda` returns tidy `profile`/`missingness`/`correlation` frames + curated `PlotSpec`s
-AND passes the frame through so VIF (multicollinearity) and the `MixedLM` fit both read it;
+(including a co-missingness heatmap) AND passes the frame through so VIF (multicollinearity) and
+the `MixedLM` fit both read it;
 `MixedLM` fits fixed + random effects on `petal length (cm)` grouped by `target`, emitting a
 `FittedStatsModel` (fixed-effect coefficients + variance components) that flows over a
 `StatsModel` edge into the coefficient/forest plot (a `PlotSpec`). Non-convergence is a

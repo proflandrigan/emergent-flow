@@ -41,6 +41,7 @@ __all__ = [
     "plot_acf",
     "plot_qq",
     "plot_correlation_heatmap",
+    "plot_missingness_heatmap",
     "plot_confusion_matrix",
 ]
 
@@ -253,6 +254,40 @@ def plot_correlation_heatmap(matrix: pd.DataFrame) -> PlotSpec:
     )
     fig.update_layout(title="Correlation Heatmap")
     return PlotSpec.from_figure("correlation_heatmap", fig)
+
+
+@public_op(name="ef.viz.plot_missingness_heatmap")
+def plot_missingness_heatmap(matrix: pd.DataFrame) -> PlotSpec:
+    """Build a heatmap from a tidy co-missingness matrix (``emergentflow.stats.co_missingness``'s
+    output: a leading ``"column"`` field of row labels, plus one column per variable, each cell
+    the fraction of rows where both variables are null). Values are fractions in ``[0, 1]``
+    rather than correlation's ``[-1, 1]``, so this uses a sequential (not diverging) colorscale
+    and a fixed ``zmin=0``/``zmax=1`` range -- distinct from ``plot_correlation_heatmap`` rather
+    than reusing it. Not part of the curated ``chart`` allow-list (``ef.viz.plot``); this is a
+    bespoke plot built from ``go.Heatmap`` directly.
+    """
+    import plotly.graph_objects as go
+
+    labels = matrix["column"].tolist()
+    value_columns = [c for c in matrix.columns if c != "column"]
+    z = matrix[value_columns].to_numpy().tolist()
+
+    fig = go.Figure(
+        data=[
+            go.Heatmap(
+                z=z,
+                x=value_columns,
+                y=labels,
+                zmin=0,
+                zmax=1,
+                colorscale="Reds",
+                text=[[f"{v:.2f}" for v in row] for row in z],
+                texttemplate="%{text}",
+            )
+        ]
+    )
+    fig.update_layout(title="Co-Missingness Heatmap")
+    return PlotSpec.from_figure("missingness_heatmap", fig)
 
 
 @public_op(name="ef.viz.plot_confusion_matrix")

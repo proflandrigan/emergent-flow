@@ -207,3 +207,33 @@ def test_distribution_summary_skips_non_numeric_column():
     result = distribution_summary(df)
     assert "b" not in set(result["column"])
     assert set(result["column"]) == {"a", "c"}
+
+
+def test_plot_missingness_heatmap_is_registered_public_op():
+    assert "ef.viz.plot_missingness_heatmap" in PUBLIC_OPS
+
+
+def test_plot_missingness_heatmap_renders_co_missingness_matrix():
+    from emergentflow.viz import plot_missingness_heatmap
+
+    df = _make_df()
+    matrix = co_missingness(df)
+    plot = plot_missingness_heatmap(matrix)
+
+    assert is_inspectable(plot)
+    heatmap = plot.spec["data"][0]
+    assert heatmap["x"] == list(df.columns)
+    assert heatmap["y"] == list(df.columns)
+    assert heatmap["zmin"] == 0
+    assert heatmap["zmax"] == 1
+
+
+def test_auto_eda_missingness_plot_is_the_co_missingness_heatmap():
+    from emergentflow.stats import auto_eda
+    from emergentflow.viz import plot_missingness_heatmap
+
+    df = _make_df()
+    result = auto_eda(df)
+
+    assert result.frames["co_missingness"].equals(co_missingness(df))
+    assert result.plots["missingness"].spec == plot_missingness_heatmap(co_missingness(df)).spec

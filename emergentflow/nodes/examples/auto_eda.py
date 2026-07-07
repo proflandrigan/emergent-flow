@@ -7,10 +7,10 @@ Story 11).
 Runs a whole EDA pass in one node and fans the result out onto typed OUT ports: a pass-through of
 the input ``frame`` (so the node can sit inline in a pipeline), the ``profile``/``missingness``/
 ``correlation`` tidy frames, and three ``PlotSpec`` plots (per-column distributions, correlation
-heatmap, missingness bar). ``execute`` calls ``emergentflow.stats.auto_eda`` once and unpacks its
-:class:`~emergentflow.stats.eda.AutoEdaResult`; ``codegen`` emits the same single call into a
-private bundle variable and unpacks the identical fields, so the two paths are equivalent by
-construction (ADR 0002) and the bundle is never computed more than once.
+heatmap, co-missingness heatmap). ``execute`` calls ``emergentflow.stats.auto_eda`` once and
+unpacks its :class:`~emergentflow.stats.eda.AutoEdaResult`; ``codegen`` emits the same single call
+into a private bundle variable and unpacks the identical fields, so the two paths are equivalent
+by construction (ADR 0002) and the bundle is never computed more than once.
 """
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ class AutoEda(NodeDefinition):
             name="missingness_plot",
             direction=Direction.OUT,
             data_type="PlotSpec",
-            help="Missingness bar chart.",
+            help="Co-missingness heatmap (which columns tend to go missing together).",
         ),
     ]
     params = [

@@ -247,8 +247,10 @@ class AutoEdaResult:
 
     Attributes
     ----------
-    frames: ``profile`` / ``missingness`` / ``distribution_summary`` / ``correlation`` tidy frames.
-    plots: ``distributions`` (per-column histograms) / ``correlation_heatmap`` / ``missingness``.
+    frames: ``profile`` / ``missingness`` / ``co_missingness`` / ``distribution_summary`` /
+        ``correlation`` tidy frames.
+    plots: ``distributions`` (per-column histograms) / ``correlation_heatmap`` / ``missingness``
+        (a co-missingness heatmap -- which columns tend to go missing together).
     """
 
     frames: dict[str, pd.DataFrame]
@@ -260,12 +262,14 @@ def auto_eda(df: pd.DataFrame, *, columns: list[str] | None = None) -> AutoEdaRe
     """Run a one-shot EDA pass and return an inspectable :class:`AutoEdaResult` bundle.
 
     With ``columns`` given, the pass is restricted to those columns (each must exist). The bundle's
-    tidy frames come from ``profile``/``missingness``/``distribution_summary`` (this module) and
-    ``ef.stats.correlation``; its plots come from ``ef.viz.plot`` and
-    ``ef.viz.plot_correlation_heatmap``
-    -- so ``auto_eda`` is a *composition* of already-equivalent seams (Epic 12 Story 11), never a
-    parallel implementation. Never mutates ``df``. ``ef.stats.correlation`` and the viz seams are
-    imported lazily to keep this module free of the ``emergentflow.viz`` import cycle.
+    tidy frames come from ``profile``/``missingness``/``co_missingness``/``distribution_summary``
+    (this module) and ``ef.stats.correlation``; its plots come from ``ef.viz.plot`` and
+    ``ef.viz.plot_correlation_heatmap``/``ef.viz.plot_missingness_heatmap`` -- so ``auto_eda`` is a
+    *composition* of already-equivalent seams (Epic 12 Story 11), never a parallel implementation.
+    ``missingness_plot`` renders the pairwise ``co_missingness`` matrix as a heatmap (which columns
+    tend to go missing together), not just per-column missing rates. Never mutates ``df``.
+    ``ef.stats.correlation`` and the viz seams are imported lazily to keep this module free of the
+    ``emergentflow.viz`` import cycle.
     """
     if columns is not None:
         unknown = [c for c in columns if c not in df.columns]
@@ -276,10 +280,11 @@ def auto_eda(df: pd.DataFrame, *, columns: list[str] | None = None) -> AutoEdaRe
         work = df
 
     from emergentflow.stats import correlation
-    from emergentflow.viz import plot, plot_correlation_heatmap
+    from emergentflow.viz import plot, plot_correlation_heatmap, plot_missingness_heatmap
 
     profile_frame = profile(work)
     missingness_frame = missingness(work)
+    co_missingness_frame = co_missingness(work)
     distribution_frame = distribution_summary(work)
     correlation_frame = correlation(work)
 
@@ -292,17 +297,14 @@ def auto_eda(df: pd.DataFrame, *, columns: list[str] | None = None) -> AutoEdaRe
         chart="histogram",
         encoding={"x": "__value__", "facet_col": "__variable__"},
     )
-    missingness_plot = plot(
-        missingness_frame,
-        chart="bar",
-        encoding={"x": "column", "y": "pct_missing"},
-    )
+    missingness_plot = plot_missingness_heatmap(co_missingness_frame)
     correlation_heatmap = plot_correlation_heatmap(correlation_frame)
 
     return AutoEdaResult(
         frames={
             "profile": profile_frame,
             "missingness": missingness_frame,
+            "co_missingness": co_missingness_frame,
             "distribution_summary": distribution_frame,
             "correlation": correlation_frame,
         },

@@ -4321,7 +4321,7 @@
           "cardinality": "one",
           "data_type": "PlotSpec",
           "direction": "out",
-          "help": "Missingness bar chart.",
+          "help": "Co-missingness heatmap (which columns tend to go missing together).",
           "label": null,
           "name": "missingness_plot",
           "required": true
