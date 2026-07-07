@@ -48,6 +48,14 @@ equivalence invariant; it governs [Epic 9](../../epics/epic-9-ai-engineering-pla
 | :-- | :------- | :----- |
 | [0017](./0017-llm-nodes-injected-effectful-client.md) | LLM/network nodes call an injected `LLMClient` seam; the effect lives at the edge, so the pure core and the equivalence gate stay intact | Accepted |
 
+The following decision generalizes ADR 0017's injected-client seam to a second effect type (data-source
+connectors) and fixes the secret-free connection-reference boundary; it governs
+[Epic 13](../../epics/epic-13-data-connectors-warehouses-sql.md) (Data Connectors, Warehouses & SQL).
+
+| ADR | Decision | Status |
+| :-- | :------- | :----- |
+| [0018](./0018-data-source-connector-seam.md) | Data-source connectors are a second injected effectful-client seam (`WarehouseClient`), resolved through one extensible client bundle; connection references in the IR stay secret-free | Proposed |
+
 ## Conventions
 
 - Filenames: `NNNN-kebab-case-title.md`, numbered sequentially from `0001`.
