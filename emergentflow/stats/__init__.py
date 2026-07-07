@@ -25,15 +25,17 @@ from scipy.stats import ttest_ind
 from statsmodels.formula.api import ols
 
 from emergentflow.api import public_op
+from emergentflow.stats.diagnostics import DiagnosticSpec, known_diagnostic_keys
 from emergentflow.stats.errors import (
     InvalidModelSpecError,
     MissingOptionalDependencyError,
     StatsError,
+    UnknownDiagnosticError,
     UnknownModelError,
 )
 from emergentflow.stats.models import FittedStatsModel
 from emergentflow.stats.registry import ModelSpec, keys_for_archetype, known_model_keys
-from emergentflow.stats.spec import _prepare_model_spec
+from emergentflow.stats.spec import _prepare_diagnostic_spec, _prepare_model_spec
 
 __all__ = [
     "anova",
@@ -41,14 +43,18 @@ __all__ = [
     "correlation",
     "CORR_METHODS",
     "describe",
+    "diagnostic",
+    "DiagnosticSpec",
     "ttest",
     "TTestResult",
     "FittedStatsModel",
     "ModelSpec",
     "StatsError",
+    "UnknownDiagnosticError",
     "UnknownModelError",
     "InvalidModelSpecError",
     "MissingOptionalDependencyError",
+    "known_diagnostic_keys",
     "known_model_keys",
     "keys_for_archetype",
     "fit_model",
@@ -268,4 +274,24 @@ def fit_model(df: pd.DataFrame, *, model: str, spec: dict[str, Any]) -> FittedSt
     return model_spec.fitter(df, resolved_spec)
 
 
-from emergentflow.stats import catalog  # noqa: E402, F401
+@public_op(name="ef.stats.diagnostic")
+def diagnostic(
+    df: pd.DataFrame | None = None,
+    *,
+    diagnostic: str,
+    model: FittedStatsModel | None = None,
+    spec: dict[str, Any] | None = None,
+) -> pd.DataFrame:
+    """Compute a curated, allow-listed diagnostic and return a tidy DataFrame.
+
+    The single seam every diagnostic node routes through (Epic 12, Story 6), mirroring
+    ``fit_model``. ``diagnostic`` is validated against the diagnostic allow-list registry and
+    ``spec`` against the shared ``_prepare_diagnostic_spec`` gate; exactly one of ``df``/``model``
+    must be given, matching the resolved diagnostic's ``needs_frame``/``needs_model`` contract.
+    Never mutates ``df``. Never returns a live model object -- always a plain tidy DataFrame.
+    """
+    diag_spec, resolved_spec = _prepare_diagnostic_spec(df, model, diagnostic, spec or {})
+    return diag_spec.fn(df, model, resolved_spec)
+
+
+from emergentflow.stats import catalog, diagnostics_catalog  # noqa: E402, F401

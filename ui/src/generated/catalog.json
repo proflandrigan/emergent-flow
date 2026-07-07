@@ -4109,6 +4109,257 @@
     },
     {
       "category": "Statistics",
+      "description": "Run a curated diagnostic that operates on a raw DataFrame (e.g. VIF).",
+      "family": "stats",
+      "label": "Diagnostic (DataFrame)",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which allow-listed DataFrame-input diagnostic to run.",
+          "hints": {
+            "choices": [
+              "vif"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Diagnostic",
+          "name": "diagnostic",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": {},
+          "help": "Diagnostic-specific structured-spec fields (e.g. VIF's 'columns'/'threshold').",
+          "hints": null,
+          "label": "Additional spec fields",
+          "name": "spec_extra",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame to diagnose.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The tidy diagnostic result frame.",
+          "label": null,
+          "name": "diagnostics",
+          "required": true
+        }
+      ],
+      "type": "stats.diagnostic_frame",
+      "version": 1
+    },
+    {
+      "category": "Statistics",
+      "description": "Run a curated diagnostic on a fitted StatsModel's residuals.",
+      "family": "stats",
+      "label": "Diagnostic (Model)",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which allow-listed model-input diagnostic to run.",
+          "hints": {
+            "choices": [
+              "autocorrelation",
+              "heteroscedasticity",
+              "normality"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Diagnostic",
+          "name": "diagnostic",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": {},
+          "help": "Diagnostic-specific structured-spec fields, if any.",
+          "hints": null,
+          "label": "Additional spec fields",
+          "name": "spec_extra",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "StatsModel",
+          "direction": "in",
+          "help": "The fitted statistical model to diagnose.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The tidy diagnostic result frame.",
+          "label": null,
+          "name": "diagnostics",
+          "required": true
+        }
+      ],
+      "type": "stats.diagnostic_model",
+      "version": 1
+    },
+    {
+      "category": "Statistics",
+      "description": "Fit a curated, allow-listed statistical model (regression/GLM/...).",
+      "family": "stats",
+      "label": "Fit Statistical Model",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which allow-listed statistical model to fit.",
+          "hints": {
+            "choices": [
+              "BayesianGLM",
+              "GAM",
+              "GLM",
+              "GLS",
+              "MixedLM",
+              "OLS",
+              "WLS"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Model",
+          "name": "model",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": null,
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Predictor columns (fixed effects).",
+          "hints": null,
+          "label": "Fixed effects",
+          "name": "fixed_effects",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Random-effect columns (mixed-effects models only).",
+          "hints": null,
+          "label": "Random effects",
+          "name": "random_effects",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Grouping-factor column (mixed-effects models only).",
+          "hints": null,
+          "label": "Grouping factor",
+          "name": "groups",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "GLM family (gaussian/binomial/poisson/negativebinomial/gamma).",
+          "hints": null,
+          "label": "Family",
+          "name": "family",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "GLM link function; defaults to the family's canonical link if unset.",
+          "hints": null,
+          "label": "Link",
+          "name": "link",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column of observation weights (WLS, or weighted GLM).",
+          "hints": null,
+          "label": "Weights column",
+          "name": "weights",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": {},
+          "help": "Any additional model-specific structured-spec fields not covered above.",
+          "hints": null,
+          "label": "Additional spec fields",
+          "name": "spec_extra",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the target and predictor columns.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "StatsModel",
+          "direction": "out",
+          "help": "The fitted statistical model.",
+          "label": null,
+          "name": "model",
+          "required": true
+        }
+      ],
+      "type": "stats.fit_model",
+      "version": 1
+    },
+    {
+      "category": "Statistics",
       "description": "Two-sample t-test between two groups.",
       "family": "stats",
       "label": "T-Test",

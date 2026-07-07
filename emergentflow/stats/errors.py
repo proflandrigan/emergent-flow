@@ -12,6 +12,7 @@ from __future__ import annotations
 
 __all__ = [
     "StatsError",
+    "UnknownDiagnosticError",
     "UnknownModelError",
     "InvalidModelSpecError",
     "MissingOptionalDependencyError",
@@ -24,6 +25,10 @@ class StatsError(ValueError):
 
 class UnknownModelError(StatsError):
     """Raised when a model key is not present in the curated model allow-list registry."""
+
+
+class UnknownDiagnosticError(StatsError):
+    """Raised when a diagnostic key is not present in the curated diagnostic allow-list."""
 
 
 class InvalidModelSpecError(StatsError):
