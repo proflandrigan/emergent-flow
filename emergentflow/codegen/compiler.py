@@ -31,12 +31,13 @@ from emergentflow.codegen.errors import CodegenError, UnboundInputError
 from emergentflow.codegen.formatting import format_source
 from emergentflow.codegen.naming import NameMap, build_name_map
 from emergentflow.codegen.traversal import topological_sort
-from emergentflow.codegen.validation import enforce_validation_gate
+from emergentflow.codegen.validation import enforce_validation_gate, required_in_port_names
 from emergentflow.codegen.wiring import build_wiring_map
 from emergentflow.ir import Direction, Graph, Node, Paradigm
 from emergentflow.llm.env import MissingAPIKeyError, resolve_api_key_env_name
 from emergentflow.llm.secrets import provider_api_key_pairs
 from emergentflow.nodes import get as get_node_definition
+from emergentflow.nodes import registry as default_node_registry
 from emergentflow.nodes.contract import CodeFragment
 
 
@@ -87,12 +88,17 @@ def _assemble(graph: Graph) -> _AssembledModule:
     # Step 2: Topological order
     topo_order_ids = topological_sort(graph)
 
-    # Step 3: Dangling-input guard
+    # Step 3: Dangling-input guard (required IN ports only -- optional IN ports
+    # may legitimately be unconnected; `build_codegen_context` binds those to
+    # the `None` literal below).
     wiring_map = build_wiring_map(graph)
     for node_id in topo_order_ids:
         node = graph.nodes[node_id]
+        required_in_names = required_in_port_names(node.type, default_node_registry)
         for port in node.ports:
             if port.direction != Direction.IN:
+                continue
+            if port.name not in required_in_names:
                 continue
             if not wiring_map.upstream(node.id, port.id):
                 raise UnboundInputError(
@@ -177,8 +183,10 @@ def compile_to_code(graph: Graph) -> str:
                       outside the supported catalog (full catalog is Epic
                       10) and for agent/LangGraph targets (deferred to Epic
                       11).
-        UnboundInputError: If any input port in the graph is not connected to
-                           an upstream output port.
+        UnboundInputError: If a *required* input port (per its `PortSpec`) is
+                           not connected to an upstream output port. An
+                           optional (`required=False`) IN port left
+                           unconnected is instead bound to the `None` literal.
         CycleError: If the graph contains a cycle (propagated from
                     `topological_sort`).
         GraphValidationError: If the graph has an error-severity validation

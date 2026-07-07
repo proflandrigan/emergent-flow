@@ -21,12 +21,15 @@ from .cluster_detect import ClusterDetect
 from .correlation import Correlation
 from .cross_validate import CrossValidate
 from .describe import Describe
+from .diagnostic_frame import DiagnosticFrame
+from .diagnostic_model import DiagnosticModel
 from .drop_missing import DropMissing
 from .eval_label import EvalLabel
 from .eval_run import EvalRun
 from .evaluate import Evaluate
 from .filter_rows import FilterRows
 from .fit_estimator import FitEstimator
+from .fit_model import FitModel
 from .fit_transform import FitTransform
 from .grid_search import GridSearch
 from .impute import ImputeMissing
@@ -59,12 +62,15 @@ __all__ = [
     "Correlation",
     "CrossValidate",
     "Describe",
+    "DiagnosticFrame",
+    "DiagnosticModel",
     "DropMissing",
     "EvalLabel",
     "EvalRun",
     "Evaluate",
     "FilterRows",
     "FitEstimator",
+    "FitModel",
     "FitTransform",
     "GenerateHtmlSummary",
     "GridSearch",
