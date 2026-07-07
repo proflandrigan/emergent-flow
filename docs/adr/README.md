@@ -54,7 +54,7 @@ connectors) and fixes the secret-free connection-reference boundary; it governs
 
 | ADR | Decision | Status |
 | :-- | :------- | :----- |
-| [0018](./0018-data-source-connector-seam.md) | Data-source connectors are a second injected effectful-client seam (`WarehouseClient`), resolved through one extensible client bundle; connection references in the IR stay secret-free | Proposed |
+| [0018](./0018-data-source-connector-seam.md) | Data-source connectors are a second injected effectful-client seam (`WarehouseClient`), resolved through one extensible client bundle; connection references in the IR stay secret-free | Accepted |
 
 ## Conventions
 

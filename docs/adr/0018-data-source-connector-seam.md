@@ -1,6 +1,6 @@
 # ADR 0018 — Data-source connectors are a second injected effectful-client seam; connection references stay secret-free
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-07-07
 - **Deciders:** SDK maintainers (proflandrigan)
 
