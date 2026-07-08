@@ -6,7 +6,7 @@
     "n-query": {
       "id": "n-query",
       "type": "data.query_builder",
-      "label": "Sales by Rep, Joined with Region Covariates",
+      "label": "Sales by Rep + Region",
       "paradigm": "functional",
       "params": [
         {
@@ -121,6 +121,13 @@
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-query-cost",
+          "name": "cost_estimate",
+          "direction": "out",
+          "data_type": "CostEstimate",
           "cardinality": "one"
         }
       ],

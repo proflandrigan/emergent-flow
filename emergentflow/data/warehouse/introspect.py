@@ -28,11 +28,14 @@ def describe_relation(
     connection: str,
     relation: str,
     client: WarehouseClient | None,
+    database: str | None = None,
+    schema: str | None = None,
 ) -> pd.DataFrame:
     """Return a tidy column-schema frame for *relation* under *connection*.
 
-    Pure aside from the single delegated effect
-    ``client.describe_relation(connection, relation)``.
+    *database*/*schema* disambiguate a *relation* name that exists in more than one
+    schema. Pure aside from the single delegated effect
+    ``client.describe_relation(connection, relation, database=database, schema=schema)``.
 
     Raises
     ------
@@ -45,4 +48,4 @@ def describe_relation(
             "execute(graph, clients=Clients(warehouse=...)) or the compiled module's "
             "main(clients=...)."
         )
-    return client.describe_relation(connection, relation)
+    return client.describe_relation(connection, relation, database=database, schema=schema)

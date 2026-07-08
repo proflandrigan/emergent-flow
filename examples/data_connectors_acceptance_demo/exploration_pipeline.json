@@ -47,6 +47,13 @@
           "direction": "out",
           "data_type": "DataFrame",
           "cardinality": "one"
+        },
+        {
+          "id": "p-query-cost",
+          "name": "cost_estimate",
+          "direction": "out",
+          "data_type": "CostEstimate",
+          "cardinality": "one"
         }
       ],
       "position": {

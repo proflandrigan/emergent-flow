@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import {
   MoreHorizontal,
   PanelLeftClose,
@@ -49,6 +49,47 @@ function Divider(): JSX.Element {
         background: "var(--border-subtle)",
       }}
     />
+  );
+}
+
+// Shared backdrop + centered panel for the overflow menu's "Manage connections"/
+// "Browse schema" overlays -- one place for backdrop/centering/click-outside-to-close
+// behavior instead of duplicating it per overlay.
+function OverlayModal({
+  width,
+  onClose,
+  children,
+}: {
+  width: number;
+  onClose: () => void;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 30,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(0, 0, 0, 0.4)",
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="glass"
+        style={{
+          width,
+          maxHeight: "70vh",
+          overflow: "auto",
+          padding: "var(--space-4)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -400,59 +441,15 @@ export function App(): JSX.Element {
       </div>
 
       {connectionsOpen && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 30,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(0, 0, 0, 0.4)",
-          }}
-          onClick={() => setConnectionsOpen(false)}
-        >
-          <div
-            className="glass"
-            style={{
-              width: 480,
-              maxHeight: "70vh",
-              overflow: "auto",
-              padding: "var(--space-4)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <ConnectionManagerPanel />
-          </div>
-        </div>
+        <OverlayModal width={480} onClose={() => setConnectionsOpen(false)}>
+          <ConnectionManagerPanel />
+        </OverlayModal>
       )}
 
       {schemaBrowserOpen && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 30,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(0, 0, 0, 0.4)",
-          }}
-          onClick={() => setSchemaBrowserOpen(false)}
-        >
-          <div
-            className="glass"
-            style={{
-              width: 560,
-              maxHeight: "70vh",
-              overflow: "auto",
-              padding: "var(--space-4)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <SchemaBrowserPanel />
-          </div>
-        </div>
+        <OverlayModal width={560} onClose={() => setSchemaBrowserOpen(false)}>
+          <SchemaBrowserPanel />
+        </OverlayModal>
       )}
     </div>
   );

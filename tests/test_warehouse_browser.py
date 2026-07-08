@@ -20,8 +20,8 @@ class _FakeClient:
         self.calls.append(("list_relations", connection, database, schema))
         return pd.DataFrame({"table": ["t1"]})
 
-    def describe_relation(self, connection, relation):
-        self.calls.append(("describe_relation", connection, relation))
+    def describe_relation(self, connection, relation, *, database=None, schema=None):
+        self.calls.append(("describe_relation", connection, relation, database, schema))
         return pd.DataFrame({"column": ["c1"]})
 
 

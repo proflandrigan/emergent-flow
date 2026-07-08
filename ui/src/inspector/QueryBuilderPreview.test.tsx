@@ -76,11 +76,19 @@ test("data.query_builder Estimate cost button fetches /execute_node and shows co
         results: {
           [id]: {
             frame: {
-              kind: "record",
-              type: "QueryResult",
-              fields: {
-                bytes_scanned: { kind: "scalar", value: 4096 },
-                cost_usd: { kind: "scalar", value: 0.0005 },
+              kind: "table",
+              columns: [],
+              dtypes: [],
+              shape: [0, 0],
+              head: [],
+              truncated: false,
+            },
+            cost_estimate: {
+              kind: "json",
+              value: {
+                dialect: "duckdb",
+                bytes_scanned: 4096,
+                cost_usd: 0.0005,
               },
             },
           },
@@ -104,8 +112,12 @@ test("data.query_builder Estimate cost button fetches /execute_node and shows co
   await waitFor(() =>
     expect(screen.getByTestId("query-builder-cost-badge")).toBeInTheDocument(),
   );
-  expect(screen.getByTestId("query-builder-cost-badge")).toHaveTextContent("4,096 bytes scanned");
-  expect(screen.getByTestId("query-builder-cost-badge")).toHaveTextContent("$0.000500 estimated");
+  expect(screen.getByTestId("query-builder-cost-badge")).toHaveTextContent(
+    "4,096 bytes scanned",
+  );
+  expect(screen.getByTestId("query-builder-cost-badge")).toHaveTextContent(
+    "$0.000500 estimated",
+  );
 });
 
 test("data.sql_query does NOT render query-builder-specific elements", () => {
@@ -115,7 +127,9 @@ test("data.sql_query does NOT render query-builder-specific elements", () => {
   const node = useGraphStore.getState().nodes[id];
   render(<ConfigForm node={node} />);
 
-  expect(screen.queryByTestId("query-builder-sql-preview")).not.toBeInTheDocument();
+  expect(
+    screen.queryByTestId("query-builder-sql-preview"),
+  ).not.toBeInTheDocument();
   expect(
     screen.queryByTestId("query-builder-estimate-cost"),
   ).not.toBeInTheDocument();

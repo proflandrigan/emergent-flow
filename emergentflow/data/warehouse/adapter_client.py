@@ -100,6 +100,15 @@ class AdapterWarehouseClient:
             credentials, database=database, schema=schema
         )
 
-    def describe_relation(self, connection: str, relation: str) -> pd.DataFrame:
+    def describe_relation(
+        self,
+        connection: str,
+        relation: str,
+        *,
+        database: str | None = None,
+        schema: str | None = None,
+    ) -> pd.DataFrame:
         profile, credentials = self._resolve(connection)
-        return self._adapter_for(profile.dialect).describe_relation(credentials, relation)
+        return self._adapter_for(profile.dialect).describe_relation(
+            credentials, relation, database=database, schema=schema
+        )

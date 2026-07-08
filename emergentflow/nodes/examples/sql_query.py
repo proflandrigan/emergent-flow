@@ -34,7 +34,7 @@ class SqlQuery(NodeDefinition):
     """Run a raw SQL query against a warehouse and return a DataFrame."""
 
     type = "data.sql_query"
-    version = 1
+    version = 2
     family = "data"
     label = "SQL Query"
     category = "Ingest"
@@ -47,7 +47,16 @@ class SqlQuery(NodeDefinition):
             name="frame",
             direction=Direction.OUT,
             data_type="DataFrame",
-            help="The query result as a pandas DataFrame.",
+            help="The query result as a pandas DataFrame. Always a genuine (possibly "
+            "empty) DataFrame, including under dry_run -- see cost_estimate for the "
+            "byte-scan/cost metadata dry_run reports instead of real rows.",
+        ),
+        PortSpec(
+            name="cost_estimate",
+            direction=Direction.OUT,
+            data_type="CostEstimate",
+            help="Cost/byte-scan metadata (dialect/bytes_scanned/cost_usd) for this query, "
+            "when the adapter reports it. Always present, even outside dry_run.",
         ),
     ]
     params = [
@@ -101,27 +110,28 @@ class SqlQuery(NodeDefinition):
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         sql, connection, dialect, max_rows, dry_run = self._args(node)
-        # Unwrap to the bare DataFrame (matching the port's declared "DataFrame" type,
-        # so it flows into the rest of the analyst surface for free) EXCEPT under
-        # dry_run, where the QueryResult carries the CostEstimate metadata
-        # (bytes_scanned/cost_usd) the canvas's cost badge reads -- its df is always
-        # empty (see emergentflow.data.warehouse.protocol.dry_run_result), so there is
-        # no real DataFrame to unwrap to in that mode. dry_run is a static node param,
-        # so this is a compile-time choice, not a runtime branch.
-        suffix = "" if dry_run else ".df"
-        return CodeFragment(
-            imports=["import emergentflow as ef"],
-            body=(
-                f"{ctx.out_var('frame')} = ef.data.query(\n"
-                f"    sql={sql!r},\n"
-                f"    connection={connection!r},\n"
-                f"    dialect={dialect!r},\n"
-                f"    client=warehouse,\n"
-                f"    max_rows={max_rows!r},\n"
-                f"    dry_run={dry_run!r},\n"
-                f"){suffix}"
-            ),
-        )
+        # The 'frame' port is always a genuine DataFrame -- empty under dry_run (see
+        # emergentflow.data.warehouse.protocol.dry_run_result), never the QueryResult
+        # wrapper itself, so its declared type holds regardless of the dry_run param.
+        # The QueryResult's cost/byte-scan metadata (populated under dry_run, and by
+        # some adapters on a real run too) goes out its own 'cost_estimate' port instead
+        # of overloading 'frame' with two different shapes.
+        bundle = f"_{ctx.out_var('frame')}_bundle"
+        lines = [
+            f"{bundle} = ef.data.query(",
+            f"    sql={sql!r},",
+            f"    connection={connection!r},",
+            f"    dialect={dialect!r},",
+            "    client=warehouse,",
+            f"    max_rows={max_rows!r},",
+            f"    dry_run={dry_run!r},",
+            ")",
+            f"{ctx.out_var('frame')} = {bundle}.df",
+            f"{ctx.out_var('cost_estimate')} = "
+            f'{{"dialect": {bundle}.dialect, "bytes_scanned": {bundle}.bytes_scanned, '
+            f'"cost_usd": {bundle}.cost_usd}}',
+        ]
+        return CodeFragment(imports=["import emergentflow as ef"], body="\n".join(lines))
 
     def execute(
         self, node: Node, inputs: dict[str, Any], *, client: WarehouseClient | None = None
@@ -135,4 +145,11 @@ class SqlQuery(NodeDefinition):
             max_rows=max_rows,
             dry_run=dry_run,
         )
-        return {"frame": result if dry_run else result.df}
+        return {
+            "frame": result.df,
+            "cost_estimate": {
+                "dialect": result.dialect,
+                "bytes_scanned": result.bytes_scanned,
+                "cost_usd": result.cost_usd,
+            },
+        }

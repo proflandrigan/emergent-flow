@@ -105,6 +105,12 @@ def build_exploration_demo() -> Graph:
         ],
         ports=[
             Port(id="p-query-frame", name="frame", direction=Direction.OUT, data_type="DataFrame"),
+            Port(
+                id="p-query-cost",
+                name="cost_estimate",
+                direction=Direction.OUT,
+                data_type="CostEstimate",
+            ),
         ],
         position=Position(x=0.0, y=0.0),
     )

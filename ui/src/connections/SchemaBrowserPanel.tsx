@@ -100,7 +100,7 @@ export function SchemaBrowserPanel(): JSX.Element {
   // name -- two different schemas can have a same-named table, and buildRelationTree
   // already nests them under separate DatabaseNode/SchemaNode entries, so the expand/cache
   // state must not collapse them onto one key.
-  function toggleTable(key: string, table: string) {
+  function toggleTable(key: string, databaseName: string, schemaName: string, table: string) {
     setExpandedTables((prev) => {
       const next = new Set(prev);
       if (next.has(key)) {
@@ -113,9 +113,13 @@ export function SchemaBrowserPanel(): JSX.Element {
 
     if (columnCache[key]) return;
     setColumnCache((cache) => ({ ...cache, [key]: "loading" }));
-    fetch(
-      `/connections/${encodeURIComponent(selectedConnection)}/schema?relation=${encodeURIComponent(table)}`,
-    )
+    // "(default)" is buildRelationTree's placeholder for a null database/schema (see
+    // buildRelationTree above) -- send it to the server only as a real filter value, never
+    // as the literal placeholder string.
+    const params = new URLSearchParams({ relation: table });
+    if (databaseName !== "(default)") params.set("database", databaseName);
+    if (schemaName !== "(default)") params.set("schema", schemaName);
+    fetch(`/connections/${encodeURIComponent(selectedConnection)}/schema?${params.toString()}`)
       .then(async (res) => {
         const body = await res.json();
         if (!res.ok) {
@@ -262,7 +266,7 @@ export function SchemaBrowserPanel(): JSX.Element {
                                 cursor: "pointer",
                                 color: "var(--text-primary)",
                               }}
-                              onClick={() => toggleTable(key, table)}
+                              onClick={() => toggleTable(key, db.name, schema.name, table)}
                             >
                               {expandedTables.has(key) ? (
                                 <ChevronDown size={14} />

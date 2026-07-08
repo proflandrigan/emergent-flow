@@ -388,4 +388,100 @@ describe("SchemaBrowserPanel", () => {
 
     expect(relationCallCount).toBe(1);
   });
+
+  test("same-named table in two schemas expands/fetches independently, scoped by database+schema", async () => {
+    const relationCalls: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("relation=")) {
+        relationCalls.push(url);
+        const columnName = url.includes("schema=analytics") ? "region" : "id";
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              rows: [
+                {
+                  database: "mydb",
+                  schema: url.includes("schema=analytics") ? "analytics" : "public",
+                  table: "users",
+                  column: columnName,
+                  data_type: "text",
+                  nullable: false,
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+      if (url === "http://127.0.0.1:8765/connections" || url === "/connections") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              connections: [{ name: "myconn", dialect: "postgres", auth_method: "password_env" }],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            rows: [
+              {
+                database: "mydb",
+                schema: "public",
+                table: "users",
+                column: null,
+                data_type: null,
+                nullable: null,
+              },
+              {
+                database: "mydb",
+                schema: "analytics",
+                table: "users",
+                column: null,
+                data_type: null,
+                nullable: null,
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    });
+
+    render(<SchemaBrowserPanel />);
+
+    await waitFor(() => {
+      expect(
+        (screen.getByTestId("schema-connection-picker") as HTMLSelectElement).options.length,
+      ).toBe(2);
+    });
+
+    fireEvent.change(screen.getByTestId("schema-connection-picker"), {
+      target: { value: "myconn" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("schema-table-users")).toHaveLength(2);
+    });
+
+    // buildRelationTree sorts schemas alphabetically, so "analytics" renders before "public".
+    const [analyticsRow, publicRow] = screen.getAllByTestId("schema-table-users");
+
+    fireEvent.click(analyticsRow);
+    await waitFor(() => expect(relationCalls).toHaveLength(1));
+    expect(relationCalls[0]).toContain("schema=analytics");
+
+    fireEvent.click(publicRow);
+    await waitFor(() => expect(relationCalls).toHaveLength(2));
+    expect(relationCalls[1]).toContain("schema=public");
+    expect(relationCalls[1]).not.toContain("schema=analytics");
+
+    // Both tables are independently expanded and cached under separate columns.
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/^schema-columns-loading-users$|^schema-column-users-/)).not.toHaveLength(0);
+    });
+  });
 });

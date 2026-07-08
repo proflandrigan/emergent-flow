@@ -89,7 +89,7 @@ def build_warehouse_stats_demo() -> Graph:
     node_query = Node(
         id="n-query",
         type="data.query_builder",
-        label="Sales by Rep, Joined with Region Covariates",
+        label="Sales by Rep + Region",
         paradigm=Paradigm.FUNCTIONAL,
         params=[
             Param(name="source", type_token="str", value="sales"),
@@ -127,6 +127,12 @@ def build_warehouse_stats_demo() -> Graph:
         ],
         ports=[
             Port(id="p-query-frame", name="frame", direction=Direction.OUT, data_type="DataFrame"),
+            Port(
+                id="p-query-cost",
+                name="cost_estimate",
+                direction=Direction.OUT,
+                data_type="CostEstimate",
+            ),
         ],
         position=Position(x=0.0, y=0.0),
     )

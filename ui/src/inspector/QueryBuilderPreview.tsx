@@ -14,7 +14,14 @@ function buildSpec(node: NodeModel): Record<string, unknown> {
   const spec: Record<string, unknown> = {
     source: String(values.source ?? ""),
   };
-  for (const key of ["select", "where", "join", "group_by", "having", "order_by"] as const) {
+  for (const key of [
+    "select",
+    "where",
+    "join",
+    "group_by",
+    "having",
+    "order_by",
+  ] as const) {
     const val = values[key];
     if (val && Array.isArray(val) && val.length > 0) {
       spec[key] = val;
@@ -39,7 +46,9 @@ function findParamValue(node: NodeModel, name: string): unknown {
   return null;
 }
 
-export function QueryBuilderPreview({ node }: QueryBuilderPreviewProps): JSX.Element {
+export function QueryBuilderPreview({
+  node,
+}: QueryBuilderPreviewProps): JSX.Element {
   const [sql, setSql] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [costLoading, setCostLoading] = useState(false);
@@ -118,20 +127,32 @@ export function QueryBuilderPreview({ node }: QueryBuilderPreviewProps): JSX.Ele
         }
         const data = (await res.json()) as {
           statuses?: Record<string, { status: string; error?: string }>;
-          results?: Record<string, Record<string, { kind: string; fields?: Record<string, { kind: string; value: unknown }> }>>;
+          results?: Record<
+            string,
+            Record<string, { kind: string; value?: unknown }>
+          >;
         };
         const nodeStatus = data.statuses?.[nodeId];
         if (!nodeStatus || nodeStatus.status === "error") {
           setCostError(nodeStatus?.error ?? "Dry run returned an error status");
           return;
         }
-        const framePayload = data.results?.[nodeId]?.frame;
-        if (framePayload?.kind === "record" && framePayload.fields) {
-          const bsField = framePayload.fields.bytes_scanned;
-          const costField = framePayload.fields.cost_usd;
+        // 'cost_estimate' is always a plain {dialect, bytes_scanned, cost_usd} dict
+        // (serialized as kind: "json"), never the query's 'frame' output -- 'frame' stays
+        // a genuine (empty, under dry_run) DataFrame regardless of dry_run.
+        const costPayload = data.results?.[nodeId]?.cost_estimate;
+        if (
+          costPayload?.kind === "json" &&
+          costPayload.value &&
+          typeof costPayload.value === "object"
+        ) {
+          const value = costPayload.value as {
+            bytes_scanned?: number | null;
+            cost_usd?: number | null;
+          };
           setCostResult({
-            bytesScanned: bsField?.kind === "scalar" ? (bsField.value as number | null) : null,
-            costUsd: costField?.kind === "scalar" ? (costField.value as number | null) : null,
+            bytesScanned: value.bytes_scanned ?? null,
+            costUsd: value.cost_usd ?? null,
           });
         } else {
           setCostError("Unexpected response format from dry run");
@@ -193,7 +214,11 @@ export function QueryBuilderPreview({ node }: QueryBuilderPreviewProps): JSX.Ele
       {costError ? (
         <div
           data-testid="query-builder-cost-error"
-          style={{ color: "var(--danger)", fontSize: "0.8rem", marginTop: "0.25rem" }}
+          style={{
+            color: "var(--danger)",
+            fontSize: "0.8rem",
+            marginTop: "0.25rem",
+          }}
         >
           {costError}
         </div>

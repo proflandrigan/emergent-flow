@@ -766,14 +766,15 @@ def get_connection_schema(
     """Browse one connection's schema (GET /connections/{name}/schema).
 
     Without `relation`: lists relations (optionally scoped to database/schema). With `relation`:
-    describes that relation's columns. Mirrors the two-mode shape of
+    describes that relation's columns, scoped to database/schema when given so a relation name
+    that exists in more than one schema resolves to the right one. Mirrors the two-mode shape of
     emergentflow.data.warehouse.browser's two functions.
     """
     from emergentflow.data.warehouse.browser import describe_relation, list_relations
 
     client = _get_warehouse_client()
     if relation is not None:
-        df = describe_relation(client, name, relation)
+        df = describe_relation(client, name, relation, database=database, schema=schema)
     else:
         df = list_relations(client, name, database=database, schema=schema)
     return {"rows": df.to_dict(orient="records")}

@@ -128,3 +128,14 @@ register_type(
         ),
     )
 )
+register_type(
+    TypeDef(
+        token="CostEstimate",
+        description=(
+            "Cost/byte-scan metadata (bytes_scanned/cost_usd/dialect) for a warehouse query, "
+            "produced alongside a query node's 'frame' DataFrame output whether or not the "
+            "query ran under dry_run (Epic 13, ADR 0018). A terminal, JSON-native summary -- "
+            "does not carry query data, so it is distinct from 'frame'."
+        ),
+    )
+)

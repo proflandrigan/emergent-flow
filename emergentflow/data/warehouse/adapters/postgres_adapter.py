@@ -152,6 +152,9 @@ class PostgresAdapter:
         self,
         credentials: Mapping[str, str],
         relation: str,
+        *,
+        database: str | None = None,
+        schema: str | None = None,
     ) -> pd.DataFrame:
         _require_driver()
         engine = self._engine(credentials)
@@ -162,11 +165,15 @@ class PostgresAdapter:
             "THEN true ELSE false END AS nullable "
             "FROM information_schema.columns "
             f"WHERE table_name = '{_escape_literal(relation)}' "
-            "ORDER BY ordinal_position"
         )
+        if database:
+            sql += f"AND table_catalog = '{_escape_literal(database)}' "
+        if schema:
+            sql += f"AND table_schema = '{_escape_literal(schema)}' "
+        sql += "ORDER BY ordinal_position"
         with engine.connect() as conn:
             df = pd.read_sql(sql, conn)
-        df["database"] = None
-        df["schema"] = None
+        df["database"] = database
+        df["schema"] = schema
         df["table"] = relation
         return df[list(RELATION_SCHEMA_COLUMNS)]
