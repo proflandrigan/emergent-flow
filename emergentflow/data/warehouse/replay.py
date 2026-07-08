@@ -18,6 +18,7 @@ seam pattern rather than inventing a new one).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from io import StringIO
@@ -31,11 +32,71 @@ from emergentflow.data.warehouse.protocol import (
     FixtureMissError,
     QueryRequest,
     QueryResult,
+    dry_run_result,
 )
 
 
 def _fixture_path(fixtures_dir: Path, content_hash: str) -> Path:
     return fixtures_dir / f"{content_hash}.json"
+
+
+def _dry_run_fixture_path(fixtures_dir: Path, content_hash: str) -> Path:
+    return fixtures_dir / f"{content_hash}.dryrun.json"
+
+
+def _estimate_to_dict(estimate: CostEstimate) -> dict:
+    return {
+        "dialect": estimate.dialect,
+        "bytes_scanned": estimate.bytes_scanned,
+        "estimated_rows": estimate.estimated_rows,
+        "cost_usd": estimate.cost_usd,
+    }
+
+
+def _estimate_from_dict(payload: dict) -> CostEstimate:
+    return CostEstimate(
+        dialect=payload["dialect"],
+        bytes_scanned=payload["bytes_scanned"],
+        estimated_rows=payload["estimated_rows"],
+        cost_usd=payload["cost_usd"],
+    )
+
+
+def _introspection_hash(**payload: str | None) -> str:
+    """Return a stable sha256 hex digest identifying one introspection call.
+
+    Mirrors ``QueryRequest.content_hash()`` (sorted-keys JSON, sha256) but for
+    the ``list_relations``/``describe_relation`` argument shape, which has no
+    dataclass of its own. ``payload`` must include a ``"method"`` key
+    (``"list_relations"`` or ``"describe_relation"``) so the two call kinds never
+    collide even with otherwise-identical arguments.
+    """
+    blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def _relations_fixture_path(fixtures_dir: Path, content_hash: str) -> Path:
+    return fixtures_dir / f"{content_hash}.relations.json"
+
+
+def _describe_fixture_path(fixtures_dir: Path, content_hash: str) -> Path:
+    return fixtures_dir / f"{content_hash}.describe.json"
+
+
+def _frame_to_dict(df: pd.DataFrame) -> dict:
+    """Serialize a tidy schema DataFrame via pandas Table Schema orient.
+
+    Mirrors the ``df`` handling inside ``_result_to_dict`` so column dtypes
+    round-trip exactly and the default RangeIndex never leaks into the fixture.
+    """
+    return json.loads(df.reset_index(drop=True).to_json(orient="table"))
+
+
+def _frame_from_dict(payload: dict) -> pd.DataFrame:
+    """Reconstruct a tidy DataFrame from the dict shape ``_frame_to_dict`` writes."""
+    frame = pd.read_json(StringIO(json.dumps(payload)), orient="table").reset_index(drop=True)
+    frame.index.name = None
+    return frame
 
 
 def _result_to_dict(result: QueryResult) -> dict:
@@ -97,14 +158,75 @@ def write_fixture(
     return path
 
 
+def write_dry_run_fixture(
+    fixtures_dir: str | os.PathLike[str], request: QueryRequest, estimate: CostEstimate
+) -> Path:
+    """Write *estimate* as the recorded ``dry_run`` fixture for *request*.
+
+    Creates *fixtures_dir* if it does not exist. The fixture file is named
+    ``<request.content_hash()>.dryrun.json`` — note ``QueryRequest.content_hash()``
+    already includes the ``dry_run`` field, so a dry-run request and the
+    equivalent live-run request never collide on the same hash even though they
+    also differ by the ``.dryrun`` filename suffix.
+    """
+    dir_path = Path(fixtures_dir)
+    dir_path.mkdir(parents=True, exist_ok=True)
+    path = _dry_run_fixture_path(dir_path, request.content_hash())
+    path.write_text(json.dumps(_estimate_to_dict(estimate), indent=2, sort_keys=True) + "\n")
+    return path
+
+
+def write_relations_fixture(
+    fixtures_dir: str | os.PathLike[str],
+    connection: str,
+    df: pd.DataFrame,
+    *,
+    database: str | None = None,
+    schema: str | None = None,
+) -> Path:
+    """Write *df* as the recorded ``list_relations`` fixture for these arguments.
+
+    Creates *fixtures_dir* if it does not exist. Companion writer to
+    ``write_fixture``, for the introspection path (Epic 13 Story 7).
+    """
+    dir_path = Path(fixtures_dir)
+    dir_path.mkdir(parents=True, exist_ok=True)
+    content_hash = _introspection_hash(
+        method="list_relations", connection=connection, database=database, schema=schema
+    )
+    path = _relations_fixture_path(dir_path, content_hash)
+    path.write_text(json.dumps(_frame_to_dict(df), indent=2, sort_keys=True) + "\n")
+    return path
+
+
+def write_describe_fixture(
+    fixtures_dir: str | os.PathLike[str],
+    connection: str,
+    relation: str,
+    df: pd.DataFrame,
+) -> Path:
+    """Write *df* as the recorded ``describe_relation`` fixture for these arguments.
+
+    Creates *fixtures_dir* if it does not exist. Companion writer to
+    ``write_fixture``, for the introspection path (Epic 13 Story 7).
+    """
+    dir_path = Path(fixtures_dir)
+    dir_path.mkdir(parents=True, exist_ok=True)
+    content_hash = _introspection_hash(
+        method="describe_relation", connection=connection, relation=relation
+    )
+    path = _describe_fixture_path(dir_path, content_hash)
+    path.write_text(json.dumps(_frame_to_dict(df), indent=2, sort_keys=True) + "\n")
+    return path
+
+
 class ReplayWarehouseClient:
     """A pure ``WarehouseClient`` that replays recorded ``QueryResult``s from disk.
 
     Structurally satisfies ``emergentflow.data.warehouse.protocol.WarehouseClient``
-    for the ``run`` path (no inheritance required). Introspection replay
-    (``list_relations``/``describe_relation``) and ``dry_run`` replay arrive with
-    Story 7/8; for now they raise ``NotImplementedError`` so a miswired call fails
-    loudly rather than silently.
+    for the ``run``, ``dry_run``, ``list_relations``, and ``describe_relation``
+    paths — every method replays a content-addressed fixture; none construct a
+    live connection.
 
     Parameters
     ----------
@@ -120,12 +242,18 @@ class ReplayWarehouseClient:
     def run(self, request: QueryRequest) -> QueryResult:
         """Replay the fixture recorded for *request*.
 
+        When ``request.dry_run`` is True, delegates to ``self.dry_run(request)``
+        and wraps the replayed ``CostEstimate`` as an empty ``QueryResult``
+        instead of replaying a query-result fixture (Epic 13 Story 8).
+
         Raises
         ------
         FixtureMissError
             If no fixture exists for ``request.content_hash()``. The message
             includes the hash and a copy-pasteable ``write_fixture(...)`` call.
         """
+        if request.dry_run:
+            return dry_run_result(self.dry_run(request))
         content_hash = request.content_hash()
         path = _fixture_path(self.fixtures_dir, content_hash)
         if not path.exists():
@@ -139,19 +267,75 @@ class ReplayWarehouseClient:
         payload = json.loads(path.read_text())
         return _result_from_dict(payload)
 
-    def dry_run(self, request: QueryRequest) -> CostEstimate:  # pragma: no cover - Story 8
-        raise NotImplementedError("ReplayWarehouseClient.dry_run arrives with Epic 13 Story 8.")
+    def dry_run(self, request: QueryRequest) -> CostEstimate:
+        """Replay the fixture recorded for this ``dry_run`` call.
+
+        Raises
+        ------
+        FixtureMissError
+            If no fixture exists for ``request.content_hash()``. The message
+            includes the hash and a copy-pasteable ``write_dry_run_fixture(...)`` call.
+        """
+        content_hash = request.content_hash()
+        path = _dry_run_fixture_path(self.fixtures_dir, content_hash)
+        if not path.exists():
+            raise FixtureMissError(
+                f"No recorded dry-run fixture for query request hash {content_hash!r} "
+                f"(looked in {self.fixtures_dir}). To record one:\n"
+                f"    from emergentflow.data.warehouse.replay import write_dry_run_fixture\n"
+                f"    write_dry_run_fixture({str(self.fixtures_dir)!r}, request, estimate)  "
+                f"# estimate is the CostEstimate you want this request to replay"
+            )
+        payload = json.loads(path.read_text())
+        return _estimate_from_dict(payload)
 
     def list_relations(
         self, connection: str, *, database: str | None = None, schema: str | None = None
-    ) -> pd.DataFrame:  # pragma: no cover - Story 7
-        raise NotImplementedError(
-            "ReplayWarehouseClient.list_relations arrives with Epic 13 Story 7."
-        )
+    ) -> pd.DataFrame:
+        """Replay the fixture recorded for this ``list_relations`` call.
 
-    def describe_relation(
-        self, connection: str, relation: str
-    ) -> pd.DataFrame:  # pragma: no cover - Story 7
-        raise NotImplementedError(
-            "ReplayWarehouseClient.describe_relation arrives with Epic 13 Story 7."
+        Raises
+        ------
+        FixtureMissError
+            If no fixture exists for this call's introspection hash. The message
+            includes the hash and a copy-pasteable ``write_relations_fixture(...)`` call.
+        """
+        content_hash = _introspection_hash(
+            method="list_relations", connection=connection, database=database, schema=schema
         )
+        path = _relations_fixture_path(self.fixtures_dir, content_hash)
+        if not path.exists():
+            raise FixtureMissError(
+                f"No recorded fixture for list_relations call hash {content_hash!r} "
+                f"(looked in {self.fixtures_dir}). To record one:\n"
+                f"    from emergentflow.data.warehouse.replay import write_relations_fixture\n"
+                f"    write_relations_fixture({str(self.fixtures_dir)!r}, {connection!r}, df, "
+                f"database={database!r}, schema={schema!r})  "
+                f"# df is the DataFrame you want this call to replay"
+            )
+        payload = json.loads(path.read_text())
+        return _frame_from_dict(payload)
+
+    def describe_relation(self, connection: str, relation: str) -> pd.DataFrame:
+        """Replay the fixture recorded for this ``describe_relation`` call.
+
+        Raises
+        ------
+        FixtureMissError
+            If no fixture exists for this call's introspection hash. The message
+            includes the hash and a copy-pasteable ``write_describe_fixture(...)`` call.
+        """
+        content_hash = _introspection_hash(
+            method="describe_relation", connection=connection, relation=relation
+        )
+        path = _describe_fixture_path(self.fixtures_dir, content_hash)
+        if not path.exists():
+            raise FixtureMissError(
+                f"No recorded fixture for describe_relation call hash {content_hash!r} "
+                f"(looked in {self.fixtures_dir}). To record one:\n"
+                f"    from emergentflow.data.warehouse.replay import write_describe_fixture\n"
+                f"    write_describe_fixture({str(self.fixtures_dir)!r}, {connection!r}, "
+                f"{relation!r}, df)  # df is the DataFrame you want this call to replay"
+            )
+        payload = json.loads(path.read_text())
+        return _frame_from_dict(payload)

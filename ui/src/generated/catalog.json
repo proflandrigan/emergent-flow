@@ -2389,6 +2389,64 @@
     },
     {
       "category": "Ingest",
+      "description": "Describe a relation's columns (name/dtype/nullable) as a tidy DataFrame.",
+      "family": "data",
+      "label": "Describe Relation",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "The named connection profile to run against (from your local store).",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "connection"
+          },
+          "label": "Connection",
+          "name": "connection",
+          "required": true,
+          "type_token": "ConnectionRef"
+        },
+        {
+          "default": null,
+          "help": "The relation (table) name to describe.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Relation",
+          "name": "relation",
+          "required": true,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The relation's column schema as a tidy pandas DataFrame.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.describe_relation",
+      "version": 1
+    },
+    {
+      "category": "Ingest",
       "description": "Load a CSV file into a pandas DataFrame.",
       "family": "data",
       "label": "Load CSV",
