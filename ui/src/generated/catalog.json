@@ -1,5 +1,5 @@
 {
-  "catalog_version": 3,
+  "catalog_version": 4,
   "charts": [
     {
       "category": "Visualization",
@@ -238,6 +238,109 @@
         "points"
       ],
       "px_function": "violin"
+    }
+  ],
+  "connectors": [
+    {
+      "adapter": "emergentflow.data.warehouse.adapters.bigquery_adapter.BigQueryAdapter",
+      "auth_schema": {
+        "credentials_json": {
+          "help": "Path to a service-account JSON key file.",
+          "required": false,
+          "type": "str"
+        },
+        "project": {
+          "help": "GCP project ID.",
+          "required": true,
+          "type": "str"
+        }
+      },
+      "description": "Google BigQuery data warehouse.",
+      "dialect": "bigquery",
+      "extra": "emergentflow[bigquery]",
+      "label": "BigQuery"
+    },
+    {
+      "adapter": "emergentflow.data.warehouse.adapters.duckdb_adapter.DuckDBAdapter",
+      "auth_schema": {
+        "path": {
+          "help": "Path to a .duckdb file; defaults to :memory:.",
+          "required": false,
+          "type": "str"
+        }
+      },
+      "description": "In-process SQL engine for local parquet, CSV, and DuckDB files.",
+      "dialect": "duckdb",
+      "extra": null,
+      "label": "DuckDB"
+    },
+    {
+      "adapter": "emergentflow.data.warehouse.adapters.postgres_adapter.PostgresAdapter",
+      "auth_schema": {
+        "database": {
+          "help": "Database name.",
+          "required": true,
+          "type": "str"
+        },
+        "host": {
+          "help": "Database host.",
+          "required": true,
+          "type": "str"
+        },
+        "password": {
+          "help": "Database password.",
+          "required": true,
+          "type": "str"
+        },
+        "port": {
+          "help": "Port (default 5432).",
+          "required": false,
+          "type": "str"
+        },
+        "user": {
+          "help": "Database user.",
+          "required": true,
+          "type": "str"
+        }
+      },
+      "description": "PostgreSQL database.",
+      "dialect": "postgres",
+      "extra": "emergentflow[postgres]",
+      "label": "PostgreSQL"
+    },
+    {
+      "adapter": "emergentflow.data.warehouse.adapters.redshift_adapter.RedshiftAdapter",
+      "auth_schema": {
+        "database": {
+          "help": "Database name.",
+          "required": true,
+          "type": "str"
+        },
+        "host": {
+          "help": "Redshift cluster endpoint.",
+          "required": true,
+          "type": "str"
+        },
+        "password": {
+          "help": "Database password.",
+          "required": true,
+          "type": "str"
+        },
+        "port": {
+          "help": "Port (default 5439).",
+          "required": false,
+          "type": "str"
+        },
+        "user": {
+          "help": "Database user.",
+          "required": true,
+          "type": "str"
+        }
+      },
+      "description": "Amazon Redshift data warehouse.",
+      "dialect": "redshift",
+      "extra": "emergentflow[redshift]",
+      "label": "Redshift"
     }
   ],
   "estimators": [
@@ -2482,6 +2585,384 @@
         }
       ],
       "type": "data.load_sample",
+      "version": 1
+    },
+    {
+      "category": "Ingest",
+      "description": "Build a SQL query from a structured spec (source, select, where, join, group_by, order_by) and return a DataFrame.",
+      "family": "data",
+      "label": "Query Builder",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "The base relation to query (e.g. 'sales').",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Source table",
+          "name": "source",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": [],
+          "help": "Columns / aggregates to select. Each item is a string or {'column': ..., 'agg': ..., 'alias': ...}.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Select columns",
+          "name": "select",
+          "required": false,
+          "type_token": "list"
+        },
+        {
+          "default": [],
+          "help": "Filter predicates. Each: {'column': ..., 'op': ..., 'value': ...}.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Where predicates",
+          "name": "where",
+          "required": false,
+          "type_token": "list"
+        },
+        {
+          "default": [],
+          "help": "Join specs. Each: {'relation': ..., 'on': [...], 'type': ...}.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Joins",
+          "name": "join",
+          "required": false,
+          "type_token": "list"
+        },
+        {
+          "default": [],
+          "help": "Column names to group by.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Group by",
+          "name": "group_by",
+          "required": false,
+          "type_token": "list"
+        },
+        {
+          "default": [],
+          "help": "HAVING filter predicates (same format as where).",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Having predicates",
+          "name": "having",
+          "required": false,
+          "type_token": "list"
+        },
+        {
+          "default": [],
+          "help": "Ordering specs. Each: a string or {'column': ..., 'desc': bool}.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Order by",
+          "name": "order_by",
+          "required": false,
+          "type_token": "list"
+        },
+        {
+          "default": null,
+          "help": "Row limit applied in the compiled SQL.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Limit",
+          "name": "limit",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": false,
+          "help": "When True, adds SELECT DISTINCT.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Distinct",
+          "name": "distinct",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": null,
+          "help": "The named connection profile to run against (from your local store).",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "connection"
+          },
+          "label": "Connection",
+          "name": "connection",
+          "required": true,
+          "type_token": "ConnectionRef"
+        },
+        {
+          "default": "duckdb",
+          "help": "SQL dialect.",
+          "hints": {
+            "choices": [
+              "duckdb",
+              "bigquery",
+              "redshift",
+              "postgres"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Dialect",
+          "name": "dialect",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional row cap (injected as LIMIT if absent).",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Max rows",
+          "name": "max_rows",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": false,
+          "help": "Return a cost estimate without running.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Dry run",
+          "name": "dry_run",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The query result as a pandas DataFrame.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.query_builder",
+      "version": 1
+    },
+    {
+      "category": "Ingest",
+      "description": "Run a raw SQL query against a warehouse connection and return a DataFrame.",
+      "family": "data",
+      "label": "SQL Query",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "The SQL query to run (SELECT/WITH only under read-only connections).",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "sql"
+          },
+          "label": "SQL",
+          "name": "sql",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "The named connection profile to run against (from your local store).",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "connection"
+          },
+          "label": "Connection",
+          "name": "connection",
+          "required": true,
+          "type_token": "ConnectionRef"
+        },
+        {
+          "default": "duckdb",
+          "help": "SQL dialect (e.g. 'duckdb', 'bigquery', 'redshift', 'postgres').",
+          "hints": {
+            "choices": [
+              "duckdb",
+              "bigquery",
+              "redshift",
+              "postgres"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Dialect",
+          "name": "dialect",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional row cap; injects LIMIT when absent from the SQL.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Max rows",
+          "name": "max_rows",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": false,
+          "help": "When True, return a cost estimate without running the query.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Dry run",
+          "name": "dry_run",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The query result as a pandas DataFrame.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.sql_query",
       "version": 1
     },
     {

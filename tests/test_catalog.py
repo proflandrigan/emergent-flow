@@ -15,6 +15,7 @@ from emergentflow.nodes.examples import (
     FilterRows,
     GenerateHtmlSummary,
     ImputeMissing,
+    LlmCall,
     LoadCsv,
     LoadJson,
     LoadParquet,
@@ -23,7 +24,9 @@ from emergentflow.nodes.examples import (
     NnModule,
     NnReLU,
     Predict,
+    QueryBuilder,
     SelectColumns,
+    SqlQuery,
     TrainClassifier,
     TrainRandomForest,
     TrainRegressor,
@@ -58,6 +61,9 @@ REFERENCE_NODES = [
     NnReLU,
     NnModule,
     VizPlot,
+    SqlQuery,
+    QueryBuilder,
+    LlmCall,
 ]
 
 _NODE_KEYS = {
@@ -84,11 +90,17 @@ def ref_registry() -> NodeRegistry:
 
 
 def test_catalog_version_constant():
-    assert CATALOG_VERSION == 3
+    assert CATALOG_VERSION == 4
 
 
 def test_top_level_keys(ref_registry: NodeRegistry):
-    assert set(export_catalog(ref_registry)) == {"catalog_version", "nodes", "estimators", "charts"}
+    assert set(export_catalog(ref_registry)) == {
+        "catalog_version",
+        "nodes",
+        "estimators",
+        "charts",
+        "connectors",
+    }
 
 
 def test_version_in_artifact(ref_registry: NodeRegistry):
@@ -134,6 +146,22 @@ def test_charts_present_and_sorted(ref_registry: NodeRegistry):
             "px_function",
             "encodings",
             "options",
+        }
+
+
+def test_connectors_present_and_sorted(ref_registry: NodeRegistry):
+    connectors = export_catalog(ref_registry)["connectors"]
+    assert connectors
+    dialects = [c["dialect"] for c in connectors]
+    assert dialects == sorted(dialects)
+    for entry in connectors:
+        assert set(entry) >= {
+            "dialect",
+            "label",
+            "extra",
+            "adapter",
+            "description",
+            "auth_schema",
         }
 
 

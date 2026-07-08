@@ -49,8 +49,10 @@ from .nn_module import NnModule
 from .nn_relu import NnReLU
 from .pipeline import Pipeline
 from .predict import Predict
+from .query_builder import QueryBuilder
 from .report import GenerateHtmlSummary
 from .select_columns import SelectColumns
+from .sql_query import SqlQuery
 from .summarize import Summarize
 from .train import TrainClassifier
 from .train_random_forest import TrainRandomForest
@@ -103,7 +105,9 @@ __all__ = [
     "NnReLU",
     "Pipeline",
     "Predict",
+    "QueryBuilder",
     "SelectColumns",
+    "SqlQuery",
     "Summarize",
     "TrainClassifier",
     "TrainRandomForest",

@@ -10,7 +10,6 @@ from emergentflow.data.warehouse.protocol import ColumnSchema, QueryRequest, Que
 from emergentflow.data.warehouse.query import (
     MissingWarehouseClientError,
     QueryParseError,
-    QuerySpecNotSupportedError,
     ReadOnlyViolationError,
     UnknownDialectError,
     query,
@@ -157,14 +156,16 @@ def test_query_bad_sql_raises_parse_error() -> None:
         )
 
 
-def test_query_spec_path_deferred() -> None:
-    with pytest.raises(QuerySpecNotSupportedError):
-        query(
-            spec={"source": "t"},
-            dialect="duckdb",
-            connection="c",
-            client=_RejectingClient(),
-        )
+def test_query_spec_path_compiles_and_routes() -> None:
+    spy = _SpyClient()
+    query(
+        spec={"source": "t", "select": ["a"]},
+        dialect="duckdb",
+        connection="c",
+        client=spy,
+    )
+    assert len(spy.requests) == 1
+    assert "SELECT a FROM t" in spy.requests[0].sql
 
 
 def test_query_requires_exactly_one_of_sql_or_spec() -> None:
@@ -198,3 +199,53 @@ def test_ef_data_query_accessible() -> None:
     import emergentflow as ef
 
     assert callable(ef.data.query)
+
+
+def test_query_injects_limit_when_absent() -> None:
+    spy = _SpyClient()
+    query(sql="SELECT x FROM t", dialect="duckdb", connection="c", client=spy, max_rows=100)
+    assert len(spy.requests) == 1
+    assert "LIMIT 100" in spy.requests[0].sql.upper()
+
+
+def test_query_preserves_existing_limit() -> None:
+    spy = _SpyClient()
+    query(
+        sql="SELECT x FROM t LIMIT 50",
+        dialect="duckdb",
+        connection="c",
+        client=spy,
+        max_rows=100,
+    )
+    assert len(spy.requests) == 1
+    # The existing LIMIT 50 should be preserved, not replaced with 100
+    req_sql_upper = spy.requests[0].sql.upper()
+    assert "LIMIT 50" in req_sql_upper
+
+
+def test_query_no_limit_injection_when_max_rows_none() -> None:
+    spy = _SpyClient()
+    query(sql="SELECT x FROM t", dialect="duckdb", connection="c", client=spy, max_rows=None)
+    assert len(spy.requests) == 1
+    assert "LIMIT" not in spy.requests[0].sql.upper()
+
+
+def test_query_injects_limit_when_only_a_subquery_has_one() -> None:
+    """A LIMIT nested in a subquery must not be mistaken for the outer query's own LIMIT.
+
+    Regression test: ``_inject_limit`` used to call ``stmt.find(exp.Limit)``, which
+    recurses into subqueries; a subquery LIMIT made the outer, unbounded statement
+    look like it already had a cap, silently bypassing max_rows.
+    """
+    spy = _SpyClient()
+    query(
+        sql="SELECT * FROM (SELECT x FROM t LIMIT 5) sub",
+        dialect="duckdb",
+        connection="c",
+        client=spy,
+        max_rows=100,
+    )
+    assert len(spy.requests) == 1
+    sql_upper = spy.requests[0].sql.upper()
+    assert "LIMIT 100" in sql_upper
+    assert "LIMIT 5" in sql_upper  # the subquery's own LIMIT is left untouched

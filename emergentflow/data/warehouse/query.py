@@ -24,6 +24,7 @@ from sqlglot.errors import SqlglotError
 
 from emergentflow.api import public_op
 from emergentflow.data.warehouse.protocol import QueryRequest, QueryResult, WarehouseClient
+from emergentflow.data.warehouse.spec_compiler import SpecValidationError, compile_spec
 
 __all__ = [
     "query",
@@ -32,6 +33,7 @@ __all__ = [
     "QueryParseError",
     "ReadOnlyViolationError",
     "QuerySpecNotSupportedError",
+    "SpecValidationError",
 ]
 
 # Top-level statement types permitted under a read-only connection (ADR 0018).
@@ -100,6 +102,37 @@ def _validate_read_only_sql(sql: str, dialect: str, read_only: bool) -> str:
     return sql
 
 
+def _inject_limit(sql: str, dialect: str, max_rows: int | None) -> str:
+    """Inject a LIMIT clause into *sql* when *max_rows* is set and no LIMIT exists.
+
+    Parses the SQL via sqlglot, checks each top-level statement's own ``limit``
+    arg (``stmt.args.get("limit")``, not a recursive ``.find()`` — a subquery's
+    LIMIT must not be mistaken for the outer statement already having one, which
+    would let an unbounded outer query slip past the *max_rows* cap). If none is
+    found and *max_rows* is not None, appends ``LIMIT max_rows``. Returns the
+    modified SQL string rendered in *dialect*. If max_rows is None, returns sql
+    unchanged.
+    """
+    if max_rows is None:
+        return sql
+    statements = [s for s in sqlglot.parse(sql, dialect=dialect) if s is not None]
+    for stmt in statements:
+        if stmt.args.get("limit") is None:
+            stmt.set("limit", exp.Limit(expression=exp.Literal.number(max_rows)))
+    return "; ".join(stmt.sql(dialect=dialect) for stmt in statements)
+
+
+def _prepare_query_spec(spec: dict, dialect: str) -> str:
+    """Validate and compile a structured query spec to dialect SQL.
+
+    The single validation gate shared by ``codegen`` and ``execute`` (the
+    ``_prepare_declarative`` pattern), so both paths accept/reject identical
+    specs. Wraps ``compile_spec`` and re-raises ``SpecValidationError`` as-is
+    (it is already a ``ValueError`` subclass).
+    """
+    return compile_spec(spec, dialect)
+
+
 @public_op(name="ef.data.query")
 def query(
     *,
@@ -129,8 +162,8 @@ def query(
         If neither or both of *sql*/*spec* are given.
     UnknownDialectError, QueryParseError, ReadOnlyViolationError
         On dialect / parse / read-only violations.
-    QuerySpecNotSupportedError
-        If *spec* is given (deferred to Story 5).
+    SpecValidationError
+        If *spec* is given but invalid (missing source, bad aggregate, etc.).
     """
     if client is None:
         raise MissingWarehouseClientError(
@@ -144,13 +177,23 @@ def query(
     _validate_dialect(dialect)
 
     if spec is not None:
-        raise QuerySpecNotSupportedError(
-            "The structured-spec path (data.query_builder) compiles a spec to dialect SQL and "
-            "arrives with Epic 13 Story 5; pass sql=... for now (data.sql_query)."
+        compiled_sql = _prepare_query_spec(spec, dialect)
+        compiled_sql = _inject_limit(compiled_sql, dialect, max_rows)
+        request = QueryRequest(
+            sql=compiled_sql,
+            dialect=dialect,
+            connection=connection,
+            params=(),
+            max_rows=max_rows,
+            byte_scan_cap=byte_scan_cap,
+            read_only=read_only,
+            dry_run=dry_run,
         )
+        return client.run(request)
 
     assert sql is not None  # narrowed by the exactly-one check above
-    compiled_sql = _validate_read_only_sql(sql, dialect, read_only)
+    validated_sql = _validate_read_only_sql(sql, dialect, read_only)
+    compiled_sql = _inject_limit(validated_sql, dialect, max_rows)
 
     request = QueryRequest(
         sql=compiled_sql,
