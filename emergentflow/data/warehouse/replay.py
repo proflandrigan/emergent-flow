@@ -27,6 +27,7 @@ import pandas as pd
 
 from emergentflow.data.warehouse.protocol import (
     ColumnSchema,
+    CostEstimate,
     FixtureMissError,
     QueryRequest,
     QueryResult,
@@ -138,7 +139,7 @@ class ReplayWarehouseClient:
         payload = json.loads(path.read_text())
         return _result_from_dict(payload)
 
-    def dry_run(self, request: QueryRequest) -> QueryResult:  # pragma: no cover - Story 8
+    def dry_run(self, request: QueryRequest) -> CostEstimate:  # pragma: no cover - Story 8
         raise NotImplementedError("ReplayWarehouseClient.dry_run arrives with Epic 13 Story 8.")
 
     def list_relations(
