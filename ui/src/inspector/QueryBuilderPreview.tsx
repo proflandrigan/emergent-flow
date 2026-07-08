@@ -57,29 +57,35 @@ export function QueryBuilderPreview({ node }: QueryBuilderPreviewProps): JSX.Ele
     let cancelled = false;
     setError(null);
     setSql(null);
-    fetch("/compile-spec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ spec, dialect }),
-    })
-      .then(async (res) => {
-        if (!cancelled) {
-          if (res.ok) {
-            const data = (await res.json()) as { sql: string };
-            setSql(data.sql);
-          } else {
-            const data = (await res.json()) as { error?: string };
-            setError(data.error ?? `Compile error: ${res.status}`);
-          }
-        }
+    // Debounced: specKey changes on every keystroke in the query-builder form, and firing
+    // a /compile-spec round-trip per character floods the server and causes response
+    // reordering; wait for a short pause in typing before compiling.
+    const timer = setTimeout(() => {
+      fetch("/compile-spec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spec, dialect }),
       })
-      .catch(() => {
-        if (!cancelled) {
-          setError("Failed to compile spec");
-        }
-      });
+        .then(async (res) => {
+          if (!cancelled) {
+            if (res.ok) {
+              const data = (await res.json()) as { sql: string };
+              setSql(data.sql);
+            } else {
+              const data = (await res.json()) as { error?: string };
+              setError(data.error ?? `Compile error: ${res.status}`);
+            }
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setError("Failed to compile spec");
+          }
+        });
+    }, 300);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [specKey, dialect]);
 

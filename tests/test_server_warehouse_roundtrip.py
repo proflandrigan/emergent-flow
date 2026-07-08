@@ -18,18 +18,12 @@ from emergentflow.ir import Edge, Graph, PortRef
 from emergentflow.nodes.examples.describe import Describe
 from emergentflow.nodes.examples.query_builder import QueryBuilder
 from emergentflow.nodes.examples.sql_query import SqlQuery
-from emergentflow.server import app, service
+from emergentflow.server import app
 
 
 @pytest.fixture(scope="module")
 def _shared_db_path(tmp_path_factory):
-    """Create a shared DuckDB database with a real sales table for all tests.
-
-    Both test profiles in every test's connections.toml point *test_duckdb_file*
-    at this same path, so whichever test initialises the
-    ``_get_warehouse_client()`` singleton first caches a store whose
-    ``test_duckdb_file`` entry is valid for every test in this module.
-    """
+    """Create a shared DuckDB database with a real sales table for all tests."""
     path = tmp_path_factory.mktemp("warehouse_data") / "sales.duckdb"
     con = duckdb.connect(str(path))
     con.execute("CREATE TABLE sales (region VARCHAR, revenue DOUBLE)")
@@ -76,7 +70,6 @@ class TestSqlQueryTerminal:
     def test_roundtrip(self, tmp_path, monkeypatch, _shared_db_path) -> None:
         _write_connections_toml(tmp_path / "connections.toml", db_path=_shared_db_path)
         monkeypatch.setenv("EMERGENTFLOW_CONNECTIONS", str(tmp_path / "connections.toml"))
-        monkeypatch.setattr(service, "_warehouse_client_singleton", None)
 
         defn = SqlQuery()
         node = defn.instantiate(
@@ -121,7 +114,6 @@ class TestQueryBuilderToDescribe:
     def test_roundtrip(self, tmp_path, monkeypatch, _shared_db_path) -> None:
         _write_connections_toml(tmp_path / "connections.toml", db_path=_shared_db_path)
         monkeypatch.setenv("EMERGENTFLOW_CONNECTIONS", str(tmp_path / "connections.toml"))
-        monkeypatch.setattr(service, "_warehouse_client_singleton", None)
 
         qb_defn = QueryBuilder()
         qb_node = qb_defn.instantiate(

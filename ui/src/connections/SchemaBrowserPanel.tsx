@@ -96,46 +96,38 @@ export function SchemaBrowserPanel(): JSX.Element {
     };
   }, [selectedConnection]);
 
-  function toggleTable(table: string) {
+  // expandedTables/columnCache are keyed by database::schema::table, not the bare table
+  // name -- two different schemas can have a same-named table, and buildRelationTree
+  // already nests them under separate DatabaseNode/SchemaNode entries, so the expand/cache
+  // state must not collapse them onto one key.
+  function toggleTable(key: string, table: string) {
     setExpandedTables((prev) => {
       const next = new Set(prev);
-      if (next.has(table)) {
-        next.delete(table);
+      if (next.has(key)) {
+        next.delete(key);
       } else {
-        next.add(table);
-        setColumnCache((cache) => {
-          if (!cache[table]) {
-            cache[table] = "loading";
-            fetch(
-              `/connections/${encodeURIComponent(selectedConnection)}/schema?relation=${encodeURIComponent(table)}`,
-            )
-              .then(async (res) => {
-                const body = await res.json();
-                if (!res.ok) {
-                  setColumnCache((c) => ({
-                    ...c,
-                    [table]: "error",
-                  }));
-                  return;
-                }
-                const cols: SchemaRow[] = body.rows ?? [];
-                setColumnCache((c) => ({
-                  ...c,
-                  [table]: cols,
-                }));
-              })
-              .catch(() => {
-                setColumnCache((c) => ({
-                  ...c,
-                  [table]: "error",
-                }));
-              });
-          }
-          return { ...cache };
-        });
+        next.add(key);
       }
       return next;
     });
+
+    if (columnCache[key]) return;
+    setColumnCache((cache) => ({ ...cache, [key]: "loading" }));
+    fetch(
+      `/connections/${encodeURIComponent(selectedConnection)}/schema?relation=${encodeURIComponent(table)}`,
+    )
+      .then(async (res) => {
+        const body = await res.json();
+        if (!res.ok) {
+          setColumnCache((c) => ({ ...c, [key]: "error" }));
+          return;
+        }
+        const cols: SchemaRow[] = body.rows ?? [];
+        setColumnCache((c) => ({ ...c, [key]: cols }));
+      })
+      .catch(() => {
+        setColumnCache((c) => ({ ...c, [key]: "error" }));
+      });
   }
 
   const tree = buildRelationTree(rows);
@@ -256,85 +248,98 @@ export function SchemaBrowserPanel(): JSX.Element {
                       {schema.name}
                     </div>
                     <div style={{ paddingLeft: "var(--space-3)" }}>
-                      {schema.tables.map((table) => (
-                        <div key={table}>
-                          <div
-                            data-testid={`schema-table-${table}`}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "var(--space-1)",
-                              padding: "2px 0",
-                              cursor: "pointer",
-                              color: "var(--text-primary)",
-                            }}
-                            onClick={() => toggleTable(table)}
-                          >
-                            {expandedTables.has(table) ? (
-                              <ChevronDown size={14} />
-                            ) : (
-                              <ChevronRight size={14} />
-                            )}
-                            <span>{table}</span>
-                          </div>
-                          {expandedTables.has(table) && (
-                            <div style={{ paddingLeft: "var(--space-5)" }}>
-                              {(() => {
-                                const entry = columnCache[table];
-                                if (!entry) return null;
-                                if (entry === "loading") {
-                                  return (
-                                    <div
-                                      data-testid={`schema-columns-loading-${table}`}
-                                      style={{
-                                        fontSize: "var(--text-xs)",
-                                        color: "var(--text-secondary)",
-                                      }}
-                                    >
-                                      Loading columns…
-                                    </div>
-                                  );
-                                }
-                                if (entry === "error") {
-                                  return (
-                                    <div
-                                      style={{
-                                        fontSize: "var(--text-xs)",
-                                        color: "var(--danger)",
-                                      }}
-                                    >
-                                      Failed to load columns
-                                    </div>
-                                  );
-                                }
-                                return entry.map((col) => (
-                                  <div
-                                    key={col.column}
-                                    data-testid={`schema-column-${table}-${col.column}`}
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "var(--space-2)",
-                                      padding: "1px 0",
-                                      fontSize: "var(--text-xs)",
-                                    }}
-                                  >
-                                    <span style={{ color: "var(--text-primary)" }}>
-                                      {col.column}
-                                    </span>
-                                    <span style={{ color: "var(--text-secondary)" }}>
-                                      {col.data_type}
-                                    </span>
-                                    <span style={{ color: "var(--text-secondary)" }}>
-                                      {col.nullable ? "NULL" : "NOT NULL"}
-                                    </span>
-                                  </div>
-                                ));
-                              })()}
+                      {schema.tables.map((table) => {
+                        const key = `${db.name}::${schema.name}::${table}`;
+                        return (
+                          <div key={table}>
+                            <div
+                              data-testid={`schema-table-${table}`}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "var(--space-1)",
+                                padding: "2px 0",
+                                cursor: "pointer",
+                                color: "var(--text-primary)",
+                              }}
+                              onClick={() => toggleTable(key, table)}
+                            >
+                              {expandedTables.has(key) ? (
+                                <ChevronDown size={14} />
+                              ) : (
+                                <ChevronRight size={14} />
+                              )}
+                              <span>{table}</span>
                             </div>
-                          )}
-                        </div>
-                      ))}
+                            {expandedTables.has(key) && (
+                              <div style={{ paddingLeft: "var(--space-5)" }}>
+                                {(() => {
+                                  const entry = columnCache[key];
+                                  if (!entry) return null;
+                                  if (entry === "loading") {
+                                    return (
+                                      <div
+                                        data-testid={`schema-columns-loading-${table}`}
+                                        style={{
+                                          fontSize: "var(--text-xs)",
+                                          color: "var(--text-secondary)",
+                                        }}
+                                      >
+                                        Loading columns…
+                                      </div>
+                                    );
+                                  }
+                                  if (entry === "error") {
+                                    return (
+                                      <div
+                                        style={{
+                                          fontSize: "var(--text-xs)",
+                                          color: "var(--danger)",
+                                        }}
+                                      >
+                                        Failed to load columns
+                                      </div>
+                                    );
+                                  }
+                                  return entry.map((col) => (
+                                    <div
+                                      key={col.column}
+                                      data-testid={`schema-column-${table}-${col.column}`}
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "var(--space-2)",
+                                        padding: "1px 0",
+                                        fontSize: "var(--text-xs)",
+                                      }}
+                                    >
+                                      <span
+                                        style={{ color: "var(--text-primary)" }}
+                                      >
+                                        {col.column}
+                                      </span>
+                                      <span
+                                        style={{
+                                          color: "var(--text-secondary)",
+                                        }}
+                                      >
+                                        {col.data_type}
+                                      </span>
+                                      <span
+                                        style={{
+                                          color: "var(--text-secondary)",
+                                        }}
+                                      >
+                                        {col.nullable ? "NULL" : "NOT NULL"}
+                                      </span>
+                                    </div>
+                                  ));
+                                })()}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}

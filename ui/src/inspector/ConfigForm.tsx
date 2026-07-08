@@ -75,9 +75,32 @@ interface ParamRowProps {
   meta: CatalogParam | undefined;
 }
 
+// Only rendered for the (typically single) "connection" param on a node, so the
+// /connections fetch in useConnectionProfiles runs once per form, not once per param row.
+function ConnectionSelect({
+  testId,
+  value,
+  onChange,
+}: {
+  testId: string;
+  value: string;
+  onChange: (value: string) => void;
+}): JSX.Element {
+  const profiles = useConnectionProfiles();
+  return (
+    <Select data-testid={testId} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="" />
+      {profiles.map((p) => (
+        <option key={p.name} value={p.name}>
+          {p.name} ({p.dialect})
+        </option>
+      ))}
+    </Select>
+  );
+}
+
 function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
   const setParam = useGraphStore((s) => s.setParam);
-  const profiles = useConnectionProfiles();
   const catalogParam = resolveCatalogParam(meta, param);
   const kind = widgetForParam(catalogParam);
   const error = validateValue(catalogParam, param.value);
@@ -178,24 +201,11 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
     );
   } else if (kind === "connection") {
     widget = (
-      <Select
-        data-testid={testId}
+      <ConnectionSelect
+        testId={testId}
         value={formatValue(catalogParam, param.value)}
-        onChange={(e) =>
-          setParam(
-            node.id,
-            param.name,
-            parseValue(catalogParam, e.target.value),
-          )
-        }
-      >
-        <option value="" />
-        {profiles.map((p) => (
-          <option key={p.name} value={p.name}>
-            {p.name} ({p.dialect})
-          </option>
-        ))}
-      </Select>
+        onChange={(value) => setParam(node.id, param.name, parseValue(catalogParam, value))}
+      />
     );
   } else {
     // text + list both edit as a plain text input; `parseValue` splits a list on commas, and
