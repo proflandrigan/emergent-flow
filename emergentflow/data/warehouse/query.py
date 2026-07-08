@@ -105,17 +105,20 @@ def _validate_read_only_sql(sql: str, dialect: str, read_only: bool) -> str:
 def _inject_limit(sql: str, dialect: str, max_rows: int | None) -> str:
     """Inject a LIMIT clause into *sql* when *max_rows* is set and no LIMIT exists.
 
-    Parses the SQL via sqlglot, checks each top-level statement for an existing
-    LIMIT clause. If none is found and *max_rows* is not None, appends
-    ``LIMIT max_rows``. Returns the modified SQL string rendered in *dialect*.
-    If max_rows is None, returns sql unchanged.
+    Parses the SQL via sqlglot, checks each top-level statement's own ``limit``
+    arg (``stmt.args.get("limit")``, not a recursive ``.find()`` — a subquery's
+    LIMIT must not be mistaken for the outer statement already having one, which
+    would let an unbounded outer query slip past the *max_rows* cap). If none is
+    found and *max_rows* is not None, appends ``LIMIT max_rows``. Returns the
+    modified SQL string rendered in *dialect*. If max_rows is None, returns sql
+    unchanged.
     """
     if max_rows is None:
         return sql
     statements = [s for s in sqlglot.parse(sql, dialect=dialect) if s is not None]
     for stmt in statements:
-        if stmt.find(exp.Limit) is None:
-            stmt.args["limit"] = exp.Limit(expression=exp.Literal.number(max_rows))
+        if stmt.args.get("limit") is None:
+            stmt.set("limit", exp.Limit(expression=exp.Literal.number(max_rows)))
     return "; ".join(stmt.sql(dialect=dialect) for stmt in statements)
 
 

@@ -14,7 +14,6 @@ import subprocess
 import sys
 
 import pandas as pd
-import pytest
 from pandas.testing import assert_frame_equal
 
 from emergentflow.clients import Clients
@@ -22,7 +21,7 @@ from emergentflow.codegen.compiler import compile_to_code
 from emergentflow.codegen.executor import execute
 from emergentflow.data.warehouse.protocol import ColumnSchema, QueryRequest, QueryResult
 from emergentflow.data.warehouse.replay import ReplayWarehouseClient, write_fixture
-from emergentflow.ir import Edge, Graph, PortRef
+from emergentflow.ir import Graph
 from emergentflow.nodes.examples.sql_query import SqlQuery
 
 

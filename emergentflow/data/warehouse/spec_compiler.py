@@ -38,9 +38,7 @@ def _parse_column_ref(col: str) -> exp.Expression:
     """Parse a column reference like ``"revenue"`` or ``"t.revenue"`` into a sqlglot Column."""
     parts = col.split(".")
     if len(parts) == 2:
-        return exp.Column(
-            this=exp.to_identifier(parts[1]), table=exp.to_identifier(parts[0])
-        )
+        return exp.Column(this=exp.to_identifier(parts[1]), table=exp.to_identifier(parts[0]))
     return exp.Column(this=exp.to_identifier(col))
 
 
@@ -79,10 +77,9 @@ def _build_select_expression(item: str | dict) -> exp.Expression:
         agg_cls = agg_map.get(agg_upper)
         if agg_cls is None:
             raise SpecValidationError(
-                f"Unsupported aggregate function {agg!r}. "
-                f"Supported: {sorted(agg_map.keys())!r}"
+                f"Unsupported aggregate function {agg!r}. Supported: {sorted(agg_map.keys())!r}"
             )
-        node = agg_cls(this=inner)
+        node: exp.Expression = agg_cls(this=inner)
     else:
         node = _parse_column_ref(column)
 
@@ -159,6 +156,7 @@ def _build_predicate(pred: dict) -> exp.Expression:
             f"Unsupported operator {op!r}. Supported: {sorted(_OP_MAP.keys())!r}"
         )
 
+    val_expr: exp.Expression
     if isinstance(value, (int, float)):
         val_expr = exp.Literal.number(value)
     elif isinstance(value, str):
@@ -193,12 +191,9 @@ def _build_join(join_spec: dict) -> tuple[exp.Expression, exp.Expression]:
         right = _parse_column_ref(pair["right"])
         conditions.append(exp.EQ(this=left, expression=right))
 
-    if len(conditions) == 1:
-        on_cond = conditions[0]
-    else:
-        on_cond = conditions[0]
-        for c in conditions[1:]:
-            on_cond = exp.And(this=on_cond, expression=c)
+    on_cond: exp.Expression = conditions[0]
+    for c in conditions[1:]:
+        on_cond = exp.And(this=on_cond, expression=c)
 
     return table_expr, on_cond
 

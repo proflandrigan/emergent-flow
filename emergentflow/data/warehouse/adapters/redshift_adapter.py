@@ -25,7 +25,7 @@ from emergentflow.data.warehouse.protocol import (
 try:
     import redshift_connector as _rs
 except ImportError:
-    _rs = None  # type: ignore[assignment]
+    _rs = None
 
 _EXTRA = "emergentflow[redshift]"
 
@@ -33,6 +33,17 @@ _EXTRA = "emergentflow[redshift]"
 def _require_driver() -> None:
     if _rs is None:
         raise MissingDriverError(_EXTRA)
+
+
+def _escape_literal(value: str) -> str:
+    """Escape a value for safe interpolation into a single-quoted SQL literal.
+
+    ``list_relations``/``describe_relation`` build introspection SQL from
+    caller-supplied database/schema/relation names; standard SQL escaping
+    (doubling embedded single quotes) prevents those names from breaking out
+    of the literal and injecting arbitrary SQL.
+    """
+    return value.replace("'", "''")
 
 
 class RedshiftAdapter:
@@ -133,9 +144,9 @@ class RedshiftAdapter:
             )
             filters: list[str] = []
             if database:
-                filters.append(f"table_catalog = '{database}'")
+                filters.append(f"table_catalog = '{_escape_literal(database)}'")
             if schema:
-                filters.append(f"table_schema = '{schema}'")
+                filters.append(f"table_schema = '{_escape_literal(schema)}'")
             if filters:
                 sql += " AND " + " AND ".join(filters)
             sql += ' ORDER BY database, schema, "table"'
@@ -164,7 +175,7 @@ class RedshiftAdapter:
                 "CASE WHEN is_nullable = 'YES' "
                 "THEN true ELSE false END AS nullable "
                 "FROM information_schema.columns "
-                f"WHERE table_name = '{relation}' "
+                f"WHERE table_name = '{_escape_literal(relation)}' "
                 "ORDER BY ordinal_position"
             )
             cursor = conn.cursor()

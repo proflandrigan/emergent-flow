@@ -79,10 +79,7 @@ class QueryBuilder(NodeDefinition):
             type_token="list",
             default=[],
             label="Where predicates",
-            help=(
-                "Filter predicates. Each: "
-                "{'column': ..., 'op': ..., 'value': ...}."
-            ),
+            help=("Filter predicates. Each: {'column': ..., 'op': ..., 'value': ...}."),
             hints=ValidationHints(widget="text"),
         ),
         ParamSpec(
@@ -90,10 +87,7 @@ class QueryBuilder(NodeDefinition):
             type_token="list",
             default=[],
             label="Joins",
-            help=(
-                "Join specs. Each: "
-                "{'relation': ..., 'on': [...], 'type': ...}."
-            ),
+            help=("Join specs. Each: {'relation': ..., 'on': [...], 'type': ...}."),
             hints=ValidationHints(widget="text"),
         ),
         ParamSpec(
@@ -117,10 +111,7 @@ class QueryBuilder(NodeDefinition):
             type_token="list",
             default=[],
             label="Order by",
-            help=(
-                "Ordering specs. Each: a string or "
-                "{'column': ..., 'desc': bool}."
-            ),
+            help=("Ordering specs. Each: a string or {'column': ..., 'desc': bool}."),
             hints=ValidationHints(widget="text"),
         ),
         ParamSpec(
@@ -176,8 +167,12 @@ class QueryBuilder(NodeDefinition):
             "source": cast(str, values.get("source") or ""),
         }
         for key in (
-            "select", "where", "join",
-            "group_by", "having", "order_by",
+            "select",
+            "where",
+            "join",
+            "group_by",
+            "having",
+            "order_by",
         ):
             val = values.get(key)
             if val:
@@ -190,21 +185,15 @@ class QueryBuilder(NodeDefinition):
             spec["distinct"] = True
         return spec
 
-    def _meta(self, node: Node) -> tuple[
-        str, str, int | None, bool
-    ]:
+    def _meta(self, node: Node) -> tuple[str, str, int | None, bool]:
         values = {p.name: p.value for p in node.params}
         connection = cast(str, values.get("connection") or "")
         dialect = cast(str, values.get("dialect") or "duckdb")
         max_rows = cast("int | None", values.get("max_rows"))
-        dry_run = cast(
-            bool, values.get("dry_run", False) or False
-        )
+        dry_run = cast(bool, values.get("dry_run", False) or False)
         return connection, dialect, max_rows, dry_run
 
-    def codegen(
-        self, node: Node, ctx: CodegenContext
-    ) -> CodeFragment:
+    def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         spec = self._build_spec(node)
         connection, dialect, max_rows, dry_run = self._meta(node)
         return CodeFragment(

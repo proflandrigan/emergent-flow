@@ -24,7 +24,7 @@ from emergentflow.data.warehouse.protocol import (
 try:
     from google.cloud import bigquery as _bq
 except ImportError:
-    _bq = None  # type: ignore[assignment]
+    _bq = None
 
 _EXTRA = "emergentflow[bigquery]"
 
@@ -63,8 +63,8 @@ class BigQueryAdapter:
         start = time.monotonic()
         client = self._client(credentials)
         job_config = _bq.QueryJobConfig()
-        if request.max_rows is not None:
-            job_config.maximum_bytes_billed = None  # let LIMIT handle row cap
+        if request.byte_scan_cap is not None:
+            job_config.maximum_bytes_billed = request.byte_scan_cap
         query_job = client.query(request.sql, job_config=job_config)
         df = query_job.to_dataframe()
         elapsed_ms = (time.monotonic() - start) * 1000

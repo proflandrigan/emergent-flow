@@ -15,7 +15,6 @@ from emergentflow.data.warehouse.spec_compiler import (
     compile_spec,
 )
 
-
 # ---- The representative spec ----
 
 REPRESENTATIVE_SPEC: dict = {
@@ -95,9 +94,7 @@ def test_representative_spec_golden(dialect: str, expected: str) -> None:
     """A representative spec compiles to the pinned golden SQL for each dialect."""
     result = compile_spec(REPRESENTATIVE_SPEC, dialect)
     assert result == expected, (
-        f"Golden mismatch for {dialect}:\n"
-        f"  expected: {expected!r}\n"
-        f"  got:      {result!r}"
+        f"Golden mismatch for {dialect}:\n  expected: {expected!r}\n  got:      {result!r}"
     )
 
 
@@ -112,9 +109,7 @@ def test_select_star_when_no_select() -> None:
 
 def test_distinct() -> None:
     """distinct=True adds SELECT DISTINCT."""
-    result = compile_spec(
-        {"source": "t", "select": ["a"], "distinct": True}, "duckdb"
-    )
+    result = compile_spec({"source": "t", "select": ["a"], "distinct": True}, "duckdb")
     assert "DISTINCT" in result.upper()
     assert result == "SELECT DISTINCT a FROM t"
 

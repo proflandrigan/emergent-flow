@@ -23,6 +23,17 @@ from emergentflow.data.warehouse.protocol import (
 )
 
 
+def _escape_literal(value: str) -> str:
+    """Escape a value for safe interpolation into a single-quoted SQL literal.
+
+    ``list_relations``/``describe_relation`` build introspection SQL from
+    caller-supplied database/schema/relation names; standard SQL escaping
+    (doubling embedded single quotes) prevents those names from breaking out
+    of the literal and injecting arbitrary SQL.
+    """
+    return value.replace("'", "''")
+
+
 class DuckDBAdapter:
     """A ``WarehouseAdapter`` for the in-process DuckDB backend.
 
@@ -33,9 +44,7 @@ class DuckDBAdapter:
 
     dialect: str = "duckdb"
 
-    def _connect(
-        self, credentials: Mapping[str, str]
-    ) -> duckdb.DuckDBPyConnection:
+    def _connect(self, credentials: Mapping[str, str]) -> duckdb.DuckDBPyConnection:
         """Open a DuckDB connection from resolved credentials.
 
         ``credentials`` may contain a ``"path"`` key pointing to a
@@ -57,10 +66,7 @@ class DuckDBAdapter:
             elapsed_ms = (time.monotonic() - start) * 1000
 
             truncated = False
-            if (
-                request.max_rows is not None
-                and len(df) >= request.max_rows
-            ):
+            if request.max_rows is not None and len(df) >= request.max_rows:
                 df = df.head(request.max_rows)
                 truncated = True
 
@@ -90,9 +96,7 @@ class DuckDBAdapter:
     ) -> CostEstimate:
         conn = self._connect(credentials)
         try:
-            explained = conn.execute(
-                f"EXPLAIN {request.sql}"
-            ).fetchdf()
+            explained = conn.execute(f"EXPLAIN {request.sql}").fetchdf()
             estimated_rows = len(explained)
             return CostEstimate(
                 dialect="duckdb",
@@ -113,21 +117,17 @@ class DuckDBAdapter:
             sql = (
                 "SELECT table_catalog AS database, "
                 "table_schema AS schema, "
-                "table_name AS \"table\" "
+                'table_name AS "table" '
                 "FROM information_schema.tables"
             )
             filters: list[str] = []
             if database:
-                filters.append(
-                    f"table_catalog = '{database}'"
-                )
+                filters.append(f"table_catalog = '{_escape_literal(database)}'")
             if schema:
-                filters.append(
-                    f"table_schema = '{schema}'"
-                )
+                filters.append(f"table_schema = '{_escape_literal(schema)}'")
             if filters:
                 sql += " WHERE " + " AND ".join(filters)
-            sql += " ORDER BY database, schema, \"table\""
+            sql += ' ORDER BY database, schema, "table"'
             df = conn.execute(sql).fetchdf()
             df["column"] = None
             df["data_type"] = None
@@ -148,8 +148,8 @@ class DuckDBAdapter:
                 "data_type, "
                 "CASE WHEN is_nullable = 'YES' "
                 "THEN true ELSE false END AS nullable "
-                f"FROM information_schema.columns "
-                f"WHERE table_name = '{relation}' "
+                "FROM information_schema.columns "
+                f"WHERE table_name = '{_escape_literal(relation)}' "
                 "ORDER BY ordinal_position"
             )
             df = conn.execute(sql).fetchdf()

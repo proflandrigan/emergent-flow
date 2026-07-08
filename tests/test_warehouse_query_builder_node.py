@@ -99,16 +99,19 @@ def test_query_builder_golden_ruff_check() -> None:
     code = compile_to_code(graph)
     proc = subprocess.run(
         [
-            sys.executable, "-m", "ruff", "check",
-            "--stdin-filename", "generated.py", "-",
+            sys.executable,
+            "-m",
+            "ruff",
+            "check",
+            "--stdin-filename",
+            "generated.py",
+            "-",
         ],
         input=code,
         capture_output=True,
         text=True,
     )
-    assert proc.returncode == 0, (
-        f"ruff check failed:\n{proc.stdout}\n{proc.stderr}"
-    )
+    assert proc.returncode == 0, f"ruff check failed:\n{proc.stdout}\n{proc.stderr}"
 
 
 def test_query_builder_compiled_uses_spec() -> None:
@@ -123,9 +126,7 @@ def test_query_builder_equivalence(tmp_path) -> None:
     expected = _make_fixture(tmp_path, graph)
     replay = ReplayWarehouseClient(tmp_path)
 
-    exec_results = execute(
-        graph, clients=Clients(warehouse=replay)
-    )
+    exec_results = execute(graph, clients=Clients(warehouse=replay))
     node_id = list(graph.nodes.keys())[0]
     exec_qr = exec_results[node_id]["frame"]
 

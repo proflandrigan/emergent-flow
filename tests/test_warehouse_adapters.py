@@ -130,6 +130,31 @@ class TestDuckDBAdapter:
         col_names = [c.name for c in result.columns]
         assert col_names == ["id", "name", "value"]
 
+    def test_describe_relation_rejects_sql_injection_attempt(self):
+        """A relation name containing a quote must not break out of the literal.
+
+        Regression test: ``describe_relation`` used to interpolate ``relation``
+        into the SQL string unescaped; a name containing ``'`` could inject
+        arbitrary SQL into the introspection query. It must now either raise a
+        (wrapped) parse/execution error or simply find no matching table --
+        never silently execute injected SQL.
+        """
+        from emergentflow.data.warehouse.adapters.duckdb_adapter import DuckDBAdapter
+
+        adapter = DuckDBAdapter()
+        malicious = "users' OR '1'='1"
+        df = adapter.describe_relation({}, malicious)
+        # No table can match this literal name once properly escaped.
+        assert len(df) == 0
+
+    def test_list_relations_rejects_sql_injection_attempt(self):
+        from emergentflow.data.warehouse.adapters.duckdb_adapter import DuckDBAdapter
+
+        adapter = DuckDBAdapter()
+        malicious = "main' OR '1'='1"
+        df = adapter.list_relations({}, schema=malicious)
+        assert len(df) == 0
+
 
 # ---- Cloud adapter missing-driver guard tests ----
 
@@ -173,6 +198,102 @@ class TestBigQueryMissingDriver:
             adapter.describe_relation({"project": "test"}, "some_table")
 
 
+class TestBigQueryByteScanCap:
+    """``byte_scan_cap`` must be wired to BigQuery's ``maximum_bytes_billed``.
+
+    Regression test: ``execute`` used to gate ``maximum_bytes_billed`` on
+    ``max_rows`` (setting it to ``None``, a no-op) instead of ``byte_scan_cap``,
+    so the ADR-0018 scanned-bytes spend cap was silently never enforced.
+    Fakes the ``google.cloud.bigquery`` module so the test runs without the
+    optional driver installed.
+    """
+
+    def test_byte_scan_cap_sets_maximum_bytes_billed(self, monkeypatch):
+        import emergentflow.data.warehouse.adapters.bigquery_adapter as mod
+
+        seen_job_configs = []
+
+        class _FakeJobConfig:
+            def __init__(self, **kwargs):
+                self.maximum_bytes_billed = None
+
+        class _FakeQueryJob:
+            total_bytes_processed = 42
+
+            def to_dataframe(self):
+                return pd.DataFrame({"x": [1]})
+
+        class _FakeClient:
+            def __init__(self, project=None):
+                self.project = project
+
+            def query(self, sql, job_config=None):
+                seen_job_configs.append(job_config)
+                return _FakeQueryJob()
+
+        class _FakeBQ:
+            QueryJobConfig = _FakeJobConfig
+            Client = _FakeClient
+
+        monkeypatch.setattr(mod, "_bq", _FakeBQ)
+
+        adapter = mod.BigQueryAdapter()
+        request = QueryRequest(
+            sql="SELECT 1",
+            dialect="bigquery",
+            connection="test",
+            max_rows=None,
+            byte_scan_cap=1_000_000,
+        )
+        result = adapter.execute(request, {"project": "test"})
+
+        assert result.bytes_scanned == 42
+        assert len(seen_job_configs) == 1
+        assert seen_job_configs[0].maximum_bytes_billed == 1_000_000
+
+    def test_no_byte_scan_cap_leaves_maximum_bytes_billed_unset(self, monkeypatch):
+        import emergentflow.data.warehouse.adapters.bigquery_adapter as mod
+
+        seen_job_configs = []
+
+        class _FakeJobConfig:
+            def __init__(self, **kwargs):
+                self.maximum_bytes_billed = None
+
+        class _FakeQueryJob:
+            total_bytes_processed = 7
+
+            def to_dataframe(self):
+                return pd.DataFrame({"x": [1]})
+
+        class _FakeClient:
+            def __init__(self, project=None):
+                self.project = project
+
+            def query(self, sql, job_config=None):
+                seen_job_configs.append(job_config)
+                return _FakeQueryJob()
+
+        class _FakeBQ:
+            QueryJobConfig = _FakeJobConfig
+            Client = _FakeClient
+
+        monkeypatch.setattr(mod, "_bq", _FakeBQ)
+
+        adapter = mod.BigQueryAdapter()
+        request = QueryRequest(
+            sql="SELECT 1",
+            dialect="bigquery",
+            connection="test",
+            max_rows=100,
+            byte_scan_cap=None,
+        )
+        adapter.execute(request, {"project": "test"})
+
+        assert len(seen_job_configs) == 1
+        assert seen_job_configs[0].maximum_bytes_billed is None
+
+
 class TestRedshiftMissingDriver:
     """Redshift adapter raises MissingDriverError when driver absent."""
 
@@ -196,6 +317,22 @@ class TestRedshiftMissingDriver:
         request = QueryRequest(sql="SELECT 1", dialect="redshift", connection="test")
         with pytest.raises(MissingDriverError, match="emergentflow\\[redshift\\]"):
             adapter.dry_run(request, {"host": "x", "database": "x", "user": "x", "password": "x"})
+
+    def test_list_relations_raises(self):
+        from emergentflow.data.warehouse.adapters.redshift_adapter import RedshiftAdapter
+
+        adapter = RedshiftAdapter()
+        with pytest.raises(MissingDriverError, match="emergentflow\\[redshift\\]"):
+            adapter.list_relations({"host": "x", "database": "x", "user": "x", "password": "x"})
+
+    def test_describe_relation_raises(self):
+        from emergentflow.data.warehouse.adapters.redshift_adapter import RedshiftAdapter
+
+        adapter = RedshiftAdapter()
+        with pytest.raises(MissingDriverError, match="emergentflow\\[redshift\\]"):
+            adapter.describe_relation(
+                {"host": "x", "database": "x", "user": "x", "password": "x"}, "some_table"
+            )
 
 
 class TestPostgresMissingDriver:
@@ -221,6 +358,22 @@ class TestPostgresMissingDriver:
         request = QueryRequest(sql="SELECT 1", dialect="postgres", connection="test")
         with pytest.raises(MissingDriverError, match="emergentflow\\[postgres\\]"):
             adapter.dry_run(request, {"host": "x", "database": "x", "user": "x", "password": "x"})
+
+    def test_list_relations_raises(self):
+        from emergentflow.data.warehouse.adapters.postgres_adapter import PostgresAdapter
+
+        adapter = PostgresAdapter()
+        with pytest.raises(MissingDriverError, match="emergentflow\\[postgres\\]"):
+            adapter.list_relations({"host": "x", "database": "x", "user": "x", "password": "x"})
+
+    def test_describe_relation_raises(self):
+        from emergentflow.data.warehouse.adapters.postgres_adapter import PostgresAdapter
+
+        adapter = PostgresAdapter()
+        with pytest.raises(MissingDriverError, match="emergentflow\\[postgres\\]"):
+            adapter.describe_relation(
+                {"host": "x", "database": "x", "user": "x", "password": "x"}, "some_table"
+            )
 
 
 # ---- Connector catalog tests ----
