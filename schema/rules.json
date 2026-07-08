@@ -19,6 +19,7 @@
     "PlotSpec",
     "Predictions",
     "PromptSpec",
+    "Schema",
     "StatsModel",
     "TTestResult",
     "Tensor",
