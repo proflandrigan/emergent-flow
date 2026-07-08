@@ -20,7 +20,7 @@ from __future__ import annotations
 import sqlglot
 from sqlglot import exp
 from sqlglot.dialects.dialect import Dialect
-from sqlglot.errors import ParseError
+from sqlglot.errors import SqlglotError
 
 from emergentflow.api import public_op
 from emergentflow.data.warehouse.protocol import QueryRequest, QueryResult, WarehouseClient
@@ -80,7 +80,12 @@ def _validate_read_only_sql(sql: str, dialect: str, read_only: bool) -> str:
     """
     try:
         statements = [s for s in sqlglot.parse(sql, dialect=dialect) if s is not None]
-    except ParseError as exc:
+    except SqlglotError as exc:
+        # Catches both ParseError (bad grammar) and TokenError (e.g. an
+        # unterminated string literal) -- siblings under SqlglotError, not a
+        # subclass relationship -- so any malformed SQL surfaces as the
+        # documented typed QueryParseError rather than an uncaught sqlglot
+        # exception leaking out of the public ef.data.query op.
         raise QueryParseError(f"Could not parse SQL in dialect {dialect!r}: {exc}") from exc
     if not statements:
         raise QueryParseError(f"No SQL statement found in {sql!r}.")
