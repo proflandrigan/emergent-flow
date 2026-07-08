@@ -6,6 +6,7 @@ BigQuery/Redshift/Postgres, Story 6) to test the resolve-then-dispatch seam.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Mapping
 
 import pandas as pd
@@ -18,10 +19,12 @@ from emergentflow.data.warehouse.profiles import (
     UnknownConnectionError,
 )
 from emergentflow.data.warehouse.protocol import (
+    ByteScanCapExceededError,
     ColumnSchema,
     CostEstimate,
     QueryRequest,
     QueryResult,
+    QueryTimeoutError,
     WarehouseClient,
 )
 
@@ -123,3 +126,126 @@ def test_adapter_client_satisfies_protocol() -> None:
     client = AdapterWarehouseClient(store, {"duckdb": fake})
 
     assert isinstance(client, WarehouseClient)
+
+
+class _ScanReportingAdapter:
+    """A fake adapter whose ``execute`` reports a caller-specified bytes_scanned."""
+
+    dialect = "duckdb"
+
+    def __init__(self, bytes_scanned: int) -> None:
+        self._bytes_scanned = bytes_scanned
+
+    def execute(self, request: QueryRequest, credentials: Mapping[str, str]) -> QueryResult:
+        return QueryResult(
+            df=pd.DataFrame({"a": [1]}),
+            row_count=1,
+            columns=(ColumnSchema(name="a", dtype="int64"),),
+            dialect="duckdb",
+            bytes_scanned=self._bytes_scanned,
+        )
+
+    def dry_run(self, request: QueryRequest, credentials: Mapping[str, str]) -> CostEstimate:
+        raise NotImplementedError
+
+
+class _SlowAdapter:
+    """A fake adapter whose ``execute`` sleeps before returning, for timeout tests."""
+
+    dialect = "duckdb"
+
+    def __init__(self, sleep_s: float) -> None:
+        self._sleep_s = sleep_s
+
+    def execute(self, request: QueryRequest, credentials: Mapping[str, str]) -> QueryResult:
+        time.sleep(self._sleep_s)
+        return _QUERY_RESULT
+
+    def dry_run(self, request: QueryRequest, credentials: Mapping[str, str]) -> CostEstimate:
+        raise NotImplementedError
+
+
+def _timeout_profile(name: str, timeout_s: float) -> ConnectionProfile:
+    return ConnectionProfile.model_construct(
+        name=name, dialect="duckdb", auth_method="none", limits={"timeout_s": timeout_s}
+    )
+
+
+# ---- dry_run short-circuit ----
+
+
+def test_run_with_dry_run_true_calls_dry_run_not_execute() -> None:
+    store = ProfileStore()
+    store.add(_duckdb_profile())
+    fake = _FakeAdapter()
+    client = AdapterWarehouseClient(store, {"duckdb": fake})
+    request = QueryRequest(
+        sql="SELECT 1", dialect="duckdb", connection="duckdb_local", dry_run=True
+    )
+
+    result = client.run(request)
+
+    assert len(fake.dry_run_calls) == 1
+    assert len(fake.execute_calls) == 0
+    assert len(result.df) == 0
+    assert result.bytes_scanned == _COST_ESTIMATE.bytes_scanned
+    assert result.cost_usd == _COST_ESTIMATE.cost_usd
+
+
+# ---- byte_scan_cap enforcement ----
+
+
+def test_run_raises_byte_scan_cap_exceeded_error_on_breach() -> None:
+    store = ProfileStore()
+    store.add(_duckdb_profile())
+    client = AdapterWarehouseClient(store, {"duckdb": _ScanReportingAdapter(5_000_000)})
+    request = QueryRequest(
+        sql="SELECT 1", dialect="duckdb", connection="duckdb_local", byte_scan_cap=1_000_000
+    )
+
+    with pytest.raises(ByteScanCapExceededError) as exc_info:
+        client.run(request)
+
+    assert exc_info.value.byte_scan_cap == 1_000_000
+    assert exc_info.value.bytes_scanned == 5_000_000
+
+
+def test_run_passes_when_under_byte_scan_cap() -> None:
+    store = ProfileStore()
+    store.add(_duckdb_profile())
+    client = AdapterWarehouseClient(store, {"duckdb": _ScanReportingAdapter(500_000)})
+    request = QueryRequest(
+        sql="SELECT 1", dialect="duckdb", connection="duckdb_local", byte_scan_cap=1_000_000
+    )
+
+    result = client.run(request)
+
+    assert result.bytes_scanned == 500_000
+
+
+# ---- timeout enforcement ----
+
+
+def test_run_raises_query_timeout_error_on_slow_adapter() -> None:
+    store = ProfileStore()
+    store.add(_timeout_profile("duckdb_local", timeout_s=0.2))
+    client = AdapterWarehouseClient(store, {"duckdb": _SlowAdapter(sleep_s=2.0)})
+
+    start = time.monotonic()
+    with pytest.raises(QueryTimeoutError) as exc_info:
+        client.run(_request())
+    elapsed = time.monotonic() - start
+
+    assert exc_info.value.timeout_s == 0.2
+    assert elapsed < 1.5, f"took too long to raise: {elapsed}s"
+
+
+def test_run_passes_when_under_timeout() -> None:
+    store = ProfileStore()
+    store.add(_timeout_profile("duckdb_local", timeout_s=5.0))
+    fake = _FakeAdapter()
+    client = AdapterWarehouseClient(store, {"duckdb": fake})
+
+    result = client.run(_request())
+
+    assert result is _QUERY_RESULT

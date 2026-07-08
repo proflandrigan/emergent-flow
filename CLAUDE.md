@@ -124,5 +124,3 @@ entry points (`ef.compile_to_code`, `ef.execute`, `ef.export_script`) on first a
   for stable JSON serialization — don't migrate them to `StrEnum`.
 - Generated code must pass `ruff` and be importable; new node types need a golden/equivalence
   test, not just a unit test.
-- Contributions go through a license-grant CLA; the `cla` PR check fails until the committer
-  comments the sign-off phrase on the PR.

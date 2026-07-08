@@ -22,6 +22,7 @@ from .cluster_detect import ClusterDetect
 from .correlation import Correlation
 from .cross_validate import CrossValidate
 from .describe import Describe
+from .describe_relation import DescribeRelation
 from .diagnostic_frame import DiagnosticFrame
 from .diagnostic_model import DiagnosticModel
 from .distribution_summary import DistributionSummary
@@ -77,6 +78,7 @@ __all__ = [
     "Correlation",
     "CrossValidate",
     "Describe",
+    "DescribeRelation",
     "DiagnosticFrame",
     "DiagnosticModel",
     "DistributionSummary",

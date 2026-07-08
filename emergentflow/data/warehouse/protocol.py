@@ -148,6 +148,28 @@ class CostEstimate:
     cost_usd: float | None = None
 
 
+def dry_run_result(estimate: CostEstimate) -> QueryResult:
+    """Wrap a ``dry_run`` cost estimate as an empty, inspectable ``QueryResult``.
+
+    ``WarehouseClient.run()`` returns this instead of executing the query when
+    ``QueryRequest.dry_run`` is True (Epic 13 Story 8), so a query node's
+    ``DataFrame`` OUT port contract still holds even though no query actually
+    ran — the frame is empty and the cost metadata carries the estimate, ready
+    for the canvas to render a "this scans 4.2 TB" warning before the analyst
+    commits to a real run.
+    """
+    return QueryResult(
+        df=pd.DataFrame(),
+        row_count=0,
+        columns=(),
+        dialect=estimate.dialect,
+        bytes_scanned=estimate.bytes_scanned,
+        cost_usd=estimate.cost_usd,
+        truncated=False,
+        elapsed_ms=None,
+    )
+
+
 #: Standard column order for the tidy schema frames returned by
 #: ``WarehouseClient.list_relations`` / ``describe_relation`` (Story 7 fills these
 #: in concretely). Kept here so the frame shape is defined in one place.
@@ -184,6 +206,62 @@ class MissingDriverError(RuntimeError):
         super().__init__(
             f"This warehouse adapter requires the optional dependency group {extra!r}; "
             f"install it with: pip install {extra}"
+        )
+
+
+class ByteScanCapExceededError(RuntimeError):
+    """Raised when a query scanned more bytes than its ``byte_scan_cap`` allows.
+
+    ADR 0018's row/byte-cap safety rule (Epic 13 Story 8): enforced at the
+    client edge only, never inline in ``execute``/``compile_to_code``. For
+    BigQuery this is a backstop — ``maximum_bytes_billed`` is also set on the
+    job config (Story 6) so the warehouse itself may reject an over-budget
+    query before this ever fires; for any adapter that reports ``bytes_scanned``
+    without a native billing cap, this is the only enforcement.
+    """
+
+    def __init__(self, byte_scan_cap: int, bytes_scanned: int) -> None:
+        self.byte_scan_cap = byte_scan_cap
+        self.bytes_scanned = bytes_scanned
+        super().__init__(
+            f"Query scanned {bytes_scanned} bytes, exceeding the connection's "
+            f"byte_scan_cap of {byte_scan_cap} bytes."
+        )
+
+
+def enforce_byte_scan_cap(request: QueryRequest, result: QueryResult) -> None:
+    """Raise ``ByteScanCapExceededError`` if *result* breached *request*'s cap.
+
+    A no-op when either ``request.byte_scan_cap`` or ``result.bytes_scanned``
+    is ``None``. Every ``WarehouseClient`` implementation (live or replayed)
+    must call this on its way out of ``run()`` — the cap is a property of the
+    request/result pair, not of how the result was produced, so it applies
+    identically whether the bytes came from a live adapter or a recorded
+    fixture (Epic 13 Story 8).
+    """
+    if (
+        request.byte_scan_cap is not None
+        and result.bytes_scanned is not None
+        and result.bytes_scanned > request.byte_scan_cap
+    ):
+        raise ByteScanCapExceededError(request.byte_scan_cap, result.bytes_scanned)
+
+
+class QueryTimeoutError(RuntimeError):
+    """Raised when a query runs longer than its connection profile's ``timeout_s``.
+
+    ADR 0018's timeout safety rule (Epic 13 Story 8): enforced at the client
+    edge only, never inline in ``execute``/``compile_to_code``. The underlying
+    query call is abandoned in a background thread (Python cannot forcibly
+    kill a running thread), not cancelled outright — this error simply stops
+    the client from waiting on it any longer.
+    """
+
+    def __init__(self, timeout_s: float) -> None:
+        self.timeout_s = timeout_s
+        super().__init__(
+            f"Query exceeded its {timeout_s}s timeout "
+            f"(see the connection profile's limits.timeout_s)."
         )
 
 

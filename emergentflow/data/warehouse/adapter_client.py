@@ -11,6 +11,7 @@ testable now with a fake adapter and real adapters drop in without a client chan
 
 from __future__ import annotations
 
+import concurrent.futures
 from collections.abc import Mapping
 
 import pandas as pd
@@ -21,7 +22,10 @@ from emergentflow.data.warehouse.protocol import (
     CostEstimate,
     QueryRequest,
     QueryResult,
+    QueryTimeoutError,
     WarehouseAdapter,
+    dry_run_result,
+    enforce_byte_scan_cap,
 )
 
 
@@ -56,9 +60,33 @@ class AdapterWarehouseClient:
         profile = self._store.get(connection)  # raises UnknownConnectionError if absent
         return profile, resolve_credentials(profile)
 
+    def _execute_with_timeout(
+        self,
+        adapter: WarehouseAdapter,
+        request: QueryRequest,
+        credentials: dict[str, str],
+        timeout_s: float | None,
+    ) -> QueryResult:
+        if timeout_s is None:
+            return adapter.execute(request, credentials)
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = pool.submit(adapter.execute, request, credentials)
+        try:
+            return future.result(timeout=timeout_s)
+        except concurrent.futures.TimeoutError as exc:
+            raise QueryTimeoutError(timeout_s) from exc
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+
     def run(self, request: QueryRequest) -> QueryResult:
+        if request.dry_run:
+            return dry_run_result(self.dry_run(request))
         profile, credentials = self._resolve(request.connection)
-        return self._adapter_for(profile.dialect).execute(request, credentials)
+        adapter = self._adapter_for(profile.dialect)
+        timeout_s = profile.limits.get("timeout_s")
+        result = self._execute_with_timeout(adapter, request, credentials, timeout_s)
+        enforce_byte_scan_cap(request, result)
+        return result
 
     def dry_run(self, request: QueryRequest) -> CostEstimate:
         profile, credentials = self._resolve(request.connection)
