@@ -1,0 +1,252 @@
+{
+  "schema_version": 1,
+  "paradigm": "functional",
+  "name": "Data Connectors Acceptance Demo -- Warehouse to Stats",
+  "nodes": {
+    "n-query": {
+      "id": "n-query",
+      "type": "data.query_builder",
+      "label": "Sales by Rep, Joined with Region Covariates",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "source",
+          "type_token": "str",
+          "value": "sales",
+          "default": null
+        },
+        {
+          "name": "select",
+          "type_token": "list",
+          "value": [
+            "sales.region",
+            "sales.rep_id",
+            {
+              "agg": "SUM",
+              "column": "sales.revenue",
+              "alias": "total_revenue"
+            },
+            {
+              "agg": "AVG",
+              "column": "regions.market_index",
+              "alias": "avg_market_index"
+            }
+          ],
+          "default": null
+        },
+        {
+          "name": "where",
+          "type_token": "list",
+          "value": [],
+          "default": null
+        },
+        {
+          "name": "join",
+          "type_token": "list",
+          "value": [
+            {
+              "relation": "regions",
+              "on": [
+                {
+                  "left": "sales.region",
+                  "right": "regions.region"
+                }
+              ],
+              "type": "INNER"
+            }
+          ],
+          "default": null
+        },
+        {
+          "name": "group_by",
+          "type_token": "list",
+          "value": [
+            "sales.region",
+            "sales.rep_id"
+          ],
+          "default": null
+        },
+        {
+          "name": "having",
+          "type_token": "list",
+          "value": [],
+          "default": null
+        },
+        {
+          "name": "order_by",
+          "type_token": "list",
+          "value": [],
+          "default": null
+        },
+        {
+          "name": "limit",
+          "type_token": "int",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "distinct",
+          "type_token": "bool",
+          "value": false,
+          "default": null
+        },
+        {
+          "name": "connection",
+          "type_token": "ConnectionRef",
+          "value": "demo_bigquery",
+          "default": null
+        },
+        {
+          "name": "dialect",
+          "type_token": "str",
+          "value": "bigquery",
+          "default": null
+        },
+        {
+          "name": "max_rows",
+          "type_token": "int",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "dry_run",
+          "type_token": "bool",
+          "value": false,
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-query-frame",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-mixed": {
+      "id": "n-mixed",
+      "type": "stats.fit_model",
+      "label": "Mixed-Effects Model",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "model",
+          "type_token": "str",
+          "value": "MixedLM",
+          "default": null
+        },
+        {
+          "name": "target",
+          "type_token": "str",
+          "value": "total_revenue",
+          "default": null
+        },
+        {
+          "name": "fixed_effects",
+          "type_token": "list[str]",
+          "value": [
+            "avg_market_index"
+          ],
+          "default": null
+        },
+        {
+          "name": "random_effects",
+          "type_token": "list[str]",
+          "value": [],
+          "default": null
+        },
+        {
+          "name": "groups",
+          "type_token": "str",
+          "value": "region",
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-mixed-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-mixed-model",
+          "name": "model",
+          "direction": "out",
+          "data_type": "StatsModel",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 250.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-forest": {
+      "id": "n-forest",
+      "type": "viz.plot_coefficients",
+      "label": "Plot Coefficients",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "id": "p-forest-model",
+          "name": "model",
+          "direction": "in",
+          "data_type": "StatsModel",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-forest-plot",
+          "name": "plot",
+          "direction": "out",
+          "data_type": "PlotSpec",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 500.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    }
+  },
+  "edges": {
+    "e-query-mixed": {
+      "id": "e-query-mixed",
+      "source": {
+        "node_id": "n-query",
+        "port_id": "p-query-frame"
+      },
+      "target": {
+        "node_id": "n-mixed",
+        "port_id": "p-mixed-in"
+      },
+      "type_compatible": null
+    },
+    "e-mixed-forest": {
+      "id": "e-mixed-forest",
+      "source": {
+        "node_id": "n-mixed",
+        "port_id": "p-mixed-model"
+      },
+      "target": {
+        "node_id": "n-forest",
+        "port_id": "p-forest-model"
+      },
+      "type_compatible": null
+    }
+  }
+}

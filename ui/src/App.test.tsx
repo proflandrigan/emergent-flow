@@ -13,7 +13,14 @@ afterEach(() => {
 function mockHealth(status: string) {
   vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
     const url = String(input);
-    const body = url.includes("/catalog") ? { nodes: [] } : { status };
+    let body: unknown;
+    if (url.includes("/catalog")) {
+      body = { nodes: [] };
+    } else if (url.includes("/connections")) {
+      body = { connections: [] };
+    } else {
+      body = { status };
+    }
     return Promise.resolve(
       new Response(JSON.stringify(body), {
         headers: { "Content-Type": "application/json" },
@@ -50,6 +57,18 @@ test("shows unreachable when the health request fails", async () => {
   );
 });
 
+test("Browse schema overflow item opens the schema browser panel", async () => {
+  mockHealth("ok");
+  render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  fireEvent.click(screen.getByText("Browse schema"));
+
+  await waitFor(() => {
+    expect(screen.getByTestId("schema-no-connection")).toBeInTheDocument();
+  });
+});
+
 test("the overflow menu closes on outside click and on Escape", () => {
   mockHealth("ok");
   render(<App />);
@@ -67,4 +86,16 @@ test("the overflow menu closes on outside click and on Escape", () => {
 
   fireEvent.keyDown(document, { key: "Escape" });
   expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+});
+
+test("Manage connections overflow item opens the connections panel", async () => {
+  mockHealth("ok");
+  render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  fireEvent.click(screen.getByText("Manage connections"));
+
+  await waitFor(() => {
+    expect(screen.getByTestId("connections-empty")).toBeInTheDocument();
+  });
 });

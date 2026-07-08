@@ -34,6 +34,22 @@ describe("isListType", () => {
 });
 
 describe("widgetForParam", () => {
+  test("explicit widget hint sql wins over choices", () => {
+    const p = param({
+      type_token: "str",
+      hints: { widget: "sql", choices: ["mean", "median"] },
+    });
+    expect(widgetForParam(p)).toBe("sql");
+  });
+
+  test("explicit widget hint connection wins over choices", () => {
+    const p = param({
+      type_token: "ConnectionRef",
+      hints: { widget: "connection", choices: ["a", "b"] },
+    });
+    expect(widgetForParam(p)).toBe("connection");
+  });
+
   test("choices win over type_token", () => {
     const p = param({
       type_token: "str",

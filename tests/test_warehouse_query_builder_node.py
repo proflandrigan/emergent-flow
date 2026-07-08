@@ -122,13 +122,15 @@ def test_query_builder_compiled_uses_spec() -> None:
 
 
 def test_query_builder_equivalence(tmp_path) -> None:
+    """The node's ``frame`` OUT port is a bare DataFrame (the QueryResult's ``.df``,
+    unwrapped in ``execute``/``codegen`` so it matches its declared ``DataFrame`` port
+    type and flows into the rest of the analyst surface)."""
     graph = _build_query_builder_graph()
     expected = _make_fixture(tmp_path, graph)
     replay = ReplayWarehouseClient(tmp_path)
 
     exec_results = execute(graph, clients=Clients(warehouse=replay))
     node_id = list(graph.nodes.keys())[0]
-    exec_qr = exec_results[node_id]["frame"]
+    exec_frame = exec_results[node_id]["frame"]
 
-    assert_frame_equal(exec_qr.df, expected.df)
-    assert exec_qr.row_count == expected.row_count
+    assert_frame_equal(exec_frame, expected.df)

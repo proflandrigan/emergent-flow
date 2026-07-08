@@ -101,6 +101,14 @@ class SqlQuery(NodeDefinition):
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         sql, connection, dialect, max_rows, dry_run = self._args(node)
+        # Unwrap to the bare DataFrame (matching the port's declared "DataFrame" type,
+        # so it flows into the rest of the analyst surface for free) EXCEPT under
+        # dry_run, where the QueryResult carries the CostEstimate metadata
+        # (bytes_scanned/cost_usd) the canvas's cost badge reads -- its df is always
+        # empty (see emergentflow.data.warehouse.protocol.dry_run_result), so there is
+        # no real DataFrame to unwrap to in that mode. dry_run is a static node param,
+        # so this is a compile-time choice, not a runtime branch.
+        suffix = "" if dry_run else ".df"
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
@@ -111,7 +119,7 @@ class SqlQuery(NodeDefinition):
                 f"    client=warehouse,\n"
                 f"    max_rows={max_rows!r},\n"
                 f"    dry_run={dry_run!r},\n"
-                f")"
+                f"){suffix}"
             ),
         )
 
@@ -127,4 +135,4 @@ class SqlQuery(NodeDefinition):
             max_rows=max_rows,
             dry_run=dry_run,
         )
-        return {"frame": result}
+        return {"frame": result if dry_run else result.df}

@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 
 import { Canvas } from "./canvas/Canvas";
+import { ConnectionManagerPanel } from "./connections/ConnectionManagerPanel";
+import { SchemaBrowserPanel } from "./connections/SchemaBrowserPanel";
 import { getDevMenuItems } from "./dev/DevControls";
 import { ExecutionToolbar } from "./exec/ExecutionToolbar";
 import { Inspector } from "./inspector/Inspector";
@@ -53,6 +55,8 @@ function Divider(): JSX.Element {
 export function App(): JSX.Element {
   const [status, setStatus] = useState<ServerStatus>("connecting");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
+  const [schemaBrowserOpen, setSchemaBrowserOpen] = useState(false);
   const past = useGraphStore((s) => s.past);
   const future = useGraphStore((s) => s.future);
   const canUndo = past.length > 0;
@@ -92,9 +96,13 @@ export function App(): JSX.Element {
   }, [inspectorCollapsed]);
 
   useEffect(() => {
-    if (!menuOpen) return undefined;
+    if (!menuOpen && !connectionsOpen && !schemaBrowserOpen) return undefined;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenuOpen(false);
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        setConnectionsOpen(false);
+        setSchemaBrowserOpen(false);
+      }
     }
     function onClick() {
       setMenuOpen(false);
@@ -105,7 +113,7 @@ export function App(): JSX.Element {
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("click", onClick);
     };
-  }, [menuOpen]);
+  }, [menuOpen, connectionsOpen, schemaBrowserOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -171,6 +179,20 @@ export function App(): JSX.Element {
         theme === "dark" ? "Switch to light theme" : "Switch to dark theme",
       onSelect: () => {
         toggleTheme();
+        setMenuOpen(false);
+      },
+    },
+    {
+      label: "Manage connections",
+      onSelect: () => {
+        setConnectionsOpen(true);
+        setMenuOpen(false);
+      },
+    },
+    {
+      label: "Browse schema",
+      onSelect: () => {
+        setSchemaBrowserOpen(true);
         setMenuOpen(false);
       },
     },
@@ -376,6 +398,62 @@ export function App(): JSX.Element {
         </div>
         {!inspectorCollapsed && <Inspector />}
       </div>
+
+      {connectionsOpen && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 30,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0, 0, 0, 0.4)",
+          }}
+          onClick={() => setConnectionsOpen(false)}
+        >
+          <div
+            className="glass"
+            style={{
+              width: 480,
+              maxHeight: "70vh",
+              overflow: "auto",
+              padding: "var(--space-4)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ConnectionManagerPanel />
+          </div>
+        </div>
+      )}
+
+      {schemaBrowserOpen && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 30,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0, 0, 0, 0.4)",
+          }}
+          onClick={() => setSchemaBrowserOpen(false)}
+        >
+          <div
+            className="glass"
+            style={{
+              width: 560,
+              maxHeight: "70vh",
+              overflow: "auto",
+              padding: "var(--space-4)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <SchemaBrowserPanel />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

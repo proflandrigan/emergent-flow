@@ -5,7 +5,7 @@
 
 import type { CatalogParam } from "../catalog/types";
 
-export type WidgetKind = "select" | "checkbox" | "number" | "text" | "list" | "json";
+export type WidgetKind = "select" | "checkbox" | "number" | "text" | "list" | "json" | "sql" | "connection";
 
 // True when the type token is a list/sequence, e.g. "list" or "list[str]".
 export function isListType(typeToken: string): boolean {
@@ -24,10 +24,17 @@ export function isListOfDictType(typeToken: string): boolean {
   return typeToken.startsWith("list[dict") || typeToken.startsWith("list[dict[");
 }
 
-// Choose the widget. Precedence: explicit choices -> "select"; then by type_token:
+// Choose the widget. Precedence: explicit widget hint -> sql/connection; then choices -> "select";
+// then by type_token:
 //   "bool" -> "checkbox"; "int"|"float" -> "number"; dict types (incl. list-of-dict) -> "json";
 //   list types -> "list"; otherwise "text".
 export function widgetForParam(param: CatalogParam): WidgetKind {
+  if (param.hints?.widget === "sql") {
+    return "sql";
+  }
+  if (param.hints?.widget === "connection") {
+    return "connection";
+  }
   if (param.hints?.choices) {
     return "select";
   }

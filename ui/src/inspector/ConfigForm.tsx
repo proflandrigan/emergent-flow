@@ -12,6 +12,7 @@
 
 import type { CatalogEstimator, CatalogParam } from "../catalog/types";
 import { useCatalog } from "../catalog/useCatalog";
+import { useConnectionProfiles } from "../catalog/useConnectionProfiles";
 import { useGraphStore } from "../store/graphStore";
 import type { NodeModel, ParamModel } from "../store/model";
 import {
@@ -22,6 +23,7 @@ import {
 } from "./widgets";
 import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
+import { QueryBuilderPreview } from "./QueryBuilderPreview";
 
 // Node types whose `params` dict param holds curated sklearn estimator constructor kwargs
 // (Epic 8 archetypes). Restricted to an explicit list rather than inferred generically, since
@@ -75,6 +77,7 @@ interface ParamRowProps {
 
 function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
   const setParam = useGraphStore((s) => s.setParam);
+  const profiles = useConnectionProfiles();
   const catalogParam = resolveCatalogParam(meta, param);
   const kind = widgetForParam(catalogParam);
   const error = validateValue(catalogParam, param.value);
@@ -151,6 +154,48 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
           )
         }
       />
+    );
+  } else if (kind === "sql") {
+    widget = (
+      <textarea
+        data-testid={testId}
+        value={formatValue(catalogParam, param.value)}
+        rows={8}
+        style={{
+          width: "100%",
+          fontFamily: "monospace",
+          fontSize: "0.8rem",
+          resize: "vertical",
+        }}
+        onChange={(e) =>
+          setParam(
+            node.id,
+            param.name,
+            parseValue(catalogParam, e.target.value),
+          )
+        }
+      />
+    );
+  } else if (kind === "connection") {
+    widget = (
+      <Select
+        data-testid={testId}
+        value={formatValue(catalogParam, param.value)}
+        onChange={(e) =>
+          setParam(
+            node.id,
+            param.name,
+            parseValue(catalogParam, e.target.value),
+          )
+        }
+      >
+        <option value="" />
+        {profiles.map((p) => (
+          <option key={p.name} value={p.name}>
+            {p.name} ({p.dialect})
+          </option>
+        ))}
+      </Select>
     );
   } else {
     // text + list both edit as a plain text input; `parseValue` splits a list on commas, and
@@ -434,6 +479,7 @@ export function ConfigForm({ node }: { node: NodeModel }): JSX.Element {
         }
         return <ParamRow key={param.name} node={node} param={param} meta={meta} />;
       })}
+      {node.type === "data.query_builder" ? <QueryBuilderPreview node={node} /> : null}
     </div>
   );
 }
