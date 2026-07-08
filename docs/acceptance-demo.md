@@ -154,3 +154,77 @@ the `compile_to_code(graph)` output produce equivalent results end to end — ke
 canonical inspectable payloads (tidy frames / `PlotSpec` JSON / the `FittedStatsModel` summary,
 whose live results object degrades to `{"kind": "unsupported"}`), so opaque model internals are
 never compared.
+
+## Data Connectors & Warehouses Today (Epic 13) — the front door
+
+Epic 13 gives the analyst surface a real front door: a `WarehouseClient` seam injected exactly
+like `LLMClient` (ADR 0018), a raw-SQL escape hatch (`data.sql_query`) and a visual query
+builder (`data.query_builder`) that both compile through one `ef.data.query` wrapper, and a
+generated connector catalog spanning DuckDB (bundled, credential-free), BigQuery, Redshift, and
+Postgres. Both query nodes' `frame` OUT port is a bare, tidy `DataFrame` — the same
+`QueryResult` metadata (`row_count`, `bytes_scanned`, `cost_usd`, `dialect`, ...) `ef.data.query`
+computes is available at the SDK level, but the node unwraps to `.df` on its declared
+`DataFrame` port (except under `dry_run`, where there is no real frame to unwrap — the port
+carries the `QueryResult`/`CostEstimate` metadata instead, which the canvas's dry-run cost badge
+reads) so a query's output flows into the rest of Epics 6/8/12 with zero glue code. Two
+pipelines under `examples/data_connectors_acceptance_demo/` are the acceptance criteria and
+demonstrate exactly that: a raw query feeding the EDA/viz surface, and a structured, joined
+query feeding a mixed-effects model.
+
+### Exploration: sql_query → describe → correlation heatmap
+
+```
+sql_query(DuckDB, read_parquet('.../sales.parquet')) ─→ stats.describe
+                                                     └─→ stats.correlation ──(matrix)──→ viz.plot_correlation_heatmap
+```
+
+A raw SQL query against a bundled parquet fixture
+(`examples/data_connectors_acceptance_demo/sales.parquet`) — no credentials, no network, runs
+anywhere including CI — flows straight into a `stats.describe` summary and a
+`stats.correlation` matrix rendered as a `PlotSpec` heatmap, proving the "DataFrame flows into
+the analyst surface for free" contract holds for warehouse data exactly as it does for
+`data.load_sample`/`data.load_csv`.
+
+### Warehouse → Stats: query_builder (join + group-by, BigQuery SQL) → MixedLM → forest plot
+
+```
+query_builder(join sales × regions, group by region+rep, dialect=bigquery) ─→ stats.fit_model(MixedLM, random intercept by region) ──(StatsModel)──→ viz.plot_coefficients
+```
+
+The structured query builder joins a transactions table to a region-level covariates table,
+groups down to one row per rep per region, and compiles to **BigQuery** SQL via the shared
+`compile_spec` function (the same function backing the canvas's live SQL preview — one place,
+never drifts). The resulting frame fits a `MixedLM` with a random intercept by region, emitting
+a `FittedStatsModel` that flows over a `StatsModel` edge into a coefficient/forest plot. This
+demo runs entirely under a `ReplayWarehouseClient` fixture keyed on the compiled BigQuery SQL —
+**BigQuery is never touched**, in this test or in CI; DuckDB is the only warehouse this repo's
+gates ever really connect to.
+
+### Where they live
+
+- **`examples/data_connectors_acceptance_demo/exploration_pipeline.json`** /
+  **`examples/data_connectors_acceptance_demo/warehouse_stats_pipeline.json`** — the IR graphs
+  in canonical form, generated and validated by `tests/test_data_connectors_acceptance_demo.py`
+  and `tests/test_data_connectors_warehouse_stats_demo.py` respectively.
+- **`examples/data_connectors_acceptance_demo/sales.parquet`** — the bundled, deterministic
+  parquet fixture the exploration demo queries directly.
+- Both graphs load in the canvas palette (via `ef.export_catalog()`'s generated `"connectors"`
+  entries), compile through `/compile` to downloadable Python (the compiled BigQuery SQL is
+  visible in the generated `.py` for the warehouse-stats demo), and execute via `/execute` with
+  per-node status — the connection manager, schema browser, and query-builder panel (live SQL
+  preview + dry-run cost badge) render entirely from the generated catalog and the design-time
+  schema-browser API, zero per-warehouse UI code.
+
+### How they're verified
+
+Unlike the Epic 8/12 demos above, these two do **not** reuse
+`tests/test_codegen_equivalence.py`'s `assert_equivalent` harness — that helper calls bare
+`execute(graph)` with no way to inject a `WarehouseClient`. Instead, each demo's
+`@pytest.mark.equivalence` test builds a `ReplayWarehouseClient` fixture (content-addressed by
+`QueryRequest.content_hash()`, exactly like the Story 9 dialect × query-shape equivalence
+matrix in `tests/test_warehouse_equivalence_matrix.py`), then compares `execute(graph,
+clients=...)` against the SAME compiled module's `main(clients=...)` run in-process — the
+compiler's own `_assemble(graph).out_ports` locates each leaf artifact's compiled variable name
+precisely, so the comparison never depends on dict-insertion-order luck. The committed JSON
+matches each builder (drift guard); node/edge counts and node types are as expected; and the
+compiled code for both demos passes `ast.parse` + `ruff check`.

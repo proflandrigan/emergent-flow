@@ -149,10 +149,17 @@ class BigQueryAdapter:
         self,
         credentials: Mapping[str, str],
         relation: str,
+        *,
+        database: str | None = None,
+        schema: str | None = None,
     ) -> pd.DataFrame:
         _require_driver()
         client = self._client(credentials)
-        table_ref = client.get_table(relation)
+        if schema:
+            project = database or credentials.get("project", client.project)
+            table_ref = client.get_table(_bq.DatasetReference(project, schema).table(relation))
+        else:
+            table_ref = client.get_table(relation)
         rows = []
         for field in table_ref.schema:
             rows.append(

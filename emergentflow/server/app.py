@@ -23,6 +23,10 @@ Routes:
 - ``POST /export/eval_set``  -- ``{"rows": [...]}`` -> eval-set JSONL file download (Epic 9 Story 7)
 - ``POST /export/finetune``  -- ``{"rows": [...]}`` -> fine-tune JSONL download (Epic 9 Story 7)
 - ``POST /validate``         -- IR JSON -> ``{"diagnostics": ...}``
+- ``GET  /connections``      -- list local connection profiles (Epic 13 Story 10)
+- ``POST /connections/{name}/test`` -- probe one connection profile
+- ``GET  /connections/{name}/schema`` -- browse a connection's relations/columns
+- ``POST /compile-spec``     -- {"spec": {...}, "dialect": ...} -> {"sql": ...}
 """
 
 from __future__ import annotations
@@ -48,14 +52,18 @@ from emergentflow.server.reports import get_default_store
 from emergentflow.server.service import (
     clear_cache,
     compile_graph,
+    compile_query_spec,
     execute_graph,
     execute_graph_stream,
     execute_node,
     export_eval_set_bytes,
     export_finetune_bytes,
     get_catalog,
+    get_connection_schema,
     get_schema,
     label_eval,
+    list_connections,
+    test_connection_route,
     validate_graph,
 )
 
@@ -124,6 +132,7 @@ _INDEX_HTML = """<!doctype html>
 _POST_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "/cache/clear": clear_cache,
     "/compile": compile_graph,
+    "/compile-spec": compile_query_spec,
     "/eval/label": label_eval,
     "/execute": execute_graph,
     "/execute_node": execute_node,
@@ -346,6 +355,25 @@ def create_app() -> FastAPI:
 
     for path, fn in _POST_ROUTES.items():
         application.add_api_route(path, _make_post_handler(fn), methods=["POST"])
+
+    @application.get("/connections")
+    async def connections() -> Response:
+        return await _safe_json(list_connections)
+
+    @application.post("/connections/{name}/test")
+    async def connection_test(name: str) -> Response:
+        return await _safe_json(lambda: test_connection_route(name))
+
+    @application.get("/connections/{name}/schema")
+    async def connection_schema(name: str, request: Request) -> Response:
+        database = request.query_params.get("database")
+        schema_param = request.query_params.get("schema")
+        relation = request.query_params.get("relation")
+        return await _safe_json(
+            lambda: get_connection_schema(
+                name, database=database, schema=schema_param, relation=relation
+            )
+        )
 
     # Catch-all GET: static asset -> demo page (for "/" and "/index.html") -> 404.
     # Declared last so the explicit GET routes above take precedence.

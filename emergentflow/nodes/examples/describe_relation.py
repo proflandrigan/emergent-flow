@@ -35,7 +35,7 @@ class DescribeRelation(NodeDefinition):
     """Describe a relation's columns and return a tidy schema DataFrame."""
 
     type = "data.describe_relation"
-    version = 1
+    version = 2
     family = "data"
     label = "Describe Relation"
     category = "Ingest"
@@ -61,22 +61,44 @@ class DescribeRelation(NodeDefinition):
             help="The relation (table) name to describe.",
             hints=ValidationHints(widget="text"),
         ),
+        ParamSpec(
+            name="database",
+            type_token="str",
+            required=False,
+            label="Database",
+            help="Optional database/catalog to disambiguate a relation name that exists "
+            "in more than one database.",
+            hints=ValidationHints(widget="text"),
+        ),
+        ParamSpec(
+            name="schema",
+            type_token="str",
+            required=False,
+            label="Schema",
+            help="Optional schema (or, for BigQuery, dataset) to disambiguate a relation "
+            "name that exists in more than one schema.",
+            hints=ValidationHints(widget="text"),
+        ),
     ]
 
-    def _args(self, node: Node) -> tuple[str, str]:
+    def _args(self, node: Node) -> tuple[str, str, str | None, str | None]:
         values = {p.name: p.value for p in node.params}
         connection = cast(str, values.get("connection") or "")
         relation = cast(str, values.get("relation") or "")
-        return connection, relation
+        database = cast("str | None", values.get("database") or None)
+        schema = cast("str | None", values.get("schema") or None)
+        return connection, relation, database, schema
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        connection, relation = self._args(node)
+        connection, relation, database, schema = self._args(node)
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('frame')} = ef.data.describe_relation(\n"
                 f"    connection={connection!r},\n"
                 f"    relation={relation!r},\n"
+                f"    database={database!r},\n"
+                f"    schema={schema!r},\n"
                 f"    client=warehouse,\n"
                 f")"
             ),
@@ -85,6 +107,12 @@ class DescribeRelation(NodeDefinition):
     def execute(
         self, node: Node, inputs: dict[str, Any], *, client: WarehouseClient | None = None
     ) -> dict[str, Any]:
-        connection, relation = self._args(node)
-        result = data_describe_relation(connection=connection, relation=relation, client=client)
+        connection, relation, database, schema = self._args(node)
+        result = data_describe_relation(
+            connection=connection,
+            relation=relation,
+            database=database,
+            schema=schema,
+            client=client,
+        )
         return {"frame": result}

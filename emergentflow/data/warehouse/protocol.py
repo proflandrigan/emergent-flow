@@ -290,8 +290,20 @@ class WarehouseClient(Protocol):
         """Return a tidy schema frame of relations under *connection*."""
         ...
 
-    def describe_relation(self, connection: str, relation: str) -> pd.DataFrame:
-        """Return a tidy column-schema frame for *relation* under *connection*."""
+    def describe_relation(
+        self,
+        connection: str,
+        relation: str,
+        *,
+        database: str | None = None,
+        schema: str | None = None,
+    ) -> pd.DataFrame:
+        """Return a tidy column-schema frame for *relation* under *connection*.
+
+        *database*/*schema* disambiguate a *relation* name that exists in more than one
+        schema (or, for BigQuery, is qualified as ``dataset.table``) — optional because most
+        connections have no same-named relation across schemas.
+        """
         ...
 
 
@@ -326,6 +338,14 @@ class WarehouseAdapter(Protocol):
         """Return a tidy schema frame of relations for the resolved connection."""
         ...
 
-    def describe_relation(self, credentials: Mapping[str, str], relation: str) -> pd.DataFrame:
-        """Return a tidy column-schema frame for *relation*."""
+    def describe_relation(
+        self,
+        credentials: Mapping[str, str],
+        relation: str,
+        *,
+        database: str | None = None,
+        schema: str | None = None,
+    ) -> pd.DataFrame:
+        """Return a tidy column-schema frame for *relation*, optionally scoped to
+        *database*/*schema* to disambiguate a same-named relation elsewhere."""
         ...

@@ -205,6 +205,9 @@ def write_describe_fixture(
     connection: str,
     relation: str,
     df: pd.DataFrame,
+    *,
+    database: str | None = None,
+    schema: str | None = None,
 ) -> Path:
     """Write *df* as the recorded ``describe_relation`` fixture for these arguments.
 
@@ -214,7 +217,11 @@ def write_describe_fixture(
     dir_path = Path(fixtures_dir)
     dir_path.mkdir(parents=True, exist_ok=True)
     content_hash = _introspection_hash(
-        method="describe_relation", connection=connection, relation=relation
+        method="describe_relation",
+        connection=connection,
+        relation=relation,
+        database=database,
+        schema=schema,
     )
     path = _describe_fixture_path(dir_path, content_hash)
     path.write_text(json.dumps(_frame_to_dict(df), indent=2, sort_keys=True) + "\n")
@@ -323,7 +330,14 @@ class ReplayWarehouseClient:
         payload = json.loads(path.read_text())
         return _frame_from_dict(payload)
 
-    def describe_relation(self, connection: str, relation: str) -> pd.DataFrame:
+    def describe_relation(
+        self,
+        connection: str,
+        relation: str,
+        *,
+        database: str | None = None,
+        schema: str | None = None,
+    ) -> pd.DataFrame:
         """Replay the fixture recorded for this ``describe_relation`` call.
 
         Raises
@@ -333,7 +347,11 @@ class ReplayWarehouseClient:
             includes the hash and a copy-pasteable ``write_describe_fixture(...)`` call.
         """
         content_hash = _introspection_hash(
-            method="describe_relation", connection=connection, relation=relation
+            method="describe_relation",
+            connection=connection,
+            relation=relation,
+            database=database,
+            schema=schema,
         )
         path = _describe_fixture_path(self.fixtures_dir, content_hash)
         if not path.exists():
@@ -342,7 +360,8 @@ class ReplayWarehouseClient:
                 f"(looked in {self.fixtures_dir}). To record one:\n"
                 f"    from emergentflow.data.warehouse.replay import write_describe_fixture\n"
                 f"    write_describe_fixture({str(self.fixtures_dir)!r}, {connection!r}, "
-                f"{relation!r}, df)  # df is the DataFrame you want this call to replay"
+                f"{relation!r}, df, database={database!r}, schema={schema!r})  "
+                f"# df is the DataFrame you want this call to replay"
             )
         payload = json.loads(path.read_text())
         return _frame_from_dict(payload)

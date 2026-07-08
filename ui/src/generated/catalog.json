@@ -2429,6 +2429,42 @@
           "name": "relation",
           "required": true,
           "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional database/catalog to disambiguate a relation name that exists in more than one database.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Database",
+          "name": "database",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional schema (or, for BigQuery, dataset) to disambiguate a relation name that exists in more than one schema.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Schema",
+          "name": "schema",
+          "required": false,
+          "type_token": "str"
         }
       ],
       "ports": [
@@ -2443,7 +2479,7 @@
         }
       ],
       "type": "data.describe_relation",
-      "version": 1
+      "version": 2
     },
     {
       "category": "Ingest",
@@ -2897,14 +2933,23 @@
           "cardinality": "one",
           "data_type": "DataFrame",
           "direction": "out",
-          "help": "The query result as a pandas DataFrame.",
+          "help": "The query result as a pandas DataFrame. Always a genuine (possibly empty) DataFrame, including under dry_run -- see cost_estimate for the byte-scan/cost metadata dry_run reports instead of real rows.",
           "label": null,
           "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "CostEstimate",
+          "direction": "out",
+          "help": "Cost/byte-scan metadata (dialect/bytes_scanned/cost_usd) for this query, when the adapter reports it. Always present, even outside dry_run.",
+          "label": null,
+          "name": "cost_estimate",
           "required": true
         }
       ],
       "type": "data.query_builder",
-      "version": 1
+      "version": 2
     },
     {
       "category": "Ingest",
@@ -3014,14 +3059,23 @@
           "cardinality": "one",
           "data_type": "DataFrame",
           "direction": "out",
-          "help": "The query result as a pandas DataFrame.",
+          "help": "The query result as a pandas DataFrame. Always a genuine (possibly empty) DataFrame, including under dry_run -- see cost_estimate for the byte-scan/cost metadata dry_run reports instead of real rows.",
           "label": null,
           "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "CostEstimate",
+          "direction": "out",
+          "help": "Cost/byte-scan metadata (dialect/bytes_scanned/cost_usd) for this query, when the adapter reports it. Always present, even outside dry_run.",
+          "label": null,
+          "name": "cost_estimate",
           "required": true
         }
       ],
       "type": "data.sql_query",
-      "version": 1
+      "version": 2
     },
     {
       "category": "LLM",

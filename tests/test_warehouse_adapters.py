@@ -155,6 +155,35 @@ class TestDuckDBAdapter:
         df = adapter.list_relations({}, schema=malicious)
         assert len(df) == 0
 
+    def test_describe_relation_disambiguates_same_named_table_across_schemas(self, tmp_path):
+        """A same-named table in two schemas must resolve to the right one when scoped.
+
+        Regression test: describe_relation used to take only a bare relation name with
+        no schema/database filter, so two same-named tables in different schemas were
+        indistinguishable -- describing "users" would return whichever schema's columns
+        the unfiltered query happened to match (or both, merged).
+        """
+        import duckdb
+
+        db_path = str(tmp_path / "test.duckdb")
+        conn = duckdb.connect(db_path)
+        conn.execute("CREATE SCHEMA s1")
+        conn.execute("CREATE SCHEMA s2")
+        conn.execute("CREATE TABLE s1.users (id INTEGER, name VARCHAR)")
+        conn.execute("CREATE TABLE s2.users (id INTEGER, region VARCHAR, revenue DOUBLE)")
+        conn.close()
+
+        from emergentflow.data.warehouse.adapters.duckdb_adapter import DuckDBAdapter
+
+        adapter = DuckDBAdapter()
+        df_s1 = adapter.describe_relation({"path": db_path}, "users", schema="s1")
+        df_s2 = adapter.describe_relation({"path": db_path}, "users", schema="s2")
+
+        assert list(df_s1["column"]) == ["id", "name"]
+        assert set(df_s1["schema"]) == {"s1"}
+        assert list(df_s2["column"]) == ["id", "region", "revenue"]
+        assert set(df_s2["schema"]) == {"s2"}
+
 
 # ---- Cloud adapter missing-driver guard tests ----
 

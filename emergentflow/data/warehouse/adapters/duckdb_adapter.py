@@ -140,6 +140,9 @@ class DuckDBAdapter:
         self,
         credentials: Mapping[str, str],
         relation: str,
+        *,
+        database: str | None = None,
+        schema: str | None = None,
     ) -> pd.DataFrame:
         conn = self._connect(credentials)
         try:
@@ -150,11 +153,15 @@ class DuckDBAdapter:
                 "THEN true ELSE false END AS nullable "
                 "FROM information_schema.columns "
                 f"WHERE table_name = '{_escape_literal(relation)}' "
-                "ORDER BY ordinal_position"
             )
+            if database:
+                sql += f"AND table_catalog = '{_escape_literal(database)}' "
+            if schema:
+                sql += f"AND table_schema = '{_escape_literal(schema)}' "
+            sql += "ORDER BY ordinal_position"
             df = conn.execute(sql).fetchdf()
-            df["database"] = None
-            df["schema"] = None
+            df["database"] = database
+            df["schema"] = schema
             df["table"] = relation
             return df[list(RELATION_SCHEMA_COLUMNS)]
         finally:

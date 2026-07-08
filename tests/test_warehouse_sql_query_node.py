@@ -107,7 +107,13 @@ def test_sql_query_compiled_references_warehouse() -> None:
 
 
 def test_sql_query_equivalence(tmp_path) -> None:
-    """execute(graph) produces the same result as running the compiled code."""
+    """execute(graph) produces the same result as running the compiled code.
+
+    The node's ``frame`` OUT port is a bare DataFrame (the QueryResult's ``.df``,
+    unwrapped in ``execute``/``codegen`` so it matches its declared ``DataFrame`` port
+    type and flows into the rest of the analyst surface), so the port's artifact is
+    compared directly against the fixture's frame.
+    """
     graph = _build_sql_query_graph()
     _request, expected_result = _make_fixture(tmp_path)
     replay = ReplayWarehouseClient(tmp_path)
@@ -115,8 +121,6 @@ def test_sql_query_equivalence(tmp_path) -> None:
     # Execute side
     exec_results = execute(graph, clients=Clients(warehouse=replay))
     node_id = list(graph.nodes.keys())[0]
-    exec_qr = exec_results[node_id]["frame"]
+    exec_frame = exec_results[node_id]["frame"]
 
-    assert_frame_equal(exec_qr.df, expected_result.df)
-    assert exec_qr.row_count == expected_result.row_count
-    assert exec_qr.dialect == expected_result.dialect
+    assert_frame_equal(exec_frame, expected_result.df)

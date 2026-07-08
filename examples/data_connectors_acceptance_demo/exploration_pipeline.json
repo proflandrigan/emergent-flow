@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "paradigm": "functional",
+  "name": "Data Connectors Acceptance Demo -- Exploration",
+  "nodes": {
+    "n-query": {
+      "id": "n-query",
+      "type": "data.sql_query",
+      "label": "Sales Query",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "sql",
+          "type_token": "str",
+          "value": "SELECT * FROM read_parquet('examples/data_connectors_acceptance_demo/sales.parquet')",
+          "default": null
+        },
+        {
+          "name": "connection",
+          "type_token": "ConnectionRef",
+          "value": "demo_duckdb",
+          "default": null
+        },
+        {
+          "name": "dialect",
+          "type_token": "str",
+          "value": "duckdb",
+          "default": null
+        },
+        {
+          "name": "max_rows",
+          "type_token": "int",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "dry_run",
+          "type_token": "bool",
+          "value": false,
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p-query-frame",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-query-cost",
+          "name": "cost_estimate",
+          "direction": "out",
+          "data_type": "CostEstimate",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-describe": {
+      "id": "n-describe",
+      "type": "stats.describe",
+      "label": "Describe",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "id": "p-describe-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-describe-summary",
+          "name": "summary",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 200.0,
+        "y": -100.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-corr": {
+      "id": "n-corr",
+      "type": "stats.correlation",
+      "label": "Correlation",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "id": "p-corr-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-corr-matrix",
+          "name": "matrix",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 200.0,
+        "y": 100.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-heatmap": {
+      "id": "n-heatmap",
+      "type": "viz.plot_correlation_heatmap",
+      "label": "Correlation Heatmap",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "id": "p-heatmap-in",
+          "name": "matrix",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p-heatmap-plot",
+          "name": "plot",
+          "direction": "out",
+          "data_type": "PlotSpec",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 400.0,
+        "y": 100.0
+      },
+      "group_id": null,
+      "subgraph": null
+    }
+  },
+  "edges": {
+    "e-query-describe": {
+      "id": "e-query-describe",
+      "source": {
+        "node_id": "n-query",
+        "port_id": "p-query-frame"
+      },
+      "target": {
+        "node_id": "n-describe",
+        "port_id": "p-describe-in"
+      },
+      "type_compatible": null
+    },
+    "e-query-corr": {
+      "id": "e-query-corr",
+      "source": {
+        "node_id": "n-query",
+        "port_id": "p-query-frame"
+      },
+      "target": {
+        "node_id": "n-corr",
+        "port_id": "p-corr-in"
+      },
+      "type_compatible": null
+    },
+    "e-corr-heatmap": {
+      "id": "e-corr-heatmap",
+      "source": {
+        "node_id": "n-corr",
+        "port_id": "p-corr-matrix"
+      },
+      "target": {
+        "node_id": "n-heatmap",
+        "port_id": "p-heatmap-in"
+      },
+      "type_compatible": null
+    }
+  }
+}

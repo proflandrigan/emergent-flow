@@ -12,6 +12,7 @@
 
 import type { CatalogEstimator, CatalogParam } from "../catalog/types";
 import { useCatalog } from "../catalog/useCatalog";
+import { useConnectionProfiles } from "../catalog/useConnectionProfiles";
 import { useGraphStore } from "../store/graphStore";
 import type { NodeModel, ParamModel } from "../store/model";
 import {
@@ -22,6 +23,7 @@ import {
 } from "./widgets";
 import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
+import { QueryBuilderPreview } from "./QueryBuilderPreview";
 
 // Node types whose `params` dict param holds curated sklearn estimator constructor kwargs
 // (Epic 8 archetypes). Restricted to an explicit list rather than inferred generically, since
@@ -71,6 +73,30 @@ interface ParamRowProps {
   node: NodeModel;
   param: ParamModel;
   meta: CatalogParam | undefined;
+}
+
+// Only rendered for the (typically single) "connection" param on a node, so the
+// /connections fetch in useConnectionProfiles runs once per form, not once per param row.
+function ConnectionSelect({
+  testId,
+  value,
+  onChange,
+}: {
+  testId: string;
+  value: string;
+  onChange: (value: string) => void;
+}): JSX.Element {
+  const profiles = useConnectionProfiles();
+  return (
+    <Select data-testid={testId} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="" />
+      {profiles.map((p) => (
+        <option key={p.name} value={p.name}>
+          {p.name} ({p.dialect})
+        </option>
+      ))}
+    </Select>
+  );
 }
 
 function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
@@ -150,6 +176,35 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
             parseValue(catalogParam, e.target.value),
           )
         }
+      />
+    );
+  } else if (kind === "sql") {
+    widget = (
+      <textarea
+        data-testid={testId}
+        value={formatValue(catalogParam, param.value)}
+        rows={8}
+        style={{
+          width: "100%",
+          fontFamily: "monospace",
+          fontSize: "0.8rem",
+          resize: "vertical",
+        }}
+        onChange={(e) =>
+          setParam(
+            node.id,
+            param.name,
+            parseValue(catalogParam, e.target.value),
+          )
+        }
+      />
+    );
+  } else if (kind === "connection") {
+    widget = (
+      <ConnectionSelect
+        testId={testId}
+        value={formatValue(catalogParam, param.value)}
+        onChange={(value) => setParam(node.id, param.name, parseValue(catalogParam, value))}
       />
     );
   } else {
@@ -434,6 +489,7 @@ export function ConfigForm({ node }: { node: NodeModel }): JSX.Element {
         }
         return <ParamRow key={param.name} node={node} param={param} meta={meta} />;
       })}
+      {node.type === "data.query_builder" ? <QueryBuilderPreview node={node} /> : null}
     </div>
   );
 }

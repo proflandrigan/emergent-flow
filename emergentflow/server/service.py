@@ -19,12 +19,12 @@ import json
 import time
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pandas as pd
 
 from emergentflow import __version__, compile_to_code, execute, export_catalog, validate
-from emergentflow.clients import Clients
+from emergentflow.clients import ClientKind, Clients
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
 from emergentflow.codegen.traversal import topological_sort
 from emergentflow.codegen.validation import enforce_validation_gate
@@ -41,6 +41,12 @@ from emergentflow.server.cache import get_default_cache
 from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
 from emergentflow.server.reports import get_default_store
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from emergentflow.data.warehouse.adapter_client import AdapterWarehouseClient
+    from emergentflow.data.warehouse.protocol import WarehouseAdapter
+
 
 # Server-run nodes that declare a client capability (`requires_client = True`,
 # Epic 9 ADR 0017, or the more general `requires` set, ADR 0018) get a real
@@ -54,12 +60,20 @@ def _execute_node(definition: Any, node: Node, inputs: dict[str, Any]) -> dict[s
     if not kinds:
         return cast(dict[str, Any], definition.execute(node, inputs))
     if len(kinds) == 1:
-        # Build the server's client bundle and hand the node the seam it needs.
-        # The LLM seam is a real GatewayClient (litellm imported lazily inside
-        # complete()); the warehouse seam is wired with real adapters in a later
-        # story (Story 6), so it is None here -- no warehouse node is served yet.
+        # Build the server's client bundle and hand the node the seam it needs. Only the
+        # seam the node actually declared is constructed: the LLM seam is a real
+        # GatewayClient (litellm imported lazily inside complete()); the warehouse seam is
+        # the same AdapterWarehouseClient _get_warehouse_client() builds for the
+        # /connections routes (Epic 13 Story 10), so a warehouse-requiring node run through
+        # the server actually reaches a real (or, for DuckDB, credential-free in-process)
+        # adapter instead of crashing on a None client. Building the *other* seam
+        # unconditionally would make e.g. every LLM-only node's execution depend on
+        # connections.toml parsing cleanly, even though it never touches a warehouse.
         (kind,) = tuple(kinds)
-        clients = Clients(llm=GatewayClient(), warehouse=None)
+        clients = Clients(
+            llm=GatewayClient() if kind is ClientKind.LLM else None,
+            warehouse=_get_warehouse_client() if kind is ClientKind.WAREHOUSE else None,
+        )
         return cast(Any, definition.execute)(node, inputs, client=clients.for_kind(kind))
     raise NotImplementedError(
         f"Node type {node.type!r} declares multiple client capabilities; multi-capability "
@@ -683,3 +697,102 @@ def execute_node(payload: dict[str, Any]) -> dict[str, Any]:
         "results": _results_to_payloads(results),
         "statuses": {node_id: status},
     }
+
+
+_warehouse_adapters_singleton: Mapping[str, WarehouseAdapter] | None = None
+
+
+def _get_warehouse_client() -> AdapterWarehouseClient:
+    """Build the server's AdapterWarehouseClient over every curated dialect adapter.
+
+    Mirrors _execute_node's GatewayClient() construction for the LLM seam: adapters are cheap
+    to construct (no I/O happens until a method is actually called), so building all four
+    unconditionally is simpler than lazily picking one per profile dialect -- the adapter set
+    is memoized since it never changes at runtime. The connection-profile store is NOT
+    memoized: it is reloaded via load_profiles() on every call so a profile added to (or
+    edited in) connections.toml after the server started is picked up immediately, instead of
+    requiring a restart before /connections/{name}/test, /connections/{name}/schema, or
+    warehouse-node execution can see it (list_connections() already reloads fresh on every
+    call; this keeps the two consistent).
+    """
+    global _warehouse_adapters_singleton
+    from emergentflow.data.warehouse.adapter_client import AdapterWarehouseClient
+    from emergentflow.data.warehouse.profiles import load_profiles
+
+    if _warehouse_adapters_singleton is None:
+        from emergentflow.data.warehouse.adapters.bigquery_adapter import BigQueryAdapter
+        from emergentflow.data.warehouse.adapters.duckdb_adapter import DuckDBAdapter
+        from emergentflow.data.warehouse.adapters.postgres_adapter import PostgresAdapter
+        from emergentflow.data.warehouse.adapters.redshift_adapter import RedshiftAdapter
+
+        _warehouse_adapters_singleton = {
+            "duckdb": DuckDBAdapter(),
+            "bigquery": BigQueryAdapter(),
+            "redshift": RedshiftAdapter(),
+            "postgres": PostgresAdapter(),
+        }
+    return AdapterWarehouseClient(load_profiles(), _warehouse_adapters_singleton)
+
+
+def list_connections() -> dict[str, Any]:
+    """Return every local connection profile (GET /connections).
+
+    Secret-free per ConnectionProfile.
+    """
+    from emergentflow.data.warehouse.profiles import load_profiles
+
+    store = load_profiles()
+    return {"connections": [store.get(name).model_dump(mode="json") for name in store.names()]}
+
+
+def test_connection_route(name: str) -> dict[str, Any]:
+    """Probe one named connection profile (POST /connections/{name}/test)."""
+    from emergentflow.data.warehouse.profiles import load_profiles, test_connection
+
+    store = load_profiles()
+    profile = store.get(name)  # raises UnknownConnectionError -> 422 if absent
+    client = _get_warehouse_client()
+    result = test_connection(profile, client=client)
+    return result.model_dump(mode="json")
+
+
+def get_connection_schema(
+    name: str,
+    *,
+    database: str | None = None,
+    schema: str | None = None,
+    relation: str | None = None,
+) -> dict[str, Any]:
+    """Browse one connection's schema (GET /connections/{name}/schema).
+
+    Without `relation`: lists relations (optionally scoped to database/schema). With `relation`:
+    describes that relation's columns, scoped to database/schema when given so a relation name
+    that exists in more than one schema resolves to the right one. Mirrors the two-mode shape of
+    emergentflow.data.warehouse.browser's two functions.
+    """
+    from emergentflow.data.warehouse.browser import describe_relation, list_relations
+
+    client = _get_warehouse_client()
+    if relation is not None:
+        df = describe_relation(client, name, relation, database=database, schema=schema)
+    else:
+        df = list_relations(client, name, database=database, schema=schema)
+    return {"rows": df.to_dict(orient="records")}
+
+
+def compile_query_spec(payload: dict[str, Any]) -> dict[str, Any]:
+    """POST /compile-spec: {"spec": {...}, "dialect": "..."} -> {"sql": <compiled SQL string>}.
+
+    Wraps the SAME emergentflow.data.warehouse.spec_compiler.compile_spec the data.query_builder
+    node's wrapper calls, so the canvas's live SQL preview can never drift from what actually
+    runs (Story 5's "one function" invariant, extended to the UI preview).
+    """
+    from emergentflow.data.warehouse.spec_compiler import compile_spec
+
+    spec = payload.get("spec")
+    dialect = payload.get("dialect")
+    if not isinstance(spec, dict):
+        raise CodegenError("compile-spec requires 'spec' (an object)")
+    if not isinstance(dialect, str) or not dialect:
+        raise CodegenError("compile-spec requires 'dialect' (a non-empty string)")
+    return {"sql": compile_spec(spec, dialect)}

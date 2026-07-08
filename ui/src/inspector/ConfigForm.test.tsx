@@ -212,3 +212,15 @@ test("switching estimator clears kwargs that don't belong to the newly selected 
   ) as HTMLTextAreaElement;
   expect(JSON.parse(advanced.value)).toEqual({});
 });
+
+test("sql param renders a textarea, not an input", () => {
+  addNode("data.sql_query");
+  const el = screen.getByTestId("param-sql");
+  expect(el.tagName).toBe("TEXTAREA");
+});
+
+test("connection param renders a select, not a text input", () => {
+  addNode("data.sql_query");
+  const el = screen.getByTestId("param-connection");
+  expect(el.tagName).toBe("SELECT");
+});

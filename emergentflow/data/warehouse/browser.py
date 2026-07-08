@@ -80,20 +80,24 @@ def describe_relation(
     connection: str,
     relation: str,
     *,
+    database: str | None = None,
+    schema: str | None = None,
     cache: SchemaBrowserCache | None = None,
 ) -> pd.DataFrame:
     """Return a tidy column-schema frame for *relation* (design-time only).
 
-    Delegates to ``client.describe_relation(...)``. When *cache* is given, a
-    call with identical arguments is served from the cache instead of
-    re-invoking the client; the result is stored in *cache* on a miss.
+    *database*/*schema* disambiguate a *relation* name that exists in more than one
+    schema — pass the values ``list_relations`` reported for the tree node the caller
+    clicked. Delegates to ``client.describe_relation(...)``. When *cache* is given, a
+    call with identical arguments is served from the cache instead of re-invoking the
+    client; the result is stored in *cache* on a miss.
     """
-    key = ("describe_relation", connection, relation)
+    key = ("describe_relation", connection, relation, database, schema)
     if cache is not None:
         cached = cache.get(key)
         if cached is not None:
             return cached
-    df = client.describe_relation(connection, relation)
+    df = client.describe_relation(connection, relation, database=database, schema=schema)
     if cache is not None:
         cache.set(key, df)
     return df

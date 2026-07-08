@@ -10,6 +10,7 @@
   "types": [
     "AnovaResult",
     "ClassifierResult",
+    "CostEstimate",
     "DataFrame",
     "EvaluationResult",
     "HTML",

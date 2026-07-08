@@ -33,7 +33,7 @@ class QueryBuilder(NodeDefinition):
     """Build a SQL query from structured spec and return a DataFrame."""
 
     type = "data.query_builder"
-    version = 1
+    version = 2
     family = "data"
     label = "Query Builder"
     category = "Ingest"
@@ -50,7 +50,16 @@ class QueryBuilder(NodeDefinition):
             name="frame",
             direction=Direction.OUT,
             data_type="DataFrame",
-            help="The query result as a pandas DataFrame.",
+            help="The query result as a pandas DataFrame. Always a genuine (possibly "
+            "empty) DataFrame, including under dry_run -- see cost_estimate for the "
+            "byte-scan/cost metadata dry_run reports instead of real rows.",
+        ),
+        PortSpec(
+            name="cost_estimate",
+            direction=Direction.OUT,
+            data_type="CostEstimate",
+            help="Cost/byte-scan metadata (dialect/bytes_scanned/cost_usd) for this query, "
+            "when the adapter reports it. Always present, even outside dry_run.",
         ),
     ]
     params = [
@@ -196,19 +205,28 @@ class QueryBuilder(NodeDefinition):
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         spec = self._build_spec(node)
         connection, dialect, max_rows, dry_run = self._meta(node)
-        return CodeFragment(
-            imports=["import emergentflow as ef"],
-            body=(
-                f"{ctx.out_var('frame')} = ef.data.query(\n"
-                f"    spec={spec!r},\n"
-                f"    connection={connection!r},\n"
-                f"    dialect={dialect!r},\n"
-                f"    client=warehouse,\n"
-                f"    max_rows={max_rows!r},\n"
-                f"    dry_run={dry_run!r},\n"
-                f")"
-            ),
-        )
+        # The 'frame' port is always a genuine DataFrame -- empty under dry_run (see
+        # emergentflow.data.warehouse.protocol.dry_run_result), never the QueryResult
+        # wrapper itself, so its declared type holds regardless of the dry_run param.
+        # The QueryResult's cost/byte-scan metadata (populated under dry_run, and by
+        # some adapters on a real run too) goes out its own 'cost_estimate' port instead
+        # of overloading 'frame' with two different shapes.
+        bundle = f"_{ctx.out_var('frame')}_bundle"
+        lines = [
+            f"{bundle} = ef.data.query(",
+            f"    spec={spec!r},",
+            f"    connection={connection!r},",
+            f"    dialect={dialect!r},",
+            "    client=warehouse,",
+            f"    max_rows={max_rows!r},",
+            f"    dry_run={dry_run!r},",
+            ")",
+            f"{ctx.out_var('frame')} = {bundle}.df",
+            f"{ctx.out_var('cost_estimate')} = "
+            f'{{"dialect": {bundle}.dialect, "bytes_scanned": {bundle}.bytes_scanned, '
+            f'"cost_usd": {bundle}.cost_usd}}',
+        ]
+        return CodeFragment(imports=["import emergentflow as ef"], body="\n".join(lines))
 
     def execute(
         self,
@@ -227,4 +245,11 @@ class QueryBuilder(NodeDefinition):
             max_rows=max_rows,
             dry_run=dry_run,
         )
-        return {"frame": result}
+        return {
+            "frame": result.df,
+            "cost_estimate": {
+                "dialect": result.dialect,
+                "bytes_scanned": result.bytes_scanned,
+                "cost_usd": result.cost_usd,
+            },
+        }
