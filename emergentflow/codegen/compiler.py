@@ -25,6 +25,7 @@ import textwrap
 from dataclasses import dataclass
 
 from emergentflow.api import public_op
+from emergentflow.clients import ClientKind
 from emergentflow.codegen.context import build_codegen_context
 from emergentflow.codegen.declarative import compile_declarative
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
@@ -58,7 +59,8 @@ class _AssembledModule:
     name_map: NameMap
     out_ports: list[tuple[str, str, str]]  # (node_id, out_port_name, var_name), topo order
     leaf_vars: list[str]  # OUT-port vars with no downstream consumer
-    needs_client: bool  # True iff any node's definition class sets requires_client = True
+    needs_llm: bool  # True iff any node needs the LLM client seam (ADR 0017/0018)
+    needs_warehouse: bool  # True iff any node needs the warehouse client seam (ADR 0018)
     env_hints: tuple[str, ...]  # sorted, deduped env vars a standalone run of this script needs
 
 
@@ -109,14 +111,16 @@ def _assemble(graph: Graph) -> _AssembledModule:
     # Step 4: Per-node codegen
     name_map = build_name_map(graph)
     code_fragments: list[CodeFragment] = []
-    needs_client = False
+    needs_llm = False
+    needs_warehouse = False
     env_hint_set: set[str] = set()
     for node_id in topo_order_ids:
         node = graph.nodes[node_id]
         definition_cls = get_node_definition(node.type)
         definition = definition_cls()
-        if definition_cls.requires_client:
-            needs_client = True
+        kinds = definition_cls.required_client_kinds()
+        if ClientKind.LLM in kinds:
+            needs_llm = True
             for provider, api_key_env in provider_api_key_pairs(node):
                 # Best-effort hint only -- an unresolvable provider/api_key_env pair here is a
                 # real problem for an actual run (GatewayClient/the pre-flight check in
@@ -125,6 +129,8 @@ def _assemble(graph: Graph) -> _AssembledModule:
                 # it rather than making compilation itself fail on this.
                 with contextlib.suppress(MissingAPIKeyError):
                     env_hint_set.add(resolve_api_key_env_name(provider, api_key_env))
+        if ClientKind.WAREHOUSE in kinds:
+            needs_warehouse = True
         ctx = build_codegen_context(node, name_map, wiring_map)
         fragment = definition.codegen(node, ctx)
         code_fragments.append(fragment)
@@ -161,7 +167,8 @@ def _assemble(graph: Graph) -> _AssembledModule:
         name_map=name_map,
         out_ports=out_ports,
         leaf_vars=leaf_vars,
-        needs_client=needs_client,
+        needs_llm=needs_llm,
+        needs_warehouse=needs_warehouse,
         env_hints=tuple(sorted(env_hint_set)),
     )
 
@@ -206,7 +213,19 @@ def compile_to_code(graph: Graph) -> str:
 
     import_block = "\n".join(assembled.imports)
 
-    body_lines = [textwrap.indent(stmt, "    ") for stmt in assembled.body_statements]
+    # A warehouse graph (ADR 0018) threads the extensible Clients bundle; main()
+    # unpacks each needed seam into the local names node fragments reference
+    # (`warehouse`, and `client` when an LLM node is also present). Emitted before
+    # the node bodies so those locals are in scope.
+    preamble_lines: list[str] = []
+    if assembled.needs_warehouse:
+        preamble_lines.append("warehouse = clients.warehouse if clients is not None else None")
+        if assembled.needs_llm:
+            preamble_lines.append("client = clients.llm if clients is not None else None")
+
+    body_lines = [
+        textwrap.indent(stmt, "    ") for stmt in preamble_lines + assembled.body_statements
+    ]
 
     return_items = ", ".join(f'"{var}": {var}' for var in assembled.leaf_vars)
     return_line = textwrap.indent(f"return {{{return_items}}}", "    ")
@@ -214,10 +233,24 @@ def compile_to_code(graph: Graph) -> str:
 
     main_body = "\n".join(body_lines)
 
-    # A graph with no client-requiring node emits the exact same `main()`
-    # signature as before this parameter existed (back-compat gate, Epic 9
-    # Story 1): only graphs with an LLM node (Story 2+) get a `client` param.
-    if assembled.needs_client:
+    if assembled.needs_warehouse:
+        main_signature = "def main(*, clients: object | None = None) -> dict[str, object]:"
+        boiler = "    from emergentflow.clients import Clients\n"
+        seams = []
+        if assembled.needs_llm:
+            boiler += "    from emergentflow.llm.gateway import GatewayClient\n"
+            seams.append("llm=GatewayClient()")
+        seams.append("warehouse=None")
+        boiler += (
+            "\n"
+            "    # A warehouse graph needs a WarehouseClient injected "
+            "(emergentflow.data.warehouse);\n"
+            "    # replace warehouse=None with your configured client before running.\n"
+            f"    _results = main(clients=Clients({', '.join(seams)}))"
+        )
+        main_call = boiler
+    elif assembled.needs_llm:
+        # Byte-identical to the pre-ADR-0018 LLM path (Epic 9 Story 1 back-compat gate).
         main_signature = "def main(*, client: object | None = None) -> dict[str, object]:"
         # A standalone run of this script needs a real client to reach an LLM
         # provider (ADR 0017), so the boilerplate constructs a `GatewayClient`
@@ -233,7 +266,7 @@ def compile_to_code(graph: Graph) -> str:
         main_call = "    _results = main()"
 
     # Step 7: Module assembly
-    if assembled.needs_client and assembled.env_hints:
+    if assembled.needs_llm and assembled.env_hints:
         export_lines = "\n".join(f"    export {name}=..." for name in assembled.env_hints)
         docstring_body = (
             "Generated by Emergent Flow. Do not edit by hand.\n\n"

@@ -18,8 +18,9 @@ from pathlib import Path
 import pandas as pd
 
 from emergentflow.api import public_op
+from emergentflow.data.warehouse.query import query
 
-__all__ = ["load_csv", "load_json", "load_parquet", "load_sample"]
+__all__ = ["load_csv", "load_json", "load_parquet", "load_sample", "query"]
 
 
 @public_op(name="ef.data.load_csv")

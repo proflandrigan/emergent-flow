@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import Field
 
+from emergentflow.clients import ClientKind
 from emergentflow.ir.common import IRModel, Paradigm
 from emergentflow.ir.node import Node, Position
 from emergentflow.ir.params import Param, ParamValue
@@ -126,6 +127,13 @@ class NodeDefinition(ABC):
         ``emergentflow.codegen.compiler.compile_to_code`` emits a ``main()``
         entry point that accepts a ``client`` parameter. Graphs containing no
         such node are completely unaffected — this is an opt-in, additive flag.
+    requires:
+        The set of injected-client capabilities this node needs (ADR 0018),
+        e.g. ``frozenset({ClientKind.WAREHOUSE})``. Generalizes ``requires_client``
+        to more than one effect type. Prefer this for new effectful nodes; the
+        legacy ``requires_client`` boolean is still honored (it implies
+        ``ClientKind.LLM``) via ``required_client_kinds`` so every Epic 9 LLM node
+        is unchanged. Default: the empty set (a pure node needs no client).
     ports:
         Declared :class:`PortSpec` list.
     params:
@@ -141,12 +149,28 @@ class NodeDefinition(ABC):
     paradigm: ClassVar[Paradigm] = Paradigm.FUNCTIONAL
     cacheable: ClassVar[bool] = True
     requires_client: ClassVar[bool] = False
+    requires: ClassVar[frozenset[ClientKind]] = frozenset()
     ports: ClassVar[list[PortSpec]] = []
     params: ClassVar[list[ParamSpec]] = []
 
     # ------------------------------------------------------------------
     # Behaviour — implemented by concrete node definitions
     # ------------------------------------------------------------------
+
+    @classmethod
+    def required_client_kinds(cls) -> frozenset[ClientKind]:
+        """Resolve the effective set of client capabilities this node needs (ADR 0018).
+
+        Unions the declared ``requires`` capability set with the legacy
+        ``requires_client`` boolean (which implies ``ClientKind.LLM``), so existing
+        LLM nodes that only set ``requires_client = True`` keep meaning "needs the
+        LLM client" and new nodes can declare ``requires`` directly. A pure node
+        (neither set) returns the empty set.
+        """
+        kinds = set(cls.requires)
+        if cls.requires_client:
+            kinds.add(ClientKind.LLM)
+        return frozenset(kinds)
 
     @abstractmethod
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:

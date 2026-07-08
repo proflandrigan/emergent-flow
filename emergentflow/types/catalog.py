@@ -118,3 +118,13 @@ register_type(
         ),
     )
 )
+register_type(
+    TypeDef(
+        token="Schema",
+        description=(
+            "A tidy schema-introspection frame (database/schema/table/column/data_type/"
+            "nullable) produced by warehouse introspection through the WarehouseClient seam "
+            "(Epic 13, ADR 0018)."
+        ),
+    )
+)

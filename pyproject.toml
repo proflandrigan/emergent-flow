@@ -64,6 +64,16 @@ dependencies = [
     # concrete syntax tree with libcst rather than splicing strings, so libcst
     # is a runtime dependency of compile_to_code for DECLARATIVE graphs.
     "libcst>=1.1",
+    # sqlglot (MIT) is the SQL dialect parser/transpiler backing Epic 13's read-only
+    # validation and the structured-spec -> dialect-SQL compilation. A hard dependency
+    # because the query seam always needs it; MIT is compatible with this SDK's license
+    # (see docs/licensing-and-dependencies.md). Not a GPL dep.
+    "sqlglot>=25,<26",
+    # duckdb (MIT) is the in-process, credential-free warehouse: a real feature (query
+    # local parquet/csv with zero credentials) AND the offline fixture-recording backend
+    # so the Epic 13 equivalence matrix runs in CI without a cloud account. A hard
+    # dependency; MIT is compatible with this SDK's license. Not a GPL dep.
+    "duckdb>=1,<2",
 ]
 
 [project.optional-dependencies]
@@ -91,6 +101,25 @@ bayes = [
     "pymc>=5,<6",
     "bambi>=0.13,<1",
     "arviz>=0.17,<1",
+]
+# `pip install emergentflow[bigquery]` enables the BigQuery warehouse adapter (Epic 13).
+# google-cloud-bigquery is Apache-2.0 (compatible; not GPL). Kept optional so a bare SDK
+# install stays credential-free and light (ADR 0007 / ADR 0018); a BigQuery node in a base
+# install raises a typed MissingOptionalDependencyError, never an opaque ImportError.
+bigquery = [
+    "google-cloud-bigquery>=3,<4",
+]
+# `pip install emergentflow[redshift]` enables the Redshift warehouse adapter (Epic 13).
+# redshift-connector is Apache-2.0 (compatible; not GPL). Kept optional (ADR 0007 / ADR 0018).
+redshift = [
+    "redshift-connector>=2.1,<3",
+]
+# `pip install emergentflow[postgres]` enables the Postgres warehouse adapter (Epic 13).
+# SQLAlchemy is MIT; the psycopg driver is LGPL and therefore lives ONLY behind this extra,
+# never on the hard-dep path (ADR 0018 / docs/licensing-and-dependencies.md). Kept optional.
+postgres = [
+    "sqlalchemy>=2,<3",
+    "psycopg[binary]>=3.1,<4",
 ]
 
 [project.urls]

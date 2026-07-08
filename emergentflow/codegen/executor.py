@@ -31,6 +31,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from emergentflow.api import public_op
+from emergentflow.clients import Clients
 from emergentflow.codegen.declarative import _prepare_declarative
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
 from emergentflow.codegen.traversal import topological_sort
@@ -50,15 +51,24 @@ def _describe(node: Node) -> str:
 
 
 @public_op(name="ef.execute")
-def execute(graph: Graph, *, client: Any | None = None) -> dict[str, dict[str, Any]]:
+def execute(
+    graph: Graph,
+    *,
+    clients: Clients | None = None,
+    client: Any | None = None,
+) -> dict[str, dict[str, Any]]:
     """Run *graph* in-process, node by node, in topological order.
 
     Args:
         graph: The IR graph to execute.
-        client: An injected ``LLMClient`` (ADR 0017), passed to any node whose
-            definition class sets ``requires_client = True``. Graphs with no
-            such node never touch this parameter and behave exactly as before
-            this parameter was added (back-compat gate, Epic 9 Story 1).
+        clients: An injected ``Clients`` bundle (ADR 0018) exposing named
+            effectful-client seams (``clients.llm``, ``clients.warehouse``, ...).
+            Each node is handed the client for the single capability it declares
+            via ``required_client_kinds()``. Graphs with no client-requiring node
+            never touch it and behave exactly as before.
+        client: **Legacy** single-client keyword (ADR 0017). It always meant the
+            LLM client, so it is mapped onto ``Clients(llm=client)`` for
+            back-compat. Passing both ``clients`` and ``client`` is an error.
 
     Returns:
         A mapping from node id to that node's outputs, themselves keyed by
@@ -81,7 +91,16 @@ def execute(graph: Graph, *, client: Any | None = None) -> dict[str, dict[str, A
                               a type incompatibility, a cardinality violation,
                               or an unconnected required IN port. Raised before
                               any node runs. Warnings do not block.
+        ValueError: If both ``clients`` and ``client`` are passed.
     """
+    if clients is not None and client is not None:
+        raise ValueError(
+            "execute() accepts either the legacy client= (the LLM client) or "
+            "clients=Clients(...), not both."
+        )
+    if clients is None:
+        clients = Clients.from_legacy_client(client)
+
     if graph.paradigm is Paradigm.DECLARATIVE:
         return _execute_declarative(graph)
 
@@ -156,14 +175,26 @@ def execute(graph: Graph, *, client: Any | None = None) -> dict[str, dict[str, A
             inputs[port.name] = results[src.node_id][src_port_name]
 
         definition = get_node_definition(node.type)()
-        if type(definition).requires_client:
-            # Widen past NodeDefinition.execute's declared (node, inputs)
-            # signature via cast(Any, ...): LLM-call node subclasses accept an
-            # extra `client` keyword, but the abstract base signature stays
-            # unchanged so the ~30 existing node subclasses need no re-typing.
-            results[node.id] = cast(Any, definition.execute)(node, inputs, client=client)
-        else:
+        kinds = type(definition).required_client_kinds()
+        if not kinds:
             results[node.id] = definition.execute(node, inputs)
+        elif len(kinds) == 1:
+            # Resolve the node's single declared capability from the bundle and
+            # pass it as `client=`. For an LLM node this is `clients.llm` — the
+            # exact value the legacy `client=` path supplied — so every Epic 9
+            # node is byte-for-byte unchanged; a warehouse node gets
+            # `clients.warehouse` through the same keyword. Widen past the
+            # abstract (node, inputs) signature via cast(Any, ...): effectful
+            # node subclasses accept an extra `client` keyword.
+            (kind,) = tuple(kinds)
+            resolved = clients.for_kind(kind)
+            results[node.id] = cast(Any, definition.execute)(node, inputs, client=resolved)
+        else:
+            raise NotImplementedError(
+                f"Node type {node.type!r} declares multiple client capabilities "
+                f"{sorted(k.value for k in kinds)!r}; multi-capability threading is a later "
+                "story. File a node needing two effectful clients if you hit this."
+            )
 
     # Step 5: Return collected results
     return results

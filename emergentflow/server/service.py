@@ -24,6 +24,7 @@ from typing import Any, cast
 import pandas as pd
 
 from emergentflow import __version__, compile_to_code, execute, export_catalog, validate
+from emergentflow.clients import Clients
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
 from emergentflow.codegen.traversal import topological_sort
 from emergentflow.codegen.validation import enforce_validation_gate
@@ -41,15 +42,29 @@ from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
 from emergentflow.server.reports import get_default_store
 
 
-# Server-run nodes that declare `requires_client = True` (Epic 9, ADR 0017) get a
-# real `GatewayClient` so "run this graph"/"run this node" over the local server
+# Server-run nodes that declare a client capability (`requires_client = True`,
+# Epic 9 ADR 0017, or the more general `requires` set, ADR 0018) get a real
+# client for that seam so "run this graph"/"run this node" over the local server
 # actually reaches the provider, mirroring `emergentflow.codegen.executor.execute`'s
-# `client` threading. `GatewayClient` itself only imports `litellm` lazily inside
-# `complete()`, so importing the class here adds no hard dependency on the `llm` extra.
+# capability-aware client dispatch. `GatewayClient` itself only imports `litellm`
+# lazily inside `complete()`, so importing the class here adds no hard dependency
+# on the `llm` extra.
 def _execute_node(definition: Any, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-    if type(definition).requires_client:
-        return cast(Any, definition.execute)(node, inputs, client=GatewayClient())
-    return cast(dict[str, Any], definition.execute(node, inputs))
+    kinds = type(definition).required_client_kinds()
+    if not kinds:
+        return cast(dict[str, Any], definition.execute(node, inputs))
+    if len(kinds) == 1:
+        # Build the server's client bundle and hand the node the seam it needs.
+        # The LLM seam is a real GatewayClient (litellm imported lazily inside
+        # complete()); the warehouse seam is wired with real adapters in a later
+        # story (Story 6), so it is None here -- no warehouse node is served yet.
+        (kind,) = tuple(kinds)
+        clients = Clients(llm=GatewayClient(), warehouse=None)
+        return cast(Any, definition.execute)(node, inputs, client=clients.for_kind(kind))
+    raise NotImplementedError(
+        f"Node type {node.type!r} declares multiple client capabilities; multi-capability "
+        "threading is a later story."
+    )
 
 
 # Per-node execution status reported to the canvas (Epic 4 Story 2). A node is
