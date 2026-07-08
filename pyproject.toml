@@ -216,5 +216,12 @@ module = [
     "pymc.*",
     "bambi.*",
     "arviz.*",
+    # The optional warehouse extras ([bigquery]/[redshift]/[postgres], Epic 13 Story 6):
+    # cloud drivers are imported lazily inside each adapter and are absent from the bare
+    # `uv sync --locked` CI env (like torch/litellm), so ignore their missing imports.
+    "google.cloud.*",
+    "redshift_connector.*",
+    "psycopg.*",
+    "sqlalchemy.*",
 ]
 ignore_missing_imports = true

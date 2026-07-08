@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Any
 
 from emergentflow.api import public_op
+from emergentflow.data.warehouse.generator import generate_connector_catalog_entries
 from emergentflow.ml.generator import generate_estimator_catalog_entries
 from emergentflow.ml.registry import get_estimator_spec, known_estimator_keys
 from emergentflow.nodes.registry import NodeRegistry
@@ -27,7 +28,7 @@ from emergentflow.viz.registry import get_chart_spec, known_chart_keys
 #: Version of the catalog artifact *shape*. Bump on a breaking change to the artifact
 #: structure (new/removed/renamed top-level or per-node fields). Distinct from
 #: ``Graph.schema_version`` (IR wire format) and each node's contract ``version``.
-CATALOG_VERSION = 3
+CATALOG_VERSION = 4
 
 
 @public_op(name="ef.export_catalog")
@@ -40,7 +41,11 @@ def export_catalog(registry: NodeRegistry = default_registry) -> dict[str, Any]:
     generated from the curated estimator allow-list via
     :func:`~emergentflow.ml.generator.generate_estimator_catalog_entries`, sorted by ``key``;
     the ``"charts"`` list (Epic 12, Story 8) is generated from the curated viz chart allow-list
-    via :func:`~emergentflow.viz.generator.generate_chart_catalog_entries`, sorted by ``key``.
+    via :func:`~emergentflow.viz.generator.generate_chart_catalog_entries`, sorted by ``key``;
+    the ``"connectors"`` list (Epic 13, Story 6) is generated from the curated warehouse
+    connector allow-list via
+    :func:`~emergentflow.data.warehouse.generator.generate_connector_catalog_entries`,
+    sorted by ``dialect``.
     """
     estimator_specs = [get_estimator_spec(key) for key in known_estimator_keys()]
     chart_specs = [get_chart_spec(key) for key in known_chart_keys()]
@@ -49,4 +54,5 @@ def export_catalog(registry: NodeRegistry = default_registry) -> dict[str, Any]:
         "nodes": [spec.model_dump(mode="json") for spec in registry.specs()],
         "estimators": generate_estimator_catalog_entries(estimator_specs),
         "charts": generate_chart_catalog_entries(chart_specs),
+        "connectors": generate_connector_catalog_entries(),
     }

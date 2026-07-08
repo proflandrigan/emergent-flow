@@ -170,6 +170,23 @@ class FixtureMissError(LookupError):
     """
 
 
+class MissingDriverError(RuntimeError):
+    """Raised when a cloud warehouse adapter's driver package is not installed.
+
+    Each cloud adapter (BigQuery, Redshift, Postgres) depends on an optional
+    extra; the base install never pulls cloud drivers. When an adapter is
+    instantiated without its driver, this error tells the user the exact
+    ``pip install`` target (the ``[bayes]`` discipline, applied to warehouses).
+    """
+
+    def __init__(self, extra: str) -> None:
+        self.extra = extra
+        super().__init__(
+            f"This warehouse adapter requires the optional dependency group {extra!r}; "
+            f"install it with: pip install {extra}"
+        )
+
+
 @runtime_checkable
 class WarehouseClient(Protocol):
     """The injected data-source seam every query node depends on (ADR 0018).
