@@ -33,6 +33,7 @@ from emergentflow.data.warehouse.protocol import (
     QueryRequest,
     QueryResult,
     dry_run_result,
+    enforce_byte_scan_cap,
 )
 
 
@@ -251,6 +252,10 @@ class ReplayWarehouseClient:
         FixtureMissError
             If no fixture exists for ``request.content_hash()``. The message
             includes the hash and a copy-pasteable ``write_fixture(...)`` call.
+        ByteScanCapExceededError
+            If the replayed fixture's ``bytes_scanned`` exceeds
+            ``request.byte_scan_cap`` — the cap is enforced identically whether
+            the result came from a live adapter or a recorded fixture.
         """
         if request.dry_run:
             return dry_run_result(self.dry_run(request))
@@ -265,7 +270,9 @@ class ReplayWarehouseClient:
                 f"# result is the QueryResult you want this request to replay"
             )
         payload = json.loads(path.read_text())
-        return _result_from_dict(payload)
+        result = _result_from_dict(payload)
+        enforce_byte_scan_cap(request, result)
+        return result
 
     def dry_run(self, request: QueryRequest) -> CostEstimate:
         """Replay the fixture recorded for this ``dry_run`` call.

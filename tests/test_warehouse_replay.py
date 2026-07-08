@@ -9,6 +9,7 @@ import pytest
 from pandas.testing import assert_frame_equal
 
 from emergentflow.data.warehouse.protocol import (
+    ByteScanCapExceededError,
     ColumnSchema,
     CostEstimate,
     FixtureMissError,
@@ -82,6 +83,28 @@ def test_replay_miss_raises_fixture_miss_error(tmp_path):
     message = str(exc_info.value)
     assert request.content_hash() in message
     assert "write_fixture" in message
+
+
+def test_replay_run_raises_byte_scan_cap_exceeded_error_on_breach(tmp_path):
+    request = dataclasses.replace(_make_request(), byte_scan_cap=100)
+    result = dataclasses.replace(_make_result(), bytes_scanned=5_000_000)
+    write_fixture(tmp_path, request, result)
+
+    with pytest.raises(ByteScanCapExceededError) as exc_info:
+        ReplayWarehouseClient(tmp_path).run(request)
+
+    assert exc_info.value.byte_scan_cap == 100
+    assert exc_info.value.bytes_scanned == 5_000_000
+
+
+def test_replay_run_passes_when_under_byte_scan_cap(tmp_path):
+    request = dataclasses.replace(_make_request(), byte_scan_cap=1_000_000)
+    result = dataclasses.replace(_make_result(), bytes_scanned=1024)
+    write_fixture(tmp_path, request, result)
+
+    replayed = ReplayWarehouseClient(tmp_path).run(request)
+
+    assert replayed.bytes_scanned == 1024
 
 
 def test_fixture_filename_is_content_hash(tmp_path):

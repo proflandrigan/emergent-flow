@@ -19,13 +19,13 @@ import pandas as pd
 from emergentflow.data.warehouse.credentials import resolve_credentials
 from emergentflow.data.warehouse.profiles import ConnectionProfile, ProfileStore
 from emergentflow.data.warehouse.protocol import (
-    ByteScanCapExceededError,
     CostEstimate,
     QueryRequest,
     QueryResult,
     QueryTimeoutError,
     WarehouseAdapter,
     dry_run_result,
+    enforce_byte_scan_cap,
 )
 
 
@@ -85,12 +85,7 @@ class AdapterWarehouseClient:
         adapter = self._adapter_for(profile.dialect)
         timeout_s = profile.limits.get("timeout_s")
         result = self._execute_with_timeout(adapter, request, credentials, timeout_s)
-        if (
-            request.byte_scan_cap is not None
-            and result.bytes_scanned is not None
-            and result.bytes_scanned > request.byte_scan_cap
-        ):
-            raise ByteScanCapExceededError(request.byte_scan_cap, result.bytes_scanned)
+        enforce_byte_scan_cap(request, result)
         return result
 
     def dry_run(self, request: QueryRequest) -> CostEstimate:

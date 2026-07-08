@@ -229,6 +229,24 @@ class ByteScanCapExceededError(RuntimeError):
         )
 
 
+def enforce_byte_scan_cap(request: QueryRequest, result: QueryResult) -> None:
+    """Raise ``ByteScanCapExceededError`` if *result* breached *request*'s cap.
+
+    A no-op when either ``request.byte_scan_cap`` or ``result.bytes_scanned``
+    is ``None``. Every ``WarehouseClient`` implementation (live or replayed)
+    must call this on its way out of ``run()`` — the cap is a property of the
+    request/result pair, not of how the result was produced, so it applies
+    identically whether the bytes came from a live adapter or a recorded
+    fixture (Epic 13 Story 8).
+    """
+    if (
+        request.byte_scan_cap is not None
+        and result.bytes_scanned is not None
+        and result.bytes_scanned > request.byte_scan_cap
+    ):
+        raise ByteScanCapExceededError(request.byte_scan_cap, result.bytes_scanned)
+
+
 class QueryTimeoutError(RuntimeError):
     """Raised when a query runs longer than its connection profile's ``timeout_s``.
 
