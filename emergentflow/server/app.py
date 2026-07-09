@@ -49,6 +49,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
 from emergentflow.collab.session import (
+    ProposalAlreadyResolvedError,
     StaleVersionError,
     UnknownProposalError,
     UnknownSessionError,
@@ -181,9 +182,11 @@ async def _session_json(fn: Callable[[], dict[str, Any]]) -> Response:
     """Run *fn* off the event loop; map collab session errors to their HTTP codes.
 
     ``UnknownSessionError`` / ``UnknownProposalError`` -> 404,
-    ``StaleVersionError`` -> 409 (optimistic-concurrency conflict -- caller sent
-    a stale expected/base version), any other exception -> 422 (mirrors
-    ``_safe_json``'s catch-all for every other service failure).
+    ``StaleVersionError`` / ``ProposalAlreadyResolvedError`` -> 409
+    (optimistic-concurrency / proposal-lifecycle conflicts -- caller sent a
+    stale expected/base version, or tried to re-resolve a decided proposal),
+    any other exception -> 422 (mirrors ``_safe_json``'s catch-all for every
+    other service failure).
     """
     try:
         result = await _run_sync(fn)
@@ -191,6 +194,8 @@ async def _session_json(fn: Callable[[], dict[str, Any]]) -> Response:
         return _error_json(404, str(exc))
     except StaleVersionError as exc:
         return _error_json(409, f"stale_version: {exc}")
+    except ProposalAlreadyResolvedError as exc:
+        return _error_json(409, f"proposal_already_resolved: {exc}")
     except Exception as exc:  # noqa: BLE001 - any other failure -> 422, never crash the server
         return _error_json(422, f"{type(exc).__name__}: {exc}")
     return JSONResponse(content=result)

@@ -199,6 +199,40 @@ class TestProposals:
         )
         assert r.status_code == 409, r.text
 
+    def test_accept_already_rejected_proposal_409(self, client: TestClient) -> None:
+        # A REJECTED proposal must never later be accepted -- its base_version
+        # still matches the (unmoved) session version, so only an explicit
+        # status check catches this; without it the "rejected" mutation would
+        # silently apply.
+        session_id = client.post("/sessions", json={"graph": _seed_graph()}).json()["id"]
+        proposal_id = client.post(
+            f"/sessions/{session_id}/proposals", json={"base_version": 0, "remove_nodes": ["n1"]}
+        ).json()["id"]
+        client.post(f"/sessions/{session_id}/proposals/{proposal_id}/reject")
+
+        r = client.post(f"/sessions/{session_id}/proposals/{proposal_id}/accept")
+        assert r.status_code == 409, r.text
+        session = client.get(f"/sessions/{session_id}").json()
+        assert session["version"] == 0
+        assert "n1" in session["graph"]["nodes"]
+        assert session["proposals"][proposal_id]["status"] == "rejected"
+
+    def test_reject_already_accepted_proposal_409(self, client: TestClient) -> None:
+        # An ACCEPTED proposal's mutation is already baked into the graph --
+        # rejecting it afterward must not be allowed to flip its status back,
+        # which would leave the session's proposal state contradicting its
+        # own graph.
+        session_id = client.post("/sessions", json={"graph": _seed_graph()}).json()["id"]
+        proposal_id = client.post(
+            f"/sessions/{session_id}/proposals", json={"base_version": 0, "remove_nodes": ["n1"]}
+        ).json()["id"]
+        client.post(f"/sessions/{session_id}/proposals/{proposal_id}/accept")
+
+        r = client.post(f"/sessions/{session_id}/proposals/{proposal_id}/reject")
+        assert r.status_code == 409, r.text
+        session = client.get(f"/sessions/{session_id}").json()
+        assert session["proposals"][proposal_id]["status"] == "accepted"
+
     def test_accept_unknown_proposal_404(self, client: TestClient) -> None:
         session_id = client.post("/sessions", json={}).json()["id"]
         r = client.post(f"/sessions/{session_id}/proposals/does-not-exist/accept")

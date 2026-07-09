@@ -56,6 +56,20 @@ class StaleVersionError(SessionError):
     session's current version (an optimistic-concurrency conflict)."""
 
 
+class ProposalAlreadyResolvedError(SessionError):
+    """Raised when accept/reject targets a proposal that is no longer PENDING.
+
+    A proposal's status transition is one-shot: once accepted or rejected, it
+    cannot be re-resolved. Without this guard, an already-REJECTED proposal
+    could later be accepted (nothing about rejecting bumps the session
+    version, so the stale-version check alone would not catch it), silently
+    applying a mutation a human already turned down; and an already-ACCEPTED
+    proposal (whose mutation is already baked into the graph) could be
+    flipped to REJECTED, leaving the session's proposal status contradicting
+    its own graph.
+    """
+
+
 class ProposalStatus(str, Enum):
     """Lifecycle status of a stored GraphMutation proposal."""
 
@@ -259,6 +273,8 @@ class SessionStore:
             If no session with that id exists.
         UnknownProposalError
             If no proposal with that id exists on the session.
+        ProposalAlreadyResolvedError
+            If the proposal is not PENDING (already accepted or rejected).
         StaleVersionError
             If the session's graph has moved on since the proposal's
             ``base_version`` (another change landed first).
@@ -271,6 +287,11 @@ class SessionStore:
             if session is None:
                 raise UnknownSessionError(f"no session with id {session_id!r}.")
             proposal = self._get_proposal(session, proposal_id)
+            if proposal.status != ProposalStatus.PENDING:
+                raise ProposalAlreadyResolvedError(
+                    f"session {session_id!r}: proposal {proposal_id!r} is already "
+                    f"{proposal.status.value} and cannot be re-resolved."
+                )
             if proposal.mutation.base_version != session.version:
                 raise StaleVersionError(
                     f"session {session_id!r}: proposal {proposal_id!r} was computed "
@@ -301,12 +322,19 @@ class SessionStore:
             If no session with that id exists.
         UnknownProposalError
             If no proposal with that id exists on the session.
+        ProposalAlreadyResolvedError
+            If the proposal is not PENDING (already accepted or rejected).
         """
         with self._lock:
             session = self._sessions.get(session_id)
             if session is None:
                 raise UnknownSessionError(f"no session with id {session_id!r}.")
             proposal = self._get_proposal(session, proposal_id)
+            if proposal.status != ProposalStatus.PENDING:
+                raise ProposalAlreadyResolvedError(
+                    f"session {session_id!r}: proposal {proposal_id!r} is already "
+                    f"{proposal.status.value} and cannot be re-resolved."
+                )
             proposal.status = ProposalStatus.REJECTED
             self._publish(
                 session_id,
