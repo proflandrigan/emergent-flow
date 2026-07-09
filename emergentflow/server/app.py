@@ -48,10 +48,12 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
+from emergentflow.collab.review import ReviewComment, ReviewThread
 from emergentflow.collab.session import (
     ProposalAlreadyResolvedError,
     StaleVersionError,
     UnknownProposalError,
+    UnknownReviewError,
     UnknownSessionError,
 )
 from emergentflow.collab.session import get_default_store as get_default_session_store
@@ -181,7 +183,7 @@ async def _safe_json(fn: Callable[[], dict[str, Any]]) -> Response:
 async def _session_json(fn: Callable[[], dict[str, Any]]) -> Response:
     """Run *fn* off the event loop; map collab session errors to their HTTP codes.
 
-    ``UnknownSessionError`` / ``UnknownProposalError`` -> 404,
+    ``UnknownSessionError`` / ``UnknownProposalError`` / ``UnknownReviewError`` -> 404,
     ``StaleVersionError`` / ``ProposalAlreadyResolvedError`` -> 409
     (optimistic-concurrency / proposal-lifecycle conflicts -- caller sent a
     stale expected/base version, or tried to re-resolve a decided proposal),
@@ -190,7 +192,7 @@ async def _session_json(fn: Callable[[], dict[str, Any]]) -> Response:
     """
     try:
         result = await _run_sync(fn)
-    except (UnknownSessionError, UnknownProposalError) as exc:
+    except (UnknownSessionError, UnknownProposalError, UnknownReviewError) as exc:
         return _error_json(404, str(exc))
     except StaleVersionError as exc:
         return _error_json(409, f"stale_version: {exc}")
@@ -484,6 +486,17 @@ def create_app() -> FastAPI:
 
         return await _session_json(_create)
 
+    @application.get("/sessions")
+    async def list_sessions(request: Request) -> Response:
+        if (unauthorized := _check_session_auth(request)) is not None:
+            return unauthorized
+
+        def _list() -> dict[str, Any]:
+            sessions = get_default_session_store().list()
+            return {"sessions": [s.model_dump(mode="json") for s in sessions]}
+
+        return await _session_json(_list)
+
     @application.get("/sessions/{session_id}")
     async def get_session(session_id: str, request: Request) -> Response:
         if (unauthorized := _check_session_auth(request)) is not None:
@@ -597,6 +610,52 @@ def create_app() -> FastAPI:
                 get_default_session_store().unsubscribe(session_id, q)
 
         return StreamingResponse(body(), media_type="text/event-stream")
+
+    @application.post("/sessions/{session_id}/reviews")
+    async def create_review(session_id: str, request: Request) -> Response:
+        if (unauthorized := _check_session_auth(request)) is not None:
+            return unauthorized
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        def _create() -> dict[str, Any]:
+            thread = ReviewThread.model_validate(body)
+            result = get_default_session_store().add_review(session_id, thread)
+            return result.model_dump(mode="json")
+
+        return await _session_json(_create)
+
+    @application.get("/sessions/{session_id}/reviews")
+    async def list_reviews(session_id: str, request: Request) -> Response:
+        if (unauthorized := _check_session_auth(request)) is not None:
+            return unauthorized
+
+        def _list() -> dict[str, Any]:
+            session = get_default_session_store().get(session_id)
+            threads = sorted(session.collab.reviews.values(), key=lambda t: t.id)
+            return {"reviews": [t.model_dump(mode="json") for t in threads]}
+
+        return await _session_json(_list)
+
+    @application.post("/sessions/{session_id}/reviews/{review_id}/comments")
+    async def add_review_comment_route(
+        session_id: str, review_id: str, request: Request
+    ) -> Response:
+        if (unauthorized := _check_session_auth(request)) is not None:
+            return unauthorized
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        def _comment() -> dict[str, Any]:
+            comment = ReviewComment.model_validate(body)
+            result = get_default_session_store().add_review_comment(session_id, review_id, comment)
+            return result.model_dump(mode="json")
+
+        return await _session_json(_comment)
 
     # Catch-all GET: serves static asset -> demo page (for "/" and "/index.html") -> 404.
     # Declared last so the explicit GET routes above take precedence.

@@ -99,3 +99,15 @@ test("Manage connections overflow item opens the connections panel", async () =>
     expect(screen.getByTestId("connections-empty")).toBeInTheDocument();
   });
 });
+
+test("Share session overflow item opens the session panel", async () => {
+  mockHealth("ok");
+  render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  fireEvent.click(screen.getByText("Share session"));
+
+  await waitFor(() => {
+    expect(screen.getByTestId("session-panel")).toBeInTheDocument();
+  });
+});

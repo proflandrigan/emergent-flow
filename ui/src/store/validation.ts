@@ -1,4 +1,4 @@
-export type Severity = "error" | "warning";
+export type Severity = "error" | "warning" | "info";
 
 export interface Diagnostic {
   severity: Severity;
@@ -10,6 +10,7 @@ export interface Diagnostic {
   port_name?: string | null;
   expected_type?: string | null;
   actual_type?: string | null;
+  source?: string | null;
 }
 
 export interface Diagnostics {

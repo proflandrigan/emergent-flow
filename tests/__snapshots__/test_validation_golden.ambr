@@ -21,6 +21,7 @@
         'port_id': 'p-in',
         'port_name': 'in0',
         'severity': 'error',
+        'source': 'validator',
       }),
     ]),
     'edge_compatibility': dict({
@@ -49,6 +50,7 @@
         'port_id': 'p-in',
         'port_name': 'in0',
         'severity': 'error',
+        'source': 'validator',
       }),
     ]),
     'edge_compatibility': dict({
@@ -68,6 +70,7 @@
         'port_id': 'p-in',
         'port_name': 'in0',
         'severity': 'error',
+        'source': 'validator',
       }),
     ]),
     'edge_compatibility': dict({
@@ -97,6 +100,7 @@
         'port_id': 'p-in',
         'port_name': 'in0',
         'severity': 'warning',
+        'source': 'validator',
       }),
     ]),
     'edge_compatibility': dict({

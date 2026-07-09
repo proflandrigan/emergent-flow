@@ -64,7 +64,7 @@ function nodeToIR(node: NodeModel): Node {
   };
 }
 
-function nodeFromIR(node: Node): NodeModel {
+export function nodeFromIR(node: Node): NodeModel {
   return {
     id: node.id ?? "",
     type: node.type,
@@ -85,7 +85,7 @@ function edgeToIR(edge: EdgeModel): Edge {
   };
 }
 
-function edgeFromIR(edge: Edge): EdgeModel {
+export function edgeFromIR(edge: Edge): EdgeModel {
   return {
     id: edge.id ?? "",
     source: portRefFromIR(edge.source),

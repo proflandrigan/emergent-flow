@@ -1,0 +1,422 @@
+{
+  "$defs": {
+    "ArtifactRef": {
+      "additionalProperties": false,
+      "description": "Reference to a large artifact stored outside the IR graph.\n\nDeliberately carries *no* bytes \u2014 only a location URI and an optional\nmedia-type hint.  Embedding artifact bytes in the IR is forbidden by\nADR 0004.\n\nThe ``kind`` field is a fixed discriminator tag (``\"artifact_ref\"``). It is\nalways emitted on serialization so that an ArtifactRef can be distinguished\nfrom a plain mapping that happens to share its shape (e.g. a config dict with\na ``uri`` key). ``ParamValue`` uses it to route deserialization, which keeps\nJSON round-trips lossless. It defaults, so construction stays ``ArtifactRef(uri=...)``.",
+      "properties": {
+        "kind": {
+          "const": "artifact_ref",
+          "default": "artifact_ref",
+          "description": "Fixed discriminator tag; always \"artifact_ref\".",
+          "title": "Kind",
+          "type": "string"
+        },
+        "media_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional MIME hint, e.g. \"application/parquet\".",
+          "title": "Media Type"
+        },
+        "uri": {
+          "description": "Location of the artifact (path or object-store URI).",
+          "title": "Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "Cardinality": {
+      "description": "How many connections a port / edge end accepts.",
+      "enum": [
+        "one",
+        "many"
+      ],
+      "title": "Cardinality",
+      "type": "string"
+    },
+    "Direction": {
+      "description": "Edge / port directionality.",
+      "enum": [
+        "in",
+        "out"
+      ],
+      "title": "Direction",
+      "type": "string"
+    },
+    "Edge": {
+      "additionalProperties": false,
+      "description": "An edge connecting an OUT port on a source node to an IN port on a target node.\n\nEdges reference endpoints by id (node_id + port_id) for CRDT-friendliness,\nnot by object reference. Each edge has a unique stable id.\n\nAttributes:\n    id: Stable unique identifier for this edge.\n    source: PortRef identifying the OUT-side endpoint.\n    target: PortRef identifying the IN-side endpoint.\n    type_compatible: Optional type-compatibility metadata. None means \"not yet\n        checked\" (or unknown/unregistered token). Populated by\n        ``ef.apply_type_compatibility`` from a ``ef.validate`` result, recording\n        whether source/target data-type tokens were found compatible.\n\nNote: Structural validation of whether referenced nodes/ports exist is handled\nby the Graph model (Task 07), which has full node/port context.",
+      "properties": {
+        "id": {
+          "description": "Stable unique identifier for this edge.",
+          "title": "Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/PortRef",
+          "description": "The OUT-side endpoint."
+        },
+        "target": {
+          "$ref": "#/$defs/PortRef",
+          "description": "The IN-side endpoint."
+        },
+        "type_compatible": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Type-compatibility metadata. None=\"not yet checked\". Set to bool by ef.apply_type_compatibility from a ef.validate result.",
+          "title": "Type Compatible"
+        }
+      },
+      "required": [
+        "source",
+        "target"
+      ],
+      "title": "Edge",
+      "type": "object"
+    },
+    "Graph": {
+      "additionalProperties": false,
+      "description": "Top-level, serialisable IR graph for an Emergent Flow pipeline.\n\nAttributes\n----------\nschema_version:\n    Embedded schema version (default: CURRENT_SCHEMA_VERSION).  Allows\n    loaders to detect and reject stale or future graphs.\nparadigm:\n    Graph-level paradigm tag (default: FUNCTIONAL).  Combined with\n    per-node ``paradigm``, this drives codegen/execution branching.\nname:\n    Optional human-friendly label for the graph.\nnodes:\n    CRDT-friendly id\u2192Node map.  Keys MUST equal ``node.id``.\nedges:\n    CRDT-friendly id\u2192Edge map.  Keys MUST equal ``edge.id``.",
+      "properties": {
+        "edges": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Edge"
+          },
+          "title": "Edges",
+          "type": "object"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "nodes": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Node"
+          },
+          "title": "Nodes",
+          "type": "object"
+        },
+        "paradigm": {
+          "$ref": "#/$defs/Paradigm",
+          "default": "functional"
+        },
+        "schema_version": {
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        }
+      },
+      "title": "Graph",
+      "type": "object"
+    },
+    "Node": {
+      "additionalProperties": false,
+      "description": "A typed, parameterised node in the Emergent Flow graph IR.\n\nAttributes\n----------\nid:\n    Stable unique identifier (auto-generated via ``new_id()``).\ntype:\n    Node type/family key, e.g. ``\"data.load_csv\"`` (required, non-empty).\nlabel:\n    Optional human-friendly display label.\nparadigm:\n    Which execution paradigm this node belongs to (default: FUNCTIONAL).\nparams:\n    Typed parameter values attached to this node.\nports:\n    The node's in/out connection points.\nposition:\n    Canvas coordinates (default: origin ``(0.0, 0.0)``).\ngroup_id:\n    ID of the parent group/composite node this node belongs to, or\n    ``None`` if this is a top-level node.\nsubgraph:\n    Optional inner graph for composite/module/agent nodes (Option A\n    nesting from ADR 0003).  ``None`` for leaf nodes.  Forward-ref to\n    ``Graph``; resolved by ``Node.model_rebuild()`` in Task 07\n    (``emergentflow/ir/graph.py``).",
+      "properties": {
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group Id"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "paradigm": {
+          "$ref": "#/$defs/Paradigm",
+          "default": "functional"
+        },
+        "params": {
+          "items": {
+            "$ref": "#/$defs/Param"
+          },
+          "title": "Params",
+          "type": "array"
+        },
+        "ports": {
+          "items": {
+            "$ref": "#/$defs/Port"
+          },
+          "title": "Ports",
+          "type": "array"
+        },
+        "position": {
+          "$ref": "#/$defs/Position"
+        },
+        "subgraph": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Graph"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "Node",
+      "type": "object"
+    },
+    "Paradigm": {
+      "description": "First-class execution paradigms (ADR 0003).",
+      "enum": [
+        "functional",
+        "declarative"
+      ],
+      "title": "Paradigm",
+      "type": "string"
+    },
+    "Param": {
+      "additionalProperties": false,
+      "description": "A single typed, defaulted, serializable parameter on an IR node.\n\nFields\n------\nname:\n    Non-empty parameter name.\ntype_token:\n    Declared-type label (e.g. ``\"str\"``, ``\"int\"``, ``\"DataFrame\"``). A\n    descriptive label for the param value, distinct from the port\n    ``data_type`` tokens the connection type system validates.\nvalue:\n    Current serializable value.  Defaults to ``None``.\ndefault:\n    Default serializable value.  Defaults to ``None``.",
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/ParamValue",
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "type_token": {
+          "title": "Type Token",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/ParamValue",
+          "default": null
+        }
+      },
+      "required": [
+        "name",
+        "type_token"
+      ],
+      "title": "Param",
+      "type": "object"
+    },
+    "ParamValue": {
+      "oneOf": [
+        {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/ParamValue"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/ParamValue"
+          },
+          "type": "object"
+        }
+      ]
+    },
+    "Port": {
+      "additionalProperties": false,
+      "description": "A typed connection point on a node.\n\nAttributes:\n    id: Stable unique identifier (auto-generated via new_id()).\n    name: Port name, unique within its node (required, non-empty).\n    direction: IN or OUT (required).\n    data_type: Data-type token (default \"any\"); validated against the type\n        registry and resolved by inference during ``ef.validate``.\n    cardinality: How many edges may attach (ONE or MANY; default ONE).",
+      "properties": {
+        "cardinality": {
+          "$ref": "#/$defs/Cardinality",
+          "default": "one"
+        },
+        "data_type": {
+          "default": "any",
+          "title": "Data Type",
+          "type": "string"
+        },
+        "direction": {
+          "$ref": "#/$defs/Direction"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "direction"
+      ],
+      "title": "Port",
+      "type": "object"
+    },
+    "PortRef": {
+      "additionalProperties": false,
+      "description": "An endpoint reference: node_id + port_id.\n\nUsed to identify one side of an edge (source or target).\nBoth node_id and port_id must be non-empty strings.",
+      "properties": {
+        "node_id": {
+          "description": "ID of the node containing the port.",
+          "title": "Node Id",
+          "type": "string"
+        },
+        "port_id": {
+          "description": "ID of the port on the node.",
+          "title": "Port Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "port_id"
+      ],
+      "title": "PortRef",
+      "type": "object"
+    },
+    "Position": {
+      "additionalProperties": false,
+      "description": "2-D canvas coordinates for a node's visual placement.",
+      "properties": {
+        "x": {
+          "default": 0.0,
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "default": 0.0,
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "title": "Position",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A proposal to mutate a Graph, submitted by an AI agent or a human.\n\n``base_version`` is the Graph/session version this mutation was computed\nagainst (used for optimistic-concurrency staleness checks by the caller \u2014\nthis module itself does not check versions against anything, since a bare\nGraph has no version; the session layer, a later story, is responsible for\nthat check).\n\n``add_nodes``/``add_edges`` are added as-is (their ``.id`` fields, if\nunset, default-generate via ``new_id()`` same as any fresh ``Node()``/\n``Edge()``).  Positions on added nodes are optional \u2014 layout is the\ncanvas's job, not this module's.\n\n``remove_nodes``/``remove_edges`` are lists of existing ids to delete.\n\n``set_params`` is a partial per-node param update:\n``node_id -> {param_name: new_value}``.  An agent never has to reconstruct\na full ``Param`` object with ``type_token``/``default``, only the new value.\n\n``author`` is a persona slug or the literal string ``\"human\"``.",
+  "properties": {
+    "add_edges": {
+      "items": {
+        "$ref": "#/$defs/Edge"
+      },
+      "title": "Add Edges",
+      "type": "array"
+    },
+    "add_nodes": {
+      "items": {
+        "$ref": "#/$defs/Node"
+      },
+      "title": "Add Nodes",
+      "type": "array"
+    },
+    "author": {
+      "default": "human",
+      "title": "Author",
+      "type": "string"
+    },
+    "base_version": {
+      "title": "Base Version",
+      "type": "integer"
+    },
+    "description": {
+      "default": "",
+      "title": "Description",
+      "type": "string"
+    },
+    "remove_edges": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Remove Edges",
+      "type": "array"
+    },
+    "remove_nodes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Remove Nodes",
+      "type": "array"
+    },
+    "set_params": {
+      "additionalProperties": {
+        "additionalProperties": {
+          "$ref": "#/$defs/ParamValue"
+        },
+        "type": "object"
+      },
+      "title": "Set Params",
+      "type": "object"
+    }
+  },
+  "required": [
+    "base_version"
+  ],
+  "title": "GraphMutation",
+  "type": "object"
+}

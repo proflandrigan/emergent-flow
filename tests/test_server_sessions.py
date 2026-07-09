@@ -324,3 +324,176 @@ class TestSessionAuth:
             assert r.status_code == 200, r.text
         finally:
             configure_session_auth(required=False)
+
+
+def test_list_sessions_returns_every_active_session(client: TestClient) -> None:
+    r1 = client.post("/sessions", json={})
+    r2 = client.post("/sessions", json={})
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+    id1, id2 = r1.json()["id"], r2.json()["id"]
+
+    resp = client.get("/sessions")
+
+    assert resp.status_code == 200
+    ids = {s["id"] for s in resp.json()["sessions"]}
+    assert ids == {id1, id2}
+
+
+def test_list_sessions_is_empty_when_no_sessions_exist(client: TestClient) -> None:
+    resp = client.get("/sessions")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"sessions": []}
+
+
+def test_list_sessions_returns_full_session_documents(client: TestClient) -> None:
+    created = client.post("/sessions", json={}).json()
+
+    resp = client.get("/sessions")
+
+    listed = resp.json()["sessions"][0]
+    assert listed["version"] == created["version"]
+    assert "graph" in listed
+    assert "proposals" in listed
+
+
+def test_list_sessions_requires_bearer_token_when_auth_is_required() -> None:
+    from emergentflow.server.app import configure_session_auth
+
+    configure_session_auth(required=True, token="secret")
+    try:
+        app = create_app()
+        with TestClient(app) as auth_client:
+            resp = auth_client.get("/sessions")
+            assert resp.status_code == 401
+
+            resp_ok = auth_client.get("/sessions", headers={"Authorization": "Bearer secret"})
+            assert resp_ok.status_code == 200
+    finally:
+        configure_session_auth(required=False)
+
+
+class TestSessionReviews:
+    def test_create_review_with_anchored_finding(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={"graph": _seed_graph()}).json()["id"]
+
+        r = client.post(
+            f"/sessions/{session_id}/reviews",
+            json={
+                "author": "ml_engineer",
+                "findings": [
+                    {
+                        "severity": "info",
+                        "code": "grain_check",
+                        "message": "looks fine",
+                        "node_id": "n1",
+                    }
+                ],
+            },
+        )
+
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["author"] == "ml_engineer"
+        assert body["status"] == "open"
+        assert len(body["findings"]) == 1
+
+    def test_create_review_rejects_unanchored_finding(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={"graph": _seed_graph()}).json()["id"]
+
+        r = client.post(
+            f"/sessions/{session_id}/reviews",
+            json={
+                "author": "ml_engineer",
+                "findings": [
+                    {
+                        "severity": "warning",
+                        "code": "c",
+                        "message": "m",
+                        "node_id": "does-not-exist",
+                    }
+                ],
+            },
+        )
+
+        assert r.status_code == 422, r.text
+
+    def test_create_review_unknown_session_404(self, client: TestClient) -> None:
+        r = client.post("/sessions/does-not-exist/reviews", json={"author": "ml_engineer"})
+        assert r.status_code == 404, r.text
+
+    def test_list_reviews(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={"graph": _seed_graph()}).json()["id"]
+        client.post(f"/sessions/{session_id}/reviews", json={"author": "a"})
+        client.post(f"/sessions/{session_id}/reviews", json={"author": "b"})
+
+        r = client.get(f"/sessions/{session_id}/reviews")
+
+        assert r.status_code == 200, r.text
+        authors = {t["author"] for t in r.json()["reviews"]}
+        assert authors == {"a", "b"}
+
+    def test_list_reviews_empty(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+
+        r = client.get(f"/sessions/{session_id}/reviews")
+
+        assert r.status_code == 200, r.text
+        assert r.json() == {"reviews": []}
+
+    def test_add_review_comment(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={"graph": _seed_graph()}).json()["id"]
+        review_id = client.post(
+            f"/sessions/{session_id}/reviews", json={"author": "ml_engineer"}
+        ).json()["id"]
+
+        r = client.post(
+            f"/sessions/{session_id}/reviews/{review_id}/comments",
+            json={"author": "human", "text": "thanks, fixing now"},
+        )
+
+        assert r.status_code == 200, r.text
+        comments = r.json()["comments"]
+        assert len(comments) == 1
+        assert comments[0]["text"] == "thanks, fixing now"
+
+    def test_add_review_comment_unknown_review_404(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+
+        r = client.post(
+            f"/sessions/{session_id}/reviews/does-not-exist/comments",
+            json={"author": "human", "text": "hi"},
+        )
+
+        assert r.status_code == 404, r.text
+
+    def test_review_events_observed(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={"graph": _seed_graph()}).json()["id"]
+
+        observed: list[dict] = []
+
+        def _watch() -> None:
+            store = session_mod.get_default_store()
+            q = store.subscribe(session_id)
+            try:
+                while len(observed) < 2:
+                    observed.append(q.get(timeout=5.0))
+            finally:
+                store.unsubscribe(session_id, q)
+
+        watcher = threading.Thread(target=_watch, daemon=True)
+        watcher.start()
+        time.sleep(0.3)
+
+        review_id = client.post(
+            f"/sessions/{session_id}/reviews", json={"author": "ml_engineer"}
+        ).json()["id"]
+        client.post(
+            f"/sessions/{session_id}/reviews/{review_id}/comments",
+            json={"author": "human", "text": "ok"},
+        )
+
+        watcher.join(timeout=5.0)
+        assert not watcher.is_alive(), "SSE watcher did not observe both events in time"
+        assert [e["type"] for e in observed] == ["review_added", "review_comment_added"]

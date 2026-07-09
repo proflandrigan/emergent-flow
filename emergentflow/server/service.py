@@ -166,6 +166,20 @@ def get_catalog() -> dict[str, Any]:
     return export_catalog()
 
 
+def get_mutation_schema() -> dict[str, Any]:
+    """Return the JSON Schema for `GraphMutation` (Epic 14 Story 4) for the canvas to consume."""
+    from emergentflow.collab.contracts import mutation_json_schema
+
+    return mutation_json_schema()
+
+
+def get_session_event_schema() -> dict[str, Any]:
+    """Return the JSON Schema for session SSE events (Epic 14 Story 4) for the canvas to consume."""
+    from emergentflow.collab.contracts import session_event_json_schema
+
+    return session_event_json_schema()
+
+
 def clear_cache(payload: dict[str, Any]) -> dict[str, Any]:
     """Remove every entry from the on-disk execution cache (POST /cache/clear).
 
