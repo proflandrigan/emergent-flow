@@ -56,6 +56,14 @@ connectors) and fixes the secret-free connection-reference boundary; it governs
 | :-- | :------- | :----- |
 | [0018](./0018-data-source-connector-seam.md) | Data-source connectors are a second injected effectful-client seam (`WarehouseClient`), resolved through one extensible client bundle; connection references in the IR stay secret-free | Accepted |
 
+The following decision introduces graph sessions and agent collaboration — the first stateful
+server surface — and records the works-without-agents invariant that governs
+[Epic 14](../../epics/epic-14-agent-collaboration.md) (Agent Collaboration on the Canvas).
+
+| ADR | Decision | Status |
+| :-- | :------- | :----- |
+| [0019](./0019-graph-sessions-and-agent-collaboration.md) | Graph sessions and agent collaboration: stateful sessions beside a stateless IR; collaboration state never on the `Graph`; optimistic concurrency; HTTP-first agent surface; gate policy at the routes; works-without-agents enforced by regression suite | Accepted |
+
 ## Conventions
 
 - Filenames: `NNNN-kebab-case-title.md`, numbered sequentially from `0001`.
