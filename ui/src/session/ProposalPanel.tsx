@@ -1,6 +1,6 @@
 import type { JSX } from "react";
 
-import { useGraphStore } from "../store/graphStore";
+import { snapshot, useGraphStore } from "../store/graphStore";
 import type { Diagnostic, Diagnostics } from "../store/validation";
 import { severityColor } from "../store/validation";
 import { Button } from "../ui/Button";
@@ -54,14 +54,7 @@ function ProposalCard({ proposal }: { proposal: StoredProposal }): JSX.Element {
   const handleReject = () => void reject(proposal.id);
 
   const handleEditIntoOwn = () => {
-    const current = useGraphStore.getState();
-    const model = {
-      schemaVersion: current.schemaVersion,
-      name: current.name,
-      paradigm: current.paradigm,
-      nodes: current.nodes,
-      edges: current.edges,
-    };
+    const model = snapshot(useGraphStore.getState());
     const diff = computeGhostDiff(model, proposal.mutation);
     useGraphStore.getState().loadModel({
       ...model,

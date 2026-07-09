@@ -1,3 +1,4 @@
+import { waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { useGraphStore } from "../store/graphStore";
@@ -272,6 +273,48 @@ describe("SSE event handling", () => {
 
     expect(sessionClient.getSession).not.toHaveBeenCalled();
     expect(useSessionStore.getState().version).toBe(0);
+  });
+
+  test("a burst of events while a refresh is in flight coalesces into one trailing refresh", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+
+    let resolveFirst: (session: sessionClient.GraphSession) => void = () => {};
+    const first = new Promise<sessionClient.GraphSession>((resolve) => {
+      resolveFirst = resolve;
+    });
+    vi.mocked(sessionClient.getSession)
+      .mockReturnValueOnce(first)
+      .mockResolvedValue(fakeSession({ id: "abc", version: 3 }));
+
+    // Three events arrive back to back, before the first GET resolves. The store's real
+    // `subscribe()` wraps the handler as `(event) => void handleSessionEvent(event)`, so
+    // `capturedOnEvent` (matching that signature) doesn't hand back a promise to await --
+    // the burst is fire-and-forget here exactly as it is for a real SSE subscription.
+    capturedOnEvent?.({
+      type: "proposal_added",
+      session_id: "abc",
+      proposal_id: "p1",
+    });
+    capturedOnEvent?.({
+      type: "proposal_added",
+      session_id: "abc",
+      proposal_id: "p2",
+    });
+    capturedOnEvent?.({
+      type: "proposal_added",
+      session_id: "abc",
+      proposal_id: "p3",
+    });
+
+    resolveFirst(fakeSession({ id: "abc", version: 1 }));
+    await waitFor(() => expect(useSessionStore.getState().version).toBe(3));
+
+    // Only two GETs total: one in flight, one trailing for the coalesced p2/p3 burst --
+    // not three, one per event.
+    expect(sessionClient.getSession).toHaveBeenCalledTimes(2);
   });
 });
 

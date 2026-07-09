@@ -8,6 +8,7 @@ import { postJson } from "../promptlab/httpJson";
 import type { Graph } from "../generated/ir";
 import type { GraphMutation } from "../generated/mutation";
 import type { SessionEvent } from "../generated/session_event";
+import { validateSessionEvent } from "../store/validateMutation";
 import type { Diagnostic, Diagnostics } from "../store/validation";
 
 export type ProposalStatus = "pending" | "accepted" | "rejected";
@@ -156,7 +157,11 @@ export function subscribeToSessionEvents(
     const source = new EventSource(`/sessions/${sessionId}/events`);
     source.onmessage = (ev: MessageEvent<string>) => {
       try {
-        onEvent(JSON.parse(ev.data) as SessionEvent);
+        const parsed: unknown = JSON.parse(ev.data);
+        if (!validateSessionEvent(parsed).valid) {
+          return;
+        }
+        onEvent(parsed as SessionEvent);
       } catch {
         // Malformed frame -- ignore rather than crash the subscriber.
       }
@@ -172,18 +177,22 @@ export function subscribeToSessionEvents(
 
   const poll = async (): Promise<void> => {
     if (stopped) return;
-    try {
-      const session = await getSession(sessionId);
-      if (lastVersion !== null && session.version !== lastVersion) {
-        onEvent({
-          type: "graph_replaced",
-          session_id: sessionId,
-          version: session.version,
-        });
+    // Skip the network round-trip while the tab is backgrounded; still reschedules so
+    // polling resumes automatically once the tab regains visibility.
+    if (typeof document === "undefined" || !document.hidden) {
+      try {
+        const session = await getSession(sessionId);
+        if (lastVersion !== null && session.version !== lastVersion) {
+          onEvent({
+            type: "graph_replaced",
+            session_id: sessionId,
+            version: session.version,
+          });
+        }
+        lastVersion = session.version;
+      } catch {
+        // Network hiccup -- try again next tick rather than tearing down the subscription.
       }
-      lastVersion = session.version;
-    } catch {
-      // Network hiccup -- try again next tick rather than tearing down the subscription.
     }
     if (!stopped) setTimeout(() => void poll(), intervalMs);
   };

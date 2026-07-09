@@ -418,6 +418,7 @@ class TestSessionReviews:
         )
 
         assert r.status_code == 422, r.text
+        assert r.json()["error"].startswith("anchor_error:")
 
     def test_create_review_unknown_session_404(self, client: TestClient) -> None:
         r = client.post("/sessions/does-not-exist/reviews", json={"author": "ml_engineer"})

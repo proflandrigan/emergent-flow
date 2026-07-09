@@ -88,7 +88,7 @@ def validate_anchors(graph: Graph, findings: list[Diagnostic]) -> None:
 
     Pure: does not mutate *graph* or *findings*.
     """
-    all_port_ids = {port.id for node in graph.nodes.values() for port in node.ports}
+    all_port_ids: set[str] | None = None
     for finding in findings:
         node = None
         if finding.node_id is not None:
@@ -110,8 +110,13 @@ def validate_anchors(graph: Graph, findings: list[Diagnostic]) -> None:
                         f"finding anchors to port_id {finding.port_id!r} which does not "
                         f"belong to node_id {finding.node_id!r}."
                     )
-            elif finding.port_id not in all_port_ids:
-                raise AnchorError(
-                    f"finding anchors to unknown port_id {finding.port_id!r} "
-                    f"(not present in the session's graph)."
-                )
+            else:
+                if all_port_ids is None:
+                    all_port_ids = {
+                        port.id for other in graph.nodes.values() for port in other.ports
+                    }
+                if finding.port_id not in all_port_ids:
+                    raise AnchorError(
+                        f"finding anchors to unknown port_id {finding.port_id!r} "
+                        f"(not present in the session's graph)."
+                    )

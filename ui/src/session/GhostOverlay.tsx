@@ -163,36 +163,27 @@ export function toGhostRFNodes(diff: GhostDiff, model: CanvasModel): RFNode[] {
     } satisfies GhostNodeData,
   }));
 
+  const badgeKinds: [string, string, ReadonlySet<string>][] = [
+    ["params", "params", diff.paramChangedNodeIds],
+    ["remove", "remove", diff.removedNodeIds],
+  ];
   const badges: RFNode[] = [];
-  for (const nodeId of diff.paramChangedNodeIds) {
-    const existing = model.nodes[nodeId];
-    if (!existing) continue;
-    badges.push({
-      id: `ghost-badge-params:${nodeId}`,
-      type: "efGhostBadge",
-      position: {
-        x: existing.position.x + BADGE_OFFSET_X,
-        y: existing.position.y + BADGE_OFFSET_Y,
-      },
-      selectable: false,
-      draggable: false,
-      data: { label: "params" } satisfies GhostBadgeData,
-    });
-  }
-  for (const nodeId of diff.removedNodeIds) {
-    const existing = model.nodes[nodeId];
-    if (!existing) continue;
-    badges.push({
-      id: `ghost-badge-remove:${nodeId}`,
-      type: "efGhostBadge",
-      position: {
-        x: existing.position.x + BADGE_OFFSET_X,
-        y: existing.position.y + BADGE_OFFSET_Y,
-      },
-      selectable: false,
-      draggable: false,
-      data: { label: "remove" } satisfies GhostBadgeData,
-    });
+  for (const [idPrefix, label, nodeIds] of badgeKinds) {
+    for (const nodeId of nodeIds) {
+      const existing = model.nodes[nodeId];
+      if (!existing) continue;
+      badges.push({
+        id: `ghost-badge-${idPrefix}:${nodeId}`,
+        type: "efGhostBadge",
+        position: {
+          x: existing.position.x + BADGE_OFFSET_X,
+          y: existing.position.y + BADGE_OFFSET_Y,
+        },
+        selectable: false,
+        draggable: false,
+        data: { label } satisfies GhostBadgeData,
+      });
+    }
   }
 
   return [...added, ...badges];
