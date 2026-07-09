@@ -35,6 +35,7 @@ import asyncio
 import contextlib
 import json
 import mimetypes
+import os
 import pathlib
 import queue
 import socket
@@ -47,6 +48,16 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
+from emergentflow.collab.session import (
+    ProposalAlreadyResolvedError,
+    StaleVersionError,
+    UnknownProposalError,
+    UnknownSessionError,
+)
+from emergentflow.collab.session import get_default_store as get_default_session_store
+from emergentflow.ir.graph import Graph
+from emergentflow.ir.mutation import GraphMutation
+from emergentflow.ir.serialize import deserialize_graph
 from emergentflow.server.cache import DEFAULT_CACHE_DIRNAME, DEFAULT_CACHE_MAX_MB, configure_cache
 from emergentflow.server.reports import get_default_store
 from emergentflow.server.service import (
@@ -165,6 +176,85 @@ async def _safe_json(fn: Callable[[], dict[str, Any]]) -> Response:
     except Exception as exc:  # noqa: BLE001 - any ef.* failure -> 422, never crash the server
         return _error_json(422, f"{type(exc).__name__}: {exc}")
     return JSONResponse(content=result)
+
+
+async def _session_json(fn: Callable[[], dict[str, Any]]) -> Response:
+    """Run *fn* off the event loop; map collab session errors to their HTTP codes.
+
+    ``UnknownSessionError`` / ``UnknownProposalError`` -> 404,
+    ``StaleVersionError`` / ``ProposalAlreadyResolvedError`` -> 409
+    (optimistic-concurrency / proposal-lifecycle conflicts -- caller sent a
+    stale expected/base version, or tried to re-resolve a decided proposal),
+    any other exception -> 422 (mirrors ``_safe_json``'s catch-all for every
+    other service failure).
+    """
+    try:
+        result = await _run_sync(fn)
+    except (UnknownSessionError, UnknownProposalError) as exc:
+        return _error_json(404, str(exc))
+    except StaleVersionError as exc:
+        return _error_json(409, f"stale_version: {exc}")
+    except ProposalAlreadyResolvedError as exc:
+        return _error_json(409, f"proposal_already_resolved: {exc}")
+    except Exception as exc:  # noqa: BLE001 - any other failure -> 422, never crash the server
+        return _error_json(422, f"{type(exc).__name__}: {exc}")
+    return JSONResponse(content=result)
+
+
+def _graph_from_session_payload(payload: dict[str, Any]) -> Graph:
+    """Parse an embedded IR graph dict the same way the payload-only routes do.
+
+    Routes it through ``deserialize_graph`` (not ``Graph.model_validate``) so
+    session routes apply the same schema-version checks/migrations as every
+    other graph-accepting route in this file.
+    """
+    return deserialize_graph(json.dumps(payload))
+
+
+# Bearer-token gate for /sessions* routes (ADR 0019 trust boundary). Open by
+# default (today's trusted-localhost model); serve() flips this on when the
+# server binds to a non-loopback host. A plain module-level pair of globals is
+# enough here -- unlike configure_cache's lazily-created singleton, there is
+# nothing to guard against re-configuring, since every route handler just
+# re-reads these two values on every request.
+_session_auth_required = False
+_session_auth_token: str | None = None
+
+
+def configure_session_auth(*, required: bool, token: str | None = None) -> None:
+    """Set whether ``/sessions*`` routes require a bearer token, and what it is.
+
+    When *required* is True, *token* MUST be a non-empty string -- binding the
+    server to a non-loopback host and leaving the session surface open is
+    exactly the misconfiguration this gate exists to prevent, so it is a hard
+    error, not a silent no-op. When *required* is False (the localhost
+    default), *token* is ignored and every ``/sessions*`` request passes
+    through unauthenticated, unchanged from today's trusted local-app model.
+    """
+    global _session_auth_required, _session_auth_token
+    if required and not token:
+        raise ValueError(
+            "configure_session_auth(required=True) needs a non-empty token -- "
+            "binding the server to a non-loopback host requires a real bearer "
+            "token, never an implicit open session surface."
+        )
+    _session_auth_required = required
+    _session_auth_token = token
+
+
+def _check_session_auth(request: Request) -> Response | None:
+    """Return a 401 Response if *request* fails the bearer-token check, else None.
+
+    Called as the first line of every ``/sessions*`` route handler. A no-op
+    (returns None) whenever auth is not required (the localhost default) --
+    every non-session route in this file is intentionally untouched by this
+    check.
+    """
+    if not _session_auth_required:
+        return None
+    if request.headers.get("authorization") != f"Bearer {_session_auth_token}":
+        return _error_json(401, "missing or invalid bearer token")
+    return None
 
 
 async def _safe_download(fn: Callable[[], bytes], filename: str) -> Response:
@@ -375,7 +465,140 @@ def create_app() -> FastAPI:
             )
         )
 
-    # Catch-all GET: static asset -> demo page (for "/" and "/index.html") -> 404.
+    @application.post("/sessions")
+    async def create_session(request: Request) -> Response:
+        if (unauthorized := _check_session_auth(request)) is not None:
+            return unauthorized
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        def _create() -> dict[str, Any]:
+            graph_payload = body.get("graph")
+            graph = (
+                _graph_from_session_payload(graph_payload) if graph_payload is not None else None
+            )
+            session = get_default_session_store().create(graph)
+            return session.model_dump(mode="json")
+
+        return await _session_json(_create)
+
+    @application.get("/sessions/{session_id}")
+    async def get_session(session_id: str, request: Request) -> Response:
+        if (unauthorized := _check_session_auth(request)) is not None:
+            return unauthorized
+
+        def _get() -> dict[str, Any]:
+            return get_default_session_store().get(session_id).model_dump(mode="json")
+
+        return await _session_json(_get)
+
+    @application.delete("/sessions/{session_id}")
+    async def delete_session(session_id: str, request: Request) -> Response:
+        if (unauthorized := _check_session_auth(request)) is not None:
+            return unauthorized
+
+        def _delete() -> dict[str, Any]:
+            get_default_session_store().delete(session_id)
+            return {"status": "ok"}
+
+        return await _session_json(_delete)
+
+    @application.put("/sessions/{session_id}/graph")
+    async def replace_session_graph(session_id: str, request: Request) -> Response:
+        if (unauthorized := _check_session_auth(request)) is not None:
+            return unauthorized
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        def _replace() -> dict[str, Any]:
+            graph_payload = body.get("graph")
+            if not isinstance(graph_payload, dict):
+                raise ValueError("PUT /sessions/{id}/graph requires a 'graph' object in the body")
+            expected_version = body.get("expected_version")
+            if not isinstance(expected_version, int):
+                raise ValueError(
+                    "PUT /sessions/{id}/graph requires an integer 'expected_version' in the body"
+                )
+            graph = _graph_from_session_payload(graph_payload)
+            session = get_default_session_store().replace_graph(
+                session_id, graph, expected_version=expected_version
+            )
+            return session.model_dump(mode="json")
+
+        return await _session_json(_replace)
+
+    @application.post("/sessions/{session_id}/proposals")
+    async def create_proposal(session_id: str, request: Request) -> Response:
+        if (unauthorized := _check_session_auth(request)) is not None:
+            return unauthorized
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        def _propose() -> dict[str, Any]:
+            mutation = GraphMutation.model_validate(body)
+            proposal = get_default_session_store().add_proposal(session_id, mutation)
+            return proposal.model_dump(mode="json")
+
+        return await _session_json(_propose)
+
+    @application.post("/sessions/{session_id}/proposals/{proposal_id}/accept")
+    async def accept_proposal_route(
+        session_id: str, proposal_id: str, request: Request
+    ) -> Response:
+        if (unauthorized := _check_session_auth(request)) is not None:
+            return unauthorized
+
+        def _accept() -> dict[str, Any]:
+            session = get_default_session_store().accept_proposal(session_id, proposal_id)
+            return session.model_dump(mode="json")
+
+        return await _session_json(_accept)
+
+    @application.post("/sessions/{session_id}/proposals/{proposal_id}/reject")
+    async def reject_proposal_route(
+        session_id: str, proposal_id: str, request: Request
+    ) -> Response:
+        if (unauthorized := _check_session_auth(request)) is not None:
+            return unauthorized
+
+        def _reject() -> dict[str, Any]:
+            session = get_default_session_store().reject_proposal(session_id, proposal_id)
+            return session.model_dump(mode="json")
+
+        return await _session_json(_reject)
+
+    @application.get("/sessions/{session_id}/events")
+    async def session_events(session_id: str, request: Request) -> Response:
+        if (unauthorized := _check_session_auth(request)) is not None:
+            return unauthorized
+        try:
+            q = await _run_sync(lambda: get_default_session_store().subscribe(session_id))
+        except UnknownSessionError as exc:
+            return _error_json(404, str(exc))
+
+        async def body() -> AsyncIterator[bytes]:
+            loop = asyncio.get_running_loop()
+            try:
+                while True:
+                    if await request.is_disconnected():
+                        break
+                    try:
+                        event = await loop.run_in_executor(None, lambda: q.get(timeout=1.0))
+                    except queue.Empty:
+                        continue
+                    yield _sse_frame(event)
+            finally:
+                get_default_session_store().unsubscribe(session_id, q)
+
+        return StreamingResponse(body(), media_type="text/event-stream")
+
+    # Catch-all GET: serves static asset -> demo page (for "/" and "/index.html") -> 404.
     # Declared last so the explicit GET routes above take precedence.
     @application.get("/{full_path:path}")
     async def static_or_demo(full_path: str, request: Request) -> Response:
@@ -439,6 +662,7 @@ def serve(
     open_browser: bool = True,
     cache_dir: str | None = None,
     cache_max_mb: float | None = None,
+    session_token: str | None = None,
 ) -> None:
     """Boot the local canvas server on Uvicorn and block until interrupted.
 
@@ -454,6 +678,14 @@ def serve(
     exists. ``None`` for either parameter means "use the built-in default"
     (``DEFAULT_CACHE_DIRNAME`` resolved under the current working directory,
     ``DEFAULT_CACHE_MAX_MB``).
+
+    *session_token* configures the ``/sessions*`` bearer-token gate (ADR 0019):
+    when *host* is ``"127.0.0.1"`` (the default), the session surface stays
+    open, matching every other route's trusted-local-app model. For any other
+    *host*, a token is REQUIRED -- from *session_token* if given, else from the
+    ``EMERGENTFLOW_SESSION_TOKEN`` environment variable; if neither is set,
+    ``serve`` raises rather than silently exposing the session surface on a
+    non-loopback bind.
     """
     import uvicorn
 
@@ -464,6 +696,18 @@ def serve(
     )
     resolved_max_mb = cache_max_mb if cache_max_mb is not None else DEFAULT_CACHE_MAX_MB
     configure_cache(cache_root, max_mb=resolved_max_mb)
+
+    if host == "127.0.0.1":
+        configure_session_auth(required=False)
+    else:
+        resolved_token = session_token or os.environ.get("EMERGENTFLOW_SESSION_TOKEN")
+        if not resolved_token:
+            raise ValueError(
+                f"serve(host={host!r}) binds to a non-loopback host, which requires a "
+                "session bearer token: pass session_token=... or set the "
+                "EMERGENTFLOW_SESSION_TOKEN environment variable."
+            )
+        configure_session_auth(required=True, token=resolved_token)
 
     browse_host = "127.0.0.1" if host == "0.0.0.0" else host  # noqa: S104
     url = f"http://{browse_host}:{port}"
