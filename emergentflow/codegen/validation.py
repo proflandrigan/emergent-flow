@@ -33,10 +33,12 @@ from emergentflow.types.registry import registry as default_type_registry
 
 
 class Severity(str, Enum):
-    """Severity of a single validation diagnostic (Story 5)."""
+    """Severity of a single validation diagnostic (Story 5; INFO added Epic 14 Story 6 for
+    agent review comments that aren't errors or warnings)."""
 
     ERROR = "error"
     WARNING = "warning"
+    INFO = "info"
 
 
 class Diagnostic(BaseModel):
@@ -52,6 +54,9 @@ class Diagnostic(BaseModel):
         port_name: the port name, when the finding is about a port.
         expected_type: the type the target IN port expected, for type findings.
         actual_type: the type the source OUT port produced, for type findings.
+        source: who produced this finding -- "validator" (ef.validate itself) or a persona
+            slug (an agent's review comment, Epic 14 Story 6). None for pre-Story-6 callers
+            that never set it.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -65,6 +70,7 @@ class Diagnostic(BaseModel):
     port_name: str | None = None
     expected_type: str | None = None
     actual_type: str | None = None
+    source: str | None = None
 
 
 class Diagnostics(BaseModel):
@@ -295,8 +301,11 @@ def validate(
     type_diagnostics, edge_compatibility = _collect_type_diagnostics(
         graph, node_registry, type_registry
     )
+    diagnostics = [
+        d.model_copy(update={"source": "validator"}) for d in structural + type_diagnostics
+    ]
     return Diagnostics(
-        diagnostics=structural + type_diagnostics,
+        diagnostics=diagnostics,
         edge_compatibility=edge_compatibility,
     )
 

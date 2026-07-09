@@ -1,4 +1,17 @@
-export type Severity = "error" | "warning";
+export type Severity = "error" | "warning" | "info";
+
+export function severityColor(severity: Severity | string): string {
+  switch (severity) {
+    case "error":
+      return "var(--danger)";
+    case "warning":
+      return "var(--warning)";
+    case "info":
+      return "var(--info)";
+    default:
+      return "var(--text-secondary)";
+  }
+}
 
 export interface Diagnostic {
   severity: Severity;
@@ -10,6 +23,7 @@ export interface Diagnostic {
   port_name?: string | null;
   expected_type?: string | null;
   actual_type?: string | null;
+  source?: string | null;
 }
 
 export interface Diagnostics {

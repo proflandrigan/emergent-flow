@@ -13,6 +13,8 @@ Routes:
 - ``GET  /schema``           -- the IR JSON Schema
 - ``GET  /catalog``          -- ``{"catalog_version": <int>, "nodes": [...], "estimators": [...],
   "charts": [...]}`` (ADR 0015)
+- ``GET  /mutation-schema``  -- the GraphMutation JSON Schema (Epic 14 Story 4)
+- ``GET  /session-event-schema`` -- the session SSE event JSON Schema (Epic 14 Story 4)
 - ``GET  /reports/{hash}``   -- a stored HTML report blob (Epic 7 Story 3)
 - ``POST /cache/clear``      -- ``{"status": "ok"}``
 - ``POST /compile``          -- IR JSON -> ``{"code": ...}``
@@ -45,13 +47,15 @@ import webbrowser
 from collections.abc import AsyncIterator, Awaitable, Callable, Generator
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
+from emergentflow.collab.review import AnchorError, ReviewComment, ReviewThread
 from emergentflow.collab.session import (
     ProposalAlreadyResolvedError,
     StaleVersionError,
     UnknownProposalError,
+    UnknownReviewError,
     UnknownSessionError,
 )
 from emergentflow.collab.session import get_default_store as get_default_session_store
@@ -71,7 +75,9 @@ from emergentflow.server.service import (
     export_finetune_bytes,
     get_catalog,
     get_connection_schema,
+    get_mutation_schema,
     get_schema,
+    get_session_event_schema,
     label_eval,
     list_connections,
     test_connection_route,
@@ -181,21 +187,27 @@ async def _safe_json(fn: Callable[[], dict[str, Any]]) -> Response:
 async def _session_json(fn: Callable[[], dict[str, Any]]) -> Response:
     """Run *fn* off the event loop; map collab session errors to their HTTP codes.
 
-    ``UnknownSessionError`` / ``UnknownProposalError`` -> 404,
+    ``UnknownSessionError`` / ``UnknownProposalError`` / ``UnknownReviewError`` -> 404,
     ``StaleVersionError`` / ``ProposalAlreadyResolvedError`` -> 409
     (optimistic-concurrency / proposal-lifecycle conflicts -- caller sent a
     stale expected/base version, or tried to re-resolve a decided proposal),
-    any other exception -> 422 (mirrors ``_safe_json``'s catch-all for every
-    other service failure).
+    ``AnchorError`` -> 422 with an ``anchor_error:`` prefix (a review finding's
+    node_id/edge_id/port_id didn't resolve against the graph -- same status as
+    the generic catch-all below, but a stable, parseable prefix like the 409s
+    get, rather than relying on the exception class name), any other
+    exception -> 422 (mirrors ``_safe_json``'s catch-all for every other
+    service failure).
     """
     try:
         result = await _run_sync(fn)
-    except (UnknownSessionError, UnknownProposalError) as exc:
+    except (UnknownSessionError, UnknownProposalError, UnknownReviewError) as exc:
         return _error_json(404, str(exc))
     except StaleVersionError as exc:
         return _error_json(409, f"stale_version: {exc}")
     except ProposalAlreadyResolvedError as exc:
         return _error_json(409, f"proposal_already_resolved: {exc}")
+    except AnchorError as exc:
+        return _error_json(422, f"anchor_error: {exc}")
     except Exception as exc:  # noqa: BLE001 - any other failure -> 422, never crash the server
         return _error_json(422, f"{type(exc).__name__}: {exc}")
     return JSONResponse(content=result)
@@ -242,19 +254,20 @@ def configure_session_auth(*, required: bool, token: str | None = None) -> None:
     _session_auth_token = token
 
 
-def _check_session_auth(request: Request) -> Response | None:
-    """Return a 401 Response if *request* fails the bearer-token check, else None.
+async def _require_session_auth(request: Request) -> None:
+    """FastAPI dependency: raise 401 if *request* fails the bearer-token check.
 
-    Called as the first line of every ``/sessions*`` route handler. A no-op
-    (returns None) whenever auth is not required (the localhost default) --
-    every non-session route in this file is intentionally untouched by this
-    check.
+    Wired via ``dependencies=[Depends(_require_session_auth)]`` on every
+    ``/sessions*`` route instead of each handler repeating a guard-clause line.
+    A no-op whenever auth is not required (the localhost default) -- every
+    non-session route in this file is intentionally untouched by this check.
+    The raised HTTPException is reshaped to the project's ``{"error": ...}``
+    body by ``_http_exception_handler`` below.
     """
     if not _session_auth_required:
-        return None
+        return
     if request.headers.get("authorization") != f"Bearer {_session_auth_token}":
-        return _error_json(401, "missing or invalid bearer token")
-    return None
+        raise HTTPException(status_code=401, detail="missing or invalid bearer token")
 
 
 async def _safe_download(fn: Callable[[], bytes], filename: str) -> Response:
@@ -397,6 +410,14 @@ def create_app() -> FastAPI:
     """Build the FastAPI application (one instance per process; see ``app`` below)."""
     application = FastAPI(title="Emergent Flow - local", docs_url=None, redoc_url=None)
 
+    @application.exception_handler(HTTPException)
+    async def _http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
+        """Reshape FastAPI's default `{"detail": ...}` into this project's one
+        error-body shape, `{"error": ...}` (see `_error_json`) -- the only
+        HTTPException raised anywhere in this module is `_require_session_auth`'s
+        401, but this keeps that response consistent with every other error path."""
+        return _error_json(exc.status_code, str(exc.detail))
+
     @application.get("/healthz")
     async def healthz() -> JSONResponse:
         return JSONResponse(content={"status": "ok"})
@@ -408,6 +429,14 @@ def create_app() -> FastAPI:
     @application.get("/catalog")
     async def catalog() -> Response:
         return await _safe_json(get_catalog)
+
+    @application.get("/mutation-schema")
+    async def mutation_schema() -> Response:
+        return await _safe_json(get_mutation_schema)
+
+    @application.get("/session-event-schema")
+    async def session_event_schema() -> Response:
+        return await _safe_json(get_session_event_schema)
 
     @application.get("/reports/{report_hash}")
     async def report(report_hash: str) -> Response:
@@ -465,10 +494,8 @@ def create_app() -> FastAPI:
             )
         )
 
-    @application.post("/sessions")
+    @application.post("/sessions", dependencies=[Depends(_require_session_auth)])
     async def create_session(request: Request) -> Response:
-        if (unauthorized := _check_session_auth(request)) is not None:
-            return unauthorized
         try:
             body = await _read_json_body(request)
         except (ValueError, json.JSONDecodeError) as exc:
@@ -484,31 +511,31 @@ def create_app() -> FastAPI:
 
         return await _session_json(_create)
 
-    @application.get("/sessions/{session_id}")
-    async def get_session(session_id: str, request: Request) -> Response:
-        if (unauthorized := _check_session_auth(request)) is not None:
-            return unauthorized
+    @application.get("/sessions", dependencies=[Depends(_require_session_auth)])
+    async def list_sessions() -> Response:
+        def _list() -> dict[str, Any]:
+            sessions = get_default_session_store().list()
+            return {"sessions": [s.model_dump(mode="json") for s in sessions]}
 
+        return await _session_json(_list)
+
+    @application.get("/sessions/{session_id}", dependencies=[Depends(_require_session_auth)])
+    async def get_session(session_id: str) -> Response:
         def _get() -> dict[str, Any]:
             return get_default_session_store().get(session_id).model_dump(mode="json")
 
         return await _session_json(_get)
 
-    @application.delete("/sessions/{session_id}")
-    async def delete_session(session_id: str, request: Request) -> Response:
-        if (unauthorized := _check_session_auth(request)) is not None:
-            return unauthorized
-
+    @application.delete("/sessions/{session_id}", dependencies=[Depends(_require_session_auth)])
+    async def delete_session(session_id: str) -> Response:
         def _delete() -> dict[str, Any]:
             get_default_session_store().delete(session_id)
             return {"status": "ok"}
 
         return await _session_json(_delete)
 
-    @application.put("/sessions/{session_id}/graph")
+    @application.put("/sessions/{session_id}/graph", dependencies=[Depends(_require_session_auth)])
     async def replace_session_graph(session_id: str, request: Request) -> Response:
-        if (unauthorized := _check_session_auth(request)) is not None:
-            return unauthorized
         try:
             body = await _read_json_body(request)
         except (ValueError, json.JSONDecodeError) as exc:
@@ -531,10 +558,10 @@ def create_app() -> FastAPI:
 
         return await _session_json(_replace)
 
-    @application.post("/sessions/{session_id}/proposals")
+    @application.post(
+        "/sessions/{session_id}/proposals", dependencies=[Depends(_require_session_auth)]
+    )
     async def create_proposal(session_id: str, request: Request) -> Response:
-        if (unauthorized := _check_session_auth(request)) is not None:
-            return unauthorized
         try:
             body = await _read_json_body(request)
         except (ValueError, json.JSONDecodeError) as exc:
@@ -547,36 +574,30 @@ def create_app() -> FastAPI:
 
         return await _session_json(_propose)
 
-    @application.post("/sessions/{session_id}/proposals/{proposal_id}/accept")
-    async def accept_proposal_route(
-        session_id: str, proposal_id: str, request: Request
-    ) -> Response:
-        if (unauthorized := _check_session_auth(request)) is not None:
-            return unauthorized
-
+    @application.post(
+        "/sessions/{session_id}/proposals/{proposal_id}/accept",
+        dependencies=[Depends(_require_session_auth)],
+    )
+    async def accept_proposal_route(session_id: str, proposal_id: str) -> Response:
         def _accept() -> dict[str, Any]:
             session = get_default_session_store().accept_proposal(session_id, proposal_id)
             return session.model_dump(mode="json")
 
         return await _session_json(_accept)
 
-    @application.post("/sessions/{session_id}/proposals/{proposal_id}/reject")
-    async def reject_proposal_route(
-        session_id: str, proposal_id: str, request: Request
-    ) -> Response:
-        if (unauthorized := _check_session_auth(request)) is not None:
-            return unauthorized
-
+    @application.post(
+        "/sessions/{session_id}/proposals/{proposal_id}/reject",
+        dependencies=[Depends(_require_session_auth)],
+    )
+    async def reject_proposal_route(session_id: str, proposal_id: str) -> Response:
         def _reject() -> dict[str, Any]:
             session = get_default_session_store().reject_proposal(session_id, proposal_id)
             return session.model_dump(mode="json")
 
         return await _session_json(_reject)
 
-    @application.get("/sessions/{session_id}/events")
+    @application.get("/sessions/{session_id}/events", dependencies=[Depends(_require_session_auth)])
     async def session_events(session_id: str, request: Request) -> Response:
-        if (unauthorized := _check_session_auth(request)) is not None:
-            return unauthorized
         try:
             q = await _run_sync(lambda: get_default_session_store().subscribe(session_id))
         except UnknownSessionError as exc:
@@ -597,6 +618,52 @@ def create_app() -> FastAPI:
                 get_default_session_store().unsubscribe(session_id, q)
 
         return StreamingResponse(body(), media_type="text/event-stream")
+
+    @application.post(
+        "/sessions/{session_id}/reviews", dependencies=[Depends(_require_session_auth)]
+    )
+    async def create_review(session_id: str, request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        def _create() -> dict[str, Any]:
+            thread = ReviewThread.model_validate(body)
+            result = get_default_session_store().add_review(session_id, thread)
+            return result.model_dump(mode="json")
+
+        return await _session_json(_create)
+
+    @application.get(
+        "/sessions/{session_id}/reviews", dependencies=[Depends(_require_session_auth)]
+    )
+    async def list_reviews(session_id: str) -> Response:
+        def _list() -> dict[str, Any]:
+            session = get_default_session_store().get(session_id)
+            threads = sorted(session.collab.reviews.values(), key=lambda t: t.id)
+            return {"reviews": [t.model_dump(mode="json") for t in threads]}
+
+        return await _session_json(_list)
+
+    @application.post(
+        "/sessions/{session_id}/reviews/{review_id}/comments",
+        dependencies=[Depends(_require_session_auth)],
+    )
+    async def add_review_comment_route(
+        session_id: str, review_id: str, request: Request
+    ) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        def _comment() -> dict[str, Any]:
+            comment = ReviewComment.model_validate(body)
+            result = get_default_session_store().add_review_comment(session_id, review_id, comment)
+            return result.model_dump(mode="json")
+
+        return await _session_json(_comment)
 
     # Catch-all GET: serves static asset -> demo page (for "/" and "/index.html") -> 404.
     # Declared last so the explicit GET routes above take precedence.

@@ -251,27 +251,27 @@ the autonomous-research loop (plan §7 — explicitly deferred here, gated on Ep
 > experience is byte-identical to today, and a user who never opens a session never loads the
 > session code path.
 
-- [ ] Generate the new contracts: extend `scripts/export_ui_contracts.py` to emit
+- [x] Generate the new contracts: extend `scripts/export_ui_contracts.py` to emit
   `mutation.schema.json` + session/event schemas and TS types into `ui/src/generated/`
   (the `ir.schema.json` flow), ajv-compiled in the UI like `validateIR.ts`
   (`ui/src/store/validateIR.ts:16`). Golden test pins schema stability.
-- [ ] `ui/src/session/` (new): a session client (join/create via the routes, subscribe to
+- [x] `ui/src/session/` (new): a session client (join/create via the routes, subscribe to
   `/events` SSE with polling fallback, reuse the `httpJson` helper pattern from
   `ui/src/promptlab/httpJson.ts`) and a `sessionStore` that *wraps* `graphStore` — on accept,
   the server's post-apply graph is loaded through the existing `fromIR`
   (`ui/src/store/ir.ts:125`); on local edit in session mode, the store pushes
   `PUT /sessions/{id}/graph` with the expected version and surfaces a 409 as a "rebase"
   banner, never a silent overwrite.
-- [ ] **Ghost-diff rendering:** a pending `GraphMutation` renders as ghost nodes/edges
+- [x] **Ghost-diff rendering:** a pending `GraphMutation` renders as ghost nodes/edges
   (dashed, pending visual state) overlaid on the canvas; position-less added nodes get
   auto-layout placement; `set_params` changes badge the affected node. The proposal panel
   shows `author`, `description`, and the attached `Diagnostics` verdict (reusing the
   existing diagnostics rendering — this is the "this proposal type-checks" moment).
-- [ ] **Accept / Reject / Edit-into-own:** Accept calls the accept route and reloads;
+- [x] **Accept / Reject / Edit-into-own:** Accept calls the accept route and reloads;
   Reject dismisses; dragging/tweaking a ghost converts the proposal into ordinary local
   edits (proposal marked superseded). Vitest coverage for the store logic and the
   ghost-overlay component; the diff renderer is pure over `(CanvasModel, GraphMutation)`.
-- [ ] **Works-without-agents check:** session UI is lazy-loaded behind the opt-in entry
+- [x] **Works-without-agents check:** session UI is lazy-loaded behind the opt-in entry
   point ("Share session" affordance); `App.tsx` default path renders zero session code;
   existing canvas tests (`ui/src/ir-interactions.test.tsx`, `Canvas.test.tsx`) pass unmodified.
 
@@ -281,16 +281,16 @@ the autonomous-research loop (plan §7 — explicitly deferred here, gated on Ep
 > a human genuinely collaborate on one graph — everything after deepens it. No MCP, no
 > embedded LLM, no new deps: the agent surface is `curl`.
 
-- [ ] Write `agents/emergent-flow-collaborator.md` — a persona file (Shards-compatible,
+- [x] Write `agents/emergent-flow-collaborator.md` — a persona file (Shards-compatible,
   plain markdown) that teaches any Claude Code agent the surface: how to find the server,
   create/join a session, read the graph + `GET /catalog` for legal node types/params/ports,
   pre-flight candidates with `POST /validate`, show the human implied code via
   `POST /compile`, submit a `GraphMutation` with correct `base_version`, and await the
   verdict on the SSE stream. Include a worked end-to-end transcript (the request → curl
   calls → proposal JSON) as the few-shot spine.
-- [ ] Add a `GET /sessions` (list active sessions) so an agent can discover the human's
+- [x] Add a `GET /sessions` (list active sessions) so an agent can discover the human's
   session without copy-pasting ids; document the discovery flow in the persona file.
-- [ ] **Scripted-agent acceptance test** (`tests/test_agent_happy_path.py`): a pytest
+- [x] **Scripted-agent acceptance test** (`tests/test_agent_happy_path.py`): a pytest
   "agent" (HTTP client following the persona file's exact call sequence) joins a session
   seeded with a small graph, proposes a two-node addition (e.g. `describe` → chart on an
   existing DataFrame output, built from `/catalog` data), the proposal arrives with clean
@@ -299,7 +299,7 @@ the autonomous-research loop (plan §7 — explicitly deferred here, gated on Ep
 - [ ] **Manual milestone (checked off when demonstrated, like Epic 13's demos):** a real
   Claude Code session with the persona file drives the same flow against `emergentflow serve`
   with the canvas open — the human watches the ghost diff land live and accepts it.
-- [ ] **Works-without-agents check:** `agents/` is documentation — nothing in the package
+- [x] **Works-without-agents check:** `agents/` is documentation — nothing in the package
   imports it; the milestone alters no code.
 
 ## Story 6 — Two-way: the agent reviews the human's work (diagnostics extension + review threads)
@@ -308,25 +308,25 @@ the autonomous-research loop (plan §7 — explicitly deferred here, gated on Ep
 > just proposals' machinery pointed the other way. Land the one-time `Diagnostic` contract
 > change here, early, so it never happens piecemeal.
 
-- [ ] **`Diagnostic` extension (additive, once):** add `INFO` to `Severity`
+- [x] **`Diagnostic` extension (additive, once):** add `INFO` to `Severity`
   (`emergentflow/codegen/validation.py:39`) and `source: str | None = None`
   (`"validator"` | persona slug) to `Diagnostic` (`validation.py:42`); `ef.validate` stamps
   `source="validator"`. Mirror both in `ui/src/store/validation.ts`; regenerate contracts;
   update the `/validate` golden (`tests/test_validation_golden.py`) — one reviewed diff.
-- [ ] `emergentflow/collab/review.py`: `ReviewThread{id, author, findings: list[Diagnostic],
+- [x] `emergentflow/collab/review.py`: `ReviewThread{id, author, findings: list[Diagnostic],
   comments, fix: GraphMutation | None, status}` on `CollaborationState`; routes
   `POST/GET /sessions/{id}/reviews`, replies appended, events on the SSE stream. Findings
   anchor to real graph elements via the existing `node_id`/`edge_id`/`port_id` fields —
   the server rejects anchors that don't resolve against the session graph.
-- [ ] Canvas: review findings render through the **same** diagnostics path as `ef.validate`
+- [x] Canvas: review findings render through the **same** diagnostics path as `ef.validate`
   output (red/yellow dots; `info` + persona `source` styled as review comments, not
   failures); a finding with an attached `fix` offers **"apply fix"** → the fix is an
   ordinary proposal accept (Story 4 machinery, zero new apply code).
-- [ ] Persona file part 2: a review workflow section — read graph + compiled preview,
+- [x] Persona file part 2: a review workflow section — read graph + compiled preview,
   post anchored findings with severities, attach fix-mutations where mechanical. Scripted
   review test: pytest agent posts two findings (one `info`, one `warning` with a fix) on a
   seeded flawed graph; "human" applies the fix; graph validates clean.
-- [ ] **Works-without-agents check:** the `Diagnostic` changes are defaulted so every
+- [x] **Works-without-agents check:** the `Diagnostic` changes are defaulted so every
   existing producer/consumer is untouched (existing goldens change only by explicit
   regeneration); review UI rides the session lazy-load.
 

@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { lazy, Suspense, type ReactNode, useEffect, useState } from "react";
 import {
   MoreHorizontal,
   PanelLeftClose,
@@ -22,6 +22,13 @@ import { useTheme } from "./theme/useTheme";
 import { IconButton } from "./ui/IconButton";
 import { Menu, type MenuItem } from "./ui/Menu";
 import { Tooltip } from "./ui/Tooltip";
+
+// Lazy: nothing under ui/src/session/ is imported until the user opens this panel (Epic 14
+// works-without-agents invariant -- session mode is strictly opt-in, App's default render path
+// stays byte-identical to before this epic).
+const SessionPanel = lazy(() =>
+  import("./session/SessionPanel").then((m) => ({ default: m.SessionPanel })),
+);
 
 type ServerStatus = "connecting" | "ok" | "unreachable";
 
@@ -98,6 +105,7 @@ export function App(): JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [schemaBrowserOpen, setSchemaBrowserOpen] = useState(false);
+  const [sessionPanelOpen, setSessionPanelOpen] = useState(false);
   const past = useGraphStore((s) => s.past);
   const future = useGraphStore((s) => s.future);
   const canUndo = past.length > 0;
@@ -122,7 +130,10 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     try {
-      localStorage.setItem("ef-panel-palette-collapsed", String(paletteCollapsed));
+      localStorage.setItem(
+        "ef-panel-palette-collapsed",
+        String(paletteCollapsed),
+      );
     } catch {
       // ignore write errors
     }
@@ -130,7 +141,10 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     try {
-      localStorage.setItem("ef-panel-inspector-collapsed", String(inspectorCollapsed));
+      localStorage.setItem(
+        "ef-panel-inspector-collapsed",
+        String(inspectorCollapsed),
+      );
     } catch {
       // ignore write errors
     }
@@ -234,6 +248,13 @@ export function App(): JSX.Element {
       label: "Browse schema",
       onSelect: () => {
         setSchemaBrowserOpen(true);
+        setMenuOpen(false);
+      },
+    },
+    {
+      label: "Share session",
+      onSelect: () => {
+        setSessionPanelOpen(true);
         setMenuOpen(false);
       },
     },
@@ -449,6 +470,13 @@ export function App(): JSX.Element {
       {schemaBrowserOpen && (
         <OverlayModal width={560} onClose={() => setSchemaBrowserOpen(false)}>
           <SchemaBrowserPanel />
+        </OverlayModal>
+      )}
+      {sessionPanelOpen && (
+        <OverlayModal width={420} onClose={() => setSessionPanelOpen(false)}>
+          <Suspense fallback={<div>Loading…</div>}>
+            <SessionPanel />
+          </Suspense>
         </OverlayModal>
       )}
     </div>

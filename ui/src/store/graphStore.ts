@@ -42,7 +42,9 @@ function emptyGraph(): CanvasModel {
 // object already) and must never carry a live reference into past/future (hence structuredClone).
 const HISTORY_LIMIT = 100;
 
-function snapshot(s: CanvasModel): CanvasModel {
+// Exported so callers outside this store (e.g. ProposalPanel's "edit into own" flow) can build
+// a CanvasModel-shaped snapshot of the live store without re-listing its fields themselves.
+export function snapshot(s: CanvasModel): CanvasModel {
   return structuredClone({
     schemaVersion: s.schemaVersion,
     name: s.name,

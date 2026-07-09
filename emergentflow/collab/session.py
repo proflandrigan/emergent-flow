@@ -34,6 +34,12 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from emergentflow.codegen.validation import Diagnostics
+from emergentflow.collab.review import (
+    CollaborationState,
+    ReviewComment,
+    ReviewThread,
+    validate_anchors,
+)
 from emergentflow.ir.common import new_id
 from emergentflow.ir.graph import Graph
 from emergentflow.ir.mutation import GraphMutation, apply_mutation, propose_diagnostics
@@ -68,6 +74,10 @@ class ProposalAlreadyResolvedError(SessionError):
     flipped to REJECTED, leaving the session's proposal status contradicting
     its own graph.
     """
+
+
+class UnknownReviewError(SessionError):
+    """Raised when a review thread id does not exist on a session."""
 
 
 class ProposalStatus(str, Enum):
@@ -106,6 +116,7 @@ class GraphSession(BaseModel):
     graph: Graph = Field(default_factory=Graph)
     version: int = 0
     proposals: dict[str, StoredProposal] = Field(default_factory=dict)
+    collab: CollaborationState = Field(default_factory=CollaborationState)
 
 
 class SessionStore:
@@ -128,6 +139,15 @@ class SessionStore:
         with self._lock:
             self._sessions[session.id] = session
         return session
+
+    def list(self) -> list[GraphSession]:
+        """Return every session currently held, ordered by id for a deterministic listing.
+
+        Used by ``GET /sessions`` (Epic 14 Story 5) so an agent can discover an active session
+        without the id being copy-pasted out-of-band.
+        """
+        with self._lock:
+            return sorted(self._sessions.values(), key=lambda s: s.id)
 
     def get(self, session_id: str) -> GraphSession:
         """Return the session for *session_id*.
@@ -341,6 +361,64 @@ class SessionStore:
                 {"type": "proposal_rejected", "session_id": session_id, "proposal_id": proposal_id},
             )
             return session
+
+    def add_review(self, session_id: str, thread: ReviewThread) -> ReviewThread:
+        """Validate *thread*'s findings anchor against the session's graph, store it, and
+        publish a ``review_added`` event.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        AnchorError
+            If any finding in *thread* anchors to a node/edge/port id absent from the
+            session's current graph.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            validate_anchors(session.graph, thread.findings)
+            session.collab.reviews[thread.id] = thread
+            self._publish(
+                session_id,
+                {"type": "review_added", "session_id": session_id, "review_id": thread.id},
+            )
+            return thread
+
+    def add_review_comment(
+        self, session_id: str, review_id: str, comment: ReviewComment
+    ) -> ReviewThread:
+        """Append *comment* to the review thread *review_id* and publish a
+        ``review_comment_added`` event.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        UnknownReviewError
+            If no review thread with that id exists on the session.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            thread = session.collab.reviews.get(review_id)
+            if thread is None:
+                raise UnknownReviewError(
+                    f"session {session_id!r} has no review thread {review_id!r}."
+                )
+            thread.comments.append(comment)
+            self._publish(
+                session_id,
+                {
+                    "type": "review_comment_added",
+                    "session_id": session_id,
+                    "review_id": review_id,
+                    "comment_id": comment.id,
+                },
+            )
+            return thread
 
 
 # A process-wide default store, lazily created (the report-store precedent --

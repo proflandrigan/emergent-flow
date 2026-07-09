@@ -1,0 +1,76 @@
+{
+  "additionalProperties": false,
+  "description": "The shape of every event `SessionStore` publishes on a session's SSE stream.",
+  "properties": {
+    "comment_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Comment Id"
+    },
+    "proposal_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Proposal Id"
+    },
+    "review_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Review Id"
+    },
+    "session_id": {
+      "title": "Session Id",
+      "type": "string"
+    },
+    "type": {
+      "enum": [
+        "graph_replaced",
+        "proposal_added",
+        "proposal_accepted",
+        "proposal_rejected",
+        "review_added",
+        "review_comment_added"
+      ],
+      "title": "Type",
+      "type": "string"
+    },
+    "version": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Version"
+    }
+  },
+  "required": [
+    "type",
+    "session_id"
+  ],
+  "title": "SessionEvent",
+  "type": "object"
+}
