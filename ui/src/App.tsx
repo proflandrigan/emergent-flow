@@ -474,7 +474,7 @@ export function App(): JSX.Element {
       )}
       {sessionPanelOpen && (
         <OverlayModal width={420} onClose={() => setSessionPanelOpen(false)}>
-          <Suspense fallback={<div>Loading\u2026</div>}>
+          <Suspense fallback={<div>Loading…</div>}>
             <SessionPanel />
           </Suspense>
         </OverlayModal>

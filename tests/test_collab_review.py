@@ -34,6 +34,20 @@ def _graph_with_one_node() -> Graph:
     return Graph(nodes={"n1": node}, edges={})
 
 
+def _graph_with_two_nodes() -> Graph:
+    n1 = Node(
+        id="n1",
+        type="data.load_csv",
+        ports=[Port(id="p1", name="frame", direction=Direction.OUT, data_type="DataFrame")],
+    )
+    n2 = Node(
+        id="n2",
+        type="data.load_csv",
+        ports=[Port(id="p2", name="frame", direction=Direction.OUT, data_type="DataFrame")],
+    )
+    return Graph(nodes={"n1": n1, "n2": n2}, edges={})
+
+
 class TestReviewThreadModel:
     def test_defaults(self) -> None:
         thread = ReviewThread(author="ml_engineer")
@@ -84,6 +98,31 @@ class TestValidateAnchors:
                 [
                     Diagnostic(
                         severity=Severity.WARNING, code="w", message="m", port_id="does-not-exist"
+                    )
+                ],
+            )
+
+    def test_passes_for_a_finding_anchored_to_a_port_on_its_own_node(self) -> None:
+        validate_anchors(
+            _graph_with_one_node(),
+            [
+                Diagnostic(
+                    severity=Severity.WARNING, code="w", message="m", node_id="n1", port_id="p1"
+                )
+            ],
+        )
+
+    def test_rejects_a_finding_whose_port_belongs_to_a_different_node(self) -> None:
+        with pytest.raises(AnchorError):
+            validate_anchors(
+                _graph_with_two_nodes(),
+                [
+                    Diagnostic(
+                        severity=Severity.WARNING,
+                        code="w",
+                        message="m",
+                        node_id="n1",
+                        port_id="p2",
                     )
                 ],
             )

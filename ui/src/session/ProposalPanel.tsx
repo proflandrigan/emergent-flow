@@ -1,22 +1,12 @@
 import type { JSX } from "react";
 
 import { useGraphStore } from "../store/graphStore";
-import type { Diagnostic, Diagnostics, Severity } from "../store/validation";
+import type { Diagnostic, Diagnostics } from "../store/validation";
+import { severityColor } from "../store/validation";
 import { Button } from "../ui/Button";
 import { computeGhostDiff } from "./ghostDiff";
 import type { StoredProposal } from "./sessionClient";
 import { useSessionStore } from "./sessionStore";
-
-function severityColor(severity: Severity | string): string {
-  switch (severity) {
-    case "error":
-      return "var(--danger)";
-    case "warning":
-      return "var(--warning)";
-    default:
-      return "var(--text-secondary)";
-  }
-}
 
 function DiagnosticsVerdict({
   diagnostics,

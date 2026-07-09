@@ -30,10 +30,14 @@ class SessionEvent(BaseModel):
         "proposal_added",
         "proposal_accepted",
         "proposal_rejected",
+        "review_added",
+        "review_comment_added",
     ]
     session_id: str
     proposal_id: str | None = None
     version: int | None = None
+    review_id: str | None = None
+    comment_id: str | None = None
 
 
 def mutation_json_schema() -> dict[str, Any]:

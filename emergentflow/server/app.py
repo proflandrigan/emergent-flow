@@ -13,6 +13,8 @@ Routes:
 - ``GET  /schema``           -- the IR JSON Schema
 - ``GET  /catalog``          -- ``{"catalog_version": <int>, "nodes": [...], "estimators": [...],
   "charts": [...]}`` (ADR 0015)
+- ``GET  /mutation-schema``  -- the GraphMutation JSON Schema (Epic 14 Story 4)
+- ``GET  /session-event-schema`` -- the session SSE event JSON Schema (Epic 14 Story 4)
 - ``GET  /reports/{hash}``   -- a stored HTML report blob (Epic 7 Story 3)
 - ``POST /cache/clear``      -- ``{"status": "ok"}``
 - ``POST /compile``          -- IR JSON -> ``{"code": ...}``
@@ -73,7 +75,9 @@ from emergentflow.server.service import (
     export_finetune_bytes,
     get_catalog,
     get_connection_schema,
+    get_mutation_schema,
     get_schema,
+    get_session_event_schema,
     label_eval,
     list_connections,
     test_connection_route,
@@ -410,6 +414,14 @@ def create_app() -> FastAPI:
     @application.get("/catalog")
     async def catalog() -> Response:
         return await _safe_json(get_catalog)
+
+    @application.get("/mutation-schema")
+    async def mutation_schema() -> Response:
+        return await _safe_json(get_mutation_schema)
+
+    @application.get("/session-event-schema")
+    async def session_event_schema() -> Response:
+        return await _safe_json(get_session_event_schema)
 
     @application.get("/reports/{report_hash}")
     async def report(report_hash: str) -> Response:

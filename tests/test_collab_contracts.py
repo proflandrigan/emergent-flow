@@ -28,6 +28,15 @@ def test_session_event_matches_every_publish_call_shape() -> None:
     SessionEvent.model_validate(
         {"type": "proposal_rejected", "session_id": "s1", "proposal_id": "p1"}
     )
+    SessionEvent.model_validate({"type": "review_added", "session_id": "s1", "review_id": "r1"})
+    SessionEvent.model_validate(
+        {
+            "type": "review_comment_added",
+            "session_id": "s1",
+            "review_id": "r1",
+            "comment_id": "c1",
+        }
+    )
 
 
 def test_mutation_json_schema_has_expected_top_level_shape() -> None:

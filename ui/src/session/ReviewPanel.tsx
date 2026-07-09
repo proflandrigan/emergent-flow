@@ -8,31 +8,29 @@
 
 import { useState, type JSX } from "react";
 
-import type { Diagnostic, Severity } from "../store/validation";
+import type { Diagnostic } from "../store/validation";
+import { severityColor } from "../store/validation";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import type { ReviewComment, ReviewThread } from "./sessionClient";
 import { useSessionStore } from "./sessionStore";
 
-function severityColor(severity: Severity | string): string {
-  switch (severity) {
-    case "error":
-      return "var(--danger)";
-    case "warning":
-      return "var(--warning)";
-    case "info":
-      return "var(--info)";
-    default:
-      return "var(--text-secondary)";
+function findingAnchor(finding: Diagnostic): string | null {
+  const parts: string[] = [];
+  if (finding.node_id) {
+    parts.push(`node ${finding.node_id}`);
   }
+  if (finding.port_id) {
+    parts.push(`port ${finding.port_id}`);
+  }
+  if (parts.length > 0) {
+    return parts.join(", ");
+  }
+  return finding.edge_id ? `edge ${finding.edge_id}` : null;
 }
 
 function FindingRow({ finding }: { finding: Diagnostic }): JSX.Element {
-  const anchor = finding.node_id
-    ? `node ${finding.node_id}`
-    : finding.edge_id
-      ? `edge ${finding.edge_id}`
-      : null;
+  const anchor = findingAnchor(finding);
   return (
     <div
       data-testid="review-finding"

@@ -1,5 +1,18 @@
 export type Severity = "error" | "warning" | "info";
 
+export function severityColor(severity: Severity | string): string {
+  switch (severity) {
+    case "error":
+      return "var(--danger)";
+    case "warning":
+      return "var(--warning)";
+    case "info":
+      return "var(--info)";
+    default:
+      return "var(--text-secondary)";
+  }
+}
+
 export interface Diagnostic {
   severity: Severity;
   code: string;

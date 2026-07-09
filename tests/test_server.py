@@ -45,6 +45,8 @@ from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION
 from emergentflow.server.service import (
     _execute_functional_stream,
     _to_graph,
+    get_mutation_schema,
+    get_session_event_schema,
 )
 
 
@@ -705,6 +707,18 @@ def test_http_get_catalog(client: TestClient) -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert "data.load_csv" in {spec["type"] for spec in body["nodes"]}
+
+
+def test_http_get_mutation_schema(client: TestClient) -> None:
+    resp = client.get("/mutation-schema")
+    assert resp.status_code == 200
+    assert resp.json() == get_mutation_schema()
+
+
+def test_http_get_session_event_schema(client: TestClient) -> None:
+    resp = client.get("/session-event-schema")
+    assert resp.status_code == 200
+    assert resp.json() == get_session_event_schema()
 
 
 def test_http_reports_round_trip(client: TestClient) -> None:

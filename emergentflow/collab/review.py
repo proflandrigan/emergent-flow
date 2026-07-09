@@ -82,24 +82,36 @@ class CollaborationState(BaseModel):
 def validate_anchors(graph: Graph, findings: list[Diagnostic]) -> None:
     """Raise AnchorError if any *findings* entry anchors to a node/edge/port id that does not
     exist in *graph*. A finding with all three anchor fields None (a graph-wide comment) always
-    passes -- there is nothing to resolve.
+    passes -- there is nothing to resolve. When both node_id and port_id are set, the port must
+    belong to that node -- a port_id that merely exists somewhere else in the graph is not a
+    valid anchor for that node_id.
 
     Pure: does not mutate *graph* or *findings*.
     """
-    port_ids = {port.id for node in graph.nodes.values() for port in node.ports}
+    all_port_ids = {port.id for node in graph.nodes.values() for port in node.ports}
     for finding in findings:
-        if finding.node_id is not None and finding.node_id not in graph.nodes:
-            raise AnchorError(
-                f"finding anchors to unknown node_id {finding.node_id!r} "
-                f"(not present in the session's graph)."
-            )
+        node = None
+        if finding.node_id is not None:
+            node = graph.nodes.get(finding.node_id)
+            if node is None:
+                raise AnchorError(
+                    f"finding anchors to unknown node_id {finding.node_id!r} "
+                    f"(not present in the session's graph)."
+                )
         if finding.edge_id is not None and finding.edge_id not in graph.edges:
             raise AnchorError(
                 f"finding anchors to unknown edge_id {finding.edge_id!r} "
                 f"(not present in the session's graph)."
             )
-        if finding.port_id is not None and finding.port_id not in port_ids:
-            raise AnchorError(
-                f"finding anchors to unknown port_id {finding.port_id!r} "
-                f"(not present in the session's graph)."
-            )
+        if finding.port_id is not None:
+            if node is not None:
+                if not any(port.id == finding.port_id for port in node.ports):
+                    raise AnchorError(
+                        f"finding anchors to port_id {finding.port_id!r} which does not "
+                        f"belong to node_id {finding.node_id!r}."
+                    )
+            elif finding.port_id not in all_port_ids:
+                raise AnchorError(
+                    f"finding anchors to unknown port_id {finding.port_id!r} "
+                    f"(not present in the session's graph)."
+                )

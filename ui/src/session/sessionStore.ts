@@ -205,9 +205,19 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
     if (state.sessionId === null) {
       throw new Error("cannot propose a mutation: no active session");
     }
-    const proposal = await proposeMutation(state.sessionId, mutation);
-    set((s) => ({ proposals: { ...s.proposals, [proposal.id]: proposal } }));
-    return proposal;
+    try {
+      const proposal = await proposeMutation(state.sessionId, mutation);
+      set((s) => ({ proposals: { ...s.proposals, [proposal.id]: proposal } }));
+      return proposal;
+    } catch (err) {
+      const message = errorMessage(err);
+      if (message.startsWith("stale_version")) {
+        set({ rebaseNeeded: true, rebaseMessage: message });
+      } else {
+        set({ error: message });
+      }
+      throw err;
+    }
   },
 
   async accept(proposalId) {
@@ -215,9 +225,18 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
     if (state.sessionId === null) {
       return;
     }
-    const session = await acceptProposal(state.sessionId, proposalId);
-    useGraphStore.getState().loadIR(session.graph);
-    set({ version: session.version, proposals: session.proposals });
+    try {
+      const session = await acceptProposal(state.sessionId, proposalId);
+      useGraphStore.getState().loadIR(session.graph);
+      set({ version: session.version, proposals: session.proposals });
+    } catch (err) {
+      const message = errorMessage(err);
+      if (message.startsWith("stale_version")) {
+        set({ rebaseNeeded: true, rebaseMessage: message });
+      } else {
+        set({ error: message });
+      }
+    }
   },
 
   async reject(proposalId) {
@@ -225,8 +244,12 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
     if (state.sessionId === null) {
       return;
     }
-    const session = await rejectProposal(state.sessionId, proposalId);
-    set({ version: session.version, proposals: session.proposals });
+    try {
+      const session = await rejectProposal(state.sessionId, proposalId);
+      set({ version: session.version, proposals: session.proposals });
+    } catch (err) {
+      set({ error: errorMessage(err) });
+    }
   },
 
   dismissRebase() {
@@ -259,7 +282,12 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
     if (!thread || !thread.fix) {
       return;
     }
-    const proposal = await get().propose(thread.fix);
-    await get().accept(proposal.id);
+    try {
+      const proposal = await get().propose(thread.fix);
+      await get().accept(proposal.id);
+    } catch {
+      // propose() already recorded the failure in `error`/`rebaseNeeded` state;
+      // swallow here so a rejected fix doesn't surface as an unhandled rejection.
+    }
   },
 }));
