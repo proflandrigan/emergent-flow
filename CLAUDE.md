@@ -4,8 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-The project uses [`uv`](https://docs.astral.sh/uv/). CI (`.github/workflows/ci.yml`) runs the
-four gates below on Python 3.11 and 3.12 — run them locally before pushing:
+The project uses [`uv`](https://docs.astral.sh/uv/) for the Python SDK/server and `npm` for the
+`ui/` canvas. CI (`.github/workflows/ci.yml`) has three jobs — a Python matrix (3.11/3.12), a UI
+job, and a live-Postgres driver-integration job — run the Python gates and the UI gates locally
+before pushing:
 
 ```bash
 uv sync --locked            # install pinned deps (regenerate lock with `uv lock` after editing pyproject)
@@ -13,6 +15,16 @@ uv run ruff check .         # lint
 uv run ruff format --check .# format gate (use `uv run ruff format .` to fix)
 uv run mypy emergentflow    # type-check
 uv run pytest               # full test suite
+uv run pytest -m equivalence -q   # ADR-0002 compile_to_code(ir) == execute(ir) gate, also covered by the full suite
+```
+
+If you change IR models, a node's `spec`, or the mutation/session-event schemas, regenerate the
+contract artifacts the `ui/` build consumes and verify the UI boundary is intact — both are CI
+gates:
+
+```bash
+uv run python scripts/export_ui_contracts.py   # regenerates ui/src/generated/*.json
+uv run python scripts/check_ui_boundary.py      # fails if ui/ imports emergentflow
 ```
 
 Single test / subset:
@@ -26,14 +38,46 @@ uv run pytest -k declarative                            # by keyword
 `torch` is intentionally **not** a dependency. Tests that exercise the declarative
 `execute` path use `pytest.importorskip("torch")` and skip when it's absent. To run them,
 install torch into the venv ad hoc (`uv pip install torch`) — do not add it to
-`pyproject.toml`.
+`pyproject.toml`. The same lazy-import pattern applies to other optional extras used only in
+specific tests: `litellm` (`[llm]`), `fastmcp` (`[mcp]`, though it's in the dev dependency
+group so it's present in CI), and the Bayesian stack `pymc`/`bambi`/`arviz` (`[bayes]`).
+
+### UI (`ui/`)
+
+```bash
+cd ui
+npm ci               # install pinned deps
+npm run dev          # Vite dev server (proxies API calls to a locally running `emergentflow serve`)
+npm run lint         # eslint .
+npm run typecheck    # tsc --noEmit
+npm test             # vitest run
+npm run build        # emits the production bundle into ../emergentflow/_static/
+npm run gen:types    # regenerate ui/src/generated/ir.ts from ir.schema.json — run after export_ui_contracts.py
+```
+
+`ui/` MUST NOT `import` or bundle `emergentflow` (enforced by `scripts/check_ui_boundary.py` in
+CI) — it talks to `emergentflow/server/` only over localhost REST/SSE, using the four exported
+contract artifacts (IR JSON Schema, node catalog, `GraphMutation` schema, session-event schema).
+
+### Running the app end to end
+
+```bash
+uv run emergentflow serve     # boots the local FastAPI/Uvicorn server + bundled canvas at :8765 (alias: `emergentflow lab`)
+curl http://127.0.0.1:8765/healthz
+```
+
+See [`docs/runbook.md`](./docs/runbook.md) for the full walkthrough (canvas UX, REST/SSE API,
+driving the SDK directly in Python).
 
 ## Architecture
 
-Emergent Flow is a visual data/ML platform; this repo is the open-source Python SDK and graph
-IR. The system is governed by a set of Architecture Decision Records in `docs/adr/` — **read
-the relevant ADR before changing anything cross-cutting**, since the invariants below are
-deliberate and expensive to retrofit.
+Emergent Flow is a visual data/ML platform shipped as **one repo, one bundled
+`pip install emergentflow`**: the open-source Python SDK + graph IR (`emergentflow/`), a bundled
+local server (`emergentflow/server/`), and a React canvas (`ui/`) that talks to the server only
+over localhost REST/SSE and never imports the Python package (ADR 0013). The system is governed
+by a set of Architecture Decision Records in `docs/adr/` — **read the relevant ADR before
+changing anything cross-cutting**, since the invariants below are deliberate and expensive to
+retrofit.
 
 ### The two pure functions over one IR (the central invariant)
 
@@ -113,9 +157,48 @@ Public operations are decorated with `@public_op` (`emergentflow/api.py`), which
 every call that the return value is **serializable + inspectable** (`is_inspectable`:
 JSON-native, Pydantic model, dataclass, tidy DataFrame, or containers thereof) — a bare
 object or live torch module will raise `InspectableContractError`. The `ef` namespace lazily
-imports families (`ef.data`, `ef.stats`, …), the `ef.codegen` namespace, and the top-level
-entry points (`ef.compile_to_code`, `ef.execute`, `ef.export_script`) on first access
-(`emergentflow/__init__.py`), so a bare `import emergentflow` stays light.
+imports families (`ef.data`, `ef.clean`, `ef.stats`, `ef.ml`, `ef.viz`, `ef.reports`, `ef.llm`,
+`ef.eval`), the `ef.codegen` namespace, and the top-level entry points (`ef.compile_to_code`,
+`ef.execute`, `ef.export_script`, `ef.validate`) on first access (`emergentflow/__init__.py`),
+so a bare `import emergentflow` stays light.
+
+### Injected effectful clients: LLM nodes and data warehouses
+
+Two node families do real, non-deterministic, credentialed network I/O — LLM calls
+(`emergentflow/llm/`, ADR 0017) and data-warehouse queries (`emergentflow/data/warehouse/`,
+ADR 0018: DuckDB, Postgres, BigQuery, Redshift). Both follow the same seam so the ADR-0002
+equivalence gate stays value-exact and offline in CI: a `requires_client = True` node receives
+its client through `execute(graph, *, client=...)` / the compiled module's `main(client=...)`,
+never by calling out directly. `GatewayClient`/a real warehouse driver makes the live call;
+`ReplayClient`/fixture-recorded adapters (content-hash-keyed) are the default in tests and CI.
+Credentials never enter the IR — a node carries an env-var *name* (e.g. `api_key_env`) or a
+named connection profile, never a literal key/DSN. See `emergentflow/clients.py` for how the
+per-node client bundle is assembled and threaded through both `execute` and codegen.
+
+### Local server (`emergentflow/server/`)
+
+A FastAPI/Uvicorn app (optional `[server]` extra; `emergentflow serve` / `emergentflow lab`)
+that calls the two pure functions in-process — no Celery, no Redis, no sandboxing. Core routes
+(`/compile`, `/execute`, `/execute_node`, `/execute/stream` (SSE), `/validate`, `/compile-spec`,
+`/catalog`, `/schema`, `/connections/*`, `/reports/{hash}`, `/export/*`) are stateless: every
+request carries the whole graph IR. `/execute/stream` backs the canvas's incremental,
+DAG-aware on-disk execution cache (`emergentflow/server/cache.py`) and per-node progress.
+
+### Agent collaboration (`emergentflow/collab/`, ADR 0019)
+
+An **additive, opt-in** layer that lets an AI agent (Claude Code, Shards, or any HTTP client)
+co-author a graph with a human on the same canvas — see
+[`agents/emergent-flow-collaborator.md`](./agents/emergent-flow-collaborator.md) for the
+agent-facing protocol. Collaboration state (`GraphSession`, `GraphMutation` proposals, review
+threads, gates, the knowledge base) lives **beside** the `Graph` IR, never on it — no `Graph`
+field, no `CURRENT_SCHEMA_VERSION` bump. Sessions are served under `/sessions/*` (session-scoped
+auth via a bearer token) with an SSE event stream at `/sessions/{id}/events`; a pure
+`apply_mutation` function applies a proposed `GraphMutation` to a `Graph`. The **works-without-
+agents invariant** is a regression-tested requirement: the base install gains zero new hard
+dependencies, `emergentflow/collab/` is never eagerly imported, CI never calls a live LLM, and
+existing route contracts stay byte-identical whether or not any session is ever opened. An
+optional MCP tool wrapper over the same routes lives in `emergentflow/collab/mcp.py` (`[mcp]`
+extra, FastMCP).
 
 ## Conventions & gotchas
 
