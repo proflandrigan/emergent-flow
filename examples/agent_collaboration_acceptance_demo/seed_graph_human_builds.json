@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "paradigm": "functional",
+  "nodes": {
+    "n1": {
+      "id": "n1",
+      "type": "data.load_csv",
+      "label": "Load CSV",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "path",
+          "type_token": "str",
+          "value": "examples/vertical_slice/sample.csv",
+          "default": null
+        },
+        {
+          "name": "encoding",
+          "type_token": "str",
+          "value": "latin-1",
+          "default": "utf-8"
+        }
+      ],
+      "ports": [
+        {
+          "id": "p1",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null
+    }
+  },
+  "edges": {}
+}

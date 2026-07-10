@@ -56,6 +56,7 @@ from emergentflow.collab.gates import (
     GateAlreadyResolvedError,
     UnknownGateError,
 )
+from emergentflow.collab.knowledge import UnknownKnowledgeEntryError
 from emergentflow.collab.review import AnchorError, ReviewComment, ReviewThread
 from emergentflow.collab.session import (
     OpenGatesError,
@@ -87,12 +88,15 @@ from emergentflow.server.service import (
     export_finetune_bytes,
     get_catalog,
     get_connection_schema,
+    get_knowledge_entry,
     get_mutation_schema,
     get_personas,
     get_schema,
     get_session_event_schema,
     label_eval,
     list_connections,
+    list_knowledge,
+    save_knowledge,
     test_connection_route,
     validate_graph,
 )
@@ -166,6 +170,7 @@ _POST_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "/eval/label": label_eval,
     "/execute": execute_graph,
     "/execute_node": execute_node,
+    "/knowledge": save_knowledge,
     "/validate": validate_graph,
 }
 
@@ -463,6 +468,23 @@ def create_app() -> FastAPI:
     @application.get("/personas")
     async def personas() -> Response:
         return await _safe_json(get_personas)
+
+    @application.get("/knowledge")
+    async def knowledge_list(request: Request) -> Response:
+        in_type = request.query_params.get("in")
+        out_type = request.query_params.get("out")
+        tag = request.query_params.get("tag")
+        return await _safe_json(lambda: list_knowledge(in_type=in_type, out_type=out_type, tag=tag))
+
+    @application.get("/knowledge/{slug}")
+    async def knowledge_get(slug: str) -> Response:
+        try:
+            result = await _run_sync(lambda: get_knowledge_entry(slug))
+        except UnknownKnowledgeEntryError as exc:
+            return _error_json(404, str(exc))
+        except Exception as exc:  # noqa: BLE001 - never crash the server on a store failure
+            return _error_json(422, f"{type(exc).__name__}: {exc}")
+        return JSONResponse(content=result)
 
     @application.get("/reports/{report_hash}")
     async def report(report_hash: str) -> Response:

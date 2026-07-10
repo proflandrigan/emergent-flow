@@ -52,7 +52,14 @@ def create_mcp_server() -> Any:
     from emergentflow.collab.review import ReviewThread
     from emergentflow.collab.session import get_default_store as get_default_session_store
     from emergentflow.ir.mutation import GraphMutation
-    from emergentflow.server.service import compile_graph, get_catalog, validate_graph
+    from emergentflow.server.service import (
+        compile_graph,
+        get_catalog,
+        get_knowledge_entry,
+        list_knowledge,
+        save_knowledge,
+        validate_graph,
+    )
 
     @mcp.tool()
     def get_graph(session_id: str) -> dict:
@@ -80,6 +87,25 @@ def create_mcp_server() -> Any:
     def compile_preview(graph: dict) -> dict:
         """Compile an IR graph to Python code (same as POST /compile)."""
         return compile_graph(graph)
+
+    @mcp.tool()
+    def save_knowledge_tool(entry: dict) -> dict:
+        """Save a knowledge entry (same as POST /knowledge)."""
+        return save_knowledge(entry)
+
+    @mcp.tool()
+    def list_knowledge_tool(
+        in_type: str | None = None,
+        out_type: str | None = None,
+        tag: str | None = None,
+    ) -> dict:
+        """List knowledge entries by in_type/out_type/tag (same as GET /knowledge)."""
+        return list_knowledge(in_type=in_type, out_type=out_type, tag=tag)
+
+    @mcp.tool()
+    def get_knowledge_entry_tool(slug: str) -> dict:
+        """Return a single knowledge entry by slug (same as GET /knowledge/{slug})."""
+        return get_knowledge_entry(slug)
 
     @mcp.tool()
     def propose_mutation(session_id: str, mutation: dict) -> dict:

@@ -247,3 +247,98 @@ workflow above): `POST` the `fix` object as the body to `/sessions/{id}/proposal
 `/sessions/{id}/proposals/{proposal_id}/accept`. The canvas's "Apply fix" button does exactly
 this under the hood — no new machinery, the review protocol rides entirely on the proposal
 protocol Story 4 already built.
+
+## Knowledge base: harvest and retrieve
+
+### 1. Harvest — save a proven fragment
+
+After a proposal you authored has been ACCEPTED (so it's now an ordinary part of the session
+graph, already validated), you may optionally save a reusable, parameterized slice of it to the
+workspace knowledge base with `POST /knowledge`. This is a workspace-level, sessionless call —
+not gated by another proposal — but only do it for fragments that already passed the normal
+accept step (the accept IS the confirmation; harvesting is a lower-stakes "remember this for
+later" action on something the human already approved, never a way to sneak unreviewed nodes
+into shared knowledge). The body shape is: `slug` (a short, descriptive, unique key — check
+`GET /knowledge/{slug}` first or list existing entries to avoid a `409`/`422` duplicate-slug
+error), `description`, `subgraph` (the extracted fragment — an ordinary `Graph` object, i.e.
+`{"schema_version": 1, "paradigm": "functional", "nodes": {...}, "edges": {...}}` built from
+the relevant `nodes`/`edges` of the accepted graph), `tags` (optional classification strings),
+`created_by` (your persona slug). `unbound_in_types`/`produced_out_types` are COMPUTED by the
+server from the subgraph's dangling ports — never send them yourself; any value you send is
+ignored/overwritten.
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/knowledge \
+  -H 'Content-Type: application/json' -d '{
+    "slug": "csv-summary",
+    "description": "Load a CSV and produce a summary DataFrame with describe",
+    "subgraph": {
+      "schema_version": 1,
+      "paradigm": "functional",
+      "nodes": {
+        "n-load": {
+          "id": "n-load",
+          "type": "data.load_csv",
+          "label": "Load CSV",
+          "paradigm": "functional",
+          "ports": [
+            {"id": "p-load-out", "name": "frame", "direction": "out", "data_type": "DataFrame", "cardinality": "one"}
+          ],
+          "params": [
+            {"name": "path", "type_token": "str", "value": null, "default": null}
+          ]
+        },
+        "n-describe": {
+          "id": "n-describe",
+          "type": "stats.describe",
+          "label": "Describe",
+          "paradigm": "functional",
+          "ports": [
+            {"id": "p-describe-in", "name": "frame", "direction": "in", "data_type": "DataFrame", "cardinality": "one"},
+            {"id": "p-describe-out", "name": "summary", "direction": "out", "data_type": "DataFrame", "cardinality": "one"}
+          ],
+          "params": [
+            {"name": "columns", "type_token": "list[str]", "value": null, "default": null}
+          ]
+        }
+      },
+      "edges": {
+        "e-load-to-describe": {
+          "id": "e-load-to-describe",
+          "source": {"node_id": "n-load", "port_id": "p-load-out"},
+          "target": {"node_id": "n-describe", "port_id": "p-describe-in"}
+        }
+      }
+    },
+    "tags": ["csv", "eda", "summary"],
+    "created_by": "emergent-flow-collaborator"
+  }'
+# {"slug":"csv-summary","description":"Load a CSV and produce a summary DataFrame with describe","tags":["csv","eda","summary"],"subgraph":{...},"unbound_in_types":[],"produced_out_types":["DataFrame"]}
+```
+
+### 2. Retrieve — reuse a matching fragment
+
+Before building something from scratch, query `GET /knowledge` with `in`/`out`/`tag` query params
+to find a fragment whose signature matches what you need — `in=<type>` finds entries with an
+unbound IN port of that type (something you'd need to feed it), `out=<type>` finds entries that
+PRODUCE that type.
+
+```bash
+curl -s 'http://127.0.0.1:8765/knowledge?out=DataFrame'
+# {"entries":[{"slug":"csv-summary","description":"Load a CSV and produce a summary DataFrame with describe","tags":["csv","eda","summary"],"unbound_in_types":[],"produced_out_types":["DataFrame"]}]}
+```
+
+Once you've picked an entry, `GET /knowledge/{slug}` for its full `subgraph`. You don't apply it
+directly — you translate its `nodes`/`edges` into an ordinary proposal exactly like step 5 of the
+main workflow above (`POST /sessions/{id}/proposals` with `add_nodes`/`add_edges` built from the
+fragment, `base_version` set to the CURRENT session version). **Critical**: the fragment's own
+node/port ids were minted when it was harvested and will very likely COLLIDE with ids already in
+the target session's graph — mint FRESH ids for every node/port you copy in (the same "you mint
+every id you use" rule from step 3 of the main workflow applies here), and rewire any internal
+edges to the fresh ids. This is why retrieve is "propose a matching fragment as its
+GraphMutation," not a literal one-line reuse — reuse is a translation, never a raw copy.
+
+```bash
+curl -s http://127.0.0.1:8765/knowledge/csv-summary
+# {"slug":"csv-summary","description":"Load a CSV and produce a summary DataFrame with describe","subgraph":{"schema_version":1,"paradigm":"functional","nodes":{"n-load":{...},"n-describe":{...}},"edges":{"e-load-to-describe":{...}}},"tags":["csv","eda","summary"],"unbound_in_types":[],"produced_out_types":["DataFrame"],"created_by":"emergent-flow-collaborator"}
+```
