@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   MoreHorizontal,
   PanelLeftClose,
@@ -21,6 +21,7 @@ import { useGraphStore } from "./store/graphStore";
 import { useTheme } from "./theme/useTheme";
 import { IconButton } from "./ui/IconButton";
 import { Menu, type MenuItem } from "./ui/Menu";
+import { OverlayModal } from "./ui/OverlayModal";
 import { Tooltip } from "./ui/Tooltip";
 
 // Lazy: nothing under ui/src/session/ is imported until the user opens this panel (Epic 14
@@ -56,47 +57,6 @@ function Divider(): JSX.Element {
         background: "var(--border-subtle)",
       }}
     />
-  );
-}
-
-// Shared backdrop + centered panel for the overflow menu's "Manage connections"/
-// "Browse schema" overlays -- one place for backdrop/centering/click-outside-to-close
-// behavior instead of duplicating it per overlay.
-function OverlayModal({
-  width,
-  onClose,
-  children,
-}: {
-  width: number;
-  onClose: () => void;
-  children: ReactNode;
-}): JSX.Element {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 30,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "rgba(0, 0, 0, 0.4)",
-      }}
-      onClick={onClose}
-    >
-      <div
-        className="glass"
-        style={{
-          width,
-          maxHeight: "70vh",
-          overflow: "auto",
-          padding: "var(--space-4)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {children}
-      </div>
-    </div>
   );
 }
 

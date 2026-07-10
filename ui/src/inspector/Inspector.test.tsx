@@ -89,3 +89,33 @@ test("Results tab shows the error string when the node errored", () => {
   fireEvent.click(screen.getByTestId("inspector-tab-results"));
   expect(screen.getByTestId("results-error")).toHaveTextContent("boom");
 });
+
+test("Expand button appears when results exist and opens the modal", () => {
+  const id = useGraphStore.getState().addNodeFromSpec(fakeSpec, { x: 0, y: 0 });
+  useSelectionStore.getState().setNodeSelected(id, true);
+  useExecutionStore.setState({
+    results: { [id]: { out: { kind: "scalar", value: 42 } } },
+    statuses: { [id]: { status: "ok" } },
+    lastRunAt: Date.now(),
+  });
+
+  render(<Inspector />);
+  fireEvent.click(screen.getByTestId("inspector-tab-results"));
+  expect(screen.getByTestId("results-expand-btn")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByTestId("results-expand-btn"));
+
+  expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Results");
+  const scalars = screen.getAllByTestId("payload-scalar");
+  expect(scalars).toHaveLength(2);
+  expect(scalars[0]).toHaveTextContent("42");
+});
+
+test("Expand button does not appear when there are no results", () => {
+  const id = useGraphStore.getState().addNodeFromSpec(fakeSpec, { x: 0, y: 0 });
+  useSelectionStore.getState().setNodeSelected(id, true);
+
+  render(<Inspector />);
+  fireEvent.click(screen.getByTestId("inspector-tab-results"));
+  expect(screen.queryByTestId("results-expand-btn")).not.toBeInTheDocument();
+});

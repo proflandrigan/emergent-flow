@@ -3,6 +3,7 @@
 // Code tab's live-compiled output, and the Results tab's last execution output for the selected
 // node; selection is read from `selectionStore`, never the IR.
 
+import { Maximize2 } from "lucide-react";
 import { useState } from "react";
 
 import { useCatalog } from "../catalog/useCatalog";
@@ -11,6 +12,8 @@ import { familyMeta } from "../theme/family";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
 import { selectedNodeId, useSelectionStore } from "../store/selectionStore";
+import { IconButton } from "../ui/IconButton";
+import { OverlayModal } from "../ui/OverlayModal";
 import { Segmented } from "../ui/Segmented";
 import { CodePanel } from "./CodePanel";
 import { ConfigForm } from "./ConfigForm";
@@ -28,6 +31,7 @@ function formatAgo(ms: number): string {
 
 export function Inspector(): JSX.Element {
   const [tab, setTab] = useState<InspectorTab>("config");
+  const [resultsExpanded, setResultsExpanded] = useState(false);
   const selNodes = useSelectionStore((s) => s.nodes);
   const nodes = useGraphStore((s) => s.nodes);
   const nodeId = selectedNodeId({ nodes: selNodes });
@@ -80,24 +84,70 @@ export function Inspector(): JSX.Element {
     }
     return (
       <div data-testid="results-list">
-        {lastRunAt !== null ? (
-          <div
-            data-testid="results-last-run"
-            style={{
-              color: "var(--text-secondary)",
-              fontSize: 11,
-              marginBottom: "0.5rem",
-            }}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          {lastRunAt !== null ? (
+            <div
+              data-testid="results-last-run"
+              style={{
+                color: "var(--text-secondary)",
+                fontSize: 11,
+              }}
+            >
+              last run: {formatAgo(lastRunAt)}
+            </div>
+          ) : (
+            <div />
+          )}
+          <IconButton
+            aria-label="Expand results"
+            data-testid="results-expand-btn"
+            onClick={() => setResultsExpanded(true)}
           >
-            last run: {formatAgo(lastRunAt)}
-          </div>
-        ) : null}
+            <Maximize2 size={14} />
+          </IconButton>
+        </div>
         {Object.entries(nodeResults).map(([portName, payload]) => (
           <div key={portName} style={{ marginBottom: "0.5rem" }}>
             <span style={{ fontWeight: 600 }}>{portName}</span>
             <PayloadView payload={payload} />
           </div>
         ))}
+        {resultsExpanded ? (
+          <OverlayModal width={720} onClose={() => setResultsExpanded(false)}>
+            <h2
+              style={{
+                margin: "0 0 var(--space-3)",
+                fontSize: "var(--text-lg)",
+                fontWeight: 600,
+              }}
+            >
+              Results — {node?.label ?? nodeId}
+            </h2>
+            {lastRunAt !== null ? (
+              <div
+                style={{
+                  color: "var(--text-secondary)",
+                  fontSize: 11,
+                  marginBottom: "0.5rem",
+                }}
+              >
+                last run: {formatAgo(lastRunAt)}
+              </div>
+            ) : null}
+            {Object.entries(nodeResults).map(([portName, payload]) => (
+              <div key={portName} style={{ marginBottom: "0.75rem" }}>
+                <span style={{ fontWeight: 600 }}>{portName}</span>
+                <PayloadView payload={payload} />
+              </div>
+            ))}
+          </OverlayModal>
+        ) : null}
       </div>
     );
   }
