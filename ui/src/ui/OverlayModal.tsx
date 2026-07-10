@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import type { JSX, ReactNode } from "react";
+import { useEffect, type JSX, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 export interface OverlayModalProps {
@@ -22,6 +22,16 @@ export function OverlayModal({
   onClose,
   children,
 }: OverlayModalProps): JSX.Element {
+  // Escape closes the modal, mirroring the new X button -- without this, the close
+  // button is the only way to dismiss without a mouse click on the backdrop.
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent): void {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   return createPortal(
     <div
       style={{
@@ -37,11 +47,16 @@ export function OverlayModal({
     >
       <div
         className="glass"
+        role="dialog"
+        aria-modal="true"
         style={{
           width,
           maxHeight: "70vh",
           overflow: "auto",
-          padding: "var(--space-4)",
+          // Extra top padding reserves room for the absolutely-positioned close
+          // button below so it never overlaps flowing content (e.g. a long
+          // header row) that starts at the top of the panel.
+          padding: "calc(var(--space-4) + var(--space-5)) var(--space-4) var(--space-4)",
           position: "relative",
         }}
         onClick={(e) => e.stopPropagation()}

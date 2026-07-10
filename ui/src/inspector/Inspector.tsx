@@ -55,6 +55,79 @@ export function Inspector(): JSX.Element {
     setExpanded(false);
   }, [nodeId]);
 
+  // Shared between the docked panel and the expanded OverlayModal so the two views can
+  // never drift apart (e.g. one gaining the family badge's ConsultAffordance while the
+  // other doesn't).
+  function renderHeader(): JSX.Element | null {
+    if (!node) return null;
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "var(--space-2)",
+          padding: "var(--space-2) var(--space-3)",
+          marginBottom: "var(--space-2)",
+          background: meta.soft,
+          borderLeft: `3px solid ${meta.color}`,
+          fontWeight: 600,
+          color: "var(--text-primary)",
+          fontSize: "var(--text-sm)",
+        }}
+      >
+        <FamIcon size={16} style={{ color: meta.color, flexShrink: 0 }} />
+        <span>{spec?.label ?? node.type}</span>
+        {spec?.advisor_persona ? (
+          <ConsultAffordance
+            nodeId={node.id}
+            personaSlug={spec.advisor_persona}
+          />
+        ) : null}
+      </div>
+    );
+  }
+
+  function renderTabs(): JSX.Element {
+    return (
+      <Segmented
+        options={[
+          {
+            value: "config",
+            label: "Config",
+            testId: "inspector-tab-config",
+          },
+          { value: "code", label: "Code", testId: "inspector-tab-code" },
+          {
+            value: "results",
+            label: "Results",
+            testId: "inspector-tab-results",
+          },
+        ]}
+        value={tab}
+        onChange={setTab}
+        aria-label="Inspector tabs"
+      />
+    );
+  }
+
+  function renderBody(): JSX.Element {
+    if (tab === "config") {
+      return node ? (
+        <ConfigForm node={node} />
+      ) : (
+        <p
+          data-testid="inspector-empty"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          Select a node to edit its parameters.
+        </p>
+      );
+    }
+    if (tab === "code") return <CodePanel />;
+    return renderResults();
+  }
+
   function renderResults(): JSX.Element {
     if (!nodeId) {
       return (
@@ -124,32 +197,7 @@ export function Inspector(): JSX.Element {
           height: "100%",
         }}
       >
-        {node ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "var(--space-2)",
-              padding: "var(--space-2) var(--space-3)",
-              marginBottom: "var(--space-2)",
-              background: meta.soft,
-              borderLeft: `3px solid ${meta.color}`,
-              fontWeight: 600,
-              color: "var(--text-primary)",
-              fontSize: "var(--text-sm)",
-            }}
-          >
-            <FamIcon size={16} style={{ color: meta.color, flexShrink: 0 }} />
-            <span>{spec?.label ?? node.type}</span>
-            {spec?.advisor_persona ? (
-              <ConsultAffordance
-                nodeId={node.id}
-                personaSlug={spec.advisor_persona}
-              />
-            ) : null}
-          </div>
-        ) : null}
+        {renderHeader()}
         <div
           style={{
             padding: "var(--space-2) var(--space-3)",
@@ -158,24 +206,7 @@ export function Inspector(): JSX.Element {
             gap: "var(--space-2)",
           }}
         >
-          <Segmented
-            options={[
-              {
-                value: "config",
-                label: "Config",
-                testId: "inspector-tab-config",
-              },
-              { value: "code", label: "Code", testId: "inspector-tab-code" },
-              {
-                value: "results",
-                label: "Results",
-                testId: "inspector-tab-results",
-              },
-            ]}
-            value={tab}
-            onChange={setTab}
-            aria-label="Inspector tabs"
-          />
+          {renderTabs()}
           <IconButton
             aria-label="Expand inspector"
             data-testid="inspector-expand-btn"
@@ -187,65 +218,14 @@ export function Inspector(): JSX.Element {
         <div
           style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0.5rem" }}
         >
-          {tab === "config" ? (
-            node ? (
-              <ConfigForm node={node} />
-            ) : (
-              <p
-                data-testid="inspector-empty"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                Select a node to edit its parameters.
-              </p>
-            )
-          ) : tab === "code" ? (
-            <CodePanel />
-          ) : (
-            renderResults()
-          )}
+          {renderBody()}
         </div>
       </aside>
       {expanded ? (
         <OverlayModal width={800} onClose={() => setExpanded(false)}>
-          {node ? (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "var(--space-2)",
-                padding: "var(--space-2) var(--space-3)",
-                marginBottom: "var(--space-2)",
-                background: meta.soft,
-                borderLeft: `3px solid ${meta.color}`,
-                fontWeight: 600,
-                color: "var(--text-primary)",
-                fontSize: "var(--text-sm)",
-              }}
-            >
-              <FamIcon size={16} style={{ color: meta.color, flexShrink: 0 }} />
-              <span>{spec?.label ?? node.type}</span>
-            </div>
-          ) : null}
+          {renderHeader()}
           <div style={{ padding: "var(--space-2) var(--space-3)" }}>
-            <Segmented
-              options={[
-                {
-                  value: "config",
-                  label: "Config",
-                  testId: "inspector-tab-config",
-                },
-                { value: "code", label: "Code", testId: "inspector-tab-code" },
-                {
-                  value: "results",
-                  label: "Results",
-                  testId: "inspector-tab-results",
-                },
-              ]}
-              value={tab}
-              onChange={setTab}
-              aria-label="Inspector tabs"
-            />
+            {renderTabs()}
           </div>
           <div
             style={{
@@ -255,22 +235,7 @@ export function Inspector(): JSX.Element {
               padding: "0.5rem",
             }}
           >
-            {tab === "config" ? (
-              node ? (
-                <ConfigForm node={node} />
-              ) : (
-                <p
-                  data-testid="inspector-empty"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  Select a node to edit its parameters.
-                </p>
-              )
-            ) : tab === "code" ? (
-              <CodePanel />
-            ) : (
-              renderResults()
-            )}
+            {renderBody()}
           </div>
         </OverlayModal>
       ) : null}
