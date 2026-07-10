@@ -35,9 +35,14 @@ from emergentflow.ir.serialize import serialize_graph
 from emergentflow.server import app
 from emergentflow.server import cache as cache_mod
 
-SAMPLE_CSV = (
-    pathlib.Path(__file__).resolve().parents[1] / "examples" / "vertical_slice" / "sample.csv"
-)
+# Deliberately a repo-root-relative path, not an absolute `pathlib.Path(__file__).resolve()`
+# one: this path is embedded verbatim into the compiled code these tests snapshot
+# (test_compile_response_golden), and an absolute path bakes in the machine/checkout-specific
+# prefix (e.g. a CI runner's `/home/runner/work/...`), making the committed .ambr snapshot
+# fail everywhere except the machine it was generated on. `uv run pytest` always runs from the
+# repo root (CLAUDE.md), and `ef.data.load_csv` resolves relative paths against cwd, so this
+# stays portable while still loading the real bundled CSV.
+SAMPLE_CSV = pathlib.Path("examples") / "vertical_slice" / "sample.csv"
 
 
 @pytest.fixture(autouse=True)
