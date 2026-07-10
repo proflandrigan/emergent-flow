@@ -722,3 +722,41 @@ class TestDiscover:
         problems = discover()
         assert problems == []
         assert unique_key in registry
+
+
+# ---------------------------------------------------------------------------
+# TestAdvisorPersona
+# ---------------------------------------------------------------------------
+
+
+class TestAdvisorPersona:
+    """Tests for the advisor_persona metadata on NodeDefinition + NodeSpec."""
+
+    def test_default_is_none(self):
+        """A node definition without advisor_persona has to_spec().advisor_persona == None."""
+
+        class _NoAdvisor(NodeDefinition):
+            type = "x.no_advisor"
+            family = "x"
+            label = "No Advisor"
+
+            def codegen(self, node):
+                return CodeFragment()
+
+            def execute(self, node, inputs):
+                return {}
+
+        spec = _NoAdvisor().to_spec()
+        assert spec.advisor_persona is None
+
+    def test_load_csv_persona(self):
+        """LoadCsv's advisor_persona matches the 'data_modeller' persona slug."""
+        from emergentflow.nodes.examples import LoadCsv
+
+        assert LoadCsv().to_spec().advisor_persona == "data_modeller"
+
+    def test_fit_model_persona(self):
+        """FitModel's advisor_persona matches the 'researcher' persona slug."""
+        from emergentflow.nodes.examples import FitModel
+
+        assert FitModel().to_spec().advisor_persona == "researcher"

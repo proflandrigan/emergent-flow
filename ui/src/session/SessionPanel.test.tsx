@@ -15,6 +15,10 @@ vi.mock("./sessionClient", () => ({
   acceptProposal: vi.fn(),
   rejectProposal: vi.fn(),
   subscribeToSessionEvents: vi.fn(() => ({ close: vi.fn() })),
+  createGate: vi.fn(),
+  closeGateRequest: vi.fn(),
+  skipGateRequest: vi.fn(),
+  postGateDecision: vi.fn(),
 }));
 
 function fakeSession(
@@ -36,6 +40,7 @@ beforeEach(() => {
     sessionId: null,
     version: null,
     proposals: {},
+    gates: {},
     status: "idle",
     error: null,
     rebaseNeeded: false,

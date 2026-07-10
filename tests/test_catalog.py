@@ -74,6 +74,7 @@ _NODE_KEYS = {
     "category",
     "description",
     "paradigm",
+    "advisor_persona",
     "ports",
     "params",
 }

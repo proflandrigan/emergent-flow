@@ -12,11 +12,16 @@ vi.mock("./sessionClient", () => ({
   deleteSession: vi.fn(),
   replaceSessionGraph: vi.fn(),
   proposeMutation: vi.fn(),
+  consultSession: vi.fn(),
   acceptProposal: vi.fn(),
   rejectProposal: vi.fn(),
   subscribeToSessionEvents: vi.fn(),
   createReview: vi.fn(),
   addReviewComment: vi.fn(),
+  createGate: vi.fn(),
+  closeGateRequest: vi.fn(),
+  skipGateRequest: vi.fn(),
+  postGateDecision: vi.fn(),
 }));
 
 function emptyGraph() {
@@ -144,6 +149,35 @@ describe("pushLocalGraph", () => {
     expect(state.rebaseMessage).toContain("stale_version");
     // The local graph must NOT have been silently replaced.
     expect(state.version).toBe(0);
+  });
+});
+
+describe("consult", () => {
+  test("consult stores the returned proposal", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+
+    const proposal: sessionClient.StoredProposal = {
+      id: "p1",
+      mutation: { base_version: 0 },
+      diagnostics: { diagnostics: [], edge_compatibility: {} },
+      status: "pending",
+    };
+    vi.mocked(sessionClient.consultSession).mockResolvedValue(proposal);
+
+    const result = await useSessionStore
+      .getState()
+      .consult({ persona: "data_modeller", node_ids: ["n1"], ask: "x" });
+
+    expect(result).toEqual(proposal);
+    expect(useSessionStore.getState().proposals.p1).toEqual(proposal);
+    expect(sessionClient.consultSession).toHaveBeenCalledWith("abc", {
+      persona: "data_modeller",
+      node_ids: ["n1"],
+      ask: "x",
+    });
   });
 });
 
@@ -446,5 +480,151 @@ describe("postReview / postReviewComment / applyFix", () => {
     await useSessionStore.getState().applyFix("r1");
 
     expect(sessionClient.proposeMutation).not.toHaveBeenCalled();
+  });
+});
+
+describe("gates", () => {
+  test("openGate stores the returned gate", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+
+    const gate: sessionClient.Gate = {
+      id: "g1",
+      phase: "review",
+      kind: "confirm",
+      description: "Confirm the analysis",
+      status: "open",
+      decisions: [],
+    };
+    vi.mocked(sessionClient.createGate).mockResolvedValue(gate);
+
+    const result = await useSessionStore.getState().openGate({
+      phase: "review",
+      kind: "confirm",
+      description: "Confirm the analysis",
+    });
+
+    expect(result).toEqual(gate);
+    expect(useSessionStore.getState().gates.g1).toEqual(gate);
+    expect(sessionClient.createGate).toHaveBeenCalledWith("abc", {
+      phase: "review",
+      kind: "confirm",
+      description: "Confirm the analysis",
+    });
+  });
+
+  test("closeGate updates the stored gate's status", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+
+    useSessionStore.setState({
+      gates: {
+        g1: {
+          id: "g1",
+          phase: "review",
+          kind: "confirm",
+          description: "",
+          status: "open",
+          decisions: [],
+        },
+      },
+    });
+
+    const closed: sessionClient.Gate = {
+      id: "g1",
+      phase: "review",
+      kind: "confirm",
+      description: "",
+      status: "closed",
+      decisions: [],
+    };
+    vi.mocked(sessionClient.closeGateRequest).mockResolvedValue(closed);
+
+    await useSessionStore.getState().closeGate("g1");
+
+    expect(useSessionStore.getState().gates.g1.status).toBe("closed");
+    expect(sessionClient.closeGateRequest).toHaveBeenCalledWith("abc", "g1");
+  });
+
+  test("skipGate updates the stored gate's status", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+
+    useSessionStore.setState({
+      gates: {
+        g1: {
+          id: "g1",
+          phase: "review",
+          kind: "confirm",
+          description: "",
+          status: "open",
+          decisions: [],
+        },
+      },
+    });
+
+    const skipped: sessionClient.Gate = {
+      id: "g1",
+      phase: "review",
+      kind: "confirm",
+      description: "",
+      status: "skipped",
+      decisions: [],
+    };
+    vi.mocked(sessionClient.skipGateRequest).mockResolvedValue(skipped);
+
+    await useSessionStore.getState().skipGate("g1");
+
+    expect(useSessionStore.getState().gates.g1.status).toBe("skipped");
+    expect(sessionClient.skipGateRequest).toHaveBeenCalledWith("abc", "g1");
+  });
+
+  test("addGateDecision updates the stored gate's decisions", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+
+    useSessionStore.setState({
+      gates: {
+        g1: {
+          id: "g1",
+          phase: "review",
+          kind: "confirm",
+          description: "",
+          status: "open",
+          decisions: [],
+        },
+      },
+    });
+
+    const updated: sessionClient.Gate = {
+      id: "g1",
+      phase: "review",
+      kind: "confirm",
+      description: "",
+      status: "open",
+      decisions: [{ id: "d1", author: "human", text: "proceed" }],
+    };
+    vi.mocked(sessionClient.postGateDecision).mockResolvedValue(updated);
+
+    await useSessionStore
+      .getState()
+      .addGateDecision("g1", { author: "human", text: "proceed" });
+
+    expect(useSessionStore.getState().gates.g1.decisions).toHaveLength(1);
+    expect(useSessionStore.getState().gates.g1.decisions[0].text).toBe(
+      "proceed",
+    );
+    expect(sessionClient.postGateDecision).toHaveBeenCalledWith("abc", "g1", {
+      author: "human",
+      text: "proceed",
+    });
   });
 });

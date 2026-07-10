@@ -14,14 +14,22 @@ import type { SessionEvent } from "../generated/session_event";
 import {
   acceptProposal,
   addReviewComment,
+  closeGateRequest,
+  consultSession,
+  createGate,
   createReview,
   createSession,
   getSession,
+  postGateDecision,
   proposeMutation,
   rejectProposal,
   replaceSessionGraph,
+  skipGateRequest,
   subscribeToSessionEvents,
+  type ConsultInput,
+  type CreateGateInput,
   type CreateReviewInput,
+  type Gate,
   type GraphSession,
   type ReviewThread,
   type SessionEventSubscription,
@@ -39,6 +47,7 @@ export interface SessionStoreState {
   version: number | null;
   proposals: Record<string, StoredProposal>;
   reviews: Record<string, ReviewThread>;
+  gates: Record<string, Gate>;
   status: SessionConnectionStatus;
   error: string | null;
   // Set when a PUT .../graph call is rejected for a stale expected_version (someone else's
@@ -52,6 +61,7 @@ export interface SessionStoreState {
   leave: () => void;
   pushLocalGraph: () => Promise<void>;
   propose: (mutation: GraphMutation) => Promise<StoredProposal>;
+  consult: (input: ConsultInput) => Promise<StoredProposal>;
   accept: (proposalId: string) => Promise<void>;
   reject: (proposalId: string) => Promise<void>;
   dismissRebase: () => void;
@@ -61,6 +71,13 @@ export interface SessionStoreState {
     comment: { author: string; text: string },
   ) => Promise<void>;
   applyFix: (reviewId: string) => Promise<void>;
+  openGate: (input: CreateGateInput) => Promise<Gate>;
+  closeGate: (gateId: string) => Promise<void>;
+  skipGate: (gateId: string) => Promise<void>;
+  addGateDecision: (
+    gateId: string,
+    decision: { author: string; text: string },
+  ) => Promise<void>;
 }
 
 // Holds the live SSE/poll subscription outside Zustand state (it is not serializable/comparable
@@ -86,6 +103,7 @@ async function refreshFromServer(
       version: session.version,
       proposals: session.proposals,
       reviews: session.collab?.reviews ?? {},
+      gates: session.collab?.gates ?? {},
     });
     if (event.type === "graph_replaced" || event.type === "proposal_accepted") {
       useGraphStore.getState().loadIR(session.graph);
@@ -143,12 +161,17 @@ type ConnectionState = Omit<
   | "leave"
   | "pushLocalGraph"
   | "propose"
+  | "consult"
   | "accept"
   | "reject"
   | "dismissRebase"
   | "postReview"
   | "postReviewComment"
   | "applyFix"
+  | "openGate"
+  | "closeGate"
+  | "skipGate"
+  | "addGateDecision"
 >;
 
 const idleConnectionState: ConnectionState = {
@@ -156,6 +179,7 @@ const idleConnectionState: ConnectionState = {
   version: null,
   proposals: {},
   reviews: {},
+  gates: {},
   status: "idle",
   error: null,
   rebaseNeeded: false,
@@ -175,6 +199,7 @@ function applySession(session: GraphSession): ConnectionState {
     version: session.version,
     proposals: session.proposals,
     reviews: session.collab?.reviews ?? {},
+    gates: session.collab?.gates ?? {},
     status: "connected",
   };
 }
@@ -259,6 +284,22 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
     }
   },
 
+  async consult(input) {
+    const state = get();
+    if (state.sessionId === null) {
+      throw new Error("cannot consult: no active session");
+    }
+    try {
+      const proposal = await consultSession(state.sessionId, input);
+      set((s) => ({ proposals: { ...s.proposals, [proposal.id]: proposal } }));
+      return proposal;
+    } catch (err) {
+      const message = errorMessage(err);
+      set({ error: message });
+      throw err;
+    }
+  },
+
   async accept(proposalId) {
     const state = get();
     if (state.sessionId === null) {
@@ -328,5 +369,44 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
       // propose() already recorded the failure in `error`/`rebaseNeeded` state;
       // swallow here so a rejected fix doesn't surface as an unhandled rejection.
     }
+  },
+
+  async openGate(input) {
+    const state = get();
+    if (state.sessionId === null) {
+      throw new Error("cannot open a gate: no active session");
+    }
+    const gate = await createGate(state.sessionId, input);
+    set((s) => ({ gates: { ...s.gates, [gate.id]: gate } }));
+    return gate;
+  },
+
+  async closeGate(gateId) {
+    const state = get();
+    if (state.sessionId === null) return;
+    try {
+      const gate = await closeGateRequest(state.sessionId, gateId);
+      set((s) => ({ gates: { ...s.gates, [gateId]: gate } }));
+    } catch (err) {
+      set({ error: errorMessage(err) });
+    }
+  },
+
+  async skipGate(gateId) {
+    const state = get();
+    if (state.sessionId === null) return;
+    try {
+      const gate = await skipGateRequest(state.sessionId, gateId);
+      set((s) => ({ gates: { ...s.gates, [gateId]: gate } }));
+    } catch (err) {
+      set({ error: errorMessage(err) });
+    }
+  },
+
+  async addGateDecision(gateId, decision) {
+    const state = get();
+    if (state.sessionId === null) return;
+    const gate = await postGateDecision(state.sessionId, gateId, decision);
+    set((s) => ({ gates: { ...s.gates, [gateId]: gate } }));
   },
 }));

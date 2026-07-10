@@ -121,6 +121,13 @@ postgres = [
     "sqlalchemy>=2,<3",
     "psycopg[binary]>=3.1,<4",
 ]
+# `pip install emergentflow[mcp]` enables the MCP tool wrapper over the
+# session/collaboration HTTP routes (Epic 14 Story 7). Kept optional so a bare
+# SDK install stays light (ADR 0007); importing `emergentflow.collab.mcp`
+# without it installed raises a typed `ModuleNotFoundError` with an install hint.
+mcp = [
+    "fastmcp>=3.4.4",
+]
 
 [project.urls]
 Homepage = "https://github.com/proflandrigan/emergent-flow"
@@ -144,6 +151,10 @@ dev = [
     "fastapi>=0.110,<1",
     "uvicorn[standard]>=0.29,<1",
     "httpx>=0.27",
+    # Mirrors the `mcp` optional-extra (Epic 14 Story 7) so `uv sync` (which installs the
+    # dev group) keeps tests/test_collab_mcp.py's happy-path tests -- which assume fastmcp
+    # IS installed, unlike the torch/litellm-style importorskip tests -- runnable in CI.
+    "fastmcp>=3.4.4",
 ]
 
 [tool.setuptools.dynamic]

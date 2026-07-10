@@ -46,6 +46,7 @@ if TYPE_CHECKING:
 
     from emergentflow.data.warehouse.adapter_client import AdapterWarehouseClient
     from emergentflow.data.warehouse.protocol import WarehouseAdapter
+    from emergentflow.llm.protocol import LLMClient
 
 
 # Server-run nodes that declare a client capability (`requires_client = True`,
@@ -178,6 +179,72 @@ def get_session_event_schema() -> dict[str, Any]:
     from emergentflow.collab.contracts import session_event_json_schema
 
     return session_event_json_schema()
+
+
+def get_personas() -> dict[str, Any]:
+    """Return every registered AgentPersona as JSON (Epic 14 Story 7) for GET /personas."""
+    from emergentflow.collab.personas import list_personas
+
+    return {"personas": [p.model_dump(mode="json") for p in list_personas()]}
+
+
+def consult_graph(payload: dict[str, Any], *, client: LLMClient) -> dict[str, Any]:
+    """POST /consult: a sessionless one-shot Mode-B consult.
+
+    payload: {"graph": <IR graph dict>, "persona": <slug>, "node_ids": [...], "ask": <str>,
+              "provider": <optional>, "model": <optional>}
+    Returns {"mutation": <GraphMutation JSON>, "diagnostics": <Diagnostics JSON>} -- NOT
+    stored anywhere (no session exists for a sessionless consult); base_version is fixed at
+    0 (meaningless outside a session, but GraphMutation requires the field).
+    """
+    from emergentflow.collab.consult import run_consult
+    from emergentflow.ir.mutation import propose_diagnostics
+
+    graph = _to_graph(payload["graph"])
+    mutation = run_consult(
+        graph,
+        persona_slug=payload["persona"],
+        node_ids=payload["node_ids"],
+        ask=payload["ask"],
+        base_version=0,
+        client=client,
+        provider=payload.get("provider") or "anthropic",
+        model=payload.get("model") or "claude-sonnet-5",
+    )
+    diagnostics = propose_diagnostics(graph, mutation)
+    return {
+        "mutation": mutation.model_dump(mode="json"),
+        "diagnostics": diagnostics.model_dump(mode="json"),
+    }
+
+
+def consult_session(
+    session_id: str, payload: dict[str, Any], *, client: LLMClient
+) -> dict[str, Any]:
+    """POST /sessions/{id}/consult: a session-scoped Mode-B consult.
+
+    payload: {"persona": <slug>, "node_ids": [...], "ask": <str>, "provider": <optional>,
+              "model": <optional>} -- the graph comes from the session, not the payload.
+    The resulting mutation is stored as an ORDINARY proposal (session.version is used as
+    base_version) via SessionStore.add_proposal -- Story 4 machinery, zero new apply code.
+    """
+    from emergentflow.collab.consult import run_consult
+    from emergentflow.collab.session import get_default_store as get_default_session_store
+
+    store = get_default_session_store()
+    session = store.get(session_id)
+    mutation = run_consult(
+        session.graph,
+        persona_slug=payload["persona"],
+        node_ids=payload["node_ids"],
+        ask=payload["ask"],
+        base_version=session.version,
+        client=client,
+        provider=payload.get("provider") or "anthropic",
+        model=payload.get("model") or "claude-sonnet-5",
+    )
+    proposal = store.add_proposal(session_id, mutation)
+    return proposal.model_dump(mode="json")
 
 
 def clear_cache(payload: dict[str, Any]) -> dict[str, Any]:
@@ -526,6 +593,37 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
         "results": _results_to_payloads(results),
         "statuses": statuses,
     }
+
+
+def compile_session(session_id: str) -> dict[str, Any]:
+    """POST /sessions/{id}/compile: compile the session's CURRENT graph to Python code.
+
+    409s (via OpenGatesError, mapped at the route layer) while any gate on the session is
+    OPEN. The payload-only POST /compile route (compile_graph, above) is completely
+    unaffected -- it has no session_id and therefore no gates to check.
+    """
+    from emergentflow.collab.session import get_default_store as get_default_session_store
+
+    store = get_default_session_store()
+    session = store.get(session_id)
+    store.assert_no_open_gates(session_id)
+    return {"code": compile_to_code(session.graph)}
+
+
+def execute_session(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """POST /sessions/{id}/execute: execute the session's CURRENT graph.
+
+    409s (via OpenGatesError) while any gate is OPEN. *payload* may optionally carry
+    {"run_to": ...} (same "run to here" envelope execute_graph already supports) -- the
+    graph itself always comes from the session, never from the request body.
+    """
+    from emergentflow.collab.session import get_default_store as get_default_session_store
+
+    store = get_default_session_store()
+    session = store.get(session_id)
+    store.assert_no_open_gates(session_id)
+    graph_dict = session.graph.model_dump(mode="json")
+    return execute_graph({"graph": graph_dict, "run_to": payload.get("run_to")})
 
 
 def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], None, None]:

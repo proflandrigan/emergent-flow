@@ -1,6 +1,8 @@
 /* AUTO-GENERATED from session_event.schema.json by `npm run gen:types`. Do not edit. */
 
 export type CommentId = string | null;
+export type DecisionId = string | null;
+export type GateId = string | null;
 export type ProposalId = string | null;
 export type ReviewId = string | null;
 export type SessionId = string;
@@ -10,7 +12,11 @@ export type Type =
   | "proposal_accepted"
   | "proposal_rejected"
   | "review_added"
-  | "review_comment_added";
+  | "review_comment_added"
+  | "gate_opened"
+  | "gate_closed"
+  | "gate_skipped"
+  | "decision_added";
 export type Version = number | null;
 
 /**
@@ -18,6 +24,8 @@ export type Version = number | null;
  */
 export interface SessionEvent {
   comment_id?: CommentId;
+  decision_id?: DecisionId;
+  gate_id?: GateId;
   proposal_id?: ProposalId;
   review_id?: ReviewId;
   session_id: SessionId;

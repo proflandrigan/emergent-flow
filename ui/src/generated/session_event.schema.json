@@ -14,6 +14,30 @@
       "default": null,
       "title": "Comment Id"
     },
+    "decision_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Decision Id"
+    },
+    "gate_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Gate Id"
+    },
     "proposal_id": {
       "anyOf": [
         {
@@ -49,7 +73,11 @@
         "proposal_accepted",
         "proposal_rejected",
         "review_added",
-        "review_comment_added"
+        "review_comment_added",
+        "gate_opened",
+        "gate_closed",
+        "gate_skipped",
+        "decision_added"
       ],
       "title": "Type",
       "type": "string"

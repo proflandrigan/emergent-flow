@@ -134,6 +134,14 @@ class NodeDefinition(ABC):
         legacy ``requires_client`` boolean is still honored (it implies
         ``ClientKind.LLM``) via ``required_client_kinds`` so every Epic 9 LLM node
         is unchanged. Default: the empty set (a pure node needs no client).
+    advisor_persona:
+        The ``AgentPersona`` slug (see ``emergentflow.collab.personas``) most
+        relevant to this node type, e.g. ``"ml_engineer"`` on an ML training node.
+        ``None`` (the default) means no persona is suggested.  Surfaced through
+        ``to_spec()`` → ``/catalog`` so the canvas can render a "consult"
+        affordance (Epic 14 Story 8, not yet wired to an executable consult in
+        this task).  This is advisory metadata only — the string is not validated
+        against the persona registry at catalog-build time.
     ports:
         Declared :class:`PortSpec` list.
     params:
@@ -150,6 +158,7 @@ class NodeDefinition(ABC):
     cacheable: ClassVar[bool] = True
     requires_client: ClassVar[bool] = False
     requires: ClassVar[frozenset[ClientKind]] = frozenset()
+    advisor_persona: ClassVar[str | None] = None
     ports: ClassVar[list[PortSpec]] = []
     params: ClassVar[list[ParamSpec]] = []
 
@@ -262,6 +271,7 @@ class NodeDefinition(ABC):
             category=cls.category,
             description=cls.description,
             paradigm=cls.paradigm,
+            advisor_persona=cls.advisor_persona,
             ports=list(cls.ports),
             params=list(cls.params),
         )

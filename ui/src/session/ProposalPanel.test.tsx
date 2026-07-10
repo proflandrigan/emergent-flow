@@ -13,9 +13,14 @@ vi.mock("./sessionClient", () => ({
   deleteSession: vi.fn(),
   replaceSessionGraph: vi.fn(),
   proposeMutation: vi.fn(),
+  consultSession: vi.fn(),
   acceptProposal: vi.fn(),
   rejectProposal: vi.fn(),
   subscribeToSessionEvents: vi.fn(() => ({ close: vi.fn() })),
+  createGate: vi.fn(),
+  closeGateRequest: vi.fn(),
+  skipGateRequest: vi.fn(),
+  postGateDecision: vi.fn(),
 }));
 
 function pendingProposal(

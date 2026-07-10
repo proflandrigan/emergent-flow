@@ -46,6 +46,7 @@ export interface CatalogNode {
   paradigm: string;
   ports: CatalogPort[];
   params: CatalogParam[];
+  advisor_persona?: string | null;
 }
 
 export interface CatalogEstimatorParam {
