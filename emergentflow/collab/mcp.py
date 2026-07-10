@@ -99,15 +99,25 @@ def create_mcp_server() -> Any:
     def await_verdict(session_id: str, proposal_id: str, timeout_seconds: float = 30.0) -> dict:
         """Long-poll for a proposal verdict on *session_id* (same as the SSE events route).
 
-        Subscribes to the session's event queue and waits up to *timeout_seconds*
-        for a ``proposal_accepted`` or ``proposal_rejected`` event whose
-        ``proposal_id`` matches.  Returns immediately when the verdict arrives,
-        or ``{"status": "timeout", ...}`` if the deadline is exceeded.
+        Subscribes to the session's event queue BEFORE checking the proposal's current
+        status, so a verdict that lands between the check and the subscribe is never
+        missed -- then waits up to *timeout_seconds* for a ``proposal_accepted`` or
+        ``proposal_rejected`` event whose ``proposal_id`` matches. Returns immediately
+        if the proposal already has a verdict (e.g. it was resolved before this tool was
+        called) or when a matching event arrives, else ``{"status": "timeout", ...}``
+        once the deadline is exceeded.
         """
         store = get_default_session_store()
         q = store.subscribe(session_id)
         start = time.monotonic()
         try:
+            proposal = store.get(session_id).proposals.get(proposal_id)
+            if proposal is not None and proposal.status.value != "pending":
+                return {
+                    "status": proposal.status.value,
+                    "session_id": session_id,
+                    "proposal_id": proposal_id,
+                }
             while True:
                 remaining = timeout_seconds - (time.monotonic() - start)
                 if remaining <= 0:

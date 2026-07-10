@@ -230,6 +230,32 @@ class TestTools:
         assert result["status"] == "accepted"
         assert result["proposal_id"] == proposal.id
 
+    def test_await_verdict_already_resolved_before_call_returns_immediately(self) -> None:
+        """A verdict landing BEFORE await_verdict subscribes must not read as a timeout.
+
+        Regression test for the race the tool's subscribe-then-check ordering guards
+        against: an agent that calls propose_mutation then await_verdict can lose the
+        race to a fast accept/reject that already published its event to no one.
+        """
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mutation = GraphMutation(base_version=0)
+        proposal = session_mod.get_default_store().add_proposal(session.id, mutation)
+        session_mod.get_default_store().accept_proposal(session.id, proposal.id)
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "await_verdict",
+                {"session_id": session.id, "proposal_id": proposal.id, "timeout_seconds": 0.2},
+            )
+        )
+        assert isinstance(result, dict)
+        assert result["status"] == "accepted"
+        assert result["proposal_id"] == proposal.id
+
     def test_await_verdict_timeout(self) -> None:
         from emergentflow.collab.mcp import create_mcp_server
 
