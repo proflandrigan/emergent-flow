@@ -4,7 +4,7 @@
 // node; selection is read from `selectionStore`, never the IR.
 
 import { Maximize2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useCatalog } from "../catalog/useCatalog";
 import { ConsultAffordance } from "../session/ConsultAffordance";
@@ -46,6 +46,14 @@ export function Inspector(): JSX.Element {
   const results = useExecutionStore((s) => s.results);
   const statuses = useExecutionStore((s) => s.statuses);
   const lastRunAt = useExecutionStore((s) => s.lastRunAt);
+
+  // Close the expanded-results modal whenever the selected node changes -- otherwise
+  // switching to a node with no results unmounts the modal (its content vanishes) but
+  // leaves `resultsExpanded` true, so re-selecting a node with results snaps the modal
+  // back open with no click on the expand button.
+  useEffect(() => {
+    setResultsExpanded(false);
+  }, [nodeId]);
 
   function renderResults(): JSX.Element {
     if (!nodeId) {
