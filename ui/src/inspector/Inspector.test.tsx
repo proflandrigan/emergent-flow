@@ -90,7 +90,7 @@ test("Results tab shows the error string when the node errored", () => {
   expect(screen.getByTestId("results-error")).toHaveTextContent("boom");
 });
 
-test("Expand button appears when results exist and opens the modal", () => {
+test("Expand button opens the inspector in a modal overlay", () => {
   const id = useGraphStore.getState().addNodeFromSpec(fakeSpec, { x: 0, y: 0 });
   useSelectionStore.getState().setNodeSelected(id, true);
   useExecutionStore.setState({
@@ -100,22 +100,38 @@ test("Expand button appears when results exist and opens the modal", () => {
   });
 
   render(<Inspector />);
-  fireEvent.click(screen.getByTestId("inspector-tab-results"));
-  expect(screen.getByTestId("results-expand-btn")).toBeInTheDocument();
 
-  fireEvent.click(screen.getByTestId("results-expand-btn"));
+  // Expand button is always visible (not just on results tab)
+  const expandBtn = screen.getByTestId("inspector-expand-btn");
+  expect(expandBtn).toBeInTheDocument();
 
-  expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Results");
-  const scalars = screen.getAllByTestId("payload-scalar");
-  expect(scalars).toHaveLength(2);
-  expect(scalars[0]).toHaveTextContent("42");
+  fireEvent.click(expandBtn);
+
+  // Modal should render — the OverlayModal has a close button
+  expect(screen.getByTestId("overlay-modal-close")).toBeInTheDocument();
+
+  // The modal contains the same tabs (there will be duplicates — one in sidebar, one in modal)
+  const configTabs = screen.getAllByTestId("inspector-tab-config");
+  expect(configTabs.length).toBe(2);
 });
 
-test("Expand button does not appear when there are no results", () => {
+test("Expand button is visible even without results", () => {
   const id = useGraphStore.getState().addNodeFromSpec(fakeSpec, { x: 0, y: 0 });
   useSelectionStore.getState().setNodeSelected(id, true);
 
   render(<Inspector />);
-  fireEvent.click(screen.getByTestId("inspector-tab-results"));
-  expect(screen.queryByTestId("results-expand-btn")).not.toBeInTheDocument();
+  expect(screen.getByTestId("inspector-expand-btn")).toBeInTheDocument();
+});
+
+test("Clicking the X button in expanded modal closes it", () => {
+  const id = useGraphStore.getState().addNodeFromSpec(fakeSpec, { x: 0, y: 0 });
+  useSelectionStore.getState().setNodeSelected(id, true);
+
+  render(<Inspector />);
+
+  fireEvent.click(screen.getByTestId("inspector-expand-btn"));
+  expect(screen.getByTestId("overlay-modal-close")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByTestId("overlay-modal-close"));
+  expect(screen.queryByTestId("overlay-modal-close")).not.toBeInTheDocument();
 });

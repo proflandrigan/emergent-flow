@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import type { JSX, ReactNode } from "react";
 import { createPortal } from "react-dom";
 
@@ -41,9 +42,31 @@ export function OverlayModal({
           maxHeight: "70vh",
           overflow: "auto",
           padding: "var(--space-4)",
+          position: "relative",
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        <button
+          type="button"
+          aria-label="Close"
+          data-testid="overlay-modal-close"
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: "var(--space-2)",
+            right: "var(--space-2)",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: "var(--text-secondary)",
+            padding: "var(--space-1)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <X size={16} />
+        </button>
         {children}
       </div>
     </div>,

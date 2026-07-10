@@ -31,7 +31,7 @@ function formatAgo(ms: number): string {
 
 export function Inspector(): JSX.Element {
   const [tab, setTab] = useState<InspectorTab>("config");
-  const [resultsExpanded, setResultsExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const selNodes = useSelectionStore((s) => s.nodes);
   const nodes = useGraphStore((s) => s.nodes);
   const nodeId = selectedNodeId({ nodes: selNodes });
@@ -47,12 +47,12 @@ export function Inspector(): JSX.Element {
   const statuses = useExecutionStore((s) => s.statuses);
   const lastRunAt = useExecutionStore((s) => s.lastRunAt);
 
-  // Close the expanded-results modal whenever the selected node changes -- otherwise
+  // Close the expanded inspector modal whenever the selected node changes -- otherwise
   // switching to a node with no results unmounts the modal (its content vanishes) but
-  // leaves `resultsExpanded` true, so re-selecting a node with results snaps the modal
+  // leaves `expanded` true, so re-selecting a node with results snaps the modal
   // back open with no click on the expand button.
   useEffect(() => {
-    setResultsExpanded(false);
+    setExpanded(false);
   }, [nodeId]);
 
   function renderResults(): JSX.Element {
@@ -92,149 +92,188 @@ export function Inspector(): JSX.Element {
     }
     return (
       <div data-testid="results-list">
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          {lastRunAt !== null ? (
-            <div
-              data-testid="results-last-run"
-              style={{
-                color: "var(--text-secondary)",
-                fontSize: 11,
-              }}
-            >
-              last run: {formatAgo(lastRunAt)}
-            </div>
-          ) : (
-            <div />
-          )}
-          <IconButton
-            aria-label="Expand results"
-            data-testid="results-expand-btn"
-            onClick={() => setResultsExpanded(true)}
+        {lastRunAt !== null ? (
+          <div
+            data-testid="results-last-run"
+            style={{
+              color: "var(--text-secondary)",
+              fontSize: 11,
+              marginBottom: "0.5rem",
+            }}
           >
-            <Maximize2 size={14} />
-          </IconButton>
-        </div>
+            last run: {formatAgo(lastRunAt)}
+          </div>
+        ) : null}
         {Object.entries(nodeResults).map(([portName, payload]) => (
           <div key={portName} style={{ marginBottom: "0.5rem" }}>
             <span style={{ fontWeight: 600 }}>{portName}</span>
             <PayloadView payload={payload} />
           </div>
         ))}
-        {resultsExpanded ? (
-          <OverlayModal width={720} onClose={() => setResultsExpanded(false)}>
-            <h2
-              style={{
-                margin: "0 0 var(--space-3)",
-                fontSize: "var(--text-lg)",
-                fontWeight: 600,
-              }}
-            >
-              Results — {node?.label ?? nodeId}
-            </h2>
-            {lastRunAt !== null ? (
-              <div
-                style={{
-                  color: "var(--text-secondary)",
-                  fontSize: 11,
-                  marginBottom: "0.5rem",
-                }}
-              >
-                last run: {formatAgo(lastRunAt)}
-              </div>
-            ) : null}
-            {Object.entries(nodeResults).map(([portName, payload]) => (
-              <div key={portName} style={{ marginBottom: "0.75rem" }}>
-                <span style={{ fontWeight: 600 }}>{portName}</span>
-                <PayloadView payload={payload} />
-              </div>
-            ))}
-          </OverlayModal>
-        ) : null}
       </div>
     );
   }
 
   return (
-    <aside
-      data-testid="inspector"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-      }}
-    >
-      {node ? (
+    <>
+      <aside
+        data-testid="inspector"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+        }}
+      >
+        {node ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "var(--space-2)",
+              padding: "var(--space-2) var(--space-3)",
+              marginBottom: "var(--space-2)",
+              background: meta.soft,
+              borderLeft: `3px solid ${meta.color}`,
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              fontSize: "var(--text-sm)",
+            }}
+          >
+            <FamIcon size={16} style={{ color: meta.color, flexShrink: 0 }} />
+            <span>{spec?.label ?? node.type}</span>
+            {spec?.advisor_persona ? (
+              <ConsultAffordance
+                nodeId={node.id}
+                personaSlug={spec.advisor_persona}
+              />
+            ) : null}
+          </div>
+        ) : null}
         <div
           style={{
+            padding: "var(--space-2) var(--space-3)",
             display: "flex",
             alignItems: "center",
-            flexWrap: "wrap",
             gap: "var(--space-2)",
-            padding: "var(--space-2) var(--space-3)",
-            marginBottom: "var(--space-2)",
-            background: meta.soft,
-            borderLeft: `3px solid ${meta.color}`,
-            fontWeight: 600,
-            color: "var(--text-primary)",
-            fontSize: "var(--text-sm)",
           }}
         >
-          <FamIcon size={16} style={{ color: meta.color, flexShrink: 0 }} />
-          <span>{spec?.label ?? node.type}</span>
-          {spec?.advisor_persona ? (
-            <ConsultAffordance
-              nodeId={node.id}
-              personaSlug={spec.advisor_persona}
-            />
-          ) : null}
+          <Segmented
+            options={[
+              {
+                value: "config",
+                label: "Config",
+                testId: "inspector-tab-config",
+              },
+              { value: "code", label: "Code", testId: "inspector-tab-code" },
+              {
+                value: "results",
+                label: "Results",
+                testId: "inspector-tab-results",
+              },
+            ]}
+            value={tab}
+            onChange={setTab}
+            aria-label="Inspector tabs"
+          />
+          <IconButton
+            aria-label="Expand inspector"
+            data-testid="inspector-expand-btn"
+            onClick={() => setExpanded(true)}
+          >
+            <Maximize2 size={14} />
+          </IconButton>
         </div>
-      ) : null}
-      <div style={{ padding: "var(--space-2) var(--space-3)" }}>
-        <Segmented
-          options={[
-            {
-              value: "config",
-              label: "Config",
-              testId: "inspector-tab-config",
-            },
-            { value: "code", label: "Code", testId: "inspector-tab-code" },
-            {
-              value: "results",
-              label: "Results",
-              testId: "inspector-tab-results",
-            },
-          ]}
-          value={tab}
-          onChange={setTab}
-          aria-label="Inspector tabs"
-        />
-      </div>
-      <div
-        style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0.5rem" }}
-      >
-        {tab === "config" ? (
-          node ? (
-            <ConfigForm node={node} />
+        <div
+          style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0.5rem" }}
+        >
+          {tab === "config" ? (
+            node ? (
+              <ConfigForm node={node} />
+            ) : (
+              <p
+                data-testid="inspector-empty"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Select a node to edit its parameters.
+              </p>
+            )
+          ) : tab === "code" ? (
+            <CodePanel />
           ) : (
-            <p
-              data-testid="inspector-empty"
-              style={{ color: "var(--text-secondary)" }}
+            renderResults()
+          )}
+        </div>
+      </aside>
+      {expanded ? (
+        <OverlayModal width={800} onClose={() => setExpanded(false)}>
+          {node ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "var(--space-2)",
+                padding: "var(--space-2) var(--space-3)",
+                marginBottom: "var(--space-2)",
+                background: meta.soft,
+                borderLeft: `3px solid ${meta.color}`,
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                fontSize: "var(--text-sm)",
+              }}
             >
-              Select a node to edit its parameters.
-            </p>
-          )
-        ) : tab === "code" ? (
-          <CodePanel />
-        ) : (
-          renderResults()
-        )}
-      </div>
-    </aside>
+              <FamIcon size={16} style={{ color: meta.color, flexShrink: 0 }} />
+              <span>{spec?.label ?? node.type}</span>
+            </div>
+          ) : null}
+          <div style={{ padding: "var(--space-2) var(--space-3)" }}>
+            <Segmented
+              options={[
+                {
+                  value: "config",
+                  label: "Config",
+                  testId: "inspector-tab-config",
+                },
+                { value: "code", label: "Code", testId: "inspector-tab-code" },
+                {
+                  value: "results",
+                  label: "Results",
+                  testId: "inspector-tab-results",
+                },
+              ]}
+              value={tab}
+              onChange={setTab}
+              aria-label="Inspector tabs"
+            />
+          </div>
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: "auto",
+              padding: "0.5rem",
+            }}
+          >
+            {tab === "config" ? (
+              node ? (
+                <ConfigForm node={node} />
+              ) : (
+                <p
+                  data-testid="inspector-empty"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  Select a node to edit its parameters.
+                </p>
+              )
+            ) : tab === "code" ? (
+              <CodePanel />
+            ) : (
+              renderResults()
+            )}
+          </div>
+        </OverlayModal>
+      ) : null}
+    </>
   );
 }
