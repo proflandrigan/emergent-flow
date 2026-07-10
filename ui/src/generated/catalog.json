@@ -2127,7 +2127,7 @@
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Subset",
           "name": "subset",
@@ -5568,7 +5568,16 @@
         {
           "default": null,
           "help": "Unpenalized linear predictor columns (GAM only; smooth terms are configured via 'Additional spec fields').",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Linear terms",
           "name": "linear_terms",
           "required": false,
@@ -5577,7 +5586,16 @@
         {
           "default": null,
           "help": "Grouping-factor column (mixed-effects models only).",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Grouping factor",
           "name": "groups",
           "required": false,
@@ -5765,7 +5783,7 @@
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",

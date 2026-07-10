@@ -2129,7 +2129,7 @@
               'min_length': None,
               'pattern': None,
               'step': None,
-              'widget': 'text',
+              'widget': 'column',
             }),
             'label': 'Subset',
             'name': 'subset',

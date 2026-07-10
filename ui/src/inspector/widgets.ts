@@ -24,8 +24,8 @@ export function isListOfDictType(typeToken: string): boolean {
   return typeToken.startsWith("list[dict") || typeToken.startsWith("list[dict[");
 }
 
-// Choose the widget. Precedence: explicit widget hint -> sql/connection; then choices -> "select";
-// then by type_token:
+// Choose the widget. Precedence: explicit widget hint -> sql/connection/column; then
+// choices -> "select"; then by type_token:
 //   "bool" -> "checkbox"; "int"|"float" -> "number"; dict types (incl. list-of-dict) -> "json";
 //   list types -> "list"; otherwise "text".
 export function widgetForParam(param: CatalogParam): WidgetKind {
@@ -141,9 +141,12 @@ export function validateValue(
     return null;
   }
 
-  if (kind === "list") {
+  if (kind === "list" || (kind === "column" && isListType(param.type_token))) {
     // For lists, min_length/max_length bound the number of items (matching the backend's
-    // generic length check in nodes/contract.py), not a character count.
+    // generic length check in nodes/contract.py), not a character count. A "column" widget
+    // backed by a list[str] param (e.g. multi-select feature columns) is length-bounded the
+    // same way -- without this branch it would fall through to the text/select case below and
+    // stringify the array, checking string length instead of item count.
     const arr = Array.isArray(value) ? value : [];
     if (hints?.min_length != null && arr.length < hints.min_length) {
       return `Must have at least ${hints.min_length} items`;

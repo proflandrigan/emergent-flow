@@ -109,6 +109,7 @@ class FitModel(NodeDefinition):
             label="Linear terms",
             help="Unpenalized linear predictor columns (GAM only; smooth terms are configured "
             "via 'Additional spec fields').",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="groups",
@@ -116,6 +117,7 @@ class FitModel(NodeDefinition):
             default=None,
             label="Grouping factor",
             help="Grouping-factor column (mixed-effects models only).",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="family",

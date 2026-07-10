@@ -73,7 +73,7 @@ class DropMissing(NodeDefinition):
             default=None,
             label="Subset",
             help="Columns to check for NA (row-axis only); empty/unset checks all.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
     ]
 
