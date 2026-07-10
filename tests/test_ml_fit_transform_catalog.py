@@ -87,6 +87,7 @@ _KEY_OVERRIDES: dict[str, dict] = {
     "OneHotEncoder": {"features": ["cat"]},
     "OrdinalEncoder": {"features": ["cat"]},
     "SelectKBest": {"features": _NUMERIC_FEATURES, "target": "y", "params": {"k": 2}},
+    "TargetEncoder": {"features": ["cat"], "target": "y"},
     "TSNE": {"features": _NUMERIC_FEATURES, "params": {"perplexity": 5}},
 }
 

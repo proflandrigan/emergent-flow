@@ -72,6 +72,8 @@
   --fam-nn-soft: rgba(236, 72, 153, 0.14);
   --fam-reports: #10b981;
   --fam-reports-soft: rgba(16, 185, 129, 0.14);
+  --fam-transform: #f97316;
+  --fam-transform-soft: rgba(249, 115, 22, 0.14);
 
   /* Product accent (distinct from family hues) */
   --accent: #6366f1;

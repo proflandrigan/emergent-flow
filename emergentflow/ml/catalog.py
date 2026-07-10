@@ -73,13 +73,18 @@ from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
 from sklearn.naive_bayes import GaussianNB, MultinomialNB
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor, LocalOutlierFactor
 from sklearn.preprocessing import (
+    Binarizer,
+    KBinsDiscretizer,
+    MaxAbsScaler,
     MinMaxScaler,
     Normalizer,
     OneHotEncoder,
     OrdinalEncoder,
     PolynomialFeatures,
+    PowerTransformer,
     RobustScaler,
     StandardScaler,
+    TargetEncoder,
 )
 from sklearn.svm import SVC, SVR, LinearSVC, OneClassSVM
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
@@ -218,6 +223,97 @@ register_estimator(
             "degree": KwargSpec(default=2, help="The degree of the polynomial features."),
             "include_bias": KwargSpec(
                 default=True, help="Include a bias (intercept) column of all ones."
+            ),
+        },
+        summary_builder=summarize_preprocessing,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="MaxAbsScaler",
+        description="Scales each feature by its maximum absolute value, preserving sparsity.",
+        import_path="sklearn.preprocessing.MaxAbsScaler",
+        sklearn_class=MaxAbsScaler,
+        archetype="fit_transform",
+        accepted_kwargs={},
+        summary_builder=summarize_preprocessing,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="PowerTransformer",
+        description=(
+            "Applies a power transform (Yeo-Johnson or Box-Cox) to make data more Gaussian-like."
+        ),
+        import_path="sklearn.preprocessing.PowerTransformer",
+        sklearn_class=PowerTransformer,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "method": KwargSpec(
+                default="yeo-johnson", help="Power transform method ('yeo-johnson'/'box-cox')."
+            ),
+            "standardize": KwargSpec(
+                default=True, help="Apply zero-mean, unit-variance normalization after transform."
+            ),
+        },
+        summary_builder=summarize_preprocessing,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="TargetEncoder",
+        description=(
+            "Encodes categorical features using the target mean, with built-in shrinkage "
+            "to prevent overfitting."
+        ),
+        import_path="sklearn.preprocessing.TargetEncoder",
+        sklearn_class=TargetEncoder,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "smooth": KwargSpec(
+                default="auto", help="Smoothing factor ('auto' or a positive float)."
+            ),
+            "random_state": KwargSpec(default=0, help="Seed for reproducibility."),
+        },
+        summary_builder=summarize_preprocessing,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="KBinsDiscretizer",
+        description=(
+            "Bins continuous features into discrete intervals (uniform, quantile, or k-means)."
+        ),
+        import_path="sklearn.preprocessing.KBinsDiscretizer",
+        sklearn_class=KBinsDiscretizer,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "n_bins": KwargSpec(default=5, help="Number of bins to produce."),
+            "encode": KwargSpec(
+                default="ordinal", help="Encoding method ('onehot'/'onehot-dense'/'ordinal')."
+            ),
+            "strategy": KwargSpec(
+                default="quantile", help="Binning strategy ('uniform'/'quantile'/'kmeans')."
+            ),
+        },
+        summary_builder=summarize_preprocessing,
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="Binarizer",
+        description="Thresholds feature values to 0/1 based on a configurable cutoff.",
+        import_path="sklearn.preprocessing.Binarizer",
+        sklearn_class=Binarizer,
+        archetype="fit_transform",
+        accepted_kwargs={
+            "threshold": KwargSpec(
+                default=0.0, help="Values above this are set to 1; at or below to 0."
             ),
         },
         summary_builder=summarize_preprocessing,

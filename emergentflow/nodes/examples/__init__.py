@@ -25,9 +25,11 @@ from .describe import Describe
 from .describe_relation import DescribeRelation
 from .diagnostic_frame import DiagnosticFrame
 from .diagnostic_model import DiagnosticModel
+from .discretize import Discretize
 from .distribution_summary import DistributionSummary
 from .drop_missing import DropMissing
 from .eda_profile import EdaProfile
+from .encode_categorical import EncodeCategorical
 from .eval_label import EvalLabel
 from .eval_run import EvalRun
 from .evaluate import Evaluate
@@ -35,6 +37,7 @@ from .filter_rows import FilterRows
 from .fit_estimator import FitEstimator
 from .fit_model import FitModel
 from .fit_transform import FitTransform
+from .generate_features import GenerateFeatures
 from .grid_search import GridSearch
 from .group_by_aggregate import GroupByAggregate
 from .impute import ImputeMissing
@@ -52,6 +55,7 @@ from .pipeline import Pipeline
 from .predict import Predict
 from .query_builder import QueryBuilder
 from .report import GenerateHtmlSummary
+from .scale_features import ScaleFeatures
 from .select_columns import SelectColumns
 from .sql_query import SqlQuery
 from .summarize import Summarize
@@ -81,9 +85,11 @@ __all__ = [
     "DescribeRelation",
     "DiagnosticFrame",
     "DiagnosticModel",
+    "Discretize",
     "DistributionSummary",
     "DropMissing",
     "EdaProfile",
+    "EncodeCategorical",
     "EvalLabel",
     "EvalRun",
     "Evaluate",
@@ -91,6 +97,7 @@ __all__ = [
     "FitEstimator",
     "FitModel",
     "FitTransform",
+    "GenerateFeatures",
     "GenerateHtmlSummary",
     "GridSearch",
     "GroupByAggregate",
@@ -108,6 +115,7 @@ __all__ = [
     "Pipeline",
     "Predict",
     "QueryBuilder",
+    "ScaleFeatures",
     "SelectColumns",
     "SqlQuery",
     "Summarize",

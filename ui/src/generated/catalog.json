@@ -515,6 +515,25 @@
       "task": null
     },
     {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Thresholds feature values to 0/1 based on a configurable cutoff.",
+      "import_path": "sklearn.preprocessing.Binarizer",
+      "key": "Binarizer",
+      "label": "Binarizer",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "choices": null,
+          "default": 0.0,
+          "help": "Values above this are set to 1; at or below to 0.",
+          "name": "threshold",
+          "type": "float"
+        }
+      ],
+      "task": null
+    },
+    {
       "archetype": "cluster_detect",
       "category": "Cluster",
       "description": "Incrementally builds a tree of cluster summaries for memory-efficient clustering of large datasets.",
@@ -1067,6 +1086,39 @@
       "task": null
     },
     {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Bins continuous features into discrete intervals (uniform, quantile, or k-means).",
+      "import_path": "sklearn.preprocessing.KBinsDiscretizer",
+      "key": "KBinsDiscretizer",
+      "label": "K Bins Discretizer",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "choices": null,
+          "default": "ordinal",
+          "help": "Encoding method ('onehot'/'onehot-dense'/'ordinal').",
+          "name": "encode",
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": 5,
+          "help": "Number of bins to produce.",
+          "name": "n_bins",
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": "quantile",
+          "help": "Binning strategy ('uniform'/'quantile'/'kmeans').",
+          "name": "strategy",
+          "type": "str"
+        }
+      ],
+      "task": null
+    },
+    {
       "archetype": "cluster_detect",
       "category": "Cluster",
       "description": "Partitions data into k clusters by minimizing within-cluster variance.",
@@ -1301,6 +1353,17 @@
         }
       ],
       "task": "classification"
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Scales each feature by its maximum absolute value, preserving sparsity.",
+      "import_path": "sklearn.preprocessing.MaxAbsScaler",
+      "key": "MaxAbsScaler",
+      "label": "Max Abs Scaler",
+      "node_type": "ml.fit_transform",
+      "params": [],
+      "task": null
     },
     {
       "archetype": "cluster_detect",
@@ -1572,6 +1635,32 @@
           "default": true,
           "help": "Include a bias (intercept) column of all ones.",
           "name": "include_bias",
+          "type": "bool"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Applies a power transform (Yeo-Johnson or Box-Cox) to make data more Gaussian-like.",
+      "import_path": "sklearn.preprocessing.PowerTransformer",
+      "key": "PowerTransformer",
+      "label": "Power Transformer",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "choices": null,
+          "default": "yeo-johnson",
+          "help": "Power transform method ('yeo-johnson'/'box-cox').",
+          "name": "method",
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": true,
+          "help": "Apply zero-mean, unit-variance normalization after transform.",
+          "name": "standardize",
           "type": "bool"
         }
       ],
@@ -1965,6 +2054,32 @@
           "help": "Seed for reproducibility.",
           "name": "random_state",
           "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Encodes categorical features using the target mean, with built-in shrinkage to prevent overfitting.",
+      "import_path": "sklearn.preprocessing.TargetEncoder",
+      "key": "TargetEncoder",
+      "label": "Target Encoder",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "choices": null,
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": "auto",
+          "help": "Smoothing factor ('auto' or a positive float).",
+          "name": "smooth",
+          "type": "str"
         }
       ],
       "task": null
@@ -3954,9 +4069,12 @@
           "help": "Which allow-listed sklearn transformer to fit.",
           "hints": {
             "choices": [
+              "Binarizer",
               "FactorAnalysis",
               "FastICA",
               "Isomap",
+              "KBinsDiscretizer",
+              "MaxAbsScaler",
               "MinMaxScaler",
               "NMF",
               "Normalizer",
@@ -3964,10 +4082,12 @@
               "OrdinalEncoder",
               "PCA",
               "PolynomialFeatures",
+              "PowerTransformer",
               "RobustScaler",
               "SelectKBest",
               "StandardScaler",
               "TSNE",
+              "TargetEncoder",
               "TruncatedSVD",
               "VarianceThreshold"
             ],
@@ -5916,6 +6036,384 @@
         }
       ],
       "type": "stats.ttest",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Feature Transform",
+      "description": "Discretize continuous features using a curated sklearn discretizer (KBinsDiscretizer or Binarizer).",
+      "family": "transform",
+      "label": "Discretize",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which discretization algorithm to use.",
+          "hints": {
+            "choices": [
+              "Binarizer",
+              "KBinsDiscretizer"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Discretizer",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to discretize; empty/unset uses all numeric columns.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": {},
+          "help": "Constructor kwargs for the chosen discretizer (allow-listed per discretizer).",
+          "hints": null,
+          "label": "Discretizer params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing continuous features to discretize.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Transformer",
+          "direction": "out",
+          "help": "The fitted discretizer (reusable on new data via ml.transform).",
+          "label": null,
+          "name": "transformer",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input frame with discretized feature columns appended.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "transform.discretize",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Feature Transform",
+      "description": "Encode categorical features using a curated sklearn encoder (OneHotEncoder, OrdinalEncoder, or TargetEncoder).",
+      "family": "transform",
+      "label": "Encode Categorical",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which categorical encoding algorithm to use.",
+          "hints": {
+            "choices": [
+              "OneHotEncoder",
+              "OrdinalEncoder",
+              "TargetEncoder"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Encoder",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Required for TargetEncoder (supervised); leave unset for OneHotEncoder/OrdinalEncoder.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Categorical columns to encode; empty/unset uses all columns (excluding target, if given).",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": {},
+          "help": "Constructor kwargs for the chosen encoder (allow-listed per encoder).",
+          "hints": null,
+          "label": "Encoder params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing categorical features to encode.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Transformer",
+          "direction": "out",
+          "help": "The fitted encoder (reusable on new data via ml.transform).",
+          "label": null,
+          "name": "transformer",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input frame with encoded feature columns appended.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "transform.encode_categorical",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Feature Transform",
+      "description": "Generate new features from existing ones using a curated sklearn feature generator (PolynomialFeatures).",
+      "family": "transform",
+      "label": "Generate Features",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which feature generation algorithm to use.",
+          "hints": {
+            "choices": [
+              "PolynomialFeatures"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Generator",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to generate features from; empty/unset uses all numeric columns.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": {},
+          "help": "Constructor kwargs for the chosen generator (allow-listed per generator).",
+          "hints": null,
+          "label": "Generator params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing features to generate from.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Transformer",
+          "direction": "out",
+          "help": "The fitted generator (reusable on new data via ml.transform).",
+          "label": null,
+          "name": "transformer",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input frame with generated feature columns appended.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "transform.generate_features",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Feature Transform",
+      "description": "Scale numeric features using a curated sklearn scaler (StandardScaler, MinMaxScaler, RobustScaler, MaxAbsScaler, Normalizer, or PowerTransformer).",
+      "family": "transform",
+      "label": "Scale Features",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which scaling algorithm to use.",
+          "hints": {
+            "choices": [
+              "MaxAbsScaler",
+              "MinMaxScaler",
+              "Normalizer",
+              "PowerTransformer",
+              "RobustScaler",
+              "StandardScaler"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Scaler",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to scale; empty/unset uses all numeric columns.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": {},
+          "help": "Constructor kwargs for the chosen scaler (allow-listed per scaler).",
+          "hints": null,
+          "label": "Scaler params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing features to scale.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Transformer",
+          "direction": "out",
+          "help": "The fitted scaler (reusable on new data via ml.transform).",
+          "label": null,
+          "name": "transformer",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input frame with scaled feature columns appended.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "transform.scale_features",
       "version": 1
     },
     {

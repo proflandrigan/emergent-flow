@@ -5,6 +5,7 @@ import {
   Brain,
   Network,
   FileText,
+  Wand2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -51,6 +52,12 @@ export const FAMILY: Record<string, FamilyMeta> = {
     color: "var(--fam-reports)",
     soft: "var(--fam-reports-soft)",
     Icon: FileText,
+  },
+  transform: {
+    label: "Transform",
+    color: "var(--fam-transform)",
+    soft: "var(--fam-transform-soft)",
+    Icon: Wand2,
   },
 };
 
