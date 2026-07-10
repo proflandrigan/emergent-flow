@@ -9,6 +9,7 @@ import { useState, type JSX } from "react";
 
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
+import { GatePanel } from "./GatePanel";
 import { ProposalPanel } from "./ProposalPanel";
 import { ReviewPanel } from "./ReviewPanel";
 import { useSessionStore } from "./sessionStore";
@@ -116,6 +117,7 @@ function ActiveSession({ sessionId }: { sessionId: string }): JSX.Element {
       ) : null}
       <ProposalPanel />
       <ReviewPanel />
+      <GatePanel />
       <Button
         variant="secondary"
         onClick={leave}

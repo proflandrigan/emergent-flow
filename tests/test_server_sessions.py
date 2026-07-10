@@ -498,3 +498,255 @@ class TestSessionReviews:
         watcher.join(timeout=5.0)
         assert not watcher.is_alive(), "SSE watcher did not observe both events in time"
         assert [e["type"] for e in observed] == ["review_added", "review_comment_added"]
+
+
+class TestSessionGates:
+    def test_create_gate(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+
+        r = client.post(
+            f"/sessions/{session_id}/gates",
+            json={
+                "phase": "train",
+                "kind": "phase",
+                "description": "training phase",
+            },
+        )
+
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["phase"] == "train"
+        assert body["kind"] == "phase"
+        assert body["status"] == "open"
+
+    def test_list_gates_empty(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+
+        r = client.get(f"/sessions/{session_id}/gates")
+
+        assert r.status_code == 200, r.text
+        assert r.json() == {"gates": []}
+
+    def test_list_gates(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        client.post(
+            f"/sessions/{session_id}/gates",
+            json={"phase": "a", "kind": "phase", "description": "first"},
+        )
+        client.post(
+            f"/sessions/{session_id}/gates",
+            json={"phase": "b", "kind": "confirm", "description": "second"},
+        )
+
+        r = client.get(f"/sessions/{session_id}/gates")
+
+        assert r.status_code == 200, r.text
+        phases = [g["phase"] for g in r.json()["gates"]]
+        assert set(phases) == {"a", "b"}
+
+    def test_create_gate_unknown_session_404(self, client: TestClient) -> None:
+        r = client.post(
+            "/sessions/does-not-exist/gates",
+            json={"phase": "x", "kind": "phase", "description": "x"},
+        )
+        assert r.status_code == 404, r.text
+
+    def test_close_gate(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        gate_id = client.post(
+            f"/sessions/{session_id}/gates",
+            json={"phase": "train", "kind": "phase", "description": "train"},
+        ).json()["id"]
+
+        r = client.post(f"/sessions/{session_id}/gates/{gate_id}/close")
+
+        assert r.status_code == 200, r.text
+        assert r.json()["status"] == "closed"
+
+    def test_close_already_closed_gate_409(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        gate_id = client.post(
+            f"/sessions/{session_id}/gates",
+            json={"phase": "train", "kind": "phase", "description": "train"},
+        ).json()["id"]
+        client.post(f"/sessions/{session_id}/gates/{gate_id}/close")
+
+        r = client.post(f"/sessions/{session_id}/gates/{gate_id}/close")
+
+        assert r.status_code == 409, r.text
+        assert "gate_already_resolved:" in r.json()["error"]
+
+    def test_skip_gate(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        gate_id = client.post(
+            f"/sessions/{session_id}/gates",
+            json={"phase": "train", "kind": "phase", "description": "train"},
+        ).json()["id"]
+
+        r = client.post(f"/sessions/{session_id}/gates/{gate_id}/skip")
+
+        assert r.status_code == 200, r.text
+        assert r.json()["status"] == "skipped"
+
+    def test_close_unknown_gate_404(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        r = client.post(f"/sessions/{session_id}/gates/does-not-exist/close")
+        assert r.status_code == 404, r.text
+
+    def test_skip_unknown_gate_404(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        r = client.post(f"/sessions/{session_id}/gates/does-not-exist/skip")
+        assert r.status_code == 404, r.text
+
+    def test_add_decision(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        gate_id = client.post(
+            f"/sessions/{session_id}/gates",
+            json={"phase": "train", "kind": "phase", "description": "train"},
+        ).json()["id"]
+
+        r = client.post(
+            f"/sessions/{session_id}/gates/{gate_id}/decisions",
+            json={"author": "human", "text": "proceed"},
+        )
+
+        assert r.status_code == 200, r.text
+        assert len(r.json()["decisions"]) == 1
+        assert r.json()["decisions"][0]["text"] == "proceed"
+
+    def test_add_decision_unknown_gate_404(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        r = client.post(
+            f"/sessions/{session_id}/gates/does-not-exist/decisions",
+            json={"author": "human", "text": "hi"},
+        )
+        assert r.status_code == 404, r.text
+
+    def test_session_compile_409_when_gate_open(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={"graph": _seed_graph()}).json()["id"]
+        gate_id = client.post(
+            f"/sessions/{session_id}/gates",
+            json={"phase": "train", "kind": "phase", "description": "checkpoint"},
+        ).json()["id"]
+
+        r = client.post(f"/sessions/{session_id}/compile")
+
+        assert r.status_code == 409, r.text
+        assert "gates_open:" in r.json()["error"]
+        assert gate_id in r.json()["error"]
+        assert "train" in r.json()["error"]
+
+    def test_session_execute_409_when_gate_open(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={"graph": _seed_graph()}).json()["id"]
+        client.post(
+            f"/sessions/{session_id}/gates",
+            json={"phase": "train", "kind": "phase", "description": "checkpoint"},
+        )
+
+        r = client.post(f"/sessions/{session_id}/execute")
+
+        assert r.status_code == 409, r.text
+        assert "gates_open:" in r.json()["error"]
+
+    def test_gated_session_compiles_after_gate_closed(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={"graph": _seed_graph()}).json()["id"]
+        gate_id = client.post(
+            f"/sessions/{session_id}/gates",
+            json={"phase": "review", "kind": "confirm", "description": "review step"},
+        ).json()["id"]
+
+        r_blocked = client.post(f"/sessions/{session_id}/compile")
+        assert r_blocked.status_code == 409
+
+        client.post(f"/sessions/{session_id}/gates/{gate_id}/close")
+        r_ok = client.post(f"/sessions/{session_id}/compile")
+
+        assert r_ok.status_code == 200, r_ok.text
+        assert "code" in r_ok.json()
+
+    def test_skip_clears_block_for_compile(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={"graph": _seed_graph()}).json()["id"]
+        gate_id = client.post(
+            f"/sessions/{session_id}/gates",
+            json={"phase": "review", "kind": "confirm", "description": "review step"},
+        ).json()["id"]
+
+        client.post(f"/sessions/{session_id}/gates/{gate_id}/skip")
+        r = client.post(f"/sessions/{session_id}/compile")
+
+        assert r.status_code == 200, r.text
+
+    def test_two_open_gates_both_named_in_409(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={"graph": _seed_graph()}).json()["id"]
+        g1 = client.post(
+            f"/sessions/{session_id}/gates",
+            json={"phase": "p1", "kind": "phase", "description": "first"},
+        ).json()
+        g2 = client.post(
+            f"/sessions/{session_id}/gates",
+            json={"phase": "p2", "kind": "confirm", "description": "second"},
+        ).json()
+
+        r = client.post(f"/sessions/{session_id}/compile")
+
+        assert r.status_code == 409, r.text
+        error = r.json()["error"]
+        assert g1["id"] in error
+        assert g2["id"] in error
+        assert "2 open gate(s)" in error
+
+    def test_payload_only_compile_unaffected_by_gates(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={"graph": _seed_graph()}).json()["id"]
+        client.post(
+            f"/sessions/{session_id}/gates",
+            json={"phase": "blocking", "kind": "phase", "description": "blocking gate"},
+        )
+
+        r = client.post("/compile", json=_seed_graph())
+
+        assert r.status_code == 200, r.text
+        assert "code" in r.json()
+
+    def test_session_compile_unknown_session_404(self, client: TestClient) -> None:
+        r = client.post("/sessions/does-not-exist/compile")
+        assert r.status_code == 404, r.text
+
+    def test_session_execute_unknown_session_404(self, client: TestClient) -> None:
+        r = client.post("/sessions/does-not-exist/execute")
+        assert r.status_code == 404, r.text
+
+    def test_gate_events_observed(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+
+        observed: list[dict] = []
+
+        def _watch() -> None:
+            store = session_mod.get_default_store()
+            q = store.subscribe(session_id)
+            try:
+                while len(observed) < 3:
+                    observed.append(q.get(timeout=5.0))
+            finally:
+                store.unsubscribe(session_id, q)
+
+        watcher = threading.Thread(target=_watch, daemon=True)
+        watcher.start()
+        time.sleep(0.3)
+
+        gate_id = client.post(
+            f"/sessions/{session_id}/gates",
+            json={"phase": "train", "kind": "phase", "description": "train"},
+        ).json()["id"]
+        client.post(
+            f"/sessions/{session_id}/gates/{gate_id}/decisions",
+            json={"author": "human", "text": "proceed"},
+        )
+        client.post(f"/sessions/{session_id}/gates/{gate_id}/close")
+
+        watcher.join(timeout=5.0)
+        assert not watcher.is_alive(), "SSE watcher did not observe all events in time"
+        assert [e["type"] for e in observed] == [
+            "gate_opened",
+            "decision_added",
+            "gate_closed",
+        ]

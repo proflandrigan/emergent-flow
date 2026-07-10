@@ -50,8 +50,15 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
+from emergentflow.collab.gates import (
+    Decision,
+    Gate,
+    GateAlreadyResolvedError,
+    UnknownGateError,
+)
 from emergentflow.collab.review import AnchorError, ReviewComment, ReviewThread
 from emergentflow.collab.session import (
+    OpenGatesError,
     ProposalAlreadyResolvedError,
     StaleVersionError,
     UnknownProposalError,
@@ -62,20 +69,26 @@ from emergentflow.collab.session import get_default_store as get_default_session
 from emergentflow.ir.graph import Graph
 from emergentflow.ir.mutation import GraphMutation
 from emergentflow.ir.serialize import deserialize_graph
+from emergentflow.llm.gateway import GatewayClient
 from emergentflow.server.cache import DEFAULT_CACHE_DIRNAME, DEFAULT_CACHE_MAX_MB, configure_cache
 from emergentflow.server.reports import get_default_store
 from emergentflow.server.service import (
     clear_cache,
     compile_graph,
     compile_query_spec,
+    compile_session,
+    consult_graph,
+    consult_session,
     execute_graph,
     execute_graph_stream,
     execute_node,
+    execute_session,
     export_eval_set_bytes,
     export_finetune_bytes,
     get_catalog,
     get_connection_schema,
     get_mutation_schema,
+    get_personas,
     get_schema,
     get_session_event_schema,
     label_eval,
@@ -200,12 +213,21 @@ async def _session_json(fn: Callable[[], dict[str, Any]]) -> Response:
     """
     try:
         result = await _run_sync(fn)
-    except (UnknownSessionError, UnknownProposalError, UnknownReviewError) as exc:
+    except (
+        UnknownSessionError,
+        UnknownProposalError,
+        UnknownReviewError,
+        UnknownGateError,
+    ) as exc:
         return _error_json(404, str(exc))
     except StaleVersionError as exc:
         return _error_json(409, f"stale_version: {exc}")
     except ProposalAlreadyResolvedError as exc:
         return _error_json(409, f"proposal_already_resolved: {exc}")
+    except OpenGatesError as exc:
+        return _error_json(409, f"gates_open: {exc}")
+    except GateAlreadyResolvedError as exc:
+        return _error_json(409, f"gate_already_resolved: {exc}")
     except AnchorError as exc:
         return _error_json(422, f"anchor_error: {exc}")
     except Exception as exc:  # noqa: BLE001 - any other failure -> 422, never crash the server
@@ -438,6 +460,10 @@ def create_app() -> FastAPI:
     async def session_event_schema() -> Response:
         return await _safe_json(get_session_event_schema)
 
+    @application.get("/personas")
+    async def personas() -> Response:
+        return await _safe_json(get_personas)
+
     @application.get("/reports/{report_hash}")
     async def report(report_hash: str) -> Response:
         try:
@@ -665,6 +691,119 @@ def create_app() -> FastAPI:
 
         return await _session_json(_comment)
 
+    @application.post("/sessions/{session_id}/gates", dependencies=[Depends(_require_session_auth)])
+    async def create_gate(session_id: str, request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        def _create() -> dict[str, Any]:
+            gate = Gate.model_validate(body)
+            result = get_default_session_store().open_gate(session_id, gate)
+            return result.model_dump(mode="json")
+
+        return await _session_json(_create)
+
+    @application.get("/sessions/{session_id}/gates", dependencies=[Depends(_require_session_auth)])
+    async def list_gates(session_id: str) -> Response:
+        def _list() -> dict[str, Any]:
+            session = get_default_session_store().get(session_id)
+            gates = sorted(session.collab.gates.values(), key=lambda g: g.id)
+            return {"gates": [g.model_dump(mode="json") for g in gates]}
+
+        return await _session_json(_list)
+
+    @application.post(
+        "/sessions/{session_id}/gates/{gate_id}/close",
+        dependencies=[Depends(_require_session_auth)],
+    )
+    async def close_gate_route(session_id: str, gate_id: str) -> Response:
+        def _close() -> dict[str, Any]:
+            result = get_default_session_store().close_gate(session_id, gate_id)
+            return result.model_dump(mode="json")
+
+        return await _session_json(_close)
+
+    @application.post(
+        "/sessions/{session_id}/gates/{gate_id}/skip",
+        dependencies=[Depends(_require_session_auth)],
+    )
+    async def skip_gate_route(session_id: str, gate_id: str) -> Response:
+        def _skip() -> dict[str, Any]:
+            result = get_default_session_store().skip_gate(session_id, gate_id)
+            return result.model_dump(mode="json")
+
+        return await _session_json(_skip)
+
+    @application.post(
+        "/sessions/{session_id}/gates/{gate_id}/decisions",
+        dependencies=[Depends(_require_session_auth)],
+    )
+    async def add_gate_decision_route(session_id: str, gate_id: str, request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        def _decision() -> dict[str, Any]:
+            decision = Decision.model_validate(body)
+            result = get_default_session_store().add_decision(session_id, gate_id, decision)
+            return result.model_dump(mode="json")
+
+        return await _session_json(_decision)
+
+    @application.post(
+        "/sessions/{session_id}/compile", dependencies=[Depends(_require_session_auth)]
+    )
+    async def compile_session_route(session_id: str) -> Response:
+        def _compile() -> dict[str, Any]:
+            return compile_session(session_id)
+
+        return await _session_json(_compile)
+
+    @application.post(
+        "/sessions/{session_id}/execute", dependencies=[Depends(_require_session_auth)]
+    )
+    async def execute_session_route(session_id: str, request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        def _execute() -> dict[str, Any]:
+            return execute_session(session_id, body)
+
+        return await _session_json(_execute)
+
+    @application.post("/consult")
+    async def consult(request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        def _consult() -> dict[str, Any]:
+            client = GatewayClient()
+            return consult_graph(body, client=client)
+
+        return await _safe_json(_consult)
+
+    @application.post(
+        "/sessions/{session_id}/consult", dependencies=[Depends(_require_session_auth)]
+    )
+    async def consult_session_route(session_id: str, request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        def _consult() -> dict[str, Any]:
+            client = GatewayClient()
+            return consult_session(session_id, body, client=client)
+
+        return await _session_json(_consult)
+
     # Catch-all GET: serves static asset -> demo page (for "/" and "/index.html") -> 404.
     # Declared last so the explicit GET routes above take precedence.
     @application.get("/{full_path:path}")
@@ -775,6 +914,10 @@ def serve(
                 "EMERGENTFLOW_SESSION_TOKEN environment variable."
             )
         configure_session_auth(required=True, token=resolved_token)
+
+    from emergentflow.collab.persona_defs import register_builtin_personas
+
+    register_builtin_personas()
 
     browse_host = "127.0.0.1" if host == "0.0.0.0" else host  # noqa: S104
     url = f"http://{browse_host}:{port}"

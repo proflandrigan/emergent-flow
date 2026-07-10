@@ -46,6 +46,7 @@ class FitModel(NodeDefinition):
     family = "stats"
     label = "Fit Statistical Model"
     category = "Statistics"
+    advisor_persona = "researcher"
     description = "Fit a curated, allow-listed statistical model (regression/GLM/...)."
 
     ports = [

@@ -6,6 +6,7 @@
 import { useState } from "react";
 
 import { useCatalog } from "../catalog/useCatalog";
+import { ConsultAffordance } from "../session/ConsultAffordance";
 import { familyMeta } from "../theme/family";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
@@ -32,7 +33,9 @@ export function Inspector(): JSX.Element {
   const nodeId = selectedNodeId({ nodes: selNodes });
   const node = nodeId ? nodes[nodeId] : null;
   const catalog = useCatalog();
-  const spec = node ? catalog.nodes.find((n) => n.type === node.type) : undefined;
+  const spec = node
+    ? catalog.nodes.find((n) => n.type === node.type)
+    : undefined;
   const meta = familyMeta(spec?.family ?? "");
   const FamIcon = meta.Icon;
 
@@ -43,7 +46,10 @@ export function Inspector(): JSX.Element {
   function renderResults(): JSX.Element {
     if (!nodeId) {
       return (
-        <p data-testid="results-empty-no-selection" style={{ color: "var(--text-secondary)" }}>
+        <p
+          data-testid="results-empty-no-selection"
+          style={{ color: "var(--text-secondary)" }}
+        >
           Select a node to see its results.
         </p>
       );
@@ -62,7 +68,10 @@ export function Inspector(): JSX.Element {
     const nodeResults = results[nodeId];
     if (!nodeResults || Object.keys(nodeResults).length === 0) {
       return (
-        <p data-testid="results-empty-no-run" style={{ color: "var(--text-secondary)" }}>
+        <p
+          data-testid="results-empty-no-run"
+          style={{ color: "var(--text-secondary)" }}
+        >
           {lastRunAt !== null
             ? "No inspectable outputs for this node."
             : "No results — run the graph first."}
@@ -74,7 +83,11 @@ export function Inspector(): JSX.Element {
         {lastRunAt !== null ? (
           <div
             data-testid="results-last-run"
-            style={{ color: "var(--text-secondary)", fontSize: 11, marginBottom: "0.5rem" }}
+            style={{
+              color: "var(--text-secondary)",
+              fontSize: 11,
+              marginBottom: "0.5rem",
+            }}
           >
             last run: {formatAgo(lastRunAt)}
           </div>
@@ -103,6 +116,7 @@ export function Inspector(): JSX.Element {
           style={{
             display: "flex",
             alignItems: "center",
+            flexWrap: "wrap",
             gap: "var(--space-2)",
             padding: "var(--space-2) var(--space-3)",
             marginBottom: "var(--space-2)",
@@ -115,14 +129,28 @@ export function Inspector(): JSX.Element {
         >
           <FamIcon size={16} style={{ color: meta.color, flexShrink: 0 }} />
           <span>{spec?.label ?? node.type}</span>
+          {spec?.advisor_persona ? (
+            <ConsultAffordance
+              nodeId={node.id}
+              personaSlug={spec.advisor_persona}
+            />
+          ) : null}
         </div>
       ) : null}
       <div style={{ padding: "var(--space-2) var(--space-3)" }}>
         <Segmented
           options={[
-            { value: "config", label: "Config", testId: "inspector-tab-config" },
+            {
+              value: "config",
+              label: "Config",
+              testId: "inspector-tab-config",
+            },
             { value: "code", label: "Code", testId: "inspector-tab-code" },
-            { value: "results", label: "Results", testId: "inspector-tab-results" },
+            {
+              value: "results",
+              label: "Results",
+              testId: "inspector-tab-results",
+            },
           ]}
           value={tab}
           onChange={setTab}
@@ -136,7 +164,10 @@ export function Inspector(): JSX.Element {
           node ? (
             <ConfigForm node={node} />
           ) : (
-            <p data-testid="inspector-empty" style={{ color: "var(--text-secondary)" }}>
+            <p
+              data-testid="inspector-empty"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Select a node to edit its parameters.
             </p>
           )

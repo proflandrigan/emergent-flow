@@ -223,6 +223,11 @@ class NodeSpec(IRModel):
         One-line description shown in the palette / tooltips.
     paradigm:
         Which execution paradigm this node belongs to (ADR 0003).
+    advisor_persona:
+        The ``AgentPersona`` slug (see ``emergentflow.collab.personas``) most
+        relevant to this node type; ``None`` (the default) means no persona is
+        suggested.  Advisory metadata surfaced through ``/catalog`` for a
+        "consult" affordance (Epic 14 Story 8).
     ports:
         Declared ports (templates for the instance's IR ports).
     params:
@@ -236,6 +241,7 @@ class NodeSpec(IRModel):
     category: str = ""
     description: str = ""
     paradigm: Paradigm = Paradigm.FUNCTIONAL
+    advisor_persona: str | None = None
     ports: list[PortSpec] = Field(default_factory=list)
     params: list[ParamSpec] = Field(default_factory=list)
 

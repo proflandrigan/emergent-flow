@@ -20,6 +20,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
 
 from emergentflow.codegen.validation import Diagnostic
+from emergentflow.collab.gates import Gate
 from emergentflow.ir.common import new_id
 from emergentflow.ir.graph import Graph
 from emergentflow.ir.mutation import GraphMutation
@@ -70,13 +71,16 @@ class CollaborationState(BaseModel):
     """Session-scoped collaboration state beyond the graph itself.
 
     Lives on ``GraphSession.collab`` (``emergentflow/collab/session.py``), BESIDE the graph,
-    never a ``Graph`` field. Holds review threads today; Story 9 (gates, out of scope here)
-    extends this same model with a ``gates`` list later -- do not add one now.
+    never a ``Graph`` field. Holds review threads and checkpoint gates: ``reviews`` are agent
+    critiques (Story 6), ``gates`` are workflow checkpoints an agent opens and the human
+    (or another agent) closes/skips, with ``Decision`` s recording what was decided along
+    the way (Story 9).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     reviews: dict[str, ReviewThread] = Field(default_factory=dict)
+    gates: dict[str, Gate] = Field(default_factory=dict)
 
 
 def validate_anchors(graph: Graph, findings: list[Diagnostic]) -> None:

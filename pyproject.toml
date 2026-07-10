@@ -121,6 +121,13 @@ postgres = [
     "sqlalchemy>=2,<3",
     "psycopg[binary]>=3.1,<4",
 ]
+# `pip install emergentflow[mcp]` enables the MCP tool wrapper over the
+# session/collaboration HTTP routes (Epic 14 Story 7). Kept optional so a bare
+# SDK install stays light (ADR 0007); importing `emergentflow.collab.mcp`
+# without it installed raises a typed `ModuleNotFoundError` with an install hint.
+mcp = [
+    "fastmcp>=3.4.4",
+]
 
 [project.urls]
 Homepage = "https://github.com/proflandrigan/emergent-flow"

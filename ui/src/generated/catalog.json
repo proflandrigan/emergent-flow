@@ -2017,6 +2017,7 @@
   ],
   "nodes": [
     {
+      "advisor_persona": null,
       "category": "Transform",
       "description": "Cast selected columns to new data types.",
       "family": "clean",
@@ -2066,6 +2067,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Transform",
       "description": "Drop rows or columns that contain missing values.",
       "family": "clean",
@@ -2157,6 +2159,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Transform",
       "description": "Keep rows matching a column/operator/value predicate.",
       "family": "clean",
@@ -2250,6 +2253,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Transform",
       "description": "Fill missing values in selected columns using a chosen strategy.",
       "family": "clean",
@@ -2321,6 +2325,7 @@
       "version": 2
     },
     {
+      "advisor_persona": null,
       "category": "Transform",
       "description": "Keep or drop a chosen subset of columns.",
       "family": "clean",
@@ -2388,6 +2393,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Ingest",
       "description": "Describe a relation's columns (name/dtype/nullable) as a tidy DataFrame.",
       "family": "data",
@@ -2482,6 +2488,7 @@
       "version": 2
     },
     {
+      "advisor_persona": "data_modeller",
       "category": "Ingest",
       "description": "Load a CSV file into a pandas DataFrame.",
       "family": "data",
@@ -2540,6 +2547,7 @@
       "version": 2
     },
     {
+      "advisor_persona": null,
       "category": "Ingest",
       "description": "Load a JSON file into a pandas DataFrame.",
       "family": "data",
@@ -2589,6 +2597,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Ingest",
       "description": "Load a Parquet file into a pandas DataFrame.",
       "family": "data",
@@ -2638,6 +2647,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Ingest",
       "description": "Load a small bundled sample dataset (zero filesystem setup).",
       "family": "data",
@@ -2682,6 +2692,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Ingest",
       "description": "Build a SQL query from a structured spec (source, select, where, join, group_by, order_by) and return a DataFrame.",
       "family": "data",
@@ -2952,6 +2963,7 @@
       "version": 2
     },
     {
+      "advisor_persona": null,
       "category": "Ingest",
       "description": "Run a raw SQL query against a warehouse connection and return a DataFrame.",
       "family": "data",
@@ -3078,6 +3090,7 @@
       "version": 2
     },
     {
+      "advisor_persona": null,
       "category": "LLM",
       "description": "Merge a labels table onto an eval-run compare table, keyed by (row_id, variant).",
       "family": "eval",
@@ -3117,6 +3130,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "LLM",
       "description": "Run one prompt over N inputs x M model variants for side-by-side compare.",
       "family": "eval",
@@ -3202,6 +3216,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "LLM",
       "description": "Run one completion call against a provider through the unified gateway.",
       "family": "llm",
@@ -3371,6 +3386,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "LLM",
       "description": "Render a system + user prompt template with {{variable}} substitution.",
       "family": "llm",
@@ -3456,6 +3472,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Apply a fitted Model to data via predict or score_samples.",
       "family": "ml",
@@ -3517,6 +3534,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Fit a curated, allow-listed sklearn clustering/mixture/outlier-detection estimator.",
       "family": "ml",
@@ -3607,6 +3625,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Cross-validate a curated, fit-archetype sklearn estimator.",
       "family": "ml",
@@ -3731,6 +3750,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Score a fitted model against labeled data.",
       "family": "ml",
@@ -3770,6 +3790,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Fit a curated, allow-listed sklearn classifier or regressor.",
       "family": "ml",
@@ -3876,6 +3897,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Fit a curated, allow-listed sklearn unsupervised transformer.",
       "family": "ml",
@@ -3978,6 +4000,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Search a hyperparameter grid for a curated, fit-archetype sklearn estimator.",
       "family": "ml",
@@ -4111,6 +4134,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Fit an ordered chain of curated estimators as one sklearn Pipeline.",
       "family": "ml",
@@ -4169,6 +4193,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Apply a fitted model to data, producing predictions.",
       "family": "ml",
@@ -4208,6 +4233,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Return a structural, inspectable summary of a fitted model.",
       "family": "ml",
@@ -4238,6 +4264,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Train a logistic-regression classifier and report evaluation metrics.",
       "family": "ml",
@@ -4323,6 +4350,7 @@
       "version": 2
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Fit a random-forest classifier or regressor.",
       "family": "ml",
@@ -4429,6 +4457,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Fit a linear-regression model.",
       "family": "ml",
@@ -4478,6 +4507,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Split a DataFrame into train and test sets.",
       "family": "ml",
@@ -4554,6 +4584,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Machine Learning",
       "description": "Apply a fitted Transformer to data via transform or score_samples.",
       "family": "ml",
@@ -4615,6 +4646,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Neural Network",
       "description": "A linear (fully-connected) layer.",
       "family": "nn",
@@ -4664,6 +4696,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Neural Network",
       "description": "An nn.Module that owns a subgraph of layers.",
       "family": "nn",
@@ -4675,6 +4708,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Neural Network",
       "description": "A ReLU activation layer.",
       "family": "nn",
@@ -4705,6 +4739,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Reporting",
       "description": "Generate an HTML profiling report summarising a DataFrame.",
       "family": "reports",
@@ -4754,6 +4789,7 @@
       "version": 2
     },
     {
+      "advisor_persona": null,
       "category": "Statistics",
       "description": "One-way ANOVA testing a numeric column across groups.",
       "family": "stats",
@@ -4821,6 +4857,7 @@
       "version": 2
     },
     {
+      "advisor_persona": null,
       "category": "Statistics",
       "description": "One-shot exploratory data analysis: summary frames + curated plots.",
       "family": "stats",
@@ -4924,6 +4961,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Statistics",
       "description": "Compute a pairwise correlation matrix.",
       "family": "stats",
@@ -4995,6 +5033,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Statistics",
       "description": "Compute summary statistics for numeric columns.",
       "family": "stats",
@@ -5044,6 +5083,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Statistics",
       "description": "Run a curated diagnostic that operates on a raw DataFrame (e.g. VIF).",
       "family": "stats",
@@ -5104,6 +5144,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Statistics",
       "description": "Run a curated diagnostic on a fitted StatsModel's residuals.",
       "family": "stats",
@@ -5166,6 +5207,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Statistics",
       "description": "Per-numeric-column quantiles and spread (min/p05/p25/p50/p75/p95/max/IQR).",
       "family": "stats",
@@ -5215,6 +5257,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Statistics",
       "description": "Per-column profile: dtype, missingness, cardinality, skew/kurtosis.",
       "family": "stats",
@@ -5264,6 +5307,7 @@
       "version": 1
     },
     {
+      "advisor_persona": "researcher",
       "category": "Statistics",
       "description": "Fit a curated, allow-listed statistical model (regression/GLM/...).",
       "family": "stats",
@@ -5402,6 +5446,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Statistics",
       "description": "Split-apply-combine: group by column(s) and aggregate.",
       "family": "stats",
@@ -5486,6 +5531,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Statistics",
       "description": "Per-column null counts and percentages.",
       "family": "stats",
@@ -5535,6 +5581,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Statistics",
       "description": "Two-sample t-test between two groups.",
       "family": "stats",
@@ -5620,6 +5667,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Visualization",
       "description": "Render a curated, allow-listed chart (plotly.express) from a DataFrame.",
       "family": "viz",
@@ -5699,6 +5747,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Visualization",
       "description": "Render an ACF or PACF bar plot of a fitted StatsModel's residuals.",
       "family": "viz",
@@ -5760,6 +5809,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Visualization",
       "description": "Render a coefficient / forest plot from a fitted StatsModel.",
       "family": "viz",
@@ -5790,6 +5840,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Visualization",
       "description": "Render a confusion-matrix heatmap for a fitted classifier.",
       "family": "viz",
@@ -5829,6 +5880,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Visualization",
       "description": "Render a heatmap from a tidy correlation matrix (stats.correlation's output).",
       "family": "viz",
@@ -5859,6 +5911,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Visualization",
       "description": "Render a Q-Q plot of a fitted StatsModel's residuals against a normal.",
       "family": "viz",
@@ -5889,6 +5942,7 @@
       "version": 1
     },
     {
+      "advisor_persona": null,
       "category": "Visualization",
       "description": "Render a fitted-values-vs-residuals scatter plot from a fitted StatsModel.",
       "family": "viz",

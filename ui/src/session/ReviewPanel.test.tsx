@@ -17,6 +17,10 @@ vi.mock("./sessionClient", () => ({
   subscribeToSessionEvents: vi.fn(() => ({ close: vi.fn() })),
   createReview: vi.fn(),
   addReviewComment: vi.fn(),
+  createGate: vi.fn(),
+  closeGateRequest: vi.fn(),
+  skipGateRequest: vi.fn(),
+  postGateDecision: vi.fn(),
 }));
 
 function reviewThread(
@@ -41,6 +45,7 @@ beforeEach(() => {
     version: null,
     proposals: {},
     reviews: {},
+    gates: {},
     status: "idle",
     error: null,
     rebaseNeeded: false,

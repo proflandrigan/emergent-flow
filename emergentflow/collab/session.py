@@ -34,6 +34,13 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from emergentflow.codegen.validation import Diagnostics
+from emergentflow.collab.gates import (
+    Decision,
+    Gate,
+    GateAlreadyResolvedError,
+    GateStatus,
+    UnknownGateError,
+)
 from emergentflow.collab.review import (
     CollaborationState,
     ReviewComment,
@@ -74,6 +81,25 @@ class ProposalAlreadyResolvedError(SessionError):
     flipped to REJECTED, leaving the session's proposal status contradicting
     its own graph.
     """
+
+
+class OpenGatesError(SessionError):
+    """Raised when a session-scoped compile/execute is attempted while any gate is OPEN.
+
+    Carries the list of open gates so the route handler's 409 response names them (epic
+    text: "409 with the open-gate list") -- the message itself lists each open gate's id,
+    phase, and description, following this codebase's convention of a single informative
+    string in the {"error": ...} body (the same shape stale_version/proposal_already_resolved
+    already use) rather than inventing a second, richer error-body shape for just this case.
+    """
+
+    def __init__(self, session_id: str, open_gates: list[Gate]) -> None:
+        self.open_gates = open_gates
+        gate_list = "; ".join(f"{g.id!r} ({g.phase}, {g.kind.value})" for g in open_gates)
+        super().__init__(
+            f"session {session_id!r} has {len(open_gates)} open gate(s) blocking "
+            f"compile/execute: {gate_list}"
+        )
 
 
 class UnknownReviewError(SessionError):
@@ -419,6 +445,112 @@ class SessionStore:
                 },
             )
             return thread
+
+    def open_gate(self, session_id: str, gate: Gate) -> Gate:
+        """Store *gate* (status forced to OPEN regardless of what the caller passed --
+        opening a gate always starts it OPEN) and publish a ``gate_opened`` event.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            gate.status = GateStatus.OPEN
+            session.collab.gates[gate.id] = gate
+            self._publish(
+                session_id,
+                {"type": "gate_opened", "session_id": session_id, "gate_id": gate.id},
+            )
+            return gate
+
+    def _get_gate(self, session: GraphSession, gate_id: str) -> Gate:
+        gate = session.collab.gates.get(gate_id)
+        if gate is None:
+            raise UnknownGateError(f"no gate with id {gate_id!r} on session {session.id!r}.")
+        return gate
+
+    def _resolve_gate(
+        self, session_id: str, gate_id: str, new_status: GateStatus, event_type: str
+    ) -> Gate:
+        """Shared close/skip transition: one-shot, OPEN -> new_status only."""
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            gate = self._get_gate(session, gate_id)
+            if gate.status != GateStatus.OPEN:
+                raise GateAlreadyResolvedError(
+                    f"session {session_id!r}: gate {gate_id!r} is already "
+                    f"{gate.status.value} and cannot be re-resolved."
+                )
+            gate.status = new_status
+            self._publish(
+                session_id,
+                {"type": event_type, "session_id": session_id, "gate_id": gate_id},
+            )
+            return gate
+
+    def close_gate(self, session_id: str, gate_id: str) -> Gate:
+        """Close an OPEN gate. Raises UnknownSessionError, UnknownGateError,
+        GateAlreadyResolvedError."""
+        return self._resolve_gate(session_id, gate_id, GateStatus.CLOSED, "gate_closed")
+
+    def skip_gate(self, session_id: str, gate_id: str) -> Gate:
+        """Skip an OPEN gate. Raises UnknownSessionError, UnknownGateError,
+        GateAlreadyResolvedError."""
+        return self._resolve_gate(session_id, gate_id, GateStatus.SKIPPED, "gate_skipped")
+
+    def assert_no_open_gates(self, session_id: str) -> None:
+        """Raise OpenGatesError if *session_id* has any gate with status OPEN.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        OpenGatesError
+            If one or more gates are OPEN.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            open_gates = [g for g in session.collab.gates.values() if g.status == GateStatus.OPEN]
+            if open_gates:
+                raise OpenGatesError(session_id, open_gates)
+
+    def add_decision(self, session_id: str, gate_id: str, decision: Decision) -> Gate:
+        """Append *decision* to gate *gate_id*'s timeline and publish a
+        ``decision_added`` event. Appending a decision is allowed regardless of the
+        gate's status (a decision is a historical record; it doesn't reopen a
+        closed gate).
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        UnknownGateError
+            If no gate with that id exists on the session.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            gate = self._get_gate(session, gate_id)
+            gate.decisions.append(decision)
+            self._publish(
+                session_id,
+                {
+                    "type": "decision_added",
+                    "session_id": session_id,
+                    "gate_id": gate_id,
+                    "decision_id": decision.id,
+                },
+            )
+            return gate
 
 
 # A process-wide default store, lazily created (the report-store precedent --

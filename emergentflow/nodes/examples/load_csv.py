@@ -38,6 +38,7 @@ class LoadCsv(NodeDefinition):
     # execute() re-reads the file at `path` on every call; the file's content can
     # change without the `path` param changing, so this is not a pure function of
     # its declared params (see NodeDefinition.cacheable's docstring).
+    advisor_persona = "data_modeller"
     cacheable = False
 
     ports = [

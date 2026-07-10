@@ -37,6 +37,30 @@ export interface ReviewThread {
   status: ReviewStatus;
 }
 
+export type GateKind = "phase" | "confirm" | "handoff" | "execute" | "final";
+export type GateStatus = "open" | "closed" | "skipped";
+
+export interface Decision {
+  id: string;
+  author: string;
+  text: string;
+}
+
+export interface Gate {
+  id: string;
+  phase: string;
+  kind: GateKind;
+  description: string;
+  status: GateStatus;
+  decisions: Decision[];
+}
+
+export interface CreateGateInput {
+  phase: string;
+  kind: GateKind;
+  description: string;
+}
+
 export interface CreateReviewInput {
   author: string;
   findings?: Diagnostic[];
@@ -48,7 +72,10 @@ export interface GraphSession {
   graph: Graph;
   version: number;
   proposals: Record<string, StoredProposal>;
-  collab?: { reviews: Record<string, ReviewThread> };
+  collab?: {
+    reviews: Record<string, ReviewThread>;
+    gates: Record<string, Gate>;
+  };
 }
 
 // Shared non-POST request helper mirroring postJson's error-handling contract (parses
@@ -97,6 +124,22 @@ export async function proposeMutation(
   return (await res.json()) as StoredProposal;
 }
 
+export interface ConsultInput {
+  persona: string;
+  node_ids: string[];
+  ask: string;
+  provider?: string;
+  model?: string;
+}
+
+export async function consultSession(
+  sessionId: string,
+  input: ConsultInput,
+): Promise<StoredProposal> {
+  const res = await postJson(`/sessions/${sessionId}/consult`, input);
+  return (await res.json()) as StoredProposal;
+}
+
 export async function acceptProposal(
   sessionId: string,
   proposalId: string,
@@ -137,6 +180,45 @@ export async function addReviewComment(
     comment,
   );
   return (await res.json()) as ReviewThread;
+}
+
+export async function createGate(
+  sessionId: string,
+  input: CreateGateInput,
+): Promise<Gate> {
+  const res = await postJson(`/sessions/${sessionId}/gates`, input);
+  return (await res.json()) as Gate;
+}
+
+export async function closeGateRequest(
+  sessionId: string,
+  gateId: string,
+): Promise<Gate> {
+  const res = await postJson(
+    `/sessions/${sessionId}/gates/${gateId}/close`,
+    {},
+  );
+  return (await res.json()) as Gate;
+}
+
+export async function skipGateRequest(
+  sessionId: string,
+  gateId: string,
+): Promise<Gate> {
+  const res = await postJson(`/sessions/${sessionId}/gates/${gateId}/skip`, {});
+  return (await res.json()) as Gate;
+}
+
+export async function postGateDecision(
+  sessionId: string,
+  gateId: string,
+  decision: { author: string; text: string },
+): Promise<Gate> {
+  const res = await postJson(
+    `/sessions/${sessionId}/gates/${gateId}/decisions`,
+    decision,
+  );
+  return (await res.json()) as Gate;
 }
 
 export interface SessionEventSubscription {
