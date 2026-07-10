@@ -151,6 +151,10 @@ dev = [
     "fastapi>=0.110,<1",
     "uvicorn[standard]>=0.29,<1",
     "httpx>=0.27",
+    # Mirrors the `mcp` optional-extra (Epic 14 Story 7) so `uv sync` (which installs the
+    # dev group) keeps tests/test_collab_mcp.py's happy-path tests -- which assume fastmcp
+    # IS installed, unlike the torch/litellm-style importorskip tests -- runnable in CI.
+    "fastmcp>=3.4.4",
 ]
 
 [tool.setuptools.dynamic]
