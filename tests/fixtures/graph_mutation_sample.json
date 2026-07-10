@@ -1,0 +1,37 @@
+{
+  "add_edges": [],
+  "add_nodes": [
+    {
+      "group_id": null,
+      "id": "8a30ecd8-1b7b-43d5-85b4-306dd2c375ca",
+      "label": null,
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "id": "57d891ed-022c-4161-b86e-7d0b8901c6ba",
+          "name": "frame"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "subgraph": null,
+      "type": "data.load_csv"
+    }
+  ],
+  "author": "human",
+  "base_version": 0,
+  "description": "Add a data.load_csv node for loading CSV data",
+  "remove_edges": [],
+  "remove_nodes": [],
+  "set_params": {
+    "existing-node-id": {
+      "some-param": "some-value"
+    }
+  }
+}

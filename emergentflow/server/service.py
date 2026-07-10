@@ -188,6 +188,45 @@ def get_personas() -> dict[str, Any]:
     return {"personas": [p.model_dump(mode="json") for p in list_personas()]}
 
 
+def save_knowledge(payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate *payload* as a KnowledgeEntry, persist it, and return the saved
+    entry with its computed port signature (Epic 14 Story 10)."""
+    from emergentflow.collab.knowledge import KnowledgeEntry
+    from emergentflow.collab.knowledge import get_default_store as get_default_knowledge_store
+
+    entry = KnowledgeEntry.model_validate(payload)
+    saved_entry = get_default_knowledge_store().save(entry)
+    return saved_entry.model_dump(mode="json")
+
+
+def list_knowledge(
+    *,
+    in_type: str | None = None,
+    out_type: str | None = None,
+    tag: str | None = None,
+) -> dict[str, Any]:
+    """Return every matching knowledge entry filtered by in_type/out_type/tag (Epic 14 Story 10).
+
+    All filters are optional and AND together; omit all to list every entry.
+    """
+    from emergentflow.collab.knowledge import get_default_store as get_default_knowledge_store
+
+    entries = get_default_knowledge_store().list(in_type=in_type, out_type=out_type, tag=tag)
+    return {"entries": [e.model_dump(mode="json") for e in entries]}
+
+
+def get_knowledge_entry(slug: str) -> dict[str, Any]:
+    """Return a single knowledge entry by slug (Epic 14 Story 10).
+
+    Raises ``UnknownKnowledgeEntryError`` (propagated to the route layer) when
+    *slug* does not match any stored entry.
+    """
+    from emergentflow.collab.knowledge import get_default_store as get_default_knowledge_store
+
+    entry = get_default_knowledge_store().get(slug)
+    return entry.model_dump(mode="json")
+
+
 def consult_graph(payload: dict[str, Any], *, client: LLMClient) -> dict[str, Any]:
     """POST /consult: a sessionless one-shot Mode-B consult.
 

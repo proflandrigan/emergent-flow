@@ -228,3 +228,77 @@ compiler's own `_assemble(graph).out_ports` locates each leaf artifact's compile
 precisely, so the comparison never depends on dict-insertion-order luck. The committed JSON
 matches each builder (drift guard); node/edge counts and node types are as expected; and the
 compiled code for both demos passes `ast.parse` + `ruff check`.
+
+## Agent Collaboration Today (Epic 14) — human + agent on one canvas
+
+Graph sessions (`emergentflow/collab/session.py`) let a human and an agent co-author one shared
+graph over plain HTTP. An agent proposes changes as a `GraphMutation` (it never edits files),
+the server validates the proposal before the human ever sees it (validate-on-propose), and an
+accepted proposal becomes an ORDINARY graph — the exact same `/compile`/`/execute` a solo canvas
+user hits, so ADR-0002 needs no new equivalence case. The two demos below prove collaboration
+runs both directions.
+
+### Agent builds, human accepts: load_csv → describe, extended with a stats + chart pair
+
+```
+load_csv(sample.csv) ─→ describe
+                  └─→ describe (extension) ──→ plot(histogram)
+```
+
+A seeded session with a `data.load_csv` node feeding a `stats.describe` node (wired by edge
+`e1`). The agent discovers the session via `GET /sessions`, reads `/catalog`, and builds a
+proposed extension: a parallel second `stats.describe` (n3, labelled "Describe (extension)")
+reading from the same `load_csv` node, whose `summary` output port feeds a `viz.plot` node
+(n4, chart=`"histogram"`, encoding=`{"x": "score"}`) in series. The agent pre-flights the
+full 4-node candidate through `/validate` (clean diagnostics) and `/compile` (ruff-clean
+Python), then submits it as a `GraphMutation` with `author: "emergent-flow-collaborator"`.
+The human accepts via the ordinary proposal-accept machinery, the session version increments
+from 0 to 1, and the accepted graph compiles to ruff-clean Python and executes to real results
+— all asserted in `tests/test_acceptance_demo_agent_builds.py`.
+
+### Human builds, agent reviews: a planted encoding flaw, fixed via a review's attached mutation
+
+```
+load_csv(sample.csv, encoding="latin-1")
+              ↑  ⚠️ reviewer: "stale encoding, recommend utf-8"
+```
+
+A human seeds a session with a single `data.load_csv` node that reads the bundled sample CSV
+but has `encoding` pinned to `"latin-1"` (stale — the modern default is `"utf-8"`). The
+`data_modeller` persona (following the Review workflow in `agents/emergent-flow-collaborator.md`)
+posts two findings on the session: an **info** finding (`grain_check`: "grain is trivially one
+row per source row") with no fix attached, and a **warning** finding (`encoding_stale`:
+"encoding is pinned to latin-1; recommend utf-8") with a `GraphMutation` fix (`set_params`:
+n1's encoding → `"utf-8"`). The human replies ("Good catch, applying now."), then applies the
+fix by posting the review's attached mutation as an ordinary proposal — there is zero new
+"apply" code (Story 6/4's point — the fix rides the same proposal machinery as any other
+delta). The accepted graph re-validates clean, compiles to ruff-clean Python, and executes to
+real results — all asserted in `tests/test_acceptance_demo_human_builds.py`.
+
+### Where they live
+
+- **`tests/test_acceptance_demo_agent_builds.py`** /
+  **`tests/test_acceptance_demo_human_builds.py`** — the CI-enforced source of truth for both
+  demos.
+- **`examples/agent_collaboration_acceptance_demo/`** — the seed graphs (`seed_graph_agent_builds.json`,
+  `seed_graph_human_builds.json`), persona-file pointers, and human-readable `curl`-style call
+  sequence transcripts (`transcript_agent_builds.md`, `transcript_human_builds.md`) for both
+  demos.
+- **`agents/emergent-flow-collaborator.md`** — the full collaboration protocol (find the
+  server, sessions, catalog, pre-flight, propose, accept) that both demos' scripted agent
+  follows.
+- **`agents/data-modeller.md`** — the reviewer persona used in the "human builds, agent
+  reviews" demo.
+
+### How they're verified
+
+Both demos run entirely as scripted pytest HTTP clients over `TestClient(create_app())` — no
+LLM, no live network; the "agent" IS the test. The accepted/fixed graph in each demo is proven
+`ast.parse`-valid and `ruff check`-clean, then actually executed via `/execute` with per-node
+`"status": "ok"` assertions, mirroring the Epic 8/12/13 demos' own `ast.parse` + `ruff check`
+discipline (see the Epic 13 section above) extended one step further to also execute.
+
+The manual milestone — a live Claude Code session with the persona file driving the same flows
+against a real `emergentflow serve` process, ghost diff visible on the canvas — is the
+human-observable proof-of-concept companion to these CI tests (not itself CI-checked; see
+`epics/epic-14-agent-collaboration.md` Story 12's unchecked manual-milestone line).

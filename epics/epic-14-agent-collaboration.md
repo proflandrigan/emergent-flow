@@ -418,21 +418,21 @@ the autonomous-research loop (plan §7 — explicitly deferred here, gated on Ep
 > slug-keyed store + port-signature discovery. Dedup/versioning/GC are recorded as real costs
 > and deferred until usage demands them (plan rev-2 §6).
 
-- [ ] `KnowledgeEntry{slug, description, subgraph: Graph, tags, created_by, metrics}` in a
+- [x] `KnowledgeEntry{slug, description, subgraph: Graph, tags, created_by, metrics}` in a
   standalone store (`emergentflow/collab/knowledge.py`) — **workspace-level, never a `Graph`
   field**; metadata tier per ADR 0004 (JSON file under the workspace locally). Routes:
   `GET/POST /knowledge`, `GET /knowledge/{slug}`; exposed as MCP tools.
-- [ ] Discovery by **dangling-port signature**: compute an entry's unbound IN-port types →
+- [x] Discovery by **dangling-port signature**: compute an entry's unbound IN-port types →
   produced OUT-port types via `infer_graph_types` (`emergentflow/codegen/inference.py`) at
   save time; `GET /knowledge?in=DataFrame&out=FittedModel` + tag filter. No embeddings — a
   later luxury.
-- [ ] Persona behaviors (Mode A, documented in the persona files): **harvest** — after a
+- [x] Persona behaviors (Mode A, documented in the persona files): **harvest** — after a
   session graph is accepted+validated, the agent may propose a parameterized fragment as a
   `KnowledgeEntry` (human confirms via the same proposal UX); **retrieve** — on a fresh ask,
   the agent queries by signature and proposes a matching fragment as its `GraphMutation`.
-- [ ] Tests: save→discover round-trip; signature computed correctly for a fragment with
+- [x] Tests: save→discover round-trip; signature computed correctly for a fragment with
   unbound inputs; a retrieved fragment applies through `apply_mutation` and validates.
-- [ ] **Works-without-agents check:** store created lazily; nothing outside `collab/`
+- [x] **Works-without-agents check:** store created lazily; nothing outside `collab/`
   imports it; the knowledge file's absence is a normal empty state.
 
 ## Story 11 — The works-without-agents regression suite + contract stability at scale
@@ -440,24 +440,24 @@ the autonomous-research loop (plan §7 — explicitly deferred here, gated on Ep
 > The epic's CRITICAL invariant, made permanent CI instead of a launch-day claim. Mirror the
 > Epic 13 Story 9 role: one story that turns every "check" scattered above into gates.
 
-- [ ] **Import-isolation gate:** a test that runs the full pre-existing suite selection with
+- [x] **Import-isolation gate:** a test that runs the full pre-existing suite selection with
   an import hook asserting `emergentflow.collab` (and the MCP lib) are never imported; plus
   the existing light-import test extended to prove `import emergentflow` pulls in no collab
   module.
-- [ ] **Byte-identical solo path:** golden tests that a representative graph's
+- [x] **Byte-identical solo path:** golden tests that a representative graph's
   `compile_to_code` output, `/compile` + `/validate` + `/execute` responses, and canvas
   IR round-trip (`toIR`/`fromIR`) are unchanged from pre-epic goldens; `ir.schema.json`
   asserted untouched; `CURRENT_SCHEMA_VERSION` asserted `== 1` with a comment tying it to
   this epic's invariant.
-- [ ] **Dependency gate:** lockfile check that the base dependency set gained nothing;
+- [x] **Dependency gate:** lockfile check that the base dependency set gained nothing;
   `[mcp]` extra verified optional via the absent-import test (Story 7).
-- [ ] **No-ambient-LLM gate:** grep-level + runtime assertion that no session/proposal/review
+- [x] **No-ambient-LLM gate:** grep-level + runtime assertion that no session/proposal/review
   route constructs an LLM client; only `/consult` may, and only when configured.
-- [ ] **Contract stability:** goldens on `mutation.schema.json` + session/event schemas
+- [x] **Contract stability:** goldens on `mutation.schema.json` + session/event schemas
   (the export_ui_contracts flow) so a model change is a reviewed diff; ajv round-trip tests
   UI-side; a `GraphMutation` serialized by the pytest agent deserializes identically in TS
   (fixture shared across both test suites, the Epic 13 fixture discipline).
-- [ ] Wire all of the above into `.github/workflows/ci.yml` alongside the existing gates.
+- [x] Wire all of the above into `.github/workflows/ci.yml` alongside the existing gates.
 
 ## Story 12 — Acceptance demos (the payoff: collaboration in both directions)
 
@@ -470,15 +470,15 @@ the autonomous-research loop (plan §7 — explicitly deferred here, gated on Ep
   extending it with a stats + chart pair discovered from `/catalog`; ghost diff renders with
   a clean verdict; accept; the graph compiles to ruff-clean `.py` and executes to results —
   asserted end-to-end in CI, demonstrated live with Claude Code against `emergentflow serve`.
-- [ ] **Acceptance demo (human builds, agent reviews):** a human-built graph with a planted
+- [x] **Acceptance demo (human builds, agent reviews):** a human-built graph with a planted
   flaw (e.g. a t-test fed by an obviously non-normal column, or a join on mismatched keys);
   the scripted reviewer posts anchored findings (`info` + `warning`) with a fix-mutation;
   the human applies the fix from the finding; re-validate is clean; compile + execute.
-- [ ] Document both under `docs/acceptance-demo.md` ("human + agent on one canvas — what the
+- [x] Document both under `docs/acceptance-demo.md` ("human + agent on one canvas — what the
   app can do today") and add `examples/agent_collaboration_acceptance_demo/` (the Epic 8/12/13
   `examples/*_acceptance_demo/` precedent) with the seeded graphs, the persona files, and the
   scripted-agent transcripts.
-- [ ] Update `epics/README.md` mapping table with the Epic 14 row (done at epic kickoff —
+- [x] Update `epics/README.md` mapping table with the Epic 14 row (done at epic kickoff —
   keep it accurate at close).
 
 ---

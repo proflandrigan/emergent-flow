@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "paradigm": "functional",
+  "nodes": {
+    "n1": {
+      "id": "n1",
+      "type": "data.load_csv",
+      "label": "Load CSV",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "path",
+          "type_token": "str",
+          "value": "examples/vertical_slice/sample.csv",
+          "default": null
+        },
+        {
+          "name": "encoding",
+          "type_token": "str",
+          "value": "utf-8",
+          "default": "utf-8"
+        }
+      ],
+      "ports": [
+        {
+          "id": "p1",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null
+    },
+    "n2": {
+      "id": "n2",
+      "type": "stats.describe",
+      "label": "Describe",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "columns",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "p2-in",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        },
+        {
+          "id": "p2-out",
+          "name": "summary",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one"
+        }
+      ],
+      "position": {
+        "x": 260.0,
+        "y": 0.0
+      },
+      "group_id": null
+    }
+  },
+  "edges": {
+    "e1": {
+      "id": "e1",
+      "source": {
+        "node_id": "n1",
+        "port_id": "p1"
+      },
+      "target": {
+        "node_id": "n2",
+        "port_id": "p2-in"
+      }
+    }
+  }
+}
