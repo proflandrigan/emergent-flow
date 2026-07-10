@@ -65,7 +65,7 @@ class Correlation(NodeDefinition):
             default=None,
             label="Columns",
             help="Columns to correlate; empty/unset correlates all numeric columns.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
     ]
 

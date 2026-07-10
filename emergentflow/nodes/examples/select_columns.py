@@ -58,7 +58,7 @@ class SelectColumns(NodeDefinition):
             required=True,
             label="Columns",
             help="Column names to keep or drop.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="drop",

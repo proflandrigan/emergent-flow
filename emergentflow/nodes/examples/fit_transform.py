@@ -86,6 +86,7 @@ class FitTransform(NodeDefinition):
             label="Target column",
             help="Only needed for supervised feature selectors (e.g. SelectKBest); "
             "leave unset for unsupervised transformers.",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="features",
@@ -94,6 +95,7 @@ class FitTransform(NodeDefinition):
             label="Feature columns",
             help="Columns to use as features; empty/unset uses every other column "
             "(excluding the target column, if given).",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="params",

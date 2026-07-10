@@ -17,12 +17,14 @@ import { useGraphStore } from "../store/graphStore";
 import type { NodeModel, ParamModel } from "../store/model";
 import {
   formatValue,
+  isListType,
   parseValue,
   validateValue,
   widgetForParam,
 } from "./widgets";
 import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
+import { ColumnSelect, ColumnMultiSelect } from "./ColumnSelect";
 import { QueryBuilderPreview } from "./QueryBuilderPreview";
 
 // Node types whose `params` dict param holds curated sklearn estimator constructor kwargs
@@ -207,6 +209,29 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
         onChange={(value) => setParam(node.id, param.name, parseValue(catalogParam, value))}
       />
     );
+  } else if (kind === "column") {
+    if (isListType(catalogParam.type_token)) {
+      const arrValue = Array.isArray(param.value) ? (param.value as string[]) : [];
+      widget = (
+        <ColumnMultiSelect
+          nodeId={node.id}
+          testId={testId}
+          value={arrValue}
+          onChange={(cols) => setParam(node.id, param.name, cols)}
+        />
+      );
+    } else {
+      widget = (
+        <ColumnSelect
+          nodeId={node.id}
+          testId={testId}
+          value={formatValue(catalogParam, param.value)}
+          onChange={(val) =>
+            setParam(node.id, param.name, val)
+          }
+        />
+      );
+    }
   } else {
     // text + list both edit as a plain text input; `parseValue` splits a list on commas, and
     // the "comma-separated" hint below is rendered only for the list kind.

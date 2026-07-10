@@ -77,6 +77,16 @@ describe("widgetForParam", () => {
   test("str -> text", () => {
     expect(widgetForParam(param({ type_token: "str" }))).toBe("text");
   });
+
+  test("returns column for widget hint column (str)", () => {
+    const p = param({ type_token: "str", hints: { widget: "column" } });
+    expect(widgetForParam(p)).toBe("column");
+  });
+
+  test("returns column for widget hint column (list[str])", () => {
+    const p = param({ type_token: "list[str]", hints: { widget: "column" } });
+    expect(widgetForParam(p)).toBe("column");
+  });
 });
 
 describe("formatValue", () => {

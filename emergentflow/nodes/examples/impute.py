@@ -65,7 +65,7 @@ class ImputeMissing(NodeDefinition):
             default=None,
             label="Columns",
             help="Columns to impute; empty/unset imputes every column.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
     ]
 

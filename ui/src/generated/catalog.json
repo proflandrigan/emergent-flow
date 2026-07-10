@@ -2177,7 +2177,7 @@
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Column",
           "name": "column",
@@ -2293,7 +2293,7 @@
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -2343,7 +2343,7 @@
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -3576,7 +3576,16 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -3683,7 +3692,16 @@
         {
           "default": null,
           "help": "Column to predict.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": true,
@@ -3692,7 +3710,16 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -3848,7 +3875,16 @@
         {
           "default": null,
           "help": "Column to predict.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": true,
@@ -3857,7 +3893,16 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -3942,7 +3987,16 @@
         {
           "default": null,
           "help": "Only needed for supervised feature selectors (e.g. SelectKBest); leave unset for unsupervised transformers.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": false,
@@ -3951,7 +4005,16 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column (excluding the target column, if given).",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -4067,7 +4130,16 @@
         {
           "default": null,
           "help": "Column to predict.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": true,
@@ -4076,7 +4148,16 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -4153,7 +4234,16 @@
         {
           "default": null,
           "help": "Column to predict; required only when the final step is a fit-archetype (supervised) estimator.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": false,
@@ -4162,7 +4252,16 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -4274,7 +4373,16 @@
         {
           "default": null,
           "help": "Column to predict.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": true,
@@ -4283,7 +4391,16 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -4360,7 +4477,16 @@
         {
           "default": null,
           "help": "Column to predict.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": true,
@@ -4369,7 +4495,16 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -4467,7 +4602,16 @@
         {
           "default": null,
           "help": "Column to predict.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": true,
@@ -4476,7 +4620,16 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -4799,7 +4952,16 @@
         {
           "default": null,
           "help": "Column whose distinct values define the groups.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Group column",
           "name": "group_col",
           "required": true,
@@ -4808,7 +4970,16 @@
         {
           "default": null,
           "help": "Column whose values are compared across groups.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Value column",
           "name": "value_col",
           "required": true,
@@ -4875,7 +5046,7 @@
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -5001,7 +5172,7 @@
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -5051,7 +5222,7 @@
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -5225,7 +5396,7 @@
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -5275,7 +5446,7 @@
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -5343,7 +5514,16 @@
         {
           "default": null,
           "help": "Column to predict.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": true,
@@ -5352,7 +5532,16 @@
         {
           "default": null,
           "help": "Predictor columns (fixed effects).",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Fixed effects",
           "name": "fixed_effects",
           "required": false,
@@ -5361,7 +5550,16 @@
         {
           "default": null,
           "help": "Random-effect columns (mixed-effects models only).",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Random effects",
           "name": "random_effects",
           "required": false,
@@ -5406,7 +5604,16 @@
         {
           "default": null,
           "help": "Column of observation weights (WLS, or weighted GLM).",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Weights column",
           "name": "weights",
           "required": false,
@@ -5456,7 +5663,16 @@
         {
           "default": null,
           "help": "Grouping column(s).",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Group by",
           "name": "by",
           "required": true,
@@ -5499,7 +5715,7 @@
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Value columns",
           "name": "columns",
@@ -5591,7 +5807,16 @@
         {
           "default": null,
           "help": "Column with exactly two groups.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Group column",
           "name": "group_col",
           "required": true,
@@ -5600,7 +5825,16 @@
         {
           "default": null,
           "help": "Numeric column to compare.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Value column",
           "name": "value_col",
           "required": true,

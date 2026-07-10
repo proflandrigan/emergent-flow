@@ -97,7 +97,7 @@ class AutoEda(NodeDefinition):
             default=None,
             label="Columns",
             help="Columns to analyze; empty/unset analyzes all columns.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
     ]
 

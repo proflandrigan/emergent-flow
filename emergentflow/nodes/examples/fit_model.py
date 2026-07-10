@@ -84,6 +84,7 @@ class FitModel(NodeDefinition):
             required=True,
             label="Target column",
             help="Column to predict.",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="fixed_effects",
@@ -91,6 +92,7 @@ class FitModel(NodeDefinition):
             default=None,
             label="Fixed effects",
             help="Predictor columns (fixed effects).",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="random_effects",
@@ -98,6 +100,7 @@ class FitModel(NodeDefinition):
             default=None,
             label="Random effects",
             help="Random-effect columns (mixed-effects models only).",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="linear_terms",
@@ -134,6 +137,7 @@ class FitModel(NodeDefinition):
             default=None,
             label="Weights column",
             help="Column of observation weights (WLS, or weighted GLM).",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="spec_extra",

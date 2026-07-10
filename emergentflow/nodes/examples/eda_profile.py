@@ -57,7 +57,7 @@ class EdaProfile(NodeDefinition):
             default=None,
             label="Columns",
             help="Columns to profile; empty/unset profiles all columns.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
     ]
 

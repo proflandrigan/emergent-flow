@@ -57,7 +57,7 @@ class DistributionSummary(NodeDefinition):
             default=None,
             label="Columns",
             help="Columns to summarize; empty/unset summarizes all numeric columns.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
     ]
 

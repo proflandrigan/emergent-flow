@@ -26,7 +26,7 @@ from emergentflow.ml import fit_pipeline
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec
+from ..spec import ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -75,6 +75,7 @@ class Pipeline(NodeDefinition):
             label="Target column",
             help="Column to predict; required only when the final step is a "
             "fit-archetype (supervised) estimator.",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="features",
@@ -82,6 +83,7 @@ class Pipeline(NodeDefinition):
             default=None,
             label="Feature columns",
             help="Columns to use as features; empty/unset uses every other column.",
+            hints=ValidationHints(widget="column"),
         ),
     ]
 

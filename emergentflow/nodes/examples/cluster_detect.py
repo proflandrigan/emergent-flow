@@ -92,6 +92,7 @@ class ClusterDetect(NodeDefinition):
             default=None,
             label="Feature columns",
             help="Columns to use as features; empty/unset uses every column.",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="params",

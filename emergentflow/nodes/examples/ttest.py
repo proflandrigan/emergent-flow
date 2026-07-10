@@ -57,6 +57,7 @@ class TTest(NodeDefinition):
             required=True,
             label="Group column",
             help="Column with exactly two groups.",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="value_col",
@@ -64,6 +65,7 @@ class TTest(NodeDefinition):
             required=True,
             label="Value column",
             help="Numeric column to compare.",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="equal_var",

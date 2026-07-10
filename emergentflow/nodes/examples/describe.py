@@ -57,7 +57,7 @@ class Describe(NodeDefinition):
             default=None,
             label="Columns",
             help="Columns to describe; empty/unset describes all numeric columns.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
     ]
 

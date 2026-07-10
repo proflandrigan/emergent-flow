@@ -72,6 +72,7 @@ class FitEstimator(NodeDefinition):
             required=True,
             label="Target column",
             help="Column to predict.",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="features",
@@ -79,6 +80,7 @@ class FitEstimator(NodeDefinition):
             default=None,
             label="Feature columns",
             help="Columns to use as features; empty/unset uses every other column.",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="params",

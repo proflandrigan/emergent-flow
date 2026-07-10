@@ -58,7 +58,7 @@ class FilterRows(NodeDefinition):
             required=True,
             label="Column",
             help="Column to test.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="operator",
