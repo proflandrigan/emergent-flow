@@ -22,7 +22,12 @@ from emergentflow.codegen.compiler import compile_to_code
 from emergentflow.ir.common import Direction
 from emergentflow.ir.edge import Edge, PortRef
 from emergentflow.ir.graph import Graph
-from emergentflow.nodes.examples import DiagnosticFrame, DiagnosticModel, FitModel, LoadSample
+from emergentflow.nodes.examples import (
+    DiagnosticFrame,
+    DiagnosticModel,
+    FitLinearRegression,
+    LoadSample,
+)
 from emergentflow.stats.diagnostics import get_diagnostic_spec, known_diagnostic_keys
 
 _FRAME_DIAGNOSTIC_KEYS = [k for k in known_diagnostic_keys() if get_diagnostic_spec(k).needs_frame]
@@ -71,8 +76,8 @@ def _build_load_diagnostic_frame_graph() -> Graph:
 
 def _build_load_fit_diagnostic_model_graph() -> Graph:
     load = LoadSample().instantiate(name="diabetes", label="Load Sample")
-    fit = FitModel().instantiate(
-        model="OLS", target="target", fixed_effects=["age", "bmi"], label="Fit OLS"
+    fit = FitLinearRegression().instantiate(
+        estimator="OLS", target="target", fixed_effects=["age", "bmi"], label="Fit OLS"
     )
     diag = DiagnosticModel().instantiate(diagnostic="normality", label="Normality")
     load_to_fit = Edge(
@@ -136,8 +141,8 @@ def test_diagnostic_frame_equivalence_matrix(diagnostic_key: str) -> None:
 @pytest.mark.parametrize("diagnostic_key", _MODEL_DIAGNOSTIC_KEYS)
 def test_diagnostic_model_equivalence_matrix(diagnostic_key: str) -> None:
     df = _regression_df()
-    fit_defn = FitModel()
-    fit_node = fit_defn.instantiate(model="OLS", target="y", fixed_effects=["x1", "x2"])
+    fit_defn = FitLinearRegression()
+    fit_node = fit_defn.instantiate(estimator="OLS", target="y", fixed_effects=["x1", "x2"])
     fitted_model = fit_defn.execute(fit_node, inputs={"frame": df.copy()})["model"]
 
     defn = DiagnosticModel()

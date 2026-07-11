@@ -4,14 +4,11 @@ Golden + equivalence tests for the Epic 12 Story 4 regression/GLM catalog (OLS/W
 Mirrors ``tests/test_ml_supervised_catalog.py``'s two-part shape:
 
 1. Golden-code quality: for a representative spec (an OLS graph, a logistic-GLM graph), the
-   whole-graph ``compile_to_code`` output (LoadSample -> FitModel) is syntactically valid Python
-   and passes ``ruff check``.
-2. ADR-0002 equivalence: for each of OLS/WLS/GLS/GLM (hardcoded, not dynamically pulled from
-   ``keys_for_archetype("fit_model")`` -- that archetype will later also hold MixedLM/GAM
-   entries with incompatible spec shapes this file's fixtures don't build; see module docstring
-   of the task blueprint this file was generated from, now folded into this note), ``execute()``
-   and running the code ``codegen()`` emits produce the same fitted coefficient frame and
-   fit_stats.
+   whole-graph ``compile_to_code`` output (LoadSample -> FitLinearRegression/FitGLM) is
+   syntactically valid Python and passes ``ruff check``.
+2. ADR-0002 equivalence: for each of OLS/WLS/GLS (via ``FitLinearRegression``) and GLM (via
+   ``FitGLM``), ``execute()`` and running the code ``codegen()`` emits produce the same fitted
+   coefficient frame and fit_stats.
 """
 
 from __future__ import annotations
@@ -29,7 +26,7 @@ from emergentflow.codegen.compiler import compile_to_code
 from emergentflow.ir.common import Direction
 from emergentflow.ir.edge import Edge, PortRef
 from emergentflow.ir.graph import Graph
-from emergentflow.nodes.examples import FitModel, LoadSample
+from emergentflow.nodes.examples import FitGLM, FitLinearRegression, LoadSample
 
 
 def _out_port(node, name):
@@ -52,9 +49,9 @@ def _run_codegen(definition, node, scope):
 # ---------------------------------------------------------------------------
 
 
-def _build_load_fit_graph(dataset: str, fit_kwargs: dict[str, Any]) -> Graph:
+def _build_load_fit_graph(dataset: str, node_cls, fit_kwargs: dict[str, Any]) -> Graph:
     load = LoadSample().instantiate(name=dataset, label="Load Sample")
-    fit = FitModel().instantiate(label="Fit Model", **fit_kwargs)
+    fit = node_cls().instantiate(label="Fit Model", **fit_kwargs)
     edge = Edge(
         source=PortRef(node_id=load.id, port_id=_out_port(load, "frame").id),
         target=PortRef(node_id=fit.id, port_id=_in_port(fit, "frame").id),
@@ -63,13 +60,17 @@ def _build_load_fit_graph(dataset: str, fit_kwargs: dict[str, Any]) -> Graph:
 
 
 _GOLDEN_GRAPHS = {
-    "ols": ("diabetes", {"model": "OLS", "target": "target", "fixed_effects": ["age", "bmi"]}),
+    "ols": (
+        "diabetes",
+        FitLinearRegression,
+        {"estimator": "OLS", "target": "target", "fixed_effects": ["age", "bmi"]},
+    ),
     # Logistic-GLM representative: parse/lint only, never executed here (iris's "target" is a
     # 3-class label, not a valid binomial outcome -- fine for a syntax/lint-only golden check).
     "glm_logistic": (
         "iris",
+        FitGLM,
         {
-            "model": "GLM",
             "target": "target",
             "fixed_effects": ["sepal length (cm)"],
             "family": "binomial",
@@ -80,15 +81,15 @@ _GOLDEN_GRAPHS = {
 
 @pytest.mark.parametrize("case", sorted(_GOLDEN_GRAPHS))
 def test_regression_catalog_codegen_is_parseable(case: str) -> None:
-    dataset, fit_kwargs = _GOLDEN_GRAPHS[case]
-    code = compile_to_code(_build_load_fit_graph(dataset, fit_kwargs))
+    dataset, node_cls, fit_kwargs = _GOLDEN_GRAPHS[case]
+    code = compile_to_code(_build_load_fit_graph(dataset, node_cls, fit_kwargs))
     ast.parse(code)
 
 
 @pytest.mark.parametrize("case", sorted(_GOLDEN_GRAPHS))
 def test_regression_catalog_codegen_is_ruff_clean(case: str) -> None:
-    dataset, fit_kwargs = _GOLDEN_GRAPHS[case]
-    code = compile_to_code(_build_load_fit_graph(dataset, fit_kwargs))
+    dataset, node_cls, fit_kwargs = _GOLDEN_GRAPHS[case]
+    code = compile_to_code(_build_load_fit_graph(dataset, node_cls, fit_kwargs))
     result = subprocess.run(
         [sys.executable, "-m", "ruff", "check", "-"],
         input=code,
@@ -100,20 +101,17 @@ def test_regression_catalog_codegen_is_ruff_clean(case: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 2. ADR-0002 equivalence: OLS/WLS/GLS/GLM (hardcoded -- see module docstring).
+# 2. ADR-0002 equivalence: OLS/WLS/GLS (via FitLinearRegression) + GLM (via FitGLM).
 # ---------------------------------------------------------------------------
 
 _EQUIVALENCE_MODEL_KEYS = ["OLS", "WLS", "GLS", "GLM"]
-# Hardcoded, NOT ``keys_for_archetype("fit_model")``, because that archetype will
-# later also hold MixedLM (Story 5) and GAM (Story 6) entries whose different
-# structured-spec shapes (groups/random_effects, smooth_terms) would cause this
-# fixture to fail at test-collection time.  Keeping the list explicit ensures this
-# file stays correct once those stories land, instead of silently breaking on keys
-# it wasn't written to handle.
+# Hardcoded, NOT dynamically pulled from the registry, because the fit_model archetype also
+# holds MixedLM/GAM/BayesianGLM entries whose different structured-spec shapes (groups/
+# random_effects, smooth_terms) belong to their own dedicated nodes/tests, not this file.
 
 
-def _equivalence_fixture(model_key: str) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """Return (df, fit_kwargs) for *model_key*, fixed seed for determinism."""
+def _equivalence_fixture(model_key: str) -> tuple[pd.DataFrame, Any, dict[str, Any]]:
+    """Return (df, node_cls, fit_kwargs) for *model_key*, fixed seed for determinism."""
     rng = np.random.default_rng(0)
     n = 60
     x1 = rng.normal(size=n)
@@ -123,24 +121,31 @@ def _equivalence_fixture(model_key: str) -> tuple[pd.DataFrame, dict[str, Any]]:
     df = pd.DataFrame({"x1": x1, "x2": x2, "y": y, "w": w})
 
     if model_key in ("OLS", "GLS"):
-        return df, {"model": model_key, "target": "y", "fixed_effects": ["x1", "x2"]}
+        return (
+            df,
+            FitLinearRegression,
+            {"estimator": model_key, "target": "y", "fixed_effects": ["x1", "x2"]},
+        )
     if model_key == "WLS":
-        return df, {
-            "model": "WLS",
-            "target": "y",
-            "fixed_effects": ["x1", "x2"],
-            "weights": "w",
-        }
+        return (
+            df,
+            FitLinearRegression,
+            {
+                "estimator": "WLS",
+                "target": "y",
+                "fixed_effects": ["x1", "x2"],
+                "weights": "w",
+            },
+        )
     if model_key == "GLM":
         p = 1.0 / (1.0 + np.exp(-(2.0 * x1)))
         label = (rng.random(n) < p).astype(float)
         df = df.assign(label=label)
-        return df, {
-            "model": "GLM",
-            "target": "label",
-            "fixed_effects": ["x1"],
-            "family": "binomial",
-        }
+        return (
+            df,
+            FitGLM,
+            {"target": "label", "fixed_effects": ["x1"], "family": "binomial"},
+        )
     raise ValueError(model_key)  # pragma: no cover - exhaustive above
 
 
@@ -148,9 +153,9 @@ def _equivalence_fixture(model_key: str) -> tuple[pd.DataFrame, dict[str, Any]]:
 @pytest.mark.parametrize("model_key", _EQUIVALENCE_MODEL_KEYS)
 def test_fit_model_equivalence_matrix(model_key: str) -> None:
     """ADR 0002: execute == running the emitted code, for OLS/WLS/GLS/GLM."""
-    df, fit_kwargs = _equivalence_fixture(model_key)
+    df, node_cls, fit_kwargs = _equivalence_fixture(model_key)
 
-    defn = FitModel()
+    defn = node_cls()
     node = defn.instantiate(**fit_kwargs)
     executed_model = defn.execute(node, inputs={"frame": df.copy()})["model"]
     scope = _run_codegen(defn, node, {"frame": df.copy()})

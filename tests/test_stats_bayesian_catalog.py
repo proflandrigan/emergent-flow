@@ -9,8 +9,9 @@ run, as here) is what actually exercises these tests.
 
 Mirrors ``tests/test_stats_mixedlm_catalog.py``'s two-part shape:
 
-1. Golden-code quality: a representative BayesianGLM graph (LoadSample -> FitModel) compiles to
-   syntactically valid, ruff-clean Python (parse/lint only, never executed in this part).
+1. Golden-code quality: a representative BayesianGLM graph (LoadSample -> FitBayesianModel)
+   compiles to syntactically valid, ruff-clean Python (parse/lint only, never executed in this
+   part).
 2. ADR-0002 equivalence: for a plain Bayesian GLM AND a Bayesian hierarchical spec (random
    intercept via the same ``random_effects``/``groups`` vocabulary as MixedLM), ``execute()`` and
    running the code ``codegen()`` emits produce the SAME posterior-summary coefficient frame and
@@ -36,7 +37,7 @@ from emergentflow.codegen.compiler import compile_to_code  # noqa: E402
 from emergentflow.ir.common import Direction  # noqa: E402
 from emergentflow.ir.edge import Edge, PortRef  # noqa: E402
 from emergentflow.ir.graph import Graph  # noqa: E402
-from emergentflow.nodes.examples import FitModel, LoadSample  # noqa: E402
+from emergentflow.nodes.examples import FitBayesianModel, LoadSample  # noqa: E402
 
 _MCMC_KWARGS = {"seed": 0, "draws": 50, "tune": 50, "chains": 2}
 
@@ -62,12 +63,11 @@ def _run_codegen(definition, node, scope):
 
 def _build_load_fit_graph() -> Graph:
     load = LoadSample().instantiate(name="diabetes", label="Load Sample")
-    fit = FitModel().instantiate(
-        model="BayesianGLM",
+    fit = FitBayesianModel().instantiate(
         target="target",
         fixed_effects=["age"],
         label="Fit BayesianGLM",
-        spec_extra=dict(_MCMC_KWARGS),
+        **_MCMC_KWARGS,
     )
     edge = Edge(
         source=PortRef(node_id=load.id, port_id=_out_port(load, "frame").id),
@@ -124,13 +124,12 @@ def _grouped_df(seed: int = 0) -> pd.DataFrame:
     [
         pytest.param(
             _plain_df,
-            {"model": "BayesianGLM", "target": "y", "fixed_effects": ["x"]},
+            {"target": "y", "fixed_effects": ["x"]},
             id="plain_glm",
         ),
         pytest.param(
             _grouped_df,
             {
-                "model": "BayesianGLM",
                 "target": "y",
                 "fixed_effects": ["x"],
                 "groups": "grp",
@@ -142,9 +141,9 @@ def _grouped_df(seed: int = 0) -> pd.DataFrame:
 def test_bayesian_equivalence_matrix(df_builder, base_kwargs: dict) -> None:
     """ADR 0002: execute == running the emitted code, for BayesianGLM (plain and hierarchical)."""
     df = df_builder()
-    fit_kwargs = {**base_kwargs, "spec_extra": dict(_MCMC_KWARGS)}
+    fit_kwargs = {**base_kwargs, **_MCMC_KWARGS}
 
-    defn = FitModel()
+    defn = FitBayesianModel()
     node = defn.instantiate(**fit_kwargs)
     executed_model = defn.execute(node, inputs={"frame": df.copy()})["model"]
     scope = _run_codegen(defn, node, {"frame": df.copy()})

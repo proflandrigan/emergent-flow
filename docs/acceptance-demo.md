@@ -111,7 +111,7 @@ coefficient plot; a `PlotSpec`-terminal edge the Results tab renders).
 
 ```
 load_sample(iris) ─→ stats.auto_eda ──(frame)──→ stats.diagnostic_frame(VIF)
-                                     └─(frame)──→ stats.fit_model(MixedLM) ──(StatsModel)──→ viz.plot_coefficients
+                                     └─(frame)──→ stats.fit_mixed_model ──(StatsModel)──→ viz.plot_coefficients
 ```
 
 `stats.auto_eda` returns tidy `profile`/`missingness`/`correlation` frames + curated `PlotSpec`s
@@ -188,7 +188,7 @@ the analyst surface for free" contract holds for warehouse data exactly as it do
 ### Warehouse → Stats: query_builder (join + group-by, BigQuery SQL) → MixedLM → forest plot
 
 ```
-query_builder(join sales × regions, group by region+rep, dialect=bigquery) ─→ stats.fit_model(MixedLM, random intercept by region) ──(StatsModel)──→ viz.plot_coefficients
+query_builder(join sales × regions, group by region+rep, dialect=bigquery) ─→ stats.fit_mixed_model (random intercept by region) ──(StatsModel)──→ viz.plot_coefficients
 ```
 
 The structured query builder joins a transactions table to a region-level covariates table,

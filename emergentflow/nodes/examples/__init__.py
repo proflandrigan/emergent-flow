@@ -34,8 +34,12 @@ from .eval_label import EvalLabel
 from .eval_run import EvalRun
 from .evaluate import Evaluate
 from .filter_rows import FilterRows
+from .fit_bayesian_model import FitBayesianModel
 from .fit_estimator import FitEstimator
-from .fit_model import FitModel
+from .fit_gam import FitGAM
+from .fit_glm import FitGLM
+from .fit_linear_regression import FitLinearRegression
+from .fit_mixed_model import FitMixedModel
 from .fit_transform import FitTransform
 from .generate_features import GenerateFeatures
 from .grid_search import GridSearch
@@ -94,8 +98,12 @@ __all__ = [
     "EvalRun",
     "Evaluate",
     "FilterRows",
+    "FitBayesianModel",
     "FitEstimator",
-    "FitModel",
+    "FitGAM",
+    "FitGLM",
+    "FitLinearRegression",
+    "FitMixedModel",
     "FitTransform",
     "GenerateFeatures",
     "GenerateHtmlSummary",

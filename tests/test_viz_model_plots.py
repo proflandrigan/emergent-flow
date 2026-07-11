@@ -26,7 +26,7 @@ from emergentflow.ml import fit_estimator
 from emergentflow.nodes.examples import (
     Correlation,
     FitEstimator,
-    FitModel,
+    FitLinearRegression,
     LoadSample,
     VizPlotAcf,
     VizPlotCoefficients,
@@ -108,8 +108,8 @@ def _fit_classifier():
 
 def _build_stats_plot_graph(plot_defn_cls, **plot_kwargs) -> Graph:
     load = LoadSample().instantiate(name="diabetes", label="Load Sample")
-    fit = FitModel().instantiate(
-        model="OLS", target="target", fixed_effects=["age", "bmi"], label="Fit Model"
+    fit = FitLinearRegression().instantiate(
+        estimator="OLS", target="target", fixed_effects=["age", "bmi"], label="Fit Model"
     )
     plot = plot_defn_cls().instantiate(label="Plot", **plot_kwargs)
     load_to_fit = Edge(

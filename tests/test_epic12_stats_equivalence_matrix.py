@@ -11,9 +11,13 @@ are modified here), this file iterates ``keys_for_archetype("fit_model")`` and
 into the equivalence gate -- and the matrix fails loudly at test time if nobody has supplied a
 compatible fixture for it yet.
 
-Fixtures below are copied verbatim (same seeds, same column names) from the per-story test files
-so the underlying fits converge identically; only the fixture *dispatch* (a dict keyed by the
-registry's own model keys) is new.
+Each registry model key is fit through its OWN dedicated node (``FitLinearRegression``/
+``FitGLM``/``FitMixedModel``/``FitGAM``/``FitBayesianModel`` -- the generic catch-all
+``FitModel`` node was retired once every family had a dedicated node), via the
+``_NODE_FOR_MODEL_KEY`` lookup table below. Fixtures are copied verbatim (same seeds, same
+column names) from the per-story test files so the underlying fits converge identically; only
+the fixture *dispatch* (a dict keyed by the registry's own model keys, resolving to a node class
++ that node's own param names) is new.
 """
 
 from __future__ import annotations
@@ -24,7 +28,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from emergentflow.nodes.examples import FitModel
+from emergentflow.nodes.examples import (
+    FitGAM,
+    FitGLM,
+    FitLinearRegression,
+    FitMixedModel,
+)
 from emergentflow.stats.registry import keys_for_archetype
 
 
@@ -78,23 +87,33 @@ def _gam_df(seed: int = 0) -> pd.DataFrame:
     return pd.DataFrame({"x1": x1, "x2": x2, "y": y})
 
 
-#: model_key -> (df, fit_kwargs). A registry key with no entry here fails the matrix loudly
-#: (see ``test_fit_model_equivalence_matrix``) instead of silently being skipped.
+#: model_key -> the dedicated node class that fits it.
+_NODE_FOR_MODEL_KEY: dict[str, type] = {
+    "OLS": FitLinearRegression,
+    "WLS": FitLinearRegression,
+    "GLS": FitLinearRegression,
+    "GLM": FitGLM,
+    "MixedLM": FitMixedModel,
+    "GAM": FitGAM,
+}
+
+#: model_key -> (df, fit_kwargs), where fit_kwargs are the DEDICATED node's own param names
+#: (no ``model``/``spec_extra`` catch-all). A registry key with no entry here fails the matrix
+#: loudly (see ``test_fit_model_equivalence_matrix``) instead of silently being skipped.
 _FIXTURES: dict[str, tuple[pd.DataFrame, dict[str, Any]]] = {
-    "OLS": (_regression_df(), {"model": "OLS", "target": "y", "fixed_effects": ["x1", "x2"]}),
-    "GLS": (_regression_df(), {"model": "GLS", "target": "y", "fixed_effects": ["x1", "x2"]}),
+    "OLS": (_regression_df(), {"estimator": "OLS", "target": "y", "fixed_effects": ["x1", "x2"]}),
+    "GLS": (_regression_df(), {"estimator": "GLS", "target": "y", "fixed_effects": ["x1", "x2"]}),
     "WLS": (
         _regression_df(),
-        {"model": "WLS", "target": "y", "fixed_effects": ["x1", "x2"], "weights": "w"},
+        {"estimator": "WLS", "target": "y", "fixed_effects": ["x1", "x2"], "weights": "w"},
     ),
     "GLM": (
         _regression_df(),
-        {"model": "GLM", "target": "label", "fixed_effects": ["x1"], "family": "binomial"},
+        {"target": "label", "fixed_effects": ["x1"], "family": "binomial"},
     ),
     "MixedLM": (
         _grouped_df(),
         {
-            "model": "MixedLM",
             "target": "y",
             "fixed_effects": ["x"],
             "random_effects": ["x"],
@@ -104,12 +123,9 @@ _FIXTURES: dict[str, tuple[pd.DataFrame, dict[str, Any]]] = {
     "GAM": (
         _gam_df(),
         {
-            "model": "GAM",
             "target": "y",
-            "spec_extra": {
-                "linear_terms": ["x1"],
-                "smooth_terms": [{"column": "x2", "df": 6, "degree": 3}],
-            },
+            "linear_terms": ["x1"],
+            "smooth_terms": [{"column": "x2", "df": 6, "degree": 3}],
         },
     ),
 }
@@ -125,9 +141,11 @@ _FIXTURES: dict[str, tuple[pd.DataFrame, dict[str, Any]]] = {
 def test_fit_model_equivalence_matrix(model_key: str) -> None:
     """ADR 0002: execute() == running the emitted code, for every fit_model-archetype key."""
     assert model_key in _FIXTURES, f"no equivalence fixture for {model_key}"
+    assert model_key in _NODE_FOR_MODEL_KEY, f"no dedicated node mapped for {model_key}"
     df, fit_kwargs = _FIXTURES[model_key]
+    node_cls = _NODE_FOR_MODEL_KEY[model_key]
 
-    defn = FitModel()
+    defn = node_cls()
     node = defn.instantiate(**fit_kwargs)
     executed_model = defn.execute(node, inputs={"frame": df.copy()})["model"]
     scope = _run_codegen(defn, node, {"frame": df.copy()})
@@ -158,12 +176,7 @@ def _bayesian_plain_df(seed: int = 0) -> pd.DataFrame:
 _BAYESIAN_FIXTURES: dict[str, tuple[pd.DataFrame, dict[str, Any]]] = {
     "BayesianGLM": (
         _bayesian_plain_df(),
-        {
-            "model": "BayesianGLM",
-            "target": "y",
-            "fixed_effects": ["x"],
-            "spec_extra": dict(_MCMC_KWARGS),
-        },
+        {"target": "y", "fixed_effects": ["x"], **_MCMC_KWARGS},
     ),
 }
 
@@ -176,10 +189,13 @@ def test_bayesian_fit_equivalence_matrix(model_key: str) -> None:
     pytest.importorskip("pymc")
     pytest.importorskip("arviz")
 
+    from emergentflow.nodes.examples import FitBayesianModel
+
     assert model_key in _BAYESIAN_FIXTURES, f"no equivalence fixture for {model_key}"
+    assert model_key == "BayesianGLM", f"no dedicated node mapped for {model_key}"
     df, fit_kwargs = _BAYESIAN_FIXTURES[model_key]
 
-    defn = FitModel()
+    defn = FitBayesianModel()
     node = defn.instantiate(**fit_kwargs)
     executed_model = defn.execute(node, inputs={"frame": df.copy()})["model"]
     scope = _run_codegen(defn, node, {"frame": df.copy()})

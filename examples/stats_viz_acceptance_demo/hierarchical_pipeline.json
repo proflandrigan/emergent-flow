@@ -141,16 +141,10 @@
     },
     "n-mixed": {
       "id": "n-mixed",
-      "type": "stats.fit_model",
+      "type": "stats.fit_mixed_model",
       "label": "Mixed-Effects Model",
       "paradigm": "functional",
       "params": [
-        {
-          "name": "model",
-          "type_token": "str",
-          "value": "MixedLM",
-          "default": null
-        },
         {
           "name": "target",
           "type_token": "str",
