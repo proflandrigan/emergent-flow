@@ -101,7 +101,7 @@ def _fit_classifier():
 
 
 # ---------------------------------------------------------------------------
-# 1. Golden-code quality: LoadSample -> FitModel -> <plot node>, one representative graph
+# 1. Golden-code quality: LoadSample -> FitLinearRegression -> <plot node>, one representative graph
 #    per StatsModel-consuming plot node, plus one each for the two non-StatsModel plots.
 # ---------------------------------------------------------------------------
 

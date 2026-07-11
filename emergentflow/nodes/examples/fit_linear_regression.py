@@ -85,7 +85,7 @@ class FitLinearRegression(NodeDefinition):
             type_token="str",
             default=None,
             label="Weights column",
-            help="Column of observation weights; only used when Estimator = WLS.",
+            help="Column of observation weights; required when Estimator = WLS, unused otherwise.",
             hints=ValidationHints(widget="column"),
         ),
     ]
