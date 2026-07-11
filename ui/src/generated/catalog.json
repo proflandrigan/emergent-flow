@@ -3332,6 +3332,410 @@
     },
     {
       "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Return the top-N worst-error rows for a fitted model.",
+      "family": "explain",
+      "label": "Error Table",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": 20,
+          "help": "Number of worst-error rows to return.",
+          "hints": null,
+          "label": "Top N",
+          "name": "top_n",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted, supervised model to score.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Labeled data to score the model against.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The top-N worst-error rows, sorted worst-first.",
+          "label": null,
+          "name": "error_table",
+          "required": true
+        }
+      ],
+      "type": "explain.error_table",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Render a reliability diagram for a fitted binary classifier.",
+      "family": "explain",
+      "label": "Plot Calibration",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": 10,
+          "help": "Number of probability buckets to bin predictions into.",
+          "hints": null,
+          "label": "Number of bins",
+          "name": "n_bins",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted, binary-classification model to score.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Labeled data to score the model against.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered calibration curve as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "explain.plot_calibration",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Render a predicted-vs-actual scatter for a fitted regression model.",
+      "family": "explain",
+      "label": "Plot Predicted vs Actual",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted, regression-task model to score.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Labeled data to score the model against.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered predicted-vs-actual scatter as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "explain.plot_predicted_vs_actual",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Render a predicted-vs-residual scatter for a fitted regression model.",
+      "family": "explain",
+      "label": "Plot Residuals",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted, regression-task model to score.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Labeled data to score the model against.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered predicted-vs-residual scatter as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "explain.plot_residuals",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Render an ROC or Precision-Recall curve for a fitted binary classifier.",
+      "family": "explain",
+      "label": "Plot ROC / PR",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "roc",
+          "help": "Which curve to render.",
+          "hints": {
+            "choices": [
+              "roc",
+              "pr"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Curve",
+          "name": "curve",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted, binary-classification model to score.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Labeled data to score the model against.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered ROC or Precision-Recall curve as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "explain.plot_roc_pr",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Render a jittered strip plot (beeswarm approximation) of SHAP values.",
+      "family": "explain",
+      "label": "Plot SHAP Beeswarm",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The tidy SHAP values frame (explain.shap_values's output); single-output only.",
+          "label": null,
+          "name": "shap_values",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered beeswarm-style plot as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "explain.plot_shap_beeswarm",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Render a ranked bar chart of mean |SHAP value| per feature.",
+      "family": "explain",
+      "label": "Plot SHAP Importance",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The tidy SHAP values frame (explain.shap_values's output).",
+          "label": null,
+          "name": "shap_values",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered feature-importance bar chart as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "explain.plot_shap_importance",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Render a waterfall chart explaining one row's prediction.",
+      "family": "explain",
+      "label": "Plot SHAP Waterfall",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which row (0-indexed position in the frame shap_values was run on) to explain.",
+          "hints": null,
+          "label": "Row index",
+          "name": "row_index",
+          "required": true,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The tidy SHAP values frame (explain.shap_values's output); single-output only.",
+          "label": null,
+          "name": "shap_values",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered waterfall chart as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "explain.plot_shap_waterfall",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Compute per-feature SHAP attributions for a fitted model.",
+      "family": "explain",
+      "label": "SHAP Values",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Random seed for background sampling (required for reproducibility).",
+          "hints": null,
+          "label": "Random seed",
+          "name": "seed",
+          "required": true,
+          "type_token": "int"
+        },
+        {
+          "default": 100,
+          "help": "Maximum number of rows to sample as the SHAP background dataset.",
+          "hints": null,
+          "label": "Background samples",
+          "name": "background_samples",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted, supervised model to explain.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The data to compute SHAP attributions over.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Tidy, long-format SHAP attributions: one row per (row_index, feature[, class]).",
+          "label": null,
+          "name": "shap_values",
+          "required": true
+        }
+      ],
+      "type": "explain.shap_values",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "LLM",
       "description": "Run one completion call against a provider through the unified gateway.",
       "family": "llm",
@@ -6058,7 +6462,7 @@
         },
         {
           "default": null,
-          "help": "Column of observation weights; only used when Estimator = WLS.",
+          "help": "Column of observation weights; required when Estimator = WLS, unused otherwise.",
           "hints": {
             "choices": null,
             "max": null,

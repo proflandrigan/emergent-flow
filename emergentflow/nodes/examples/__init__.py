@@ -33,6 +33,15 @@ from .encode_categorical import EncodeCategorical
 from .eval_label import EvalLabel
 from .eval_run import EvalRun
 from .evaluate import Evaluate
+from .explain_error_table import ExplainErrorTable
+from .explain_plot_calibration import ExplainPlotCalibration
+from .explain_plot_predicted_vs_actual import ExplainPlotPredictedVsActual
+from .explain_plot_residuals import ExplainPlotResiduals
+from .explain_plot_roc_pr import ExplainPlotRocPr
+from .explain_plot_shap_beeswarm import ExplainPlotShapBeeswarm
+from .explain_plot_shap_importance import ExplainPlotShapImportance
+from .explain_plot_shap_waterfall import ExplainPlotShapWaterfall
+from .explain_shap_values import ExplainShapValues
 from .filter_rows import FilterRows
 from .fit_bayesian_model import FitBayesianModel
 from .fit_estimator import FitEstimator
@@ -97,6 +106,15 @@ __all__ = [
     "EvalLabel",
     "EvalRun",
     "Evaluate",
+    "ExplainErrorTable",
+    "ExplainPlotCalibration",
+    "ExplainPlotPredictedVsActual",
+    "ExplainPlotResiduals",
+    "ExplainPlotRocPr",
+    "ExplainPlotShapBeeswarm",
+    "ExplainPlotShapImportance",
+    "ExplainPlotShapWaterfall",
+    "ExplainShapValues",
     "FilterRows",
     "FitBayesianModel",
     "FitEstimator",

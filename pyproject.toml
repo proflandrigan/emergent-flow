@@ -102,6 +102,14 @@ bayes = [
     "bambi>=0.13,<1",
     "arviz>=0.17,<1",
 ]
+# `pip install emergentflow[explain]` enables the optional model-explainability family
+# (SHAP-based feature attribution + error analysis, ADR 0020): shap (MIT license) computes
+# per-feature attributions for a fitted ml.FittedModel. Kept optional so a bare SDK install
+# stays light (ADR 0007) and never pulls numba/llvmlite. An explain.* node in a base install
+# raises a typed MissingOptionalDependencyError, never an opaque ImportError.
+explain = [
+    "shap>=0.44,<1",
+]
 # `pip install emergentflow[bigquery]` enables the BigQuery warehouse adapter (Epic 13).
 # google-cloud-bigquery is Apache-2.0 (compatible; not GPL). Kept optional so a bare SDK
 # install stays credential-free and light (ADR 0007 / ADR 0018); a BigQuery node in a base
@@ -235,5 +243,9 @@ module = [
     "redshift_connector.*",
     "psycopg.*",
     "sqlalchemy.*",
+    # The optional `emergentflow[explain]` extra (ADR 0020): shap ships no type stubs and is
+    # imported lazily inside `emergentflow/explain/_shap.py`, absent from the bare
+    # `uv sync --locked` CI env (like torch/litellm/pymc).
+    "shap.*",
 ]
 ignore_missing_imports = true
