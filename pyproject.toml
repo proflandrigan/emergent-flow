@@ -74,6 +74,11 @@ dependencies = [
     # so the Epic 13 equivalence matrix runs in CI without a cloud account. A hard
     # dependency; MIT is compatible with this SDK's license. Not a GPL dep.
     "duckdb>=1,<2",
+    # tomli-w (MIT) is the TOML writer for emergentflow.connections.profiles.save_profiles --
+    # stdlib tomllib is read-only, and the connection-profile store needs to persist
+    # create/edit/delete operations back to connections.toml. A hard dependency because the
+    # profile store is always available in a base install. Not a GPL dep.
+    "tomli-w>=1,<2",
 ]
 
 [project.optional-dependencies]

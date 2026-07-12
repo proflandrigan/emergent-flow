@@ -138,8 +138,11 @@ def test_llm_call_equivalence_json_with_schema(tmp_path):
     assert exec_response.data == {"answer": 42}
 
 
-def test_llm_call_no_api_key_in_ir_or_code(monkeypatch):
-    """A secret VALUE never appears in serialized IR or emitted code — only the NAME does."""
+def test_llm_call_no_secret_or_env_name_in_ir_or_code(monkeypatch):
+    """Neither a secret VALUE nor even the raw env-var NAME appears in IR/code -- only an opaque
+    LLM connection profile name does. This is a stronger isolation property than the old
+    api_key_env design: resolving a profile name to a real env var now happens only inside the
+    effectful GatewayClient, never in the pure IR/codegen path."""
     secret_value = "sk-super-secret-value-should-never-appear-1234567890"
     monkeypatch.setenv("ANTHROPIC_API_KEY", secret_value)
 
@@ -147,7 +150,7 @@ def test_llm_call_no_api_key_in_ir_or_code(monkeypatch):
         messages=[{"role": "user", "content": "hi"}],
         provider="anthropic",
         model="claude-sonnet-5",
-        api_key_env="ANTHROPIC_API_KEY",
+        llm_connection="my_anthropic_profile",
     )
 
     ir_json = serialize_graph(graph)
@@ -155,6 +158,9 @@ def test_llm_call_no_api_key_in_ir_or_code(monkeypatch):
 
     assert secret_value not in ir_json
     assert secret_value not in code
-    # The env-var NAME is expected to appear -- that's the whole point of ADR 0017.
-    assert "ANTHROPIC_API_KEY" in ir_json
-    assert "ANTHROPIC_API_KEY" in code
+    assert "ANTHROPIC_API_KEY" not in ir_json
+    assert "ANTHROPIC_API_KEY" not in code
+    # The connection profile NAME is expected to appear -- that's the point of the profile-based
+    # design: the IR/code carry an opaque reference, never even the env-var name.
+    assert "my_anthropic_profile" in ir_json
+    assert "my_anthropic_profile" in code

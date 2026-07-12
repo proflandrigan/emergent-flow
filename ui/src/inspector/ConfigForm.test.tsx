@@ -224,3 +224,9 @@ test("connection param renders a select, not a text input", () => {
   const el = screen.getByTestId("param-connection");
   expect(el.tagName).toBe("SELECT");
 });
+
+test("llm_connection param renders a select, not a text input", () => {
+  addNode("llm.call");
+  const el = screen.getByTestId("param-llm_connection");
+  expect(el.tagName).toBe("SELECT");
+});

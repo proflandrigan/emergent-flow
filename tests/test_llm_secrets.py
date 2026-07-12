@@ -18,11 +18,11 @@ def _llm_call_node(
     node_id: str = "n-llm",
     *,
     provider: str = "anthropic",
-    api_key_env: str | None = None,
+    llm_connection: str | None = None,
 ) -> Node:
     params = [Param(name="provider", type_token="str", value=provider)]
-    if api_key_env is not None:
-        params.append(Param(name="api_key_env", type_token="str", value=api_key_env))
+    if llm_connection is not None:
+        params.append(Param(name="llm_connection", type_token="str", value=llm_connection))
     return Node(
         id=node_id,
         type="llm.call",
@@ -112,12 +112,22 @@ def test_llm_call_with_env_var_unset_raises_naming_it(monkeypatch: pytest.Monkey
     assert "ANTHROPIC_API_KEY" in str(exc_info.value)
 
 
-def test_llm_call_with_explicit_api_key_env_checks_that_name(
-    monkeypatch: pytest.MonkeyPatch,
+def test_llm_call_with_llm_connection_checks_the_profiles_env_var(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from emergentflow.connections.profiles import LlmConnectionProfile, ProfileStore, save_profiles
+
+    monkeypatch.setenv("EMERGENTFLOW_CONNECTIONS", str(tmp_path / "connections.toml"))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setenv("MY_CUSTOM_KEY", "x")
-    graph = _graph(_llm_call_node(provider="anthropic", api_key_env="MY_CUSTOM_KEY"))
+
+    store = ProfileStore()
+    store.add(
+        LlmConnectionProfile(name="my_profile", provider="anthropic", api_key_env="MY_CUSTOM_KEY")
+    )
+    save_profiles(store)
+
+    graph = _graph(_llm_call_node(provider="anthropic", llm_connection="my_profile"))
     validate_api_keys_present(graph)  # must not raise -- proves MY_CUSTOM_KEY was checked
 
 
@@ -140,11 +150,27 @@ def test_non_client_node_is_never_checked(monkeypatch: pytest.MonkeyPatch) -> No
     validate_api_keys_present(graph)  # must not raise -- data.load_csv doesn't require_client
 
 
-def test_node_ids_restricts_which_nodes_are_checked(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_node_ids_restricts_which_nodes_are_checked(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from emergentflow.connections.profiles import LlmConnectionProfile, ProfileStore, save_profiles
+
+    monkeypatch.setenv("EMERGENTFLOW_CONNECTIONS", str(tmp_path / "connections.toml"))
     monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
     monkeypatch.delenv("MY_CUSTOM_KEY", raising=False)
+
+    store = ProfileStore()
+    store.add(
+        LlmConnectionProfile(
+            name="custom_profile", provider="anthropic", api_key_env="MY_CUSTOM_KEY"
+        )
+    )
+    save_profiles(store)
+
     set_node = _llm_call_node("n-llm-set", provider="anthropic")
-    unset_node = _llm_call_node("n-llm-unset", provider="anthropic", api_key_env="MY_CUSTOM_KEY")
+    unset_node = _llm_call_node(
+        "n-llm-unset", provider="anthropic", llm_connection="custom_profile"
+    )
     graph = _graph(set_node, unset_node)
 
     validate_api_keys_present(graph, node_ids=["n-llm-set"])  # must not raise

@@ -2144,6 +2144,7 @@
           "help": "Mapping of column name to dtype (int/float/str/bool/category).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2197,6 +2198,7 @@
               "rows",
               "columns"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2218,6 +2220,7 @@
               "any",
               "all"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2236,6 +2239,7 @@
           "help": "Columns to check for NA (row-axis only); empty/unset checks all.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2286,6 +2290,7 @@
           "help": "Column to test.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2312,6 +2317,7 @@
               ">=",
               "isin"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2330,6 +2336,7 @@
           "help": "Scalar to compare against; for 'isin' provide a list.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2384,6 +2391,7 @@
               "median",
               "most_frequent"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2402,6 +2410,7 @@
           "help": "Columns to impute; empty/unset imputes every column.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2452,6 +2461,7 @@
           "help": "Column names to keep or drop.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2470,6 +2480,7 @@
           "help": "If True, drop the named columns; if False, keep only them.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2520,6 +2531,7 @@
           "help": "The named connection profile to run against (from your local store).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2538,6 +2550,7 @@
           "help": "The relation (table) name to describe.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2556,6 +2569,7 @@
           "help": "Optional database/catalog to disambiguate a relation name that exists in more than one database.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2574,6 +2588,7 @@
           "help": "Optional schema (or, for BigQuery, dataset) to disambiguate a relation name that exists in more than one schema.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2615,6 +2630,7 @@
           "help": "Filesystem path to the .csv file to load.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2633,6 +2649,7 @@
           "help": "Text encoding used to read the file.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2674,6 +2691,7 @@
           "help": "Filesystem path to the .json file to load.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2724,6 +2742,7 @@
           "help": "Filesystem path to the .parquet file to load.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2778,6 +2797,7 @@
               "wine",
               "diabetes"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2819,6 +2839,7 @@
           "help": "The base relation to query (e.g. 'sales').",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2837,6 +2858,7 @@
           "help": "Columns / aggregates to select. Each item is a string or {'column': ..., 'agg': ..., 'alias': ...}.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2855,6 +2877,7 @@
           "help": "Filter predicates. Each: {'column': ..., 'op': ..., 'value': ...}.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2873,6 +2896,7 @@
           "help": "Join specs. Each: {'relation': ..., 'on': [...], 'type': ...}.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2891,6 +2915,7 @@
           "help": "Column names to group by.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2909,6 +2934,7 @@
           "help": "HAVING filter predicates (same format as where).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2927,6 +2953,7 @@
           "help": "Ordering specs. Each: a string or {'column': ..., 'desc': bool}.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2945,6 +2972,7 @@
           "help": "Row limit applied in the compiled SQL.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": 1.0,
@@ -2963,6 +2991,7 @@
           "help": "When True, adds SELECT DISTINCT.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2981,6 +3010,7 @@
           "help": "The named connection profile to run against (from your local store).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3004,6 +3034,7 @@
               "redshift",
               "postgres"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3022,6 +3053,7 @@
           "help": "Optional row cap (injected as LIMIT if absent).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": 1.0,
@@ -3040,6 +3072,7 @@
           "help": "Return a cost estimate without running.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3090,6 +3123,7 @@
           "help": "The SQL query to run (SELECT/WITH only under read-only connections).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3108,6 +3142,7 @@
           "help": "The named connection profile to run against (from your local store).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3131,6 +3166,7 @@
               "redshift",
               "postgres"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3149,6 +3185,7 @@
           "help": "Optional row cap; injects LIMIT when absent from the SQL.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": 1.0,
@@ -3167,6 +3204,7 @@
           "help": "When True, return a cost estimate without running the query.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3257,6 +3295,7 @@
           "help": "System-message template, e.g. 'You are a {{persona}} assistant.'",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3275,6 +3314,7 @@
           "help": "User-message template, e.g. 'Answer this: {{question}}'",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3293,6 +3333,7 @@
           "help": "Model variants, e.g. [{'provider': 'anthropic', 'model': 'claude-sonnet-5'}].",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3526,6 +3567,7 @@
               "roc",
               "pr"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3747,6 +3789,7 @@
           "help": "Gateway provider key, e.g. 'anthropic', 'openai', 'gemini'.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3765,6 +3808,7 @@
           "help": "Provider model id, e.g. 'claude-sonnet-5'.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3783,6 +3827,7 @@
           "help": "Literal [{role, content}] messages (superseded by wired 'prompt' port later).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3801,6 +3846,7 @@
           "help": "Sampling temperature; 0 for reproducible output.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": 2.0,
             "max_length": null,
             "min": 0.0,
@@ -3819,6 +3865,7 @@
           "help": "Optional output token cap.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": 1.0,
@@ -3840,6 +3887,7 @@
               "text",
               "json"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3858,6 +3906,7 @@
           "help": "Optional JSON Schema the parsed 'json' output must satisfy.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3873,19 +3922,20 @@
         },
         {
           "default": null,
-          "help": "Env-var name holding the provider API key (never the key itself; ADR 0017).",
+          "help": "Name of a registered LLM credential profile (Manage Connections -> LLM Credentials). Resolves to an env-var name at call time; never a literal secret. Leave blank to use the provider's conventional default env var.",
           "hints": {
             "choices": null,
+            "connection_kind": "llm",
             "max": null,
             "max_length": null,
             "min": null,
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "connection"
           },
-          "label": "API key env var",
-          "name": "api_key_env",
+          "label": "LLM connection",
+          "name": "llm_connection",
           "required": false,
           "type_token": "str"
         }
@@ -3902,7 +3952,7 @@
         }
       ],
       "type": "llm.call",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -3917,6 +3967,7 @@
           "help": "System-message template, e.g. 'You are a {{persona}} assistant.'",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3935,6 +3986,7 @@
           "help": "User-message template, e.g. 'Answer this: {{question}}'",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3953,6 +4005,7 @@
           "help": "Documentary name -> type-token map shown in the canvas (e.g. {'q': 'str'}).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4006,6 +4059,7 @@
               "predict",
               "score_samples"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4079,6 +4133,7 @@
               "OneClassSVM",
               "SpectralClustering"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4097,6 +4152,7 @@
           "help": "Columns to use as features; empty/unset uses every column.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4195,6 +4251,7 @@
               "SVC",
               "SVR"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4213,6 +4270,7 @@
           "help": "Column to predict.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4231,6 +4289,7 @@
           "help": "Columns to use as features; empty/unset uses every other column.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4378,6 +4437,7 @@
               "SVC",
               "SVR"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4396,6 +4456,7 @@
           "help": "Column to predict.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4414,6 +4475,7 @@
           "help": "Columns to use as features; empty/unset uses every other column.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4495,6 +4557,7 @@
               "TruncatedSVD",
               "VarianceThreshold"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4513,6 +4576,7 @@
           "help": "Only needed for supervised feature selectors (e.g. SelectKBest); leave unset for unsupervised transformers.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4531,6 +4595,7 @@
           "help": "Columns to use as features; empty/unset uses every other column (excluding the target column, if given).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4629,6 +4694,7 @@
               "SVC",
               "SVR"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4656,6 +4722,7 @@
           "help": "Column to predict.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4674,6 +4741,7 @@
           "help": "Columns to use as features; empty/unset uses every other column.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4760,6 +4828,7 @@
           "help": "Column to predict; required only when the final step is a fit-archetype (supervised) estimator.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4778,6 +4847,7 @@
           "help": "Columns to use as features; empty/unset uses every other column.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4899,6 +4969,7 @@
           "help": "Column to predict.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4917,6 +4988,7 @@
           "help": "Columns to use as features; empty/unset uses every other column.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4935,6 +5007,7 @@
           "help": "Fraction of rows held out for evaluation.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": 1.0,
             "max_length": null,
             "min": 0.0,
@@ -4953,6 +5026,7 @@
           "help": "Seed controlling the train/test split and model fit.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5003,6 +5077,7 @@
           "help": "Column to predict.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5021,6 +5096,7 @@
           "help": "Columns to use as features; empty/unset uses every other column.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5042,6 +5118,7 @@
               "classification",
               "regression"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5060,6 +5137,7 @@
           "help": "Number of trees in the forest.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": 1.0,
@@ -5078,6 +5156,7 @@
           "help": "Seed for reproducibility.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5128,6 +5207,7 @@
           "help": "Column to predict.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5146,6 +5226,7 @@
           "help": "Columns to use as features; empty/unset uses every other column.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5196,6 +5277,7 @@
           "help": "Fraction of rows held out for evaluation.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": 1.0,
             "max_length": null,
             "min": 0.0,
@@ -5214,6 +5296,7 @@
           "help": "Seed controlling the train/test split.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5276,6 +5359,7 @@
               "transform",
               "score_samples"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5428,6 +5512,7 @@
           "help": "Markdown note body.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5461,6 +5546,7 @@
               "green",
               "purple"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5492,6 +5578,7 @@
           "help": "Title shown at the top of the report.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5542,6 +5629,7 @@
           "help": "Column whose distinct values define the groups.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5560,6 +5648,7 @@
           "help": "Column whose values are compared across groups.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5578,6 +5667,7 @@
           "help": "Significance level recorded alongside the result.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": 1.0,
             "max_length": null,
             "min": 0.0,
@@ -5628,6 +5718,7 @@
           "help": "Columns to analyze; empty/unset analyzes all columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5736,6 +5827,7 @@
               "spearman",
               "kendall"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5754,6 +5846,7 @@
           "help": "Columns to correlate; empty/unset correlates all numeric columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5804,6 +5897,7 @@
           "help": "Columns to describe; empty/unset describes all numeric columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5856,6 +5950,7 @@
             "choices": [
               "vif"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5919,6 +6014,7 @@
               "heteroscedasticity",
               "normality"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5978,6 +6074,7 @@
           "help": "Columns to summarize; empty/unset summarizes all numeric columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6028,6 +6125,7 @@
           "help": "Columns to profile; empty/unset profiles all columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6078,6 +6176,7 @@
           "help": "Column to predict.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6096,6 +6195,7 @@
           "help": "Predictor columns (fixed effects).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6114,6 +6214,7 @@
           "help": "Random-effect columns (random slopes, hierarchical models only).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6132,6 +6233,7 @@
           "help": "Grouping-factor column; setting this fits a hierarchical (random-intercept/slope) model.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6156,6 +6258,7 @@
               "negativebinomial",
               "poisson"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6242,6 +6345,7 @@
           "help": "Column to predict.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6260,6 +6364,7 @@
           "help": "Unpenalized linear predictor columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6293,6 +6398,7 @@
               "negativebinomial",
               "poisson"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6352,6 +6458,7 @@
           "help": "Column to predict.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6370,6 +6477,7 @@
           "help": "Predictor columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6394,6 +6502,7 @@
               "negativebinomial",
               "poisson"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6421,6 +6530,7 @@
           "help": "Column of observation weights (for weighted GLM).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6475,6 +6585,7 @@
               "OLS",
               "WLS"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6493,6 +6604,7 @@
           "help": "Column to predict.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6511,6 +6623,7 @@
           "help": "Predictor columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6529,6 +6642,7 @@
           "help": "Column of observation weights; required when Estimator = WLS, unused otherwise.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6579,6 +6693,7 @@
           "help": "Column to predict.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6597,6 +6712,7 @@
           "help": "Predictor columns (fixed effects).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6615,6 +6731,7 @@
           "help": "Random-effect columns (random slopes); leave unset for a random-intercept-only model.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6633,6 +6750,7 @@
           "help": "Grouping-factor column (e.g. subject/site/region).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6683,6 +6801,7 @@
           "help": "Grouping column(s).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6709,6 +6828,7 @@
               "count",
               "std"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6727,6 +6847,7 @@
           "help": "Columns to aggregate; unset aggregates all numeric non-group columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6777,6 +6898,7 @@
           "help": "Columns to analyze; empty/unset analyzes all columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6827,6 +6949,7 @@
           "help": "Column with exactly two groups.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6845,6 +6968,7 @@
           "help": "Numeric column to compare.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6863,6 +6987,7 @@
           "help": "Assume equal variance (Student's); off = Welch's.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6881,6 +7006,7 @@
           "help": "Significance level recorded alongside the result.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": 1.0,
             "max_length": null,
             "min": 0.0,
@@ -6934,6 +7060,7 @@
               "Binarizer",
               "KBinsDiscretizer"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -6952,6 +7079,7 @@
           "help": "Columns to discretize; empty/unset uses all numeric columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -7024,6 +7152,7 @@
               "OrdinalEncoder",
               "TargetEncoder"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -7042,6 +7171,7 @@
           "help": "Required for TargetEncoder (supervised); leave unset for OneHotEncoder/OrdinalEncoder.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -7060,6 +7190,7 @@
           "help": "Categorical columns to encode; empty/unset uses all columns (excluding target, if given).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -7130,6 +7261,7 @@
             "choices": [
               "PolynomialFeatures"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -7148,6 +7280,7 @@
           "help": "Columns to generate features from; empty/unset uses all numeric columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -7223,6 +7356,7 @@
               "RobustScaler",
               "StandardScaler"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -7241,6 +7375,7 @@
           "help": "Columns to scale; empty/unset uses all numeric columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -7321,6 +7456,7 @@
               "strip",
               "violin"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -7392,6 +7528,7 @@
               "acf",
               "pacf"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,

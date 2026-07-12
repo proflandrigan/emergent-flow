@@ -80,6 +80,8 @@ from emergentflow.server.service import (
     compile_session,
     consult_graph,
     consult_session,
+    create_connection,
+    delete_connection,
     execute_graph,
     execute_graph_stream,
     execute_node,
@@ -98,6 +100,7 @@ from emergentflow.server.service import (
     list_knowledge,
     save_knowledge,
     test_connection_route,
+    update_connection,
     validate_graph,
 )
 
@@ -530,6 +533,26 @@ def create_app() -> FastAPI:
     @application.post("/connections/{name}/test")
     async def connection_test(name: str) -> Response:
         return await _safe_json(lambda: test_connection_route(name))
+
+    @application.post("/connections")
+    async def connection_create(request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+        return await _safe_json(lambda: create_connection(body))
+
+    @application.put("/connections/{name}")
+    async def connection_update(name: str, request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+        return await _safe_json(lambda: update_connection(name, body))
+
+    @application.delete("/connections/{name}")
+    async def connection_delete(name: str) -> Response:
+        return await _safe_json(lambda: delete_connection(name))
 
     @application.get("/connections/{name}/schema")
     async def connection_schema(name: str, request: Request) -> Response:

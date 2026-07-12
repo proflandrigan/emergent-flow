@@ -30,6 +30,7 @@ _EXPECTED_BASE_DEPENDENCIES = [
     "libcst>=1.1",
     "sqlglot>=25,<26",
     "duckdb>=1,<2",
+    "tomli-w>=1,<2",
 ]
 
 

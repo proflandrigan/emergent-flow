@@ -16,17 +16,21 @@ from collections.abc import Collection
 from typing import Any, cast
 
 from emergentflow.ir import Graph, Node
-from emergentflow.llm.env import MissingAPIKeyError, resolve_api_key_env_name
+from emergentflow.llm.env import MissingAPIKeyError, resolve_effective_api_key_env_name
 from emergentflow.nodes import get as get_node_definition
 
 
-def provider_api_key_pairs(node: Node) -> list[tuple[str, str | None]]:
-    """Return every `(provider, api_key_env)` pair *node* would resolve a key for at run time.
+def provider_api_key_pairs(node: Node) -> list[tuple[str, str | None, str | None]]:
+    """Return every `(provider, api_key_env, llm_connection)` triple *node* would resolve a key
+    for at run time.
 
     Handles the two node shapes that currently set `requires_client = True`:
-    - `llm.call`: one pair from its own `provider`/`api_key_env` params.
-    - `eval.run`: one pair per entry in its `variants` param (each a dict with its own
-      `provider` and optional `api_key_env`).
+    - `llm.call`: one triple from its own `provider`/`llm_connection` params (`api_key_env` is
+      always `None` here -- `llm.call` no longer has that param; it references a connection
+      profile by name instead).
+    - `eval.run`: one triple per entry in its `variants` param (each a dict with its own
+      `provider` and optional `api_key_env`; `llm_connection` is always `None` for `eval.run` --
+      its variants are not migrated to profile-based credentials by this task).
     Any other `requires_client` node type found in the future would need a case added here --
     until then, a node type this function doesn't recognize contributes no pairs (so it's
     silently not pre-flight-checked rather than raising a confusing internal error; a real
@@ -35,11 +39,11 @@ def provider_api_key_pairs(node: Node) -> list[tuple[str, str | None]]:
     values = {p.name: p.value for p in node.params}
     if node.type == "llm.call":
         provider = cast(str, values.get("provider") or "anthropic")
-        api_key_env = cast("str | None", values.get("api_key_env"))
-        return [(provider, api_key_env)]
+        llm_connection = cast("str | None", values.get("llm_connection"))
+        return [(provider, None, llm_connection)]
     if node.type == "eval.run":
         variants = cast("list[dict[str, Any]]", values.get("variants") or [])
-        return [(v["provider"], v.get("api_key_env")) for v in variants if "provider" in v]
+        return [(v["provider"], v.get("api_key_env"), None) for v in variants if "provider" in v]
     return []
 
 
@@ -66,8 +70,8 @@ def validate_api_keys_present(graph: Graph, node_ids: Collection[str] | None = N
         definition_cls = get_node_definition(node.type)
         if not definition_cls.requires_client:
             continue
-        for provider, api_key_env in provider_api_key_pairs(node):
-            env_name = resolve_api_key_env_name(provider, api_key_env)
+        for provider, api_key_env, llm_connection in provider_api_key_pairs(node):
+            env_name = resolve_effective_api_key_env_name(provider, api_key_env, llm_connection)
             if not os.environ.get(env_name):
                 raise MissingAPIKeyError(
                     f"Node {node.label or node.id!r} (type {node.type!r}) needs the "

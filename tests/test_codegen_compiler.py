@@ -282,17 +282,18 @@ def test_llm_graph_docstring_hints_default_provider_env_var() -> None:
     assert source.index("export ANTHROPIC_API_KEY=...") < source.index("def main")
 
 
-def test_llm_graph_docstring_hints_explicit_api_key_env() -> None:
-    """An explicit api_key_env overrides the provider's conventional default."""
+def test_llm_graph_docstring_hints_llm_connection_profile_name() -> None:
+    """An llm_connection profile name is hinted by name (compile_to_code can't resolve it to a
+    real env-var name without I/O, which it must never do -- ADR 0002 purity)."""
     node = LlmCall().instantiate(
         messages=[{"role": "user", "content": "hi"}],
         provider="anthropic",
-        api_key_env="MY_CUSTOM_KEY",
+        llm_connection="my_anthropic_profile",
     )
     graph = _graph([node])
     source = compile_to_code(graph)
 
-    assert "export MY_CUSTOM_KEY=..." in source
+    assert "my_anthropic_profile" in source
     assert "export ANTHROPIC_API_KEY=..." not in source
 
 
@@ -318,17 +319,17 @@ def test_llm_graph_docstring_hints_deduped_across_variants() -> None:
 
 
 def test_llm_graph_docstring_hint_escapes_triple_quote_breakout() -> None:
-    """A malicious api_key_env can't break out of the generated docstring and inject code.
+    """A malicious llm_connection value can't break out of the generated docstring and inject code.
 
     Regression test: `compile_to_code` used to splice the resolved env-var name into the
-    module docstring unescaped, so an `api_key_env` value containing `\"\"\"` would terminate
+    module docstring unescaped, so an `llm_connection` value containing `\"\"\"` would terminate
     the docstring early and turn the rest of the value into live top-level statements in the
     emitted module.
     """
     node = LlmCall().instantiate(
         messages=[{"role": "user", "content": "hi"}],
         provider="anthropic",
-        api_key_env='X"""\nimport os\nos.system("echo pwned")\n#',
+        llm_connection='X"""\nimport os\nos.system("echo pwned")\n#',
     )
     graph = _graph([node])
     source = compile_to_code(graph)
