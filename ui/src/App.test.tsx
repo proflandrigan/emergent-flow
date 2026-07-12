@@ -69,7 +69,7 @@ test("Browse schema overflow item opens the schema browser panel", async () => {
   });
 });
 
-test("the overflow menu closes on outside click and on Escape", () => {
+test("the overflow menu closes on outside click and on Escape", async () => {
   mockHealth("ok");
   render(<App />);
 
@@ -77,6 +77,11 @@ test("the overflow menu closes on outside click and on Escape", () => {
 
   fireEvent.click(toggle);
   expect(screen.getByRole("menu")).toBeInTheDocument();
+
+  // The outside-click listener attaches on the next tick (App.tsx) so the click that just
+  // opened the menu doesn't bubble into it and immediately close what it opened -- let that
+  // tick pass before simulating a click elsewhere.
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
   fireEvent.click(document.body);
   expect(screen.queryByRole("menu")).not.toBeInTheDocument();

@@ -114,6 +114,27 @@ test("Leave session returns to the start/join form", async () => {
   expect(screen.getByTestId("session-start")).toBeInTheDocument();
 });
 
+test("shows a copyable session id with handoff instructions", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.assign(navigator, { clipboard: { writeText } });
+
+  useSessionStore.setState({
+    sessionId: "abc",
+    version: 0,
+    status: "connected",
+  });
+
+  render(<SessionPanel />);
+  expect(screen.getByTestId("session-id-value")).toHaveTextContent("abc");
+
+  fireEvent.click(screen.getByTestId("session-copy-id"));
+
+  expect(writeText).toHaveBeenCalledWith("abc");
+  await waitFor(() => {
+    expect(screen.getByTestId("session-copy-id")).toHaveTextContent("Copied!");
+  });
+});
+
 test("shows the rebase banner and dismisses it", () => {
   useSessionStore.setState({
     sessionId: "abc",

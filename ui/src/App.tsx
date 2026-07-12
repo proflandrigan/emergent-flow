@@ -123,9 +123,17 @@ export function App(): JSX.Element {
       setMenuOpen(false);
     }
     document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("click", onClick);
+    // Deferred via setTimeout: the click that just set menuOpen/etc. to true is still
+    // bubbling up to document when this effect's passive-effect flush runs (React commits
+    // discrete updates synchronously for real native events), so attaching this listener
+    // synchronously would catch that SAME click and immediately close what it just opened.
+    // Pushing the attach to the next task lets the triggering click finish bubbling first.
+    const timer = window.setTimeout(() => {
+      document.addEventListener("click", onClick);
+    }, 0);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
+      window.clearTimeout(timer);
       document.removeEventListener("click", onClick);
     };
   }, [menuOpen, connectionsOpen, schemaBrowserOpen]);
