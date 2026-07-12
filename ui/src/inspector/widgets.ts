@@ -5,7 +5,7 @@
 
 import type { CatalogParam } from "../catalog/types";
 
-export type WidgetKind = "select" | "checkbox" | "number" | "text" | "list" | "json" | "sql" | "connection" | "column";
+export type WidgetKind = "select" | "checkbox" | "number" | "text" | "list" | "json" | "sql" | "connection" | "column" | "markdown";
 
 // True when the type token is a list/sequence, e.g. "list" or "list[str]".
 export function isListType(typeToken: string): boolean {
@@ -31,6 +31,9 @@ export function isListOfDictType(typeToken: string): boolean {
 export function widgetForParam(param: CatalogParam): WidgetKind {
   if (param.hints?.widget === "sql") {
     return "sql";
+  }
+  if (param.hints?.widget === "markdown") {
+    return "markdown";
   }
   if (param.hints?.widget === "connection") {
     return "connection";

@@ -28,10 +28,12 @@ import { useValidationStore } from "../store/validationStore";
 import { runGraph } from "../exec/runGraph";
 import { EfEdge } from "./edges/EfEdge";
 import { EfNode } from "./nodes/EfNode";
+import { NoteNode } from "./nodes/NoteNode";
 import { NodeContextMenu } from "./NodeContextMenu";
+import { NoteAnchorOverlay } from "./NoteAnchorOverlay";
 import { toRFEdge, toRFNode } from "./toReactFlow";
 
-const nodeTypes: NodeTypes = { efNode: EfNode };
+const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode };
 const edgeTypes: EdgeTypes = { efEdge: EfEdge };
 
 export function Canvas(): JSX.Element {
@@ -192,6 +194,7 @@ export function Canvas(): JSX.Element {
         }
       >
         <Background color="var(--grid-dot)" />
+        <NoteAnchorOverlay />
         <Controls
           className="glass"
           style={

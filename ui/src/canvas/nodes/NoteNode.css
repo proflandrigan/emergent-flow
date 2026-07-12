@@ -1,0 +1,36 @@
+.note-node-content {
+  cursor: text;
+}
+
+.note-node-content > *:first-child {
+  margin-top: 0;
+}
+
+.note-node-content > *:last-child {
+  margin-bottom: 0;
+}
+
+.note-node-content p,
+.note-node-content ul,
+.note-node-content ol {
+  margin: 0.4em 0;
+}
+
+.note-node-content h1,
+.note-node-content h2,
+.note-node-content h3 {
+  margin: 0.3em 0;
+  font-size: 1.1em;
+}
+
+.note-node-content ul,
+.note-node-content ol {
+  padding-left: 1.2em;
+}
+
+.note-node-content code {
+  font-size: 0.9em;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+}

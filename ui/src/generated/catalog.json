@@ -5417,6 +5417,70 @@
     },
     {
       "advisor_persona": null,
+      "category": "Annotation",
+      "description": "A markdown note for narrating the pipeline; no data flows through it.",
+      "family": "notes",
+      "label": "Note",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "",
+          "help": "Markdown note body.",
+          "hints": {
+            "choices": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "markdown"
+          },
+          "label": "Text",
+          "name": "content",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Id of a node or edge in this graph this note narrates. Unset means the note floats freely.",
+          "hints": null,
+          "label": "Anchor",
+          "name": "anchor_id",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "yellow",
+          "help": "Background color swatch for the note.",
+          "hints": {
+            "choices": [
+              "yellow",
+              "pink",
+              "blue",
+              "green",
+              "purple"
+            ],
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Color",
+          "name": "color",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [],
+      "type": "notes.markdown",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "Reporting",
       "description": "Generate an HTML profiling report summarising a DataFrame.",
       "family": "reports",

@@ -201,6 +201,26 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
         }
       />
     );
+  } else if (kind === "markdown") {
+    widget = (
+      <textarea
+        data-testid={testId}
+        value={formatValue(catalogParam, param.value)}
+        rows={6}
+        style={{
+          width: "100%",
+          fontSize: "0.8rem",
+          resize: "vertical",
+        }}
+        onChange={(e) =>
+          setParam(
+            node.id,
+            param.name,
+            parseValue(catalogParam, e.target.value),
+          )
+        }
+      />
+    );
   } else if (kind === "connection") {
     widget = (
       <ConnectionSelect

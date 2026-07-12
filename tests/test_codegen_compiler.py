@@ -25,6 +25,7 @@ from emergentflow.nodes.examples import (
 )
 from emergentflow.nodes.examples.eval_run import EvalRun
 from emergentflow.nodes.examples.llm_call import LlmCall
+from emergentflow.nodes.examples.markdown_note import MarkdownNote
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent
 
@@ -368,3 +369,53 @@ assert 'emergentflow.codegen' in sys.modules
     )
     assert result.returncode == 0, f"Subprocess failed:\n{result.stderr}\n{result.stdout}"
     assert "compile_to_code" in ef.__all__
+
+
+class TestAnchoredNoteComments:
+    def test_note_anchored_to_node_emits_comment_after_it(self):
+        load_csv_node = LoadCsv().instantiate(path="x.csv")
+        note_node = MarkdownNote().instantiate(
+            content="Loaded the raw source file here.",
+            anchor_id=load_csv_node.id,
+        )
+        code = compile_to_code(_graph([load_csv_node, note_node]))
+        load_line_idx = code.index("ef.data.load_csv(")
+        comment_idx = code.index("Loaded the raw source file here.")
+        assert comment_idx > load_line_idx
+        assert "# --- Note ---" in code
+
+    def test_note_anchored_to_edge_emits_comment_after_target(self):
+        load_csv_node = LoadCsv().instantiate(path="x.csv")
+        impute_node = ImputeMissing().instantiate()
+        edge = Edge(
+            source=PortRef(node_id=load_csv_node.id, port_id=_out_port(load_csv_node, "frame").id),
+            target=PortRef(node_id=impute_node.id, port_id=_in_port(impute_node, "frame").id),
+        )
+        note_node = MarkdownNote().instantiate(
+            content="Why we impute right after loading.",
+            anchor_id=edge.id,
+        )
+        code = compile_to_code(_graph([load_csv_node, impute_node, note_node], edges=[edge]))
+        impute_line_idx = code.index("ef.clean.impute_missing(")
+        comment_idx = code.index("Why we impute right after loading.")
+        assert comment_idx > impute_line_idx
+
+    def test_unanchored_note_emits_nothing(self):
+        note_node = MarkdownNote().instantiate(content="Just a floating thought.")
+        code = compile_to_code(_graph([note_node]))
+        assert "Just a floating thought." not in code
+        assert "--- Note ---" not in code
+
+    def test_note_with_stale_anchor_does_not_raise(self):
+        note_node = MarkdownNote().instantiate(
+            content="Points at nothing real.", anchor_id="does-not-exist"
+        )
+        code = compile_to_code(_graph([note_node]))
+        assert "Points at nothing real." not in code
+
+    def test_two_notes_same_anchor_both_emitted_in_order(self):
+        load_csv_node = LoadCsv().instantiate(path="x.csv")
+        note_a = MarkdownNote().instantiate(content="First note.", anchor_id=load_csv_node.id)
+        note_b = MarkdownNote().instantiate(content="Second note.", anchor_id=load_csv_node.id)
+        code = compile_to_code(_graph([load_csv_node, note_a, note_b]))
+        assert code.index("First note.") < code.index("Second note.")

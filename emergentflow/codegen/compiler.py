@@ -41,6 +41,17 @@ from emergentflow.nodes import get as get_node_definition
 from emergentflow.nodes import registry as default_node_registry
 from emergentflow.nodes.contract import CodeFragment
 
+# The catalog key of the markdown-note node type (emergentflow/nodes/examples/
+# markdown_note.py). The compiler special-cases this one node type so an
+# *anchored* note's text is emitted as a comment adjacent to whatever it
+# annotates -- a note has zero ports/edges, so plain topological order alone
+# can't place its text near its anchor. This is intentionally a small,
+# contained exception in the assembly pass, not a change to topological_sort
+# itself or to the generic per-node codegen contract (the note's own
+# `codegen()` still always returns an empty body; this string constant is the
+# only place compiler.py knows about a specific node type).
+_NOTE_NODE_TYPE = "notes.markdown"
+
 
 def _describe(node: Node) -> str:
     """Human-readable identifier for a node in error messages."""
@@ -48,6 +59,32 @@ def _describe(node: Node) -> str:
     if label:
         return f"{label!r} (id={node.id})"
     return f"{node.type!r} (id={node.id})"
+
+
+def _note_target_node_id(graph: Graph, anchor_id: str) -> str | None:
+    """Resolve a note's `anchor_id` to the node id it should be emitted next to.
+
+    `anchor_id` may name a node directly, or an edge (in which case the note
+    is emitted next to the edge's *target* node -- by the time that node's
+    code runs, both the connection's source and target are bound, so the
+    comment reads naturally as explaining the incoming connection). A stale
+    or unresolvable `anchor_id` returns None (not an error -- see
+    markdown_note.py's docstring: this node type does not validate
+    `anchor_id` against the graph).
+    """
+    if anchor_id in graph.nodes:
+        return anchor_id
+    edge = graph.edges.get(anchor_id)
+    if edge is not None:
+        return edge.target.node_id
+    return None
+
+
+def _format_note_comment(content: str) -> str:
+    """Render a note's markdown `content` as a Python comment block."""
+    lines = content.splitlines() or [""]
+    commented = "\n".join(f"# {line}" if line else "#" for line in lines)
+    return f"# --- Note ---\n{commented}"
 
 
 @dataclass(frozen=True)
@@ -114,6 +151,31 @@ def _assemble(graph: Graph) -> _AssembledModule:
     needs_llm = False
     needs_warehouse = False
     env_hint_set: set[str] = set()
+
+    # Anchored notes: map each resolved target node id -> ordered list of
+    # comment-formatted note bodies. Built in graph insertion order for
+    # determinism when more than one note anchors to the same target (graph
+    # insertion order matters when UUID-based ids make topo-order unstable
+    # for zero-dependency nodes).
+    note_comments_by_target: dict[str, list[str]] = {}
+    for node_id in graph.nodes:
+        node = graph.nodes[node_id]
+        if node.type != _NOTE_NODE_TYPE:
+            continue
+        values = {p.name: p.value for p in node.params}
+        raw_anchor_id = values.get("anchor_id")
+        raw_content = values.get("content")
+        if not isinstance(raw_anchor_id, str) or not isinstance(raw_content, str):
+            continue
+        anchor_id: str = raw_anchor_id
+        content: str = raw_content
+        if not anchor_id or not content:
+            continue
+        target_id = _note_target_node_id(graph, anchor_id)
+        if target_id is None:
+            continue
+        note_comments_by_target.setdefault(target_id, []).append(content)
+
     for node_id in topo_order_ids:
         node = graph.nodes[node_id]
         definition_cls = get_node_definition(node.type)
@@ -134,6 +196,8 @@ def _assemble(graph: Graph) -> _AssembledModule:
         ctx = build_codegen_context(node, name_map, wiring_map)
         fragment = definition.codegen(node, ctx)
         code_fragments.append(fragment)
+        for note_content in note_comments_by_target.get(node_id, []):
+            code_fragments.append(CodeFragment(imports=[], body=_format_note_comment(note_content)))
 
     # Step 5: Import collection
     all_imports: set[str] = set()
