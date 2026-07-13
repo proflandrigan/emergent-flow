@@ -110,3 +110,39 @@ def test_node_ids_subset_scopes_check(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(MissingConnectionProfileError):
         validate_connections_present(graph, store)
+
+
+def _adc_profile() -> ConnectionProfile:
+    return ConnectionProfile(
+        name="bq_adc",
+        dialect="bigquery",
+        auth_method="adc",
+        credential_refs={},
+    )
+
+
+def _implicit_pg_profile() -> ConnectionProfile:
+    return ConnectionProfile(
+        name="pg_implicit",
+        dialect="postgres",
+        auth_method="implicit",
+        credential_refs={},
+    )
+
+
+def test_adc_profile_passes_preflight() -> None:
+    """A BigQuery ADC profile with no credential_refs passes preflight."""
+    node = _connection_node(connection="bq_adc")
+    graph = _graph(node)
+    store = ProfileStore()
+    store.add(_adc_profile())
+    validate_connections_present(graph, store)  # must not raise
+
+
+def test_implicit_postgres_passes_preflight() -> None:
+    """A Postgres implicit-auth profile with no credential_refs passes preflight."""
+    node = _connection_node(connection="pg_implicit")
+    graph = _graph(node)
+    store = ProfileStore()
+    store.add(_implicit_pg_profile())
+    validate_connections_present(graph, store)  # must not raise

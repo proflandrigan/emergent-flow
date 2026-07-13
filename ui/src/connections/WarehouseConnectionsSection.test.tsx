@@ -342,3 +342,41 @@ test("invalid JSON in coordinates shows error and does not POST", async () => {
     expect.objectContaining({ method: "POST" }),
   );
 });
+
+test("credential refs textarea is hidden when auth method is adc", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+    Promise.resolve(
+      new Response(JSON.stringify({ connections: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    ),
+  );
+
+  render(<WarehouseConnectionsSection />);
+
+  await waitFor(() => {
+    expect(screen.getByTestId("connection-new-button")).toBeInTheDocument();
+  });
+
+  fireEvent.click(screen.getByTestId("connection-new-button"));
+
+  await waitFor(() => {
+    expect(screen.getByTestId("warehouse-connection-form")).toBeInTheDocument();
+  });
+
+  // Default is "none" — credential refs should be hidden
+  expect(screen.queryByTestId("warehouse-form-credential-refs")).not.toBeInTheDocument();
+
+  // Switch to password_env — credential refs should appear
+  fireEvent.change(screen.getByTestId("warehouse-form-auth-method"), {
+    target: { value: "password_env" },
+  });
+  expect(screen.getByTestId("warehouse-form-credential-refs")).toBeInTheDocument();
+
+  // Switch to adc — credential refs should hide again
+  fireEvent.change(screen.getByTestId("warehouse-form-auth-method"), {
+    target: { value: "adc" },
+  });
+  expect(screen.queryByTestId("warehouse-form-credential-refs")).not.toBeInTheDocument();
+});

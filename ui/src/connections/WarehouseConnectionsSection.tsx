@@ -66,8 +66,9 @@ function WarehouseConnectionForm({
     }
     const coordinates = parseJsonObject(coordinatesText, "Coordinates");
     if (coordinates === null) return;
-    const credentialRefs = parseJsonObject(credentialRefsText, "Credential refs");
-    if (credentialRefs === null) return;
+    const isImplicitAuth = authMethod === "adc" || authMethod === "implicit" || authMethod === "none";
+    const credentialRefs = isImplicitAuth ? {} : parseJsonObject(credentialRefsText, "Credential refs");
+    if (!isImplicitAuth && credentialRefs === null) return;
     const limits = parseJsonObject(limitsText, "Limits");
     if (limits === null) return;
 
@@ -129,11 +130,22 @@ function WarehouseConnectionForm({
       </label>
       <label style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
         Auth method
-        <Input
+        <select
           data-testid="warehouse-form-auth-method"
           value={authMethod}
           onChange={(e) => setAuthMethod(e.target.value)}
-        />
+          style={{ width: "100%", padding: "6px 8px", fontSize: "0.875rem" }}
+        >
+          <option value="none">none — No authentication</option>
+          <option value="password_env">password_env — Password from env var</option>
+          <option value="service_account_file">
+            service_account_file — Service account JSON file
+          </option>
+          <option value="adc">
+            adc — Application Default Credentials (Google Cloud)
+          </option>
+          <option value="implicit">implicit — Implicit / environment auth (libpq)</option>
+        </select>
       </label>
       <label style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
         Coordinates (JSON)
@@ -145,16 +157,18 @@ function WarehouseConnectionForm({
           onChange={(e) => setCoordinatesText(e.target.value)}
         />
       </label>
-      <label style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
-        Credential refs (JSON — env-var NAMES only, never a literal secret)
-        <textarea
-          data-testid="warehouse-form-credential-refs"
-          rows={3}
-          style={{ width: "100%", fontFamily: "monospace", fontSize: "0.8rem" }}
-          value={credentialRefsText}
-          onChange={(e) => setCredentialRefsText(e.target.value)}
-        />
-      </label>
+      {authMethod !== "adc" && authMethod !== "implicit" && authMethod !== "none" && (
+        <label style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
+          Credential refs (JSON — env-var NAMES only, never a literal secret)
+          <textarea
+            data-testid="warehouse-form-credential-refs"
+            rows={3}
+            style={{ width: "100%", fontFamily: "monospace", fontSize: "0.8rem" }}
+            value={credentialRefsText}
+            onChange={(e) => setCredentialRefsText(e.target.value)}
+          />
+        </label>
+      )}
       <label style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
         Limits (JSON)
         <textarea

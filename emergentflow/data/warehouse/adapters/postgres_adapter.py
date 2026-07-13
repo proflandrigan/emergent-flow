@@ -59,12 +59,18 @@ class PostgresAdapter:
     def _engine(self, credentials: Mapping[str, str]) -> _sa.Engine:
         """Build a SQLAlchemy engine from resolved credentials."""
         _require_driver()
-        host = credentials["host"]
+        host = credentials.get("host", "localhost")
         port = credentials.get("port", "5432")
-        database = credentials["database"]
-        user = credentials["user"]
-        password = credentials["password"]
-        url = f"postgresql+psycopg://{user}:{password}@{host}:{port}/{database}"
+        database = credentials.get("database", "")
+        user = credentials.get("user")
+        password = credentials.get("password")
+        if user and password:
+            userinfo = f"{user}:{password}@"
+        elif user:
+            userinfo = f"{user}@"
+        else:
+            userinfo = ""
+        url = f"postgresql+psycopg://{userinfo}{host}:{port}/{database}"
         return _sa.create_engine(url)
 
     def execute(

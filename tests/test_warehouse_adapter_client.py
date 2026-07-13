@@ -249,3 +249,25 @@ def test_run_passes_when_under_timeout() -> None:
     result = client.run(_request())
 
     assert result is _QUERY_RESULT
+
+
+def test_coordinates_merged_into_adapter_credentials() -> None:
+    """Adapter receives both profile coordinates and resolved credential values."""
+    profile = ConnectionProfile(
+        name="bq_adc",
+        dialect="duckdb",  # use duckdb dialect to match _FakeAdapter.dialect
+        auth_method="adc",
+        coordinates={"project": "my-gcp-project", "location": "us-central1"},
+        credential_refs={},
+    )
+    store = ProfileStore()
+    store.add(profile)
+    fake = _FakeAdapter()
+    client = AdapterWarehouseClient(store, {"duckdb": fake})
+
+    client.run(QueryRequest(sql="SELECT 1", dialect="duckdb", connection="bq_adc"))
+
+    assert len(fake.execute_calls) == 1
+    _, credentials = fake.execute_calls[0]
+    assert credentials["project"] == "my-gcp-project"
+    assert credentials["location"] == "us-central1"
