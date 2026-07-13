@@ -141,6 +141,13 @@ postgres = [
 mcp = [
     "fastmcp>=3.4.4",
 ]
+# `pip install emergentflow[all]` installs every optional extra in one shot —
+# the server, all warehouse adapters, LLM gateway, explainability, Bayesian
+# modeling, and the MCP tool wrapper. Convenient for local development or
+# exploration; production installs should cherry-pick only the extras they need.
+all = [
+    "emergentflow[server,llm,bayes,explain,bigquery,redshift,postgres,mcp]",
+]
 
 [project.urls]
 Homepage = "https://github.com/proflandrigan/emergent-flow"

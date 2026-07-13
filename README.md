@@ -54,6 +54,7 @@ CI). The `[server]` extra adds FastAPI/Uvicorn so `emergentflow serve` (alias `e
 can boot the local canvas. Optional extras for specific node families:
 
 ```bash
+pip install emergentflow[all]       # everything — server + all optional extras
 pip install emergentflow[llm]       # LiteLLM gateway for LLM nodes
 pip install emergentflow[explain]   # SHAP-based model explainability
 pip install emergentflow[bayes]     # Bayesian modeling (PyMC/Bambi/ArviZ)
@@ -63,7 +64,8 @@ pip install emergentflow[redshift]  # Redshift warehouse adapter
 pip install emergentflow[mcp]       # MCP tool wrapper for agent collaboration
 ```
 
-Combine extras as needed: `pip install emergentflow[server,llm,explain]`.
+Combine extras as needed: `pip install emergentflow[server,llm,explain]`, or use
+`pip install emergentflow[all]` to get everything in one shot.
 
 ---
 

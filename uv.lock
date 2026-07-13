@@ -957,6 +957,21 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+all = [
+    { name = "arviz" },
+    { name = "bambi" },
+    { name = "fastapi" },
+    { name = "fastmcp" },
+    { name = "google-cloud-bigquery" },
+    { name = "litellm" },
+    { name = "psycopg", extra = ["binary"] },
+    { name = "pymc" },
+    { name = "redshift-connector" },
+    { name = "shap", version = "0.51.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "shap", version = "0.52.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "sqlalchemy" },
+    { name = "uvicorn", extra = ["standard"] },
+]
 bayes = [
     { name = "arviz" },
     { name = "bambi" },
@@ -1003,6 +1018,7 @@ requires-dist = [
     { name = "arviz", marker = "extra == 'bayes'", specifier = ">=0.17,<1" },
     { name = "bambi", marker = "extra == 'bayes'", specifier = ">=0.13,<1" },
     { name = "duckdb", specifier = ">=1,<2" },
+    { name = "emergentflow", extras = ["bayes", "bigquery", "explain", "llm", "mcp", "postgres", "redshift", "server"], marker = "extra == 'all'" },
     { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.110,<1" },
     { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=3.4.4" },
     { name = "google-cloud-bigquery", marker = "extra == 'bigquery'", specifier = ">=3,<4" },
@@ -1027,7 +1043,7 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'server'", specifier = ">=0.29,<1" },
     { name = "ydata-profiling", specifier = ">=4" },
 ]
-provides-extras = ["server", "llm", "bayes", "explain", "bigquery", "redshift", "postgres", "mcp"]
+provides-extras = ["server", "llm", "bayes", "explain", "bigquery", "redshift", "postgres", "mcp", "all"]
 
 [package.metadata.requires-dev]
 dev = [
