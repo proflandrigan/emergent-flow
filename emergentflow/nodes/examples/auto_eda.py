@@ -43,12 +43,14 @@ class AutoEda(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.IN,
             data_type="DataFrame",
             help="The input DataFrame to analyze.",
         ),
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.OUT,
             data_type="DataFrame",
             help="The input DataFrame, passed through unchanged so this node can sit inline.",

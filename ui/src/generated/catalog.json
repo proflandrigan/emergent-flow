@@ -2165,7 +2165,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose columns should be cast.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -2174,7 +2174,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The DataFrame with cast columns.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2260,7 +2260,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame from which rows/columns with NA should be dropped.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -2269,7 +2269,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The DataFrame with missing-value rows or columns removed.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2357,7 +2357,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame to filter.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -2366,7 +2366,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The filtered DataFrame containing only rows that match the predicate.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2431,7 +2431,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose missing cells should be filled.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -2440,7 +2440,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The DataFrame with missing cells imputed.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2501,7 +2501,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose columns should be selected.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -2510,7 +2510,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The DataFrame with selected columns kept or dropped.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2609,7 +2609,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The relation's column schema as a tidy pandas DataFrame.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2670,7 +2670,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The loaded data as a pandas DataFrame.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2721,7 +2721,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The loaded data as a pandas DataFrame.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2772,7 +2772,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The loaded data as a pandas DataFrame.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2818,7 +2818,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The loaded data as a pandas DataFrame.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -3093,7 +3093,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The query result as a pandas DataFrame. Always a genuine (possibly empty) DataFrame, including under dry_run -- see cost_estimate for the byte-scan/cost metadata dry_run reports instead of real rows.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -3225,7 +3225,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The query result as a pandas DataFrame. Always a genuine (possibly empty) DataFrame, including under dry_run -- see cost_estimate for the byte-scan/cost metadata dry_run reports instead of real rows.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -3404,7 +3404,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "Labeled data to score the model against.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -3454,7 +3454,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "Labeled data to score the model against.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -3494,7 +3494,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "Labeled data to score the model against.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -3534,7 +3534,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "Labeled data to score the model against.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -3597,7 +3597,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "Labeled data to score the model against.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -3759,7 +3759,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The data to compute SHAP attributions over.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4089,7 +4089,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The data to apply the model to.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4182,7 +4182,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4337,7 +4337,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features and the target column.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4377,7 +4377,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "Labeled data to score the model against.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4505,7 +4505,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features and the target column.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4625,7 +4625,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features (and, for supervised feature selectors, the target column).",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4780,7 +4780,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features and the target column.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4868,7 +4868,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features and (if the final step is supervised) the target column.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4908,7 +4908,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The data to predict on.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5047,7 +5047,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features and the target column.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5177,7 +5177,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features and the target column.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5247,7 +5247,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features and the target column.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5317,7 +5317,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame to split.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5389,7 +5389,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The data to apply the transformer to.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5599,7 +5599,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The DataFrame to profile.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5739,7 +5739,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing the group and value columns.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5790,7 +5790,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame to analyze.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5799,7 +5799,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The input DataFrame, passed through unchanged so this node can sit inline.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5918,7 +5918,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose columns should be correlated.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5969,7 +5969,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose columns should be described.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -6031,7 +6031,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame to diagnose.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -6146,7 +6146,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose numeric columns should be summarized.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -6197,7 +6197,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose columns should be profiled.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -6366,7 +6366,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing the target and predictor columns.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -6479,7 +6479,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing the target and predictor columns.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -6602,7 +6602,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing the target and predictor columns.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -6714,7 +6714,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing the target and predictor columns.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -6822,7 +6822,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing the target and predictor columns.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -6919,7 +6919,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame to group and aggregate.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -6970,7 +6970,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose columns should be analyzed for nulls.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -7078,7 +7078,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing the group and value columns.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -7160,7 +7160,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing continuous features to discretize.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -7271,7 +7271,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing categorical features to encode.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -7361,7 +7361,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features to generate from.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -7456,7 +7456,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features to scale.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -7546,7 +7546,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame to chart.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -7680,7 +7680,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "Labeled data to score the classifier against.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },

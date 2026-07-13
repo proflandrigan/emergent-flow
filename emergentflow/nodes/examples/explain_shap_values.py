@@ -48,6 +48,7 @@ class ExplainShapValues(NodeDefinition):
         ),
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.IN,
             data_type="DataFrame",
             help="The data to compute SHAP attributions over.",

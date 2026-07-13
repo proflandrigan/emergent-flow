@@ -39,12 +39,14 @@ class CastTypes(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.IN,
             data_type="DataFrame",
             help="The input DataFrame whose columns should be cast.",
         ),
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.OUT,
             data_type="DataFrame",
             help="The DataFrame with cast columns.",

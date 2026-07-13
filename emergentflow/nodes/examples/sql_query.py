@@ -45,6 +45,7 @@ class SqlQuery(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.OUT,
             data_type="DataFrame",
             help="The query result as a pandas DataFrame. Always a genuine (possibly "

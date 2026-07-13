@@ -45,14 +45,16 @@
                 "name": "x",
                 "direction": "in",
                 "data_type": "Tensor",
-                "cardinality": "one"
+                "cardinality": "one",
+                "label": null
               },
               {
                 "id": "p-linear1-out",
                 "name": "out",
                 "direction": "out",
                 "data_type": "Tensor",
-                "cardinality": "one"
+                "cardinality": "one",
+                "label": null
               }
             ],
             "position": {
@@ -74,14 +76,16 @@
                 "name": "x",
                 "direction": "in",
                 "data_type": "Tensor",
-                "cardinality": "one"
+                "cardinality": "one",
+                "label": null
               },
               {
                 "id": "p-relu-out",
                 "name": "out",
                 "direction": "out",
                 "data_type": "Tensor",
-                "cardinality": "one"
+                "cardinality": "one",
+                "label": null
               }
             ],
             "position": {
@@ -116,14 +120,16 @@
                 "name": "x",
                 "direction": "in",
                 "data_type": "Tensor",
-                "cardinality": "one"
+                "cardinality": "one",
+                "label": null
               },
               {
                 "id": "p-linear2-out",
                 "name": "out",
                 "direction": "out",
                 "data_type": "Tensor",
-                "cardinality": "one"
+                "cardinality": "one",
+                "label": null
               }
             ],
             "position": {

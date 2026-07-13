@@ -38,6 +38,7 @@ function portToIR(port: PortModel): Port {
     direction: port.direction,
     data_type: port.dataType,
     cardinality: port.cardinality,
+    label: port.label ?? null,
   };
 }
 
@@ -48,6 +49,7 @@ function portFromIR(port: Port): PortModel {
     direction: port.direction,
     dataType: port.data_type ?? "any",
     cardinality: port.cardinality ?? "one",
+    label: port.label ?? null,
   };
 }
 

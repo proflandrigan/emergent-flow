@@ -25,7 +25,12 @@ import { familyMeta } from "../../theme/family";
 export interface EfNodeData extends Record<string, unknown> {
   label: string;
   family?: string | null;
-  ports: { id: string; name: string; direction: "in" | "out" }[];
+  ports: {
+    id: string;
+    name: string;
+    direction: "in" | "out";
+    label?: string | null;
+  }[];
   status?: NodeStatus | null; // from /execute statuses
   results?: Record<string, Payload> | null; // outPortName -> payload
 }
@@ -164,14 +169,14 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
               }}
             />
             <span style={{ visibility: detailed ? "visible" : "hidden" }}>
-              {port.name}
+              {port.label ?? port.name}
             </span>
           </div>
         ))}
         {outPorts.map((port) => (
           <div key={port.id} style={{ ...portRowStyle, textAlign: "right" }}>
             <span style={{ visibility: detailed ? "visible" : "hidden" }}>
-              {port.name}
+              {port.label ?? port.name}
             </span>
             <Handle
               type="source"

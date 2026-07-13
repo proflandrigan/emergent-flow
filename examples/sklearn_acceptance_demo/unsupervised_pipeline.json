@@ -22,7 +22,8 @@
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {
@@ -74,21 +75,24 @@
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-scale-transformer",
           "name": "transformer",
           "direction": "out",
           "data_type": "Transformer",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-scale-result",
           "name": "result",
           "direction": "out",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {
@@ -137,21 +141,24 @@
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-cluster-model",
           "name": "model",
           "direction": "out",
           "data_type": "Model",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-cluster-result",
           "name": "result",
           "direction": "out",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {
@@ -173,14 +180,16 @@
           "name": "model",
           "direction": "in",
           "data_type": "Model",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-summarize-summary",
           "name": "summary",
           "direction": "out",
           "data_type": "ModelSummary",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {
@@ -209,21 +218,24 @@
           "name": "transformer",
           "direction": "in",
           "data_type": "Transformer",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-transform-frame",
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-transform-result",
           "name": "result",
           "direction": "out",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {

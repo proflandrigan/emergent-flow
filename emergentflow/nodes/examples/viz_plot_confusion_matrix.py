@@ -45,6 +45,7 @@ class VizPlotConfusionMatrix(NodeDefinition):
         ),
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.IN,
             data_type="DataFrame",
             help="Labeled data to score the classifier against.",

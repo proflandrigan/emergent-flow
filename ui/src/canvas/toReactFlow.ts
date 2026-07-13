@@ -49,6 +49,7 @@ export function toRFNode(
         id: port.id,
         name: port.name,
         direction: port.direction,
+        label: port.label ?? null,
       })),
       status: status ?? null,
       results: results ?? null,

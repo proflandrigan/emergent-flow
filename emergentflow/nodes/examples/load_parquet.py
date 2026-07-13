@@ -42,6 +42,7 @@ class LoadParquet(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.OUT,
             data_type="DataFrame",
             help="The loaded data as a pandas DataFrame.",

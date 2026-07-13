@@ -39,6 +39,7 @@ class GroupByAggregate(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.IN,
             data_type="DataFrame",
             help="The input DataFrame to group and aggregate.",
