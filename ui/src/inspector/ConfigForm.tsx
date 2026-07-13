@@ -24,6 +24,7 @@ import {
 } from "./widgets";
 import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
+import { CodeEditor } from "./CodeEditor";
 import { ColumnSelect, ColumnMultiSelect } from "./ColumnSelect";
 import { QueryBuilderPreview } from "./QueryBuilderPreview";
 
@@ -191,43 +192,25 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
     );
   } else if (kind === "sql") {
     widget = (
-      <textarea
-        data-testid={testId}
+      <CodeEditor
+        testId={testId}
+        language="sql"
         value={formatValue(catalogParam, param.value)}
-        rows={8}
-        style={{
-          width: "100%",
-          fontFamily: "monospace",
-          fontSize: "0.8rem",
-          resize: "vertical",
-        }}
-        onChange={(e) =>
-          setParam(
-            node.id,
-            param.name,
-            parseValue(catalogParam, e.target.value),
-          )
+        minHeight="160px"
+        onChange={(value) =>
+          setParam(node.id, param.name, parseValue(catalogParam, value))
         }
       />
     );
   } else if (kind === "code") {
     widget = (
-      <textarea
-        data-testid={testId}
+      <CodeEditor
+        testId={testId}
+        language="python"
         value={formatValue(catalogParam, param.value)}
-        rows={10}
-        style={{
-          width: "100%",
-          fontFamily: "monospace",
-          fontSize: "0.8rem",
-          resize: "vertical",
-        }}
-        onChange={(e) =>
-          setParam(
-            node.id,
-            param.name,
-            parseValue(catalogParam, e.target.value),
-          )
+        minHeight="200px"
+        onChange={(value) =>
+          setParam(node.id, param.name, parseValue(catalogParam, value))
         }
       />
     );

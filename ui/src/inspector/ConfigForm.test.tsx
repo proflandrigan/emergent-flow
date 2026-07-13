@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { EditorView } from "@codemirror/view";
 import { beforeEach, expect, test } from "vitest";
 
 import catalogJson from "../generated/catalog.json";
@@ -213,16 +214,35 @@ test("switching estimator clears kwargs that don't belong to the newly selected 
   expect(JSON.parse(advanced.value)).toEqual({});
 });
 
-test("sql param renders a textarea, not an input", () => {
+test("sql param renders a CodeMirror editor, not a plain textarea", () => {
   addNode("data.sql_query");
   const el = screen.getByTestId("param-sql");
-  expect(el.tagName).toBe("TEXTAREA");
+  expect(el.tagName).toBe("DIV");
+  expect(el.querySelector(".cm-editor")).not.toBeNull();
+  expect(el.querySelector("textarea")).toBeNull();
 });
 
-test("code param renders a textarea, not an input", () => {
+test("code param renders a CodeMirror editor, not a plain textarea", () => {
   addNode("script.custom_code");
   const el = screen.getByTestId("param-code");
-  expect(el.tagName).toBe("TEXTAREA");
+  expect(el.tagName).toBe("DIV");
+  expect(el.querySelector(".cm-editor")).not.toBeNull();
+  expect(el.querySelector("textarea")).toBeNull();
+});
+
+test("editing the sql CodeMirror editor updates the store", () => {
+  const id = addNode("data.sql_query");
+  const container = screen.getByTestId("param-sql");
+  const editorDom = container.querySelector(".cm-editor") as HTMLElement;
+  const view = EditorView.findFromDOM(editorDom);
+  expect(view).not.toBeNull();
+
+  view!.dispatch({ changes: { from: view!.state.doc.length, insert: "\nSELECT * FROM foo" } });
+
+  const param = useGraphStore
+    .getState()
+    .nodes[id].params.find((p) => p.name === "sql");
+  expect(param?.value).toContain("SELECT * FROM foo");
 });
 
 test("connection param renders a select, not a text input", () => {
