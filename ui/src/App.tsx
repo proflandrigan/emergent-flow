@@ -24,11 +24,11 @@ import { Menu, type MenuItem } from "./ui/Menu";
 import { OverlayModal } from "./ui/OverlayModal";
 import { Tooltip } from "./ui/Tooltip";
 
-// Lazy: nothing under ui/src/session/ is imported until the user opens this panel (Epic 14
-// works-without-agents invariant -- session mode is strictly opt-in, App's default render path
+// Lazy: nothing under ui/src/session/ is imported until the user opens this modal (Epic 14
+// works-without-agents invariant -- chat mode is strictly opt-in, App's default render path
 // stays byte-identical to before this epic).
-const SessionPanel = lazy(() =>
-  import("./session/SessionPanel").then((m) => ({ default: m.SessionPanel })),
+const ChatModal = lazy(() =>
+  import("./session/ChatModal").then((m) => ({ default: m.ChatModal })),
 );
 
 type ServerStatus = "connecting" | "ok" | "unreachable";
@@ -65,7 +65,7 @@ export function App(): JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [schemaBrowserOpen, setSchemaBrowserOpen] = useState(false);
-  const [sessionPanelOpen, setSessionPanelOpen] = useState(false);
+  const [chatModalOpen, setChatModalOpen] = useState(false);
   const past = useGraphStore((s) => s.past);
   const future = useGraphStore((s) => s.future);
   const canUndo = past.length > 0;
@@ -220,9 +220,9 @@ export function App(): JSX.Element {
       },
     },
     {
-      label: "Share session",
+      label: "Start chat",
       onSelect: () => {
-        setSessionPanelOpen(true);
+        setChatModalOpen(true);
         setMenuOpen(false);
       },
     },
@@ -440,12 +440,10 @@ export function App(): JSX.Element {
           <SchemaBrowserPanel />
         </OverlayModal>
       )}
-      {sessionPanelOpen && (
-        <OverlayModal width={420} onClose={() => setSessionPanelOpen(false)}>
-          <Suspense fallback={<div>Loading…</div>}>
-            <SessionPanel />
-          </Suspense>
-        </OverlayModal>
+      {chatModalOpen && (
+        <Suspense fallback={<div>Loading…</div>}>
+          <ChatModal onClose={() => setChatModalOpen(false)} />
+        </Suspense>
       )}
     </div>
   );

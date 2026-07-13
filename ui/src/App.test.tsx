@@ -2,9 +2,49 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import { App } from "./App";
+import { useSessionStore } from "./session/sessionStore";
+
+vi.mock("./session/sessionClient", () => ({
+  createSession: vi.fn().mockResolvedValue({
+    id: "app-test-session",
+    graph: { paradigm: "functional", nodes: {}, edges: {} },
+    version: 0,
+    proposals: {},
+  }),
+  getSession: vi.fn(),
+  deleteSession: vi.fn(),
+  replaceSessionGraph: vi.fn(),
+  proposeMutation: vi.fn(),
+  consultSession: vi.fn(),
+  acceptProposal: vi.fn(),
+  rejectProposal: vi.fn(),
+  subscribeToSessionEvents: vi.fn(() => ({ close: vi.fn() })),
+  createReview: vi.fn(),
+  addReviewComment: vi.fn(),
+  createGate: vi.fn(),
+  closeGateRequest: vi.fn(),
+  skipGateRequest: vi.fn(),
+  postGateDecision: vi.fn(),
+  startChat: vi.fn(),
+  stopChatTurn: vi.fn(),
+  endChat: vi.fn(),
+  getAvailableAgents: vi.fn().mockResolvedValue([]),
+}));
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  vi.clearAllMocks();
+  useSessionStore.setState({
+    sessionId: null,
+    version: null,
+    proposals: {},
+    reviews: {},
+    gates: {},
+    chat: { backend: null, backend_thread_id: null, turns: [] },
+    status: "idle",
+    error: null,
+    rebaseNeeded: false,
+    rebaseMessage: null,
+  });
 });
 
 // App fires two fetches on mount (/healthz and the palette's /catalog). A `Response` body is
@@ -105,14 +145,17 @@ test("Manage connections overflow item opens the connections panel", async () =>
   });
 });
 
-test("Share session overflow item opens the session panel", async () => {
+test("Start chat overflow item opens the chat modal", async () => {
   mockHealth("ok");
   render(<App />);
 
   fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-  fireEvent.click(screen.getByText("Share session"));
+  fireEvent.click(screen.getByText("Start chat"));
 
   await waitFor(() => {
-    expect(screen.getByTestId("session-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("chat-connecting")).toBeInTheDocument();
+  });
+  await waitFor(() => {
+    expect(screen.getByTestId("chat-backend-picker")).toBeInTheDocument();
   });
 });

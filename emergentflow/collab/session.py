@@ -34,6 +34,13 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from emergentflow.codegen.validation import Diagnostics
+from emergentflow.collab.chat import (
+    ChatAlreadyActiveError,
+    ChatTurn,
+    ChatTurnAlreadyResolvedError,
+    ChatTurnStatus,
+    UnknownChatTurnError,
+)
 from emergentflow.collab.gates import (
     Decision,
     Gate,
@@ -551,6 +558,176 @@ class SessionStore:
                 },
             )
             return gate
+
+    def _get_chat_turn(self, session: GraphSession, turn_id: str) -> ChatTurn:
+        for turn in session.collab.chat.turns:
+            if turn.id == turn_id:
+                return turn
+        raise UnknownChatTurnError(f"no chat turn with id {turn_id!r} on session {session.id!r}.")
+
+    def start_chat_turn(self, session_id: str, backend: str, user_message: str) -> ChatTurn:
+        """Start a new chat turn on *session_id* with a spawned *backend* CLI.
+
+        If no chat is active on the session, *backend* becomes the session's active chat
+        backend. Raises ChatAlreadyActiveError if a DIFFERENT backend is already active, or if
+        the active backend's most recent turn is still RUNNING (one active chat, one turn at a
+        time, per product decision).
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        ChatAlreadyActiveError
+            If a different backend is already active, or the current turn hasn't resolved yet.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            chat = session.collab.chat
+            if chat.backend is not None and chat.backend != backend:
+                raise ChatAlreadyActiveError(
+                    f"session {session_id!r}: chat backend {chat.backend!r} is already active; "
+                    f"end it before starting {backend!r}."
+                )
+            if chat.turns and chat.turns[-1].status == ChatTurnStatus.RUNNING:
+                raise ChatAlreadyActiveError(
+                    f"session {session_id!r}: turn {chat.turns[-1].id!r} is still running."
+                )
+            if chat.backend is None:
+                chat.backend = backend
+            turn = ChatTurn(backend=backend, user_message=user_message)
+            chat.turns.append(turn)
+            self._publish(
+                session_id,
+                {"type": "chat_turn_started", "session_id": session_id, "turn_id": turn.id},
+            )
+            return turn
+
+    def append_chat_narration(self, session_id: str, turn_id: str, text: str) -> ChatTurn:
+        """Append one narration line (e.g. "proposing mutation: ...") to a RUNNING chat turn.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        UnknownChatTurnError
+            If no turn with that id exists on the session.
+        ChatTurnAlreadyResolvedError
+            If the turn is not RUNNING.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            turn = self._get_chat_turn(session, turn_id)
+            if turn.status != ChatTurnStatus.RUNNING:
+                raise ChatTurnAlreadyResolvedError(
+                    f"session {session_id!r}: turn {turn_id!r} is already "
+                    f"{turn.status.value} and cannot receive more narration."
+                )
+            turn.narration.append(text)
+            self._publish(
+                session_id,
+                {"type": "chat_narration_added", "session_id": session_id, "turn_id": turn_id},
+            )
+            return turn
+
+    def _resolve_chat_turn(
+        self,
+        session_id: str,
+        turn_id: str,
+        new_status: ChatTurnStatus,
+        event_type: str,
+        *,
+        agent_message: str | None = None,
+        error: str | None = None,
+    ) -> ChatTurn:
+        """Shared complete/fail/interrupt transition: one-shot, RUNNING -> new_status only."""
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            turn = self._get_chat_turn(session, turn_id)
+            if turn.status != ChatTurnStatus.RUNNING:
+                raise ChatTurnAlreadyResolvedError(
+                    f"session {session_id!r}: turn {turn_id!r} is already "
+                    f"{turn.status.value} and cannot be re-resolved."
+                )
+            turn.status = new_status
+            if agent_message is not None:
+                turn.agent_message = agent_message
+            if error is not None:
+                turn.error = error
+            self._publish(
+                session_id,
+                {"type": event_type, "session_id": session_id, "turn_id": turn_id},
+            )
+            return turn
+
+    def complete_chat_turn(self, session_id: str, turn_id: str, agent_message: str) -> ChatTurn:
+        """Mark a RUNNING chat turn COMPLETED with the agent's final reply text.
+
+        Raises UnknownSessionError, UnknownChatTurnError, ChatTurnAlreadyResolvedError."""
+        return self._resolve_chat_turn(
+            session_id,
+            turn_id,
+            ChatTurnStatus.COMPLETED,
+            "chat_turn_completed",
+            agent_message=agent_message,
+        )
+
+    def fail_chat_turn(self, session_id: str, turn_id: str, error: str) -> ChatTurn:
+        """Mark a RUNNING chat turn FAILED with an error message.
+
+        Raises UnknownSessionError, UnknownChatTurnError, ChatTurnAlreadyResolvedError."""
+        return self._resolve_chat_turn(
+            session_id, turn_id, ChatTurnStatus.FAILED, "chat_turn_failed", error=error
+        )
+
+    def interrupt_chat_turn(self, session_id: str, turn_id: str) -> ChatTurn:
+        """Mark a RUNNING chat turn INTERRUPTED (the user hit Stop).
+
+        Raises UnknownSessionError, UnknownChatTurnError, ChatTurnAlreadyResolvedError."""
+        return self._resolve_chat_turn(
+            session_id, turn_id, ChatTurnStatus.INTERRUPTED, "chat_turn_interrupted"
+        )
+
+    def set_chat_thread_id(self, session_id: str, thread_id: str) -> None:
+        """Record the spawned CLI's own resume/thread id on the session's ChatState, so the
+        next turn continues the same backend conversation instead of starting fresh. Does not
+        publish an event -- the next narration/turn event on the same turn already triggers a
+        refresh that picks this up.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            session.collab.chat.backend_thread_id = thread_id
+
+    def end_chat(self, session_id: str) -> GraphSession:
+        """Clear the session's active chat backend and thread id so a new backend can be
+        started. Turn history is kept. Callers should interrupt any RUNNING turn (see
+        interrupt_chat_turn) before calling this -- end_chat does not itself check for one.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            session.collab.chat.backend = None
+            session.collab.chat.backend_thread_id = None
+            self._publish(session_id, {"type": "chat_ended", "session_id": session_id})
+            return session
 
 
 # A process-wide default store, lazily created (the report-store precedent --

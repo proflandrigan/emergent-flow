@@ -9,6 +9,8 @@ HTTP client that speaks this surface.
 
 from __future__ import annotations
 
+import json
+import sys
 import threading
 import time
 
@@ -16,6 +18,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from emergentflow.collab import session as session_mod
+from emergentflow.collab.agents.base import AdapterEvent, AgentAdapter, register_adapter
 from emergentflow.server.app import configure_session_auth, create_app
 
 
@@ -750,3 +753,151 @@ class TestSessionGates:
             "decision_added",
             "gate_closed",
         ]
+
+
+_FAKE_HAPPY_CHAT_SCRIPT = "import json\nprint(json.dumps({'type': 'text', 'text': 'All set.'}))\n"
+
+_FAKE_SLOW_CHAT_SCRIPT = "import time\ntime.sleep(30)\n"
+
+
+class _FakeHttpChatAdapter(AgentAdapter):
+    """Base for test-only adapters: spawns `python -c <SCRIPT>` and parses simple
+    `{"type": ..., "text": ...}` JSON lines directly into an AdapterEvent."""
+
+    cli_executable = sys.executable
+    SCRIPT = ""
+
+    def build_command(self, *, prompt: str, resume_id: str | None) -> list[str]:
+        return [sys.executable, "-c", self.SCRIPT]
+
+    def parse_line(self, raw_line: str) -> AdapterEvent | None:
+        line = raw_line.strip()
+        if not line:
+            return None
+        try:
+            data = json.loads(line)
+        except json.JSONDecodeError:
+            return None
+        return AdapterEvent(kind=data["type"], text=data["text"])
+
+
+@register_adapter
+class _HappyHttpChatAdapter(_FakeHttpChatAdapter):
+    name = "fake-http-chat-happy"
+    SCRIPT = _FAKE_HAPPY_CHAT_SCRIPT
+
+
+@register_adapter
+class _SlowHttpChatAdapter(_FakeHttpChatAdapter):
+    name = "fake-http-chat-slow"
+    SCRIPT = _FAKE_SLOW_CHAT_SCRIPT
+
+
+def _wait_for_chat_status(
+    client: TestClient, session_id: str, turn_id: str, timeout: float = 5.0
+) -> dict:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        session = client.get(f"/sessions/{session_id}").json()
+        turn = next(t for t in session["collab"]["chat"]["turns"] if t["id"] == turn_id)
+        if turn["status"] != "running":
+            return turn
+        time.sleep(0.05)
+    raise TimeoutError(f"turn {turn_id} did not resolve within {timeout}s")
+
+
+class TestSessionChat:
+    def test_start_chat_requires_backend_field(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        r = client.post(f"/sessions/{session_id}/chat", json={"message": "hi"})
+        assert r.status_code == 400, r.text
+
+    def test_start_chat_requires_message_field(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        r = client.post(f"/sessions/{session_id}/chat", json={"backend": "fake-http-chat-happy"})
+        assert r.status_code == 400, r.text
+
+    def test_start_chat_unknown_session_404(self, client: TestClient) -> None:
+        r = client.post(
+            "/sessions/does-not-exist/chat",
+            json={"backend": "fake-http-chat-happy", "message": "hi"},
+        )
+        assert r.status_code == 404, r.text
+
+    def test_start_chat_unavailable_backend_422(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        r = client.post(
+            f"/sessions/{session_id}/chat",
+            json={"backend": "no-such-backend", "message": "hi"},
+        )
+        assert r.status_code == 422, r.text
+
+    def test_start_chat_happy_path_completes(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        r = client.post(
+            f"/sessions/{session_id}/chat",
+            json={"backend": "fake-http-chat-happy", "message": "hello"},
+        )
+        assert r.status_code == 200, r.text
+        turn_id = r.json()["id"]
+        assert r.json()["status"] == "running"
+
+        turn = _wait_for_chat_status(client, session_id, turn_id)
+        assert turn["status"] == "completed"
+        assert turn["agent_message"] == "All set."
+
+        session = client.get(f"/sessions/{session_id}").json()
+        assert session["collab"]["chat"]["backend"] == "fake-http-chat-happy"
+
+    def test_starting_a_second_chat_while_first_is_running_returns_409(
+        self, client: TestClient
+    ) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        client.post(
+            f"/sessions/{session_id}/chat",
+            json={"backend": "fake-http-chat-slow", "message": "hi"},
+        )
+        r = client.post(
+            f"/sessions/{session_id}/chat",
+            json={"backend": "fake-http-chat-slow", "message": "again"},
+        )
+        assert r.status_code == 409, r.text
+        # Cleanup: stop the slow turn so its subprocess doesn't linger past the test.
+        turn_id = client.get(f"/sessions/{session_id}").json()["collab"]["chat"]["turns"][0]["id"]
+        client.post(f"/sessions/{session_id}/chat/{turn_id}/stop")
+
+    def test_stop_chat_interrupts_running_turn(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        r = client.post(
+            f"/sessions/{session_id}/chat",
+            json={"backend": "fake-http-chat-slow", "message": "hi"},
+        )
+        turn_id = r.json()["id"]
+        time.sleep(0.1)
+
+        stop_response = client.post(f"/sessions/{session_id}/chat/{turn_id}/stop")
+        assert stop_response.status_code == 200, stop_response.text
+        assert stop_response.json()["status"] == "interrupted"
+
+    def test_stop_chat_unknown_turn_404(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        r = client.post(f"/sessions/{session_id}/chat/no-such-turn/stop")
+        assert r.status_code == 404, r.text
+
+    def test_end_chat_clears_backend(self, client: TestClient) -> None:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        r = client.post(
+            f"/sessions/{session_id}/chat",
+            json={"backend": "fake-http-chat-happy", "message": "hello"},
+        )
+        turn_id = r.json()["id"]
+        _wait_for_chat_status(client, session_id, turn_id)
+
+        end_response = client.post(f"/sessions/{session_id}/chat/end")
+        assert end_response.status_code == 200, end_response.text
+        assert end_response.json()["collab"]["chat"]["backend"] is None
+
+    def test_list_agents_includes_fake_test_backends(self, client: TestClient) -> None:
+        r = client.get("/agents")
+        assert r.status_code == 200, r.text
+        assert "fake-http-chat-happy" in r.json()["agents"]

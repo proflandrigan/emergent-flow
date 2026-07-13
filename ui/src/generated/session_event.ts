@@ -6,6 +6,7 @@ export type GateId = string | null;
 export type ProposalId = string | null;
 export type ReviewId = string | null;
 export type SessionId = string;
+export type TurnId = string | null;
 export type Type =
   | "graph_replaced"
   | "proposal_added"
@@ -16,7 +17,13 @@ export type Type =
   | "gate_opened"
   | "gate_closed"
   | "gate_skipped"
-  | "decision_added";
+  | "decision_added"
+  | "chat_turn_started"
+  | "chat_narration_added"
+  | "chat_turn_completed"
+  | "chat_turn_failed"
+  | "chat_turn_interrupted"
+  | "chat_ended";
 export type Version = number | null;
 
 /**
@@ -29,6 +36,7 @@ export interface SessionEvent {
   proposal_id?: ProposalId;
   review_id?: ReviewId;
   session_id: SessionId;
+  turn_id?: TurnId;
   type: Type;
   version?: Version;
 }

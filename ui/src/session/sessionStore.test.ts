@@ -22,6 +22,9 @@ vi.mock("./sessionClient", () => ({
   closeGateRequest: vi.fn(),
   skipGateRequest: vi.fn(),
   postGateDecision: vi.fn(),
+  startChat: vi.fn(),
+  stopChatTurn: vi.fn(),
+  endChat: vi.fn(),
 }));
 
 function emptyGraph() {
@@ -626,5 +629,155 @@ describe("gates", () => {
       author: "human",
       text: "proceed",
     });
+  });
+});
+
+describe("chat", () => {
+  test("startChat posts to the session and stores the returned turn", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+
+    const turn: sessionClient.ChatTurn = {
+      id: "turn-1",
+      backend: "claude",
+      user_message: "hello",
+      narration: [],
+      agent_message: null,
+      status: "running",
+      error: null,
+    };
+    vi.mocked(sessionClient.startChat).mockResolvedValue(turn);
+
+    const result = await useSessionStore.getState().startChat("claude", "hello");
+
+    expect(sessionClient.startChat).toHaveBeenCalledWith("abc", {
+      backend: "claude",
+      message: "hello",
+    });
+    expect(result).toEqual(turn);
+    const state = useSessionStore.getState();
+    expect(state.chat.backend).toBe("claude");
+    expect(state.chat.turns).toEqual([turn]);
+  });
+
+  test("startChat throws when there is no active session", async () => {
+    await expect(
+      useSessionStore.getState().startChat("claude", "hello"),
+    ).rejects.toThrow("no active session");
+  });
+
+  test("startChat sets error state and rethrows on failure", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+    vi.mocked(sessionClient.startChat).mockRejectedValue(new Error("boom"));
+
+    await expect(
+      useSessionStore.getState().startChat("claude", "hello"),
+    ).rejects.toThrow("boom");
+    expect(useSessionStore.getState().error).toBe("boom");
+  });
+
+  test("stopChat replaces the matching turn with the resolved one", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+    const runningTurn: sessionClient.ChatTurn = {
+      id: "turn-1",
+      backend: "claude",
+      user_message: "hello",
+      narration: [],
+      agent_message: null,
+      status: "running",
+      error: null,
+    };
+    vi.mocked(sessionClient.startChat).mockResolvedValue(runningTurn);
+    await useSessionStore.getState().startChat("claude", "hello");
+
+    const interruptedTurn: sessionClient.ChatTurn = {
+      ...runningTurn,
+      status: "interrupted",
+    };
+    vi.mocked(sessionClient.stopChatTurn).mockResolvedValue(interruptedTurn);
+
+    await useSessionStore.getState().stopChat("turn-1");
+
+    expect(sessionClient.stopChatTurn).toHaveBeenCalledWith("abc", "turn-1");
+    expect(useSessionStore.getState().chat.turns).toEqual([interruptedTurn]);
+  });
+
+  test("endChat clears the chat backend from the returned session", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+    vi.mocked(sessionClient.startChat).mockResolvedValue({
+      id: "turn-1",
+      backend: "claude",
+      user_message: "hello",
+      narration: [],
+      agent_message: "done",
+      status: "completed",
+      error: null,
+    });
+    await useSessionStore.getState().startChat("claude", "hello");
+
+    vi.mocked(sessionClient.endChat).mockResolvedValue(
+      fakeSession({
+        id: "abc",
+        version: 0,
+        collab: {
+          reviews: {},
+          gates: {},
+          chat: { backend: null, backend_thread_id: null, turns: [] },
+        },
+      }),
+    );
+
+    await useSessionStore.getState().endChat();
+
+    expect(sessionClient.endChat).toHaveBeenCalledWith("abc");
+    expect(useSessionStore.getState().chat.backend).toBeNull();
+    expect(useSessionStore.getState().chat.turns).toEqual([]);
+  });
+
+  test("a chat_narration_added SSE event refreshes the chat state from the server", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+
+    const turn: sessionClient.ChatTurn = {
+      id: "turn-1",
+      backend: "claude",
+      user_message: "hello",
+      narration: ["running curl"],
+      agent_message: null,
+      status: "running",
+      error: null,
+    };
+    vi.mocked(sessionClient.getSession).mockResolvedValue(
+      fakeSession({
+        id: "abc",
+        version: 0,
+        collab: {
+          reviews: {},
+          gates: {},
+          chat: { backend: "claude", backend_thread_id: null, turns: [turn] },
+        },
+      }),
+    );
+
+    await capturedOnEvent?.({
+      type: "chat_narration_added",
+      session_id: "abc",
+      turn_id: "turn-1",
+    });
+
+    expect(useSessionStore.getState().chat.turns).toEqual([turn]);
   });
 });

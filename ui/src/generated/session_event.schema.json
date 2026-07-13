@@ -66,6 +66,18 @@
       "title": "Session Id",
       "type": "string"
     },
+    "turn_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Turn Id"
+    },
     "type": {
       "enum": [
         "graph_replaced",
@@ -77,7 +89,13 @@
         "gate_opened",
         "gate_closed",
         "gate_skipped",
-        "decision_added"
+        "decision_added",
+        "chat_turn_started",
+        "chat_narration_added",
+        "chat_turn_completed",
+        "chat_turn_failed",
+        "chat_turn_interrupted",
+        "chat_ended"
       ],
       "title": "Type",
       "type": "string"
