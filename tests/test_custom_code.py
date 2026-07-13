@@ -12,13 +12,13 @@ from emergentflow.script import CustomCodeError
 
 
 def test_custom_code_golden_preview_code():
-    """The node's codegen preview is deterministic, with a per-node wrapper."""
+    """The node's codegen preview is deterministic, with a per-node renamed function."""
     node = CustomCode().instantiate(code="def transform(value):\n    return value + 1")
     frag = CustomCode().preview(node)
 
-    assert "def _run_result(value):" in frag.body
+    assert "def _transform_result(value):" in frag.body
     assert "return value + 1" in frag.body
-    assert "return transform(value)" in frag.body
+    assert "result = _transform_result(value)" in frag.body
     # Deterministic: previewing twice yields byte-identical source.
     assert CustomCode().preview(node).body == frag.body
 
@@ -84,7 +84,7 @@ def test_custom_code_execute_missing_transform_raises():
 
 
 def test_custom_code_two_nodes_no_collision():
-    """Two custom-code nodes with different CodegenContexts produce distinct wrappers."""
+    """Two custom-code nodes with different CodegenContexts produce distinct renamed functions."""
     code = "def transform(value):\n    return value"
 
     node_a = CustomCode().instantiate(code=code, label="a")
@@ -96,6 +96,29 @@ def test_custom_code_two_nodes_no_collision():
     frag_a = CustomCode().codegen(node_a, ctx_a)
     frag_b = CustomCode().codegen(node_b, ctx_b)
 
-    assert "_run_result_1" in frag_a.body
-    assert "_run_result_2" in frag_b.body
+    assert "_transform_result_1" in frag_a.body
+    assert "_transform_result_2" in frag_b.body
     assert frag_a.body != frag_b.body
+
+
+def test_custom_code_multiline_string_equivalence():
+    """A multi-line string literal in the user's code round-trips unchanged through codegen.
+
+    Regression test: an earlier implementation used textwrap.indent() on the raw code text
+    and nested it inside a wrapper function, which corrupted the *contents* of any multi-line
+    string literal (extra indentation became part of the string's runtime value). codegen now
+    renames the top-level `transform` function via an AST transform + ast.unparse instead of
+    re-indenting raw text, so the string's value must be byte-identical between execute() and
+    the exec'd codegen preview.
+    """
+    code = 'def transform(value):\n    s = """\nline1\nline2\n"""\n    return s\n'
+    node = CustomCode().instantiate(code=code)
+
+    frag = CustomCode().preview(node)
+    scope = {"value": None}
+    exec(frag.render(), scope)  # noqa: S102 -- test-only, on our own emitted code
+    codegen_result = scope["result"]
+
+    exec_result = CustomCode().execute(node, {"value": None})["result"]
+
+    assert codegen_result == exec_result == "\nline1\nline2\n"

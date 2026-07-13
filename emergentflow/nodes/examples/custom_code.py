@@ -10,11 +10,14 @@ flow, or anything else a graph needs a one-off Python transform for.
 Both ``execute`` and ``codegen`` route through the same
 ``emergentflow.script.run_code`` wrapper via the ``ef.script.run_code`` alias
 (ADR 0002): ``execute`` calls it directly against the exec'd user code; the
-code emitted by ``codegen`` wraps the user's ``transform`` function inside a
-per-node uniquely-named outer function (named from ``ctx.out_var``, which is
-already collision-free across the graph) and calls it -- so the user's source
-is never rewritten, only wrapped, and multiple custom-code nodes in one graph
-never collide.
+code emitted by ``codegen`` renames the user's top-level ``transform``
+function to a per-node unique name (derived from ``ctx.out_var``, which is
+already collision-free across the graph) via an AST transform + ``ast.unparse``,
+then calls it at module level -- so multiple custom-code nodes in one graph
+never collide. Renaming is done on the parsed AST (not by re-indenting raw
+text) so multi-line string literals, docstrings, and any nested indentation in
+the user's code are preserved exactly -- a naive text-wrapping approach would
+corrupt their contents.
 
 This node is intentionally unsandboxed (same trust level as the rest of the
 local emergentflow server); see ``emergentflow.script.run_code`` for details.
@@ -26,9 +29,9 @@ default ``False`` (no injected client needed).
 from __future__ import annotations
 
 import ast
-import textwrap
 from typing import TYPE_CHECKING, Any, cast
 
+from emergentflow.codegen.errors import CodegenError
 from emergentflow.ir.common import Direction
 from emergentflow.ir.node import Node
 from emergentflow.script import run_code as script_run_code
@@ -90,15 +93,35 @@ class CustomCode(NodeDefinition):
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         code = self._code(node)
-        fn_name = f"_run_{ctx.out_var('result')}"
-        indented = textwrap.indent(code, "    ")
+        fn_name = f"_transform_{ctx.out_var('result')}"
+
+        tree = ast.parse(code)
+        renamed = False
+        for stmt in tree.body:
+            if (
+                isinstance(stmt, ast.FunctionDef)
+                and stmt.name == _REQUIRED_FUNCTION_NAME
+                and len(stmt.args.args) == 1
+            ):
+                stmt.name = fn_name
+                renamed = True
+                break
+        if not renamed:
+            raise CodegenError(
+                f"{self.type!r}: 'code' must define a top-level function "
+                f"'{_REQUIRED_FUNCTION_NAME}(value)' taking exactly one argument."
+            )
+
+        # AST-based renaming (rather than re-indenting the raw text and nesting it
+        # inside a wrapper) so multi-line strings/docstrings in the user's code are
+        # never touched -- ast.unparse regenerates syntactically-equivalent source
+        # from the (renamed) parsed tree, preserving every literal's runtime value
+        # exactly, unlike a naive textwrap.indent over raw source lines.
+        renamed_source = ast.unparse(tree)
         return CodeFragment(
             imports=[],
             body=(
-                f"def {fn_name}(value):\n"
-                f"{indented}\n"
-                f"    return {_REQUIRED_FUNCTION_NAME}(value)\n\n\n"
-                f"{ctx.out_var('result')} = {fn_name}({ctx.in_var('value')})"
+                f"{renamed_source}\n\n\n{ctx.out_var('result')} = {fn_name}({ctx.in_var('value')})"
             ),
         )
 
