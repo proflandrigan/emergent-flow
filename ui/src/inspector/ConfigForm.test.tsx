@@ -219,6 +219,12 @@ test("sql param renders a textarea, not an input", () => {
   expect(el.tagName).toBe("TEXTAREA");
 });
 
+test("code param renders a textarea, not an input", () => {
+  addNode("script.custom_code");
+  const el = screen.getByTestId("param-code");
+  expect(el.tagName).toBe("TEXTAREA");
+});
+
 test("connection param renders a select, not a text input", () => {
   addNode("data.sql_query");
   const el = screen.getByTestId("param-connection");

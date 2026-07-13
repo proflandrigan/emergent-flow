@@ -42,6 +42,14 @@ describe("widgetForParam", () => {
     expect(widgetForParam(p)).toBe("sql");
   });
 
+  test("explicit widget hint code wins over choices", () => {
+    const p = param({
+      type_token: "str",
+      hints: { widget: "code", choices: ["mean", "median"] },
+    });
+    expect(widgetForParam(p)).toBe("code");
+  });
+
   test("explicit widget hint connection wins over choices", () => {
     const p = param({
       type_token: "ConnectionRef",

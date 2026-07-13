@@ -21,6 +21,7 @@ from .cast_types import CastTypes
 from .cluster_detect import ClusterDetect
 from .correlation import Correlation
 from .cross_validate import CrossValidate
+from .custom_code import CustomCode
 from .describe import Describe
 from .describe_relation import DescribeRelation
 from .diagnostic_frame import DiagnosticFrame
@@ -95,6 +96,7 @@ __all__ = [
     "ClusterDetect",
     "Correlation",
     "CrossValidate",
+    "CustomCode",
     "Describe",
     "DescribeRelation",
     "DiagnosticFrame",

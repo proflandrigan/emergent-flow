@@ -5618,6 +5618,57 @@
     },
     {
       "advisor_persona": null,
+      "category": "Custom Code",
+      "description": "Run a user-authored Python transform() function against an input value.",
+      "family": "script",
+      "label": "Custom Code",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "",
+          "help": "A Python function named 'transform' taking one argument, e.g. 'def transform(value):\\n    return value'. Any imports needed go inside the function body.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "code"
+          },
+          "label": "Code",
+          "name": "code",
+          "required": true,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "any",
+          "direction": "in",
+          "help": "The value passed as transform()'s argument -- any upstream type.",
+          "label": null,
+          "name": "value",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "any",
+          "direction": "out",
+          "help": "transform(value)'s return value.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "script.custom_code",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "Statistics",
       "description": "One-way ANOVA testing a numeric column across groups.",
       "family": "stats",
