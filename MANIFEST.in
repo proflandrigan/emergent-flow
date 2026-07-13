@@ -4,3 +4,13 @@
 # `sdist`-based install fails with "ModuleNotFoundError: No module named
 # 'build_backend'" before the wheel build even starts.
 include build_backend.py
+
+# ui/ is not a Python package, so setuptools' package auto-discovery never picks it up --
+# without this, the sdist ships without ui/ at all, so build_backend.py's _build_ui() (which
+# checks for ui/package.json) silently no-ops even when npm is available, and `uv build`
+# (which builds the wheel from the sdist, not the working tree) produces a wheel with no
+# emergentflow/_static/ (ADR 0013, server falls back to the v0 demo page).
+graft ui
+prune ui/node_modules
+prune ui/dist
+global-exclude *.tsbuildinfo

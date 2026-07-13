@@ -14,7 +14,7 @@ from emergentflow.api import (
     public_op,
 )
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 # Functional-pipeline namespaces (Epic 1, Story 8). Imported lazily so that
 # ``import emergentflow`` stays light — the heavy scientific stack (pandas,
