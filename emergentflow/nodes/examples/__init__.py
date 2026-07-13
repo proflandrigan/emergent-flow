@@ -21,20 +21,37 @@ from .cast_types import CastTypes
 from .cluster_detect import ClusterDetect
 from .correlation import Correlation
 from .cross_validate import CrossValidate
+from .custom_code import CustomCode
 from .describe import Describe
 from .describe_relation import DescribeRelation
 from .diagnostic_frame import DiagnosticFrame
 from .diagnostic_model import DiagnosticModel
+from .discretize import Discretize
 from .distribution_summary import DistributionSummary
 from .drop_missing import DropMissing
 from .eda_profile import EdaProfile
+from .encode_categorical import EncodeCategorical
 from .eval_label import EvalLabel
 from .eval_run import EvalRun
 from .evaluate import Evaluate
+from .explain_error_table import ExplainErrorTable
+from .explain_plot_calibration import ExplainPlotCalibration
+from .explain_plot_predicted_vs_actual import ExplainPlotPredictedVsActual
+from .explain_plot_residuals import ExplainPlotResiduals
+from .explain_plot_roc_pr import ExplainPlotRocPr
+from .explain_plot_shap_beeswarm import ExplainPlotShapBeeswarm
+from .explain_plot_shap_importance import ExplainPlotShapImportance
+from .explain_plot_shap_waterfall import ExplainPlotShapWaterfall
+from .explain_shap_values import ExplainShapValues
 from .filter_rows import FilterRows
+from .fit_bayesian_model import FitBayesianModel
 from .fit_estimator import FitEstimator
-from .fit_model import FitModel
+from .fit_gam import FitGAM
+from .fit_glm import FitGLM
+from .fit_linear_regression import FitLinearRegression
+from .fit_mixed_model import FitMixedModel
 from .fit_transform import FitTransform
+from .generate_features import GenerateFeatures
 from .grid_search import GridSearch
 from .group_by_aggregate import GroupByAggregate
 from .impute import ImputeMissing
@@ -44,6 +61,7 @@ from .load_csv import LoadCsv
 from .load_json import LoadJson
 from .load_parquet import LoadParquet
 from .load_sample import LoadSample
+from .markdown_note import MarkdownNote
 from .missingness import Missingness
 from .nn_linear import NnLinear
 from .nn_module import NnModule
@@ -52,6 +70,7 @@ from .pipeline import Pipeline
 from .predict import Predict
 from .query_builder import QueryBuilder
 from .report import GenerateHtmlSummary
+from .scale_features import ScaleFeatures
 from .select_columns import SelectColumns
 from .sql_query import SqlQuery
 from .summarize import Summarize
@@ -77,20 +96,37 @@ __all__ = [
     "ClusterDetect",
     "Correlation",
     "CrossValidate",
+    "CustomCode",
     "Describe",
     "DescribeRelation",
     "DiagnosticFrame",
     "DiagnosticModel",
+    "Discretize",
     "DistributionSummary",
     "DropMissing",
     "EdaProfile",
+    "EncodeCategorical",
     "EvalLabel",
     "EvalRun",
     "Evaluate",
+    "ExplainErrorTable",
+    "ExplainPlotCalibration",
+    "ExplainPlotPredictedVsActual",
+    "ExplainPlotResiduals",
+    "ExplainPlotRocPr",
+    "ExplainPlotShapBeeswarm",
+    "ExplainPlotShapImportance",
+    "ExplainPlotShapWaterfall",
+    "ExplainShapValues",
     "FilterRows",
+    "FitBayesianModel",
     "FitEstimator",
-    "FitModel",
+    "FitGAM",
+    "FitGLM",
+    "FitLinearRegression",
+    "FitMixedModel",
     "FitTransform",
+    "GenerateFeatures",
     "GenerateHtmlSummary",
     "GridSearch",
     "GroupByAggregate",
@@ -101,6 +137,7 @@ __all__ = [
     "LoadJson",
     "LoadParquet",
     "LoadSample",
+    "MarkdownNote",
     "Missingness",
     "NnLinear",
     "NnModule",
@@ -108,6 +145,7 @@ __all__ = [
     "Pipeline",
     "Predict",
     "QueryBuilder",
+    "ScaleFeatures",
     "SelectColumns",
     "SqlQuery",
     "Summarize",

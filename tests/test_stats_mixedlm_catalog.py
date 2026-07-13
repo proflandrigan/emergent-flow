@@ -6,8 +6,8 @@ Mirrors ``tests/test_stats_regression_catalog.py``'s two-part shape:
 
 1. Golden-code quality: a representative MixedLM graph (LoadSample-free -- built directly from a
    grouped DataFrame fixture via a synthetic in-graph frame is not available, so this uses the
-   same LoadSample -> FitModel graph shape on a real sample dataset, treated as a fixed grouping
-   column) compiles to syntactically valid, ruff-clean Python.
+   same LoadSample -> FitMixedModel graph shape on a real sample dataset, treated as a fixed
+   grouping column) compiles to syntactically valid, ruff-clean Python.
 2. ADR-0002 equivalence: for MixedLM with random-intercept-only AND random-intercept+slope specs,
    ``execute()`` and running the code ``codegen()`` emits produce the same fixed-effect +
    variance-component coefficient frame and fit_stats, on a fixed-seed, well-separated grouped
@@ -29,7 +29,7 @@ from emergentflow.codegen.compiler import compile_to_code
 from emergentflow.ir.common import Direction
 from emergentflow.ir.edge import Edge, PortRef
 from emergentflow.ir.graph import Graph
-from emergentflow.nodes.examples import FitModel, LoadSample
+from emergentflow.nodes.examples import FitMixedModel, LoadSample
 
 
 def _out_port(node, name):
@@ -73,8 +73,7 @@ def _build_load_fit_graph() -> Graph:
     # (the sample's own "target" column, reused as a coarse "group" for this parse/lint-only
     # check) is fine.
     load = LoadSample().instantiate(name="wine", label="Load Sample")
-    fit = FitModel().instantiate(
-        model="MixedLM",
+    fit = FitMixedModel().instantiate(
         target="alcohol",
         fixed_effects=["magnesium"],
         random_effects=["magnesium"],
@@ -115,12 +114,11 @@ def test_mixedlm_codegen_is_ruff_clean() -> None:
     "fit_kwargs",
     [
         pytest.param(
-            {"model": "MixedLM", "target": "y", "fixed_effects": ["x"], "groups": "grp"},
+            {"target": "y", "fixed_effects": ["x"], "groups": "grp"},
             id="random_intercept_only",
         ),
         pytest.param(
             {
-                "model": "MixedLM",
                 "target": "y",
                 "fixed_effects": ["x"],
                 "random_effects": ["x"],
@@ -134,7 +132,7 @@ def test_mixedlm_equivalence_matrix(fit_kwargs: dict) -> None:
     """ADR 0002: execute == running the emitted code, for MixedLM (both RE structures)."""
     df = _grouped_df()
 
-    defn = FitModel()
+    defn = FitMixedModel()
     node = defn.instantiate(**fit_kwargs)
     executed_model = defn.execute(node, inputs={"frame": df.copy()})["model"]
     scope = _run_codegen(defn, node, {"frame": df.copy()})

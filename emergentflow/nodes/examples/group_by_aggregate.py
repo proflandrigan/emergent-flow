@@ -39,6 +39,7 @@ class GroupByAggregate(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.IN,
             data_type="DataFrame",
             help="The input DataFrame to group and aggregate.",
@@ -57,6 +58,7 @@ class GroupByAggregate(NodeDefinition):
             required=True,
             label="Group by",
             help="Grouping column(s).",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="agg",
@@ -75,7 +77,7 @@ class GroupByAggregate(NodeDefinition):
             default=None,
             label="Value columns",
             help="Columns to aggregate; unset aggregates all numeric non-group columns.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
     ]
 

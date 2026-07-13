@@ -139,11 +139,10 @@ def build_warehouse_stats_demo() -> Graph:
 
     node_mixed = Node(
         id="n-mixed",
-        type="stats.fit_model",
+        type="stats.fit_mixed_model",
         label="Mixed-Effects Model",
         paradigm=Paradigm.FUNCTIONAL,
         params=[
-            Param(name="model", type_token="str", value="MixedLM"),
             Param(name="target", type_token="str", value="total_revenue"),
             Param(name="fixed_effects", type_token="list[str]", value=["avg_market_index"]),
             Param(name="random_effects", type_token="list[str]", value=[]),
@@ -278,7 +277,7 @@ class TestWarehouseStatsDemo:
         node_types = {node.type for node in graph.nodes.values()}
         assert node_types == {
             "data.query_builder",
-            "stats.fit_model",
+            "stats.fit_mixed_model",
             "viz.plot_coefficients",
         }
 

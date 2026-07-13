@@ -122,11 +122,10 @@ def build_hierarchical_demo() -> Graph:
 
     node_mixed = Node(
         id="n-mixed",
-        type="stats.fit_model",
+        type="stats.fit_mixed_model",
         label="Mixed-Effects Model",
         paradigm=Paradigm.FUNCTIONAL,
         params=[
-            Param(name="model", type_token="str", value="MixedLM"),
             Param(name="target", type_token="str", value="sepal width (cm)"),
             Param(name="fixed_effects", type_token="list[str]", value=["petal length (cm)"]),
             Param(name="random_effects", type_token="list[str]", value=["petal length (cm)"]),
@@ -378,7 +377,7 @@ class TestHierarchicalDemo:
             "data.load_sample",
             "stats.auto_eda",
             "stats.diagnostic_frame",
-            "stats.fit_model",
+            "stats.fit_mixed_model",
             "viz.plot_coefficients",
         }
 

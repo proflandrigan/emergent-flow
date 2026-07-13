@@ -133,4 +133,17 @@ describe("Canvas", () => {
       screen.queryByTestId("node-context-menu-run-to-here"),
     ).toBeNull();
   });
+
+  test("renders a notes.markdown node alongside an ordinary node without throwing", () => {
+    useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    useGraphStore.getState().addNodeFromSpec(
+      requireCatalogNode("notes.markdown"),
+      { x: 300, y: 0 },
+    );
+
+    const { container } = render(<Canvas />);
+
+    expect(container.querySelector(".react-flow")).not.toBeNull();
+    expect(Object.keys(useGraphStore.getState().nodes)).toHaveLength(2);
+  });
 });

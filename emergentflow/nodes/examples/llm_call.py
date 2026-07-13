@@ -39,7 +39,7 @@ class LlmCall(NodeDefinition):
     """Run one LLM completion call (text or structured/JSON output)."""
 
     type = "llm.call"
-    version = 1
+    version = 2
     family = "llm"
     label = "LLM Call"
     category = "LLM"
@@ -115,12 +115,16 @@ class LlmCall(NodeDefinition):
             hints=ValidationHints(widget="text"),
         ),
         ParamSpec(
-            name="api_key_env",
+            name="llm_connection",
             type_token="str",
             default=None,
-            label="API key env var",
-            help="Env-var name holding the provider API key (never the key itself; ADR 0017).",
-            hints=ValidationHints(widget="text"),
+            label="LLM connection",
+            help=(
+                "Name of a registered LLM credential profile (Manage Connections -> LLM "
+                "Credentials). Resolves to an env-var name at call time; never a literal "
+                "secret. Leave blank to use the provider's conventional default env var."
+            ),
+            hints=ValidationHints(widget="connection", connection_kind="llm"),
         ),
     ]
 
@@ -144,7 +148,7 @@ class LlmCall(NodeDefinition):
         max_tokens = cast("int | None", values.get("max_tokens"))
         response_format = cast(str, values.get("response_format") or "text")
         response_schema = cast("dict[str, Any] | None", values.get("response_schema"))
-        api_key_env = cast("str | None", values.get("api_key_env"))
+        llm_connection = cast("str | None", values.get("llm_connection"))
         return (
             provider,
             model,
@@ -153,7 +157,7 @@ class LlmCall(NodeDefinition):
             max_tokens,
             response_format,
             response_schema,
-            api_key_env,
+            llm_connection,
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
@@ -165,7 +169,7 @@ class LlmCall(NodeDefinition):
             max_tokens,
             response_format,
             response_schema,
-            api_key_env,
+            llm_connection,
         ) = self._args(node)
         return CodeFragment(
             imports=["import emergentflow as ef"],
@@ -179,7 +183,7 @@ class LlmCall(NodeDefinition):
                 f"    max_tokens={max_tokens!r},\n"
                 f"    response_format={response_format!r},\n"
                 f"    response_schema={response_schema!r},\n"
-                f"    api_key_env={api_key_env!r},\n"
+                f"    llm_connection={llm_connection!r},\n"
                 f")"
             ),
         )
@@ -195,7 +199,7 @@ class LlmCall(NodeDefinition):
             max_tokens,
             response_format,
             response_schema,
-            api_key_env,
+            llm_connection,
         ) = self._args(node)
         response = llm_call(
             messages,
@@ -206,6 +210,6 @@ class LlmCall(NodeDefinition):
             max_tokens=max_tokens,
             response_format=response_format,
             response_schema=response_schema,
-            api_key_env=api_key_env,
+            llm_connection=llm_connection,
         )
         return {"response": response}

@@ -172,3 +172,33 @@ test("test button shows error message on 422 failure", async () => {
     ).toHaveTextContent("UnknownConnectionError: warehouse_prod not found");
   });
 });
+
+test("renders all three sections together", async () => {
+  vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+    const url = String(input);
+    if (url.includes("/sessions")) {
+      return Promise.resolve(
+        new Response(JSON.stringify({ sessions: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify({ connections: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  });
+
+  render(<ConnectionManagerPanel />);
+
+  expect(screen.getByText("Warehouses")).toBeInTheDocument();
+  expect(screen.getByText("LLM Credentials")).toBeInTheDocument();
+  expect(screen.getByText("Coding Agents")).toBeInTheDocument();
+
+  await waitFor(() => {
+    expect(screen.getByTestId("connections-empty")).toBeInTheDocument();
+  });
+});

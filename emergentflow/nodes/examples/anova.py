@@ -39,6 +39,7 @@ class Anova(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.IN,
             data_type="DataFrame",
             help="The input DataFrame containing the group and value columns.",
@@ -57,6 +58,7 @@ class Anova(NodeDefinition):
             required=True,
             label="Group column",
             help="Column whose distinct values define the groups.",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="value_col",
@@ -64,6 +66,7 @@ class Anova(NodeDefinition):
             required=True,
             label="Value column",
             help="Column whose values are compared across groups.",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="alpha",

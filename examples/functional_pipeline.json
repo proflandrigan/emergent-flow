@@ -22,7 +22,8 @@
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {
@@ -51,14 +52,16 @@
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-impute-out",
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {
@@ -93,14 +96,16 @@
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-anova-out",
           "name": "result",
           "direction": "out",
           "data_type": "AnovaResult",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {

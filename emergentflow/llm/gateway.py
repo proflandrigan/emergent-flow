@@ -7,9 +7,10 @@ routes a completion call through LiteLLM, a unified multi-provider gateway
 light per ADR 0007).
 
 The API key is never read from the IR or from `LLMRequest` as a literal —
-only an env-var *name* is threaded through (`LLMRequest.api_key_env`);
-`GatewayClient` resolves the actual key from `os.environ` at call time
-(ADR 0017 secrets rule).
+only an env-var *name* (`LLMRequest.api_key_env`) or a connection-profile *name*
+(`LLMRequest.llm_connection`) is threaded through; `GatewayClient` resolves the actual key
+from `os.environ` (and, for a profile reference, from the local connection-profile store
+first) at call time (ADR 0017 secrets rule).
 
 `cost_usd` is always returned as `0.0` here on purpose: cost computation is
 centralized in `emergentflow.llm.call()` (a pure function of `model` and
@@ -21,7 +22,7 @@ from __future__ import annotations
 import os
 import time
 
-from emergentflow.llm.env import MissingAPIKeyError, resolve_api_key_env_name
+from emergentflow.llm.env import MissingAPIKeyError, resolve_effective_api_key_env_name
 from emergentflow.llm.protocol import LLMRequest, LLMResponse, Usage
 
 
@@ -62,7 +63,9 @@ class GatewayClient:
                 "Install it with:  pip install 'emergentflow[llm]'"
             ) from exc
 
-        env_name = resolve_api_key_env_name(request.provider, request.api_key_env)
+        env_name = resolve_effective_api_key_env_name(
+            request.provider, request.api_key_env, request.llm_connection
+        )
         api_key = os.environ.get(env_name)
         if not api_key:
             raise MissingAPIKeyError(

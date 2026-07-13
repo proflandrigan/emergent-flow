@@ -39,6 +39,7 @@ class Correlation(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.IN,
             data_type="DataFrame",
             help="The input DataFrame whose columns should be correlated.",
@@ -65,7 +66,7 @@ class Correlation(NodeDefinition):
             default=None,
             label="Columns",
             help="Columns to correlate; empty/unset correlates all numeric columns.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
     ]
 

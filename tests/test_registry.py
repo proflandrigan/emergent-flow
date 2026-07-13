@@ -755,8 +755,13 @@ class TestAdvisorPersona:
 
         assert LoadCsv().to_spec().advisor_persona == "data_modeller"
 
-    def test_fit_model_persona(self):
-        """FitModel's advisor_persona matches the 'researcher' persona slug."""
-        from emergentflow.nodes.examples import FitModel
+    @pytest.mark.parametrize(
+        "cls_name",
+        ["FitLinearRegression", "FitGLM", "FitMixedModel", "FitGAM", "FitBayesianModel"],
+    )
+    def test_fit_model_persona(self, cls_name):
+        """Every dedicated fit-model node's advisor_persona matches the 'researcher' slug."""
+        import emergentflow.nodes.examples as examples
 
-        assert FitModel().to_spec().advisor_persona == "researcher"
+        cls = getattr(examples, cls_name)
+        assert cls().to_spec().advisor_persona == "researcher"

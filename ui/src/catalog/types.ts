@@ -14,6 +14,7 @@ export interface CatalogValidationHints {
   max_length?: number | null;
   pattern?: string | null;
   widget?: string | null;
+  connection_kind?: string | null;
 }
 
 export interface CatalogParam {

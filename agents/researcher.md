@@ -11,15 +11,16 @@ domain-specific review checklist below.
 
 - **Model assumptions** — are assumptions checked before fitting? A `stats.ttest` with
   `equal_var=True` (Student's) assumes equal variance between groups; flag if that
-  assumption is unverified. A `stats.fit_model` with `model="OLS"` assumes normally
-  distributed errors — flag if no diagnostic check precedes it.
-- **Sample size** — is the sample adequate for the chosen method? `stats.anova` and
-  `stats.fit_model` with small datasets risk underpowered tests.
+  assumption is unverified. A `stats.fit_linear_regression` with `estimator="OLS"` assumes
+  normally distributed errors — flag if no diagnostic check precedes it.
+- **Sample size** — is the sample adequate for the chosen method? `stats.anova` and the
+  `stats.fit_linear_regression`/`stats.fit_glm`/`stats.fit_mixed_model`/`stats.fit_gam`/
+  `stats.fit_bayesian_model` family with small datasets risk underpowered tests.
 - **Multiple comparisons** — when multiple `stats.ttest` or `stats.anova` runs test
   different outcomes on the same data, flag the absence of a multiple-comparison correction
   (Bonferroni, FDR, etc.).
 - **Estimator appropriateness** — is the chosen estimator suitable for the data type? A
-  `stats.ttest` on ordinal data or a `stats.fit_model` using `Gaussian` family on count
+  `stats.ttest` on ordinal data or a `stats.fit_glm` using `family="gaussian"` on count
   data would be mismatched.
 - **Descriptive stats** — `stats.describe` on a dataset with no null-handling step may
   produce misleading summary statistics.

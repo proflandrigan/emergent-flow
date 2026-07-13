@@ -19,13 +19,18 @@ import {
   createGate,
   createReview,
   createSession,
+  endChat as endChatRequest,
   getSession,
   postGateDecision,
   proposeMutation,
   rejectProposal,
   replaceSessionGraph,
   skipGateRequest,
+  startChat as startChatRequest,
+  stopChatTurn as stopChatTurnRequest,
   subscribeToSessionEvents,
+  type ChatState,
+  type ChatTurn,
   type ConsultInput,
   type CreateGateInput,
   type CreateReviewInput,
@@ -48,6 +53,7 @@ export interface SessionStoreState {
   proposals: Record<string, StoredProposal>;
   reviews: Record<string, ReviewThread>;
   gates: Record<string, Gate>;
+  chat: ChatState;
   status: SessionConnectionStatus;
   error: string | null;
   // Set when a PUT .../graph call is rejected for a stale expected_version (someone else's
@@ -78,6 +84,9 @@ export interface SessionStoreState {
     gateId: string,
     decision: { author: string; text: string },
   ) => Promise<void>;
+  startChat: (backend: string, message: string) => Promise<ChatTurn>;
+  stopChat: (turnId: string) => Promise<void>;
+  endChat: () => Promise<void>;
 }
 
 // Holds the live SSE/poll subscription outside Zustand state (it is not serializable/comparable
@@ -92,7 +101,11 @@ function errorMessage(err: unknown): string {
 // one GET), and ONLY reloads the canvas's graph for the two event types that actually change
 // the accepted graph server-side (graph_replaced, proposal_accepted). proposal_added/
 // proposal_rejected update the proposal list without touching the canvas, so an in-progress
-// local edit is never stomped by someone else's proposal arriving.
+// local edit is never stomped by someone else's proposal arriving. The six chat_* event types
+// (chat_turn_started, chat_narration_added, chat_turn_completed, chat_turn_failed,
+// chat_turn_interrupted, chat_ended) need no special case here -- they flow through this same
+// full refetch, which is how live narration/replies actually reach the UI as a spawned chat
+// backend streams output in the background.
 async function refreshFromServer(
   sessionId: string,
   event: SessionEvent,
@@ -104,6 +117,7 @@ async function refreshFromServer(
       proposals: session.proposals,
       reviews: session.collab?.reviews ?? {},
       gates: session.collab?.gates ?? {},
+      chat: session.collab?.chat ?? idleChatState,
     });
     if (event.type === "graph_replaced" || event.type === "proposal_accepted") {
       useGraphStore.getState().loadIR(session.graph);
@@ -172,7 +186,16 @@ type ConnectionState = Omit<
   | "closeGate"
   | "skipGate"
   | "addGateDecision"
+  | "startChat"
+  | "stopChat"
+  | "endChat"
 >;
+
+const idleChatState: ChatState = {
+  backend: null,
+  backend_thread_id: null,
+  turns: [],
+};
 
 const idleConnectionState: ConnectionState = {
   sessionId: null,
@@ -180,6 +203,7 @@ const idleConnectionState: ConnectionState = {
   proposals: {},
   reviews: {},
   gates: {},
+  chat: idleChatState,
   status: "idle",
   error: null,
   rebaseNeeded: false,
@@ -200,6 +224,7 @@ function applySession(session: GraphSession): ConnectionState {
     proposals: session.proposals,
     reviews: session.collab?.reviews ?? {},
     gates: session.collab?.gates ?? {},
+    chat: session.collab?.chat ?? idleChatState,
     status: "connected",
   };
 }
@@ -408,5 +433,59 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
     if (state.sessionId === null) return;
     const gate = await postGateDecision(state.sessionId, gateId, decision);
     set((s) => ({ gates: { ...s.gates, [gateId]: gate } }));
+  },
+
+  async startChat(backend, message) {
+    const state = get();
+    if (state.sessionId === null) {
+      throw new Error("cannot start chat: no active session");
+    }
+    try {
+      const turn = await startChatRequest(state.sessionId, { backend, message });
+      set((s) => ({
+        chat: {
+          backend: s.chat.backend ?? backend,
+          backend_thread_id: s.chat.backend_thread_id,
+          turns: [...s.chat.turns, turn],
+        },
+      }));
+      return turn;
+    } catch (err) {
+      set({ error: errorMessage(err) });
+      throw err;
+    }
+  },
+
+  async stopChat(turnId) {
+    const state = get();
+    if (state.sessionId === null) return;
+    try {
+      const turn = await stopChatTurnRequest(state.sessionId, turnId);
+      set((s) => ({
+        chat: {
+          ...s.chat,
+          turns: s.chat.turns.map((t) => (t.id === turn.id ? turn : t)),
+        },
+      }));
+    } catch (err) {
+      set({ error: errorMessage(err) });
+    }
+  },
+
+  async endChat() {
+    const state = get();
+    if (state.sessionId === null) return;
+    try {
+      const session = await endChatRequest(state.sessionId);
+      set({
+        version: session.version,
+        proposals: session.proposals,
+        reviews: session.collab?.reviews ?? {},
+        gates: session.collab?.gates ?? {},
+        chat: session.collab?.chat ?? idleChatState,
+      });
+    } catch (err) {
+      set({ error: errorMessage(err) });
+    }
   },
 }));

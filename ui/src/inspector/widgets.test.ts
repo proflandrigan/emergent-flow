@@ -42,6 +42,14 @@ describe("widgetForParam", () => {
     expect(widgetForParam(p)).toBe("sql");
   });
 
+  test("explicit widget hint code wins over choices", () => {
+    const p = param({
+      type_token: "str",
+      hints: { widget: "code", choices: ["mean", "median"] },
+    });
+    expect(widgetForParam(p)).toBe("code");
+  });
+
   test("explicit widget hint connection wins over choices", () => {
     const p = param({
       type_token: "ConnectionRef",
@@ -76,6 +84,16 @@ describe("widgetForParam", () => {
 
   test("str -> text", () => {
     expect(widgetForParam(param({ type_token: "str" }))).toBe("text");
+  });
+
+  test("returns column for widget hint column (str)", () => {
+    const p = param({ type_token: "str", hints: { widget: "column" } });
+    expect(widgetForParam(p)).toBe("column");
+  });
+
+  test("returns column for widget hint column (list[str])", () => {
+    const p = param({ type_token: "list[str]", hints: { widget: "column" } });
+    expect(widgetForParam(p)).toBe("column");
   });
 });
 
@@ -200,6 +218,24 @@ describe("validateValue", () => {
   test("string longer than max_length -> message", () => {
     const p = param({ hints: { max_length: 2 } });
     expect(validateValue(p, "abc")).toBe("Must be at most 2 characters");
+  });
+
+  test("column widget over list[str] validates item count, not stringified length", () => {
+    const p = param({
+      type_token: "list[str]",
+      hints: { widget: "column", min_length: 2 },
+    });
+    // Regression: with only 1 selected column, this must fail on item count (1 < 2),
+    // not be stringified to "a" (1 char) and pass a min_length: 2 *character* check.
+    expect(validateValue(p, ["a"])).toBe("Must have at least 2 items");
+  });
+
+  test("column widget over str validates string length, not item count", () => {
+    const p = param({
+      type_token: "str",
+      hints: { widget: "column", min_length: 2 },
+    });
+    expect(validateValue(p, "a")).toBe("Must be at least 2 characters");
   });
 });
 

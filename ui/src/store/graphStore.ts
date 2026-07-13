@@ -107,6 +107,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       direction: port.direction,
       dataType: port.data_type ?? "any",
       cardinality: port.cardinality ?? "one",
+      label: port.label ?? null,
     }));
     const params: ParamModel[] = spec.params.map((param) => ({
       name: param.name,

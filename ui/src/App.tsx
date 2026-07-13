@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   MoreHorizontal,
   PanelLeftClose,
@@ -21,13 +21,14 @@ import { useGraphStore } from "./store/graphStore";
 import { useTheme } from "./theme/useTheme";
 import { IconButton } from "./ui/IconButton";
 import { Menu, type MenuItem } from "./ui/Menu";
+import { OverlayModal } from "./ui/OverlayModal";
 import { Tooltip } from "./ui/Tooltip";
 
-// Lazy: nothing under ui/src/session/ is imported until the user opens this panel (Epic 14
-// works-without-agents invariant -- session mode is strictly opt-in, App's default render path
+// Lazy: nothing under ui/src/session/ is imported until the user opens this modal (Epic 14
+// works-without-agents invariant -- chat mode is strictly opt-in, App's default render path
 // stays byte-identical to before this epic).
-const SessionPanel = lazy(() =>
-  import("./session/SessionPanel").then((m) => ({ default: m.SessionPanel })),
+const ChatModal = lazy(() =>
+  import("./session/ChatModal").then((m) => ({ default: m.ChatModal })),
 );
 
 type ServerStatus = "connecting" | "ok" | "unreachable";
@@ -45,7 +46,7 @@ const STATUS_COLOR: Record<ServerStatus, string> = {
 // Estimated single-row height of the floating command bar (32px button row + --space-2
 // vertical padding on each side); panels below it use this to clear the bar with a gutter
 // gap, per spec `calc(100vh - 2*gutter - commandbar)`.
-const COMMAND_BAR_CLEARANCE = "calc(var(--space-4) * 2 + 56px)";
+export const COMMAND_BAR_CLEARANCE = "calc(var(--space-4) * 2 + 56px)";
 
 function Divider(): JSX.Element {
   return (
@@ -59,53 +60,12 @@ function Divider(): JSX.Element {
   );
 }
 
-// Shared backdrop + centered panel for the overflow menu's "Manage connections"/
-// "Browse schema" overlays -- one place for backdrop/centering/click-outside-to-close
-// behavior instead of duplicating it per overlay.
-function OverlayModal({
-  width,
-  onClose,
-  children,
-}: {
-  width: number;
-  onClose: () => void;
-  children: ReactNode;
-}): JSX.Element {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 30,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "rgba(0, 0, 0, 0.4)",
-      }}
-      onClick={onClose}
-    >
-      <div
-        className="glass"
-        style={{
-          width,
-          maxHeight: "70vh",
-          overflow: "auto",
-          padding: "var(--space-4)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
 export function App(): JSX.Element {
   const [status, setStatus] = useState<ServerStatus>("connecting");
   const [menuOpen, setMenuOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [schemaBrowserOpen, setSchemaBrowserOpen] = useState(false);
-  const [sessionPanelOpen, setSessionPanelOpen] = useState(false);
+  const [chatModalOpen, setChatModalOpen] = useState(false);
   const past = useGraphStore((s) => s.past);
   const future = useGraphStore((s) => s.future);
   const canUndo = past.length > 0;
@@ -163,9 +123,17 @@ export function App(): JSX.Element {
       setMenuOpen(false);
     }
     document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("click", onClick);
+    // Deferred via setTimeout: the click that just set menuOpen/etc. to true is still
+    // bubbling up to document when this effect's passive-effect flush runs (React commits
+    // discrete updates synchronously for real native events), so attaching this listener
+    // synchronously would catch that SAME click and immediately close what it just opened.
+    // Pushing the attach to the next task lets the triggering click finish bubbling first.
+    const timer = window.setTimeout(() => {
+      document.addEventListener("click", onClick);
+    }, 0);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
+      window.clearTimeout(timer);
       document.removeEventListener("click", onClick);
     };
   }, [menuOpen, connectionsOpen, schemaBrowserOpen]);
@@ -252,9 +220,9 @@ export function App(): JSX.Element {
       },
     },
     {
-      label: "Share session",
+      label: "Start chat",
       onSelect: () => {
-        setSessionPanelOpen(true);
+        setChatModalOpen(true);
         setMenuOpen(false);
       },
     },
@@ -472,12 +440,10 @@ export function App(): JSX.Element {
           <SchemaBrowserPanel />
         </OverlayModal>
       )}
-      {sessionPanelOpen && (
-        <OverlayModal width={420} onClose={() => setSessionPanelOpen(false)}>
-          <Suspense fallback={<div>Loading…</div>}>
-            <SessionPanel />
-          </Suspense>
-        </OverlayModal>
+      {chatModalOpen && (
+        <Suspense fallback={<div>Loading…</div>}>
+          <ChatModal onClose={() => setChatModalOpen(false)} />
+        </Suspense>
       )}
     </div>
   );

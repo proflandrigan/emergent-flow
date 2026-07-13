@@ -559,7 +559,7 @@
       },
       "Port": {
         "additionalProperties": false,
-        "description": "A typed connection point on a node.\n\nAttributes:\n    id: Stable unique identifier (auto-generated via new_id()).\n    name: Port name, unique within its node (required, non-empty).\n    direction: IN or OUT (required).\n    data_type: Data-type token (default \"any\"); validated against the type\n        registry and resolved by inference during ``ef.validate``.\n    cardinality: How many edges may attach (ONE or MANY; default ONE).",
+        "description": "A typed connection point on a node.\n\nAttributes:\n    id: Stable unique identifier (auto-generated via new_id()).\n    name: Port name, unique within its node (required, non-empty).\n    direction: IN or OUT (required).\n    data_type: Data-type token (default \"any\"); validated against the type\n        registry and resolved by inference during ``ef.validate``.\n    cardinality: How many edges may attach (ONE or MANY; default ONE).\n    label: Optional human-friendly display label for the port, copied from\n        the originating ``PortSpec`` at instantiation time. Falls back to\n        ``name`` for display when unset.",
         "properties": {
           "cardinality": {
             "$ref": "#/$defs/Cardinality",
@@ -576,6 +576,18 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
           },
           "name": {
             "title": "Name",

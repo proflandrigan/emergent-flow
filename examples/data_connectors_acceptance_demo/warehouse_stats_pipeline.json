@@ -121,14 +121,16 @@
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-query-cost",
           "name": "cost_estimate",
           "direction": "out",
           "data_type": "CostEstimate",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {
@@ -140,16 +142,10 @@
     },
     "n-mixed": {
       "id": "n-mixed",
-      "type": "stats.fit_model",
+      "type": "stats.fit_mixed_model",
       "label": "Mixed-Effects Model",
       "paradigm": "functional",
       "params": [
-        {
-          "name": "model",
-          "type_token": "str",
-          "value": "MixedLM",
-          "default": null
-        },
         {
           "name": "target",
           "type_token": "str",
@@ -183,14 +179,16 @@
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-mixed-model",
           "name": "model",
           "direction": "out",
           "data_type": "StatsModel",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {
@@ -212,14 +210,16 @@
           "name": "model",
           "direction": "in",
           "data_type": "StatsModel",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-forest-plot",
           "name": "plot",
           "direction": "out",
           "data_type": "PlotSpec",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {

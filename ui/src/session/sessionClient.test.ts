@@ -6,10 +6,14 @@ import {
   addReviewComment,
   createSession,
   deleteSession,
+  endChat,
+  getAvailableAgents,
   getSession,
   proposeMutation,
   rejectProposal,
   replaceSessionGraph,
+  startChat,
+  stopChatTurn,
   subscribeToSessionEvents,
   type GraphSession,
 } from "./sessionClient";
@@ -326,5 +330,110 @@ describe("addReviewComment", () => {
       expect.objectContaining({ method: "POST" }),
     );
     expect(thread.comments).toHaveLength(1);
+  });
+});
+
+describe("startChat", () => {
+  test("POSTs backend/message to /sessions/{id}/chat", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "turn-1",
+          backend: "claude",
+          user_message: "hi",
+          narration: [],
+          agent_message: null,
+          status: "running",
+          error: null,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const turn = await startChat("abc", { backend: "claude", message: "hi" });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, opts] = fetchSpy.mock.calls[0];
+    expect(url).toBe("/sessions/abc/chat");
+    expect((opts as RequestInit).method).toBe("POST");
+    const body = JSON.parse((opts as RequestInit).body as string);
+    expect(body).toEqual({ backend: "claude", message: "hi" });
+    expect(turn.id).toBe("turn-1");
+    expect(turn.status).toBe("running");
+  });
+
+  test("throws with the server's error message on a non-2xx response", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: "chat_already_active: already running" }), {
+        status: 409,
+      }),
+    );
+
+    await expect(
+      startChat("abc", { backend: "claude", message: "hi" }),
+    ).rejects.toThrow("chat_already_active");
+  });
+});
+
+describe("stopChatTurn", () => {
+  test("POSTs to /sessions/{id}/chat/{turnId}/stop", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "turn-1",
+          backend: "claude",
+          user_message: "hi",
+          narration: [],
+          agent_message: null,
+          status: "interrupted",
+          error: null,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const turn = await stopChatTurn("abc", "turn-1");
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/sessions/abc/chat/turn-1/stop",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(turn.status).toBe("interrupted");
+  });
+});
+
+describe("endChat", () => {
+  test("POSTs to /sessions/{id}/chat/end and returns the session", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(JSON.stringify(fakeSession()), { status: 200 }),
+      );
+
+    const session = await endChat("abc");
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/sessions/abc/chat/end",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(session.id).toBe("sess-1");
+  });
+});
+
+describe("getAvailableAgents", () => {
+  test("GETs /agents and returns the agent list", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ agents: ["claude", "opencode"] }), {
+        status: 200,
+      }),
+    );
+
+    const agents = await getAvailableAgents();
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/agents",
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(agents).toEqual(["claude", "opencode"]);
   });
 });

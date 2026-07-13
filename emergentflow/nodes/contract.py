@@ -311,6 +311,7 @@ class NodeDefinition(ABC):
                 direction=ps.direction,
                 data_type=ps.data_type,
                 cardinality=ps.cardinality,
+                label=ps.label,
             )
             for ps in cls.ports
         ]

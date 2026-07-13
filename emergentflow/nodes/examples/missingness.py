@@ -39,6 +39,7 @@ class Missingness(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.IN,
             data_type="DataFrame",
             help="The input DataFrame whose columns should be analyzed for nulls.",
@@ -57,7 +58,7 @@ class Missingness(NodeDefinition):
             default=None,
             label="Columns",
             help="Columns to analyze; empty/unset analyzes all columns.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
     ]
 

@@ -39,12 +39,14 @@ class SelectColumns(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.IN,
             data_type="DataFrame",
             help="The input DataFrame whose columns should be selected.",
         ),
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.OUT,
             data_type="DataFrame",
             help="The DataFrame with selected columns kept or dropped.",
@@ -58,7 +60,7 @@ class SelectColumns(NodeDefinition):
             required=True,
             label="Columns",
             help="Column names to keep or drop.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="drop",

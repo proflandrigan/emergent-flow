@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import type { EdgeModel } from "../store/model";
-import { toRFEdge } from "./toReactFlow";
+import type { EdgeModel, NodeModel } from "../store/model";
+import { toRFEdge, toRFNode } from "./toReactFlow";
 
 const edge: EdgeModel = {
   id: "e1",
@@ -38,5 +38,97 @@ describe("toRFEdge", () => {
     const rfEdge = toRFEdge(edge, true, undefined, undefined);
 
     expect(rfEdge.selected).toBe(true);
+  });
+});
+
+function noteModel(overrides?: Partial<NodeModel>): NodeModel {
+  return {
+    id: "n1",
+    type: "notes.markdown",
+    label: undefined,
+    paradigm: "functional",
+    params: [
+      { name: "content", typeToken: "str", value: "# Hello\nThis is a note." },
+      { name: "color", typeToken: "str", value: "pink" },
+      { name: "anchor_id", typeToken: "str | null", value: "node-abc" },
+    ],
+    ports: [],
+    position: { x: 100, y: 200 },
+    ...overrides,
+  };
+}
+
+describe("toRFNode (notes.markdown)", () => {
+  test("produces a noteNode with content / color / anchorId from params", () => {
+    const rf = toRFNode(noteModel(), false, null, null, null) as ReturnType<typeof toRFNode>;
+
+    expect(rf.type).toBe("noteNode");
+    if (rf.type === "noteNode") {
+      expect(rf.data.content).toBe("# Hello\nThis is a note.");
+      expect(rf.data.color).toBe("pink");
+      expect(rf.data.anchorId).toBe("node-abc");
+    }
+  });
+
+  test("missing color param falls back to yellow", () => {
+    const rf = toRFNode(
+      noteModel({ params: [{ name: "content", typeToken: "str", value: "hi" }] }),
+      false, null, null, null,
+    ) as ReturnType<typeof toRFNode>;
+
+    if (rf.type === "noteNode") {
+      expect(rf.data.color).toBe("yellow");
+    }
+  });
+
+  test("non-string color value falls back to yellow", () => {
+    const rf = toRFNode(
+      noteModel({ params: [
+        { name: "content", typeToken: "str", value: "hi" },
+        { name: "color", typeToken: "str", value: 42 },
+      ] }),
+      false, null, null, null,
+    ) as ReturnType<typeof toRFNode>;
+
+    if (rf.type === "noteNode") {
+      expect(rf.data.color).toBe("yellow");
+    }
+  });
+
+  test("missing anchor_id param produces null anchorId", () => {
+    const rf = toRFNode(
+      noteModel({ params: [
+        { name: "content", typeToken: "str", value: "hi" },
+        { name: "color", typeToken: "str", value: "blue" },
+      ] }),
+      false, null, null, null,
+    ) as ReturnType<typeof toRFNode>;
+
+    if (rf.type === "noteNode") {
+      expect(rf.data.anchorId).toBeNull();
+    }
+  });
+
+  test("null anchor_id value produces null anchorId", () => {
+    const rf = toRFNode(
+      noteModel({ params: [
+        { name: "content", typeToken: "str", value: "hi" },
+        { name: "color", typeToken: "str", value: "blue" },
+        { name: "anchor_id", typeToken: "str | null", value: null },
+      ] }),
+      false, null, null, null,
+    ) as ReturnType<typeof toRFNode>;
+
+    if (rf.type === "noteNode") {
+      expect(rf.data.anchorId).toBeNull();
+    }
+  });
+
+  test("noteNode passes id / position / selected through", () => {
+    const rf = toRFNode(noteModel(), true, null, null, null) as ReturnType<typeof toRFNode>;
+
+    expect(rf.id).toBe("n1");
+    expect(rf.position).toEqual({ x: 100, y: 200 });
+    expect(rf.selected).toBe(true);
   });
 });

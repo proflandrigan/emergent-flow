@@ -48,6 +48,18 @@ def test_session_event_matches_every_publish_call_shape() -> None:
             "decision_id": "d1",
         }
     )
+    SessionEvent.model_validate({"type": "chat_turn_started", "session_id": "s1", "turn_id": "t1"})
+    SessionEvent.model_validate(
+        {"type": "chat_narration_added", "session_id": "s1", "turn_id": "t1"}
+    )
+    SessionEvent.model_validate(
+        {"type": "chat_turn_completed", "session_id": "s1", "turn_id": "t1"}
+    )
+    SessionEvent.model_validate({"type": "chat_turn_failed", "session_id": "s1", "turn_id": "t1"})
+    SessionEvent.model_validate(
+        {"type": "chat_turn_interrupted", "session_id": "s1", "turn_id": "t1"}
+    )
+    SessionEvent.model_validate({"type": "chat_ended", "session_id": "s1"})
 
 
 def test_mutation_json_schema_has_expected_top_level_shape() -> None:

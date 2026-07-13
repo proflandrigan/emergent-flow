@@ -74,6 +74,11 @@ dependencies = [
     # so the Epic 13 equivalence matrix runs in CI without a cloud account. A hard
     # dependency; MIT is compatible with this SDK's license. Not a GPL dep.
     "duckdb>=1,<2",
+    # tomli-w (MIT) is the TOML writer for emergentflow.connections.profiles.save_profiles --
+    # stdlib tomllib is read-only, and the connection-profile store needs to persist
+    # create/edit/delete operations back to connections.toml. A hard dependency because the
+    # profile store is always available in a base install. Not a GPL dep.
+    "tomli-w>=1,<2",
 ]
 
 [project.optional-dependencies]
@@ -102,6 +107,14 @@ bayes = [
     "bambi>=0.13,<1",
     "arviz>=0.17,<1",
 ]
+# `pip install emergentflow[explain]` enables the optional model-explainability family
+# (SHAP-based feature attribution + error analysis, ADR 0020): shap (MIT license) computes
+# per-feature attributions for a fitted ml.FittedModel. Kept optional so a bare SDK install
+# stays light (ADR 0007) and never pulls numba/llvmlite. An explain.* node in a base install
+# raises a typed MissingOptionalDependencyError, never an opaque ImportError.
+explain = [
+    "shap>=0.44,<1",
+]
 # `pip install emergentflow[bigquery]` enables the BigQuery warehouse adapter (Epic 13).
 # google-cloud-bigquery is Apache-2.0 (compatible; not GPL). Kept optional so a bare SDK
 # install stays credential-free and light (ADR 0007 / ADR 0018); a BigQuery node in a base
@@ -127,6 +140,13 @@ postgres = [
 # without it installed raises a typed `ModuleNotFoundError` with an install hint.
 mcp = [
     "fastmcp>=3.4.4",
+]
+# `pip install emergentflow[all]` installs every optional extra in one shot —
+# the server, all warehouse adapters, LLM gateway, explainability, Bayesian
+# modeling, and the MCP tool wrapper. Convenient for local development or
+# exploration; production installs should cherry-pick only the extras they need.
+all = [
+    "emergentflow[server,llm,bayes,explain,bigquery,redshift,postgres,mcp]",
 ]
 
 [project.urls]
@@ -235,5 +255,9 @@ module = [
     "redshift_connector.*",
     "psycopg.*",
     "sqlalchemy.*",
+    # The optional `emergentflow[explain]` extra (ADR 0020): shap ships no type stubs and is
+    # imported lazily inside `emergentflow/explain/_shap.py`, absent from the bare
+    # `uv sync --locked` CI env (like torch/litellm/pymc).
+    "shap.*",
 ]
 ignore_missing_imports = true

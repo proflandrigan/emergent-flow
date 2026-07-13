@@ -19,7 +19,7 @@ from emergentflow.ml import train_regressor
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec
+from ..spec import ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -39,6 +39,7 @@ class TrainRegressor(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.IN,
             data_type="DataFrame",
             help="The input DataFrame containing features and the target column.",
@@ -57,6 +58,7 @@ class TrainRegressor(NodeDefinition):
             required=True,
             label="Target column",
             help="Column to predict.",
+            hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
             name="features",
@@ -64,6 +66,7 @@ class TrainRegressor(NodeDefinition):
             default=None,
             label="Feature columns",
             help="Columns to use as features; empty/unset uses every other column.",
+            hints=ValidationHints(widget="column"),
         ),
     ]
 

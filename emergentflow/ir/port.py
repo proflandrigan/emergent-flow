@@ -26,6 +26,9 @@ class Port(IRModel):
         data_type: Data-type token (default "any"); validated against the type
             registry and resolved by inference during ``ef.validate``.
         cardinality: How many edges may attach (ONE or MANY; default ONE).
+        label: Optional human-friendly display label for the port, copied from
+            the originating ``PortSpec`` at instantiation time. Falls back to
+            ``name`` for display when unset.
     """
 
     id: IRId = Field(default_factory=new_id)
@@ -33,6 +36,7 @@ class Port(IRModel):
     direction: Direction
     data_type: str = "any"
     cardinality: Cardinality = Cardinality.ONE
+    label: str | None = None
 
     @field_validator("name")
     @classmethod

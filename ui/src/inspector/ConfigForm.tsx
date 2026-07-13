@@ -12,17 +12,20 @@
 
 import type { CatalogEstimator, CatalogParam } from "../catalog/types";
 import { useCatalog } from "../catalog/useCatalog";
-import { useConnectionProfiles } from "../catalog/useConnectionProfiles";
+import { useConnectionProfiles, useLlmConnectionProfiles } from "../catalog/useConnectionProfiles";
 import { useGraphStore } from "../store/graphStore";
 import type { NodeModel, ParamModel } from "../store/model";
 import {
   formatValue,
+  isListType,
   parseValue,
   validateValue,
   widgetForParam,
 } from "./widgets";
 import { Input } from "../ui/Input";
 import { Select } from "../ui/Select";
+import { CodeEditor } from "./CodeEditor";
+import { ColumnSelect, ColumnMultiSelect } from "./ColumnSelect";
 import { QueryBuilderPreview } from "./QueryBuilderPreview";
 
 // Node types whose `params` dict param holds curated sklearn estimator constructor kwargs
@@ -75,24 +78,33 @@ interface ParamRowProps {
   meta: CatalogParam | undefined;
 }
 
-// Only rendered for the (typically single) "connection" param on a node, so the
-// /connections fetch in useConnectionProfiles runs once per form, not once per param row.
+// Only rendered for the (typically single) "connection" param on a node, so the /connections
+// fetch(es) below run once per form, not once per param row. Both hooks are always called
+// (rules-of-hooks forbids calling one conditionally) and the unused one's data is simply
+// discarded -- an extra localhost fetch is a trivial cost.
 function ConnectionSelect({
   testId,
   value,
   onChange,
+  connectionKind,
 }: {
   testId: string;
   value: string;
   onChange: (value: string) => void;
+  connectionKind: "warehouse" | "llm";
 }): JSX.Element {
-  const profiles = useConnectionProfiles();
+  const warehouseProfiles = useConnectionProfiles();
+  const llmProfiles = useLlmConnectionProfiles();
+  const options =
+    connectionKind === "llm"
+      ? llmProfiles.map((p) => ({ name: p.name, label: `${p.name} (${p.provider})` }))
+      : warehouseProfiles.map((p) => ({ name: p.name, label: `${p.name} (${p.dialect})` }));
   return (
     <Select data-testid={testId} value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="" />
-      {profiles.map((p) => (
-        <option key={p.name} value={p.name}>
-          {p.name} ({p.dialect})
+      {options.map((o) => (
+        <option key={o.name} value={o.name}>
+          {o.label}
         </option>
       ))}
     </Select>
@@ -180,13 +192,36 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
     );
   } else if (kind === "sql") {
     widget = (
+      <CodeEditor
+        testId={testId}
+        language="sql"
+        value={formatValue(catalogParam, param.value)}
+        minHeight="160px"
+        onChange={(value) =>
+          setParam(node.id, param.name, parseValue(catalogParam, value))
+        }
+      />
+    );
+  } else if (kind === "code") {
+    widget = (
+      <CodeEditor
+        testId={testId}
+        language="python"
+        value={formatValue(catalogParam, param.value)}
+        minHeight="200px"
+        onChange={(value) =>
+          setParam(node.id, param.name, parseValue(catalogParam, value))
+        }
+      />
+    );
+  } else if (kind === "markdown") {
+    widget = (
       <textarea
         data-testid={testId}
         value={formatValue(catalogParam, param.value)}
-        rows={8}
+        rows={6}
         style={{
           width: "100%",
-          fontFamily: "monospace",
           fontSize: "0.8rem",
           resize: "vertical",
         }}
@@ -205,8 +240,32 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
         testId={testId}
         value={formatValue(catalogParam, param.value)}
         onChange={(value) => setParam(node.id, param.name, parseValue(catalogParam, value))}
+        connectionKind={catalogParam.hints?.connection_kind === "llm" ? "llm" : "warehouse"}
       />
     );
+  } else if (kind === "column") {
+    if (isListType(catalogParam.type_token)) {
+      const arrValue = Array.isArray(param.value) ? (param.value as string[]) : [];
+      widget = (
+        <ColumnMultiSelect
+          nodeId={node.id}
+          testId={testId}
+          value={arrValue}
+          onChange={(cols) => setParam(node.id, param.name, cols)}
+        />
+      );
+    } else {
+      widget = (
+        <ColumnSelect
+          nodeId={node.id}
+          testId={testId}
+          value={formatValue(catalogParam, param.value)}
+          onChange={(val) =>
+            setParam(node.id, param.name, val)
+          }
+        />
+      );
+    }
   } else {
     // text + list both edit as a plain text input; `parseValue` splits a list on commas, and
     // the "comma-separated" hint below is rendered only for the list kind.

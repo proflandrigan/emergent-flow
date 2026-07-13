@@ -44,6 +44,10 @@ from emergentflow.server.reports import get_default_store
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from emergentflow.connections.profiles import (
+        LlmConnectionProfile,
+        WarehouseConnectionProfile,
+    )
     from emergentflow.data.warehouse.adapter_client import AdapterWarehouseClient
     from emergentflow.data.warehouse.protocol import WarehouseAdapter
     from emergentflow.llm.protocol import LLMClient
@@ -886,14 +890,15 @@ def _get_warehouse_client() -> AdapterWarehouseClient:
 
 
 def list_connections() -> dict[str, Any]:
-    """Return every local connection profile (GET /connections).
+    """Return every local connection profile, both warehouse and LLM kinds (GET /connections).
 
-    Secret-free per ConnectionProfile.
+    Secret-free per ConnectionProfile -- includes a 'kind' field ('warehouse'/'llm') per entry
+    so the UI can split them into separate sections.
     """
-    from emergentflow.data.warehouse.profiles import load_profiles
+    from emergentflow.connections.profiles import load_profiles
 
     store = load_profiles()
-    return {"connections": [store.get(name).model_dump(mode="json") for name in store.names()]}
+    return {"connections": [p.model_dump(mode="json") for p in store.list()]}
 
 
 def test_connection_route(name: str) -> dict[str, Any]:
@@ -905,6 +910,86 @@ def test_connection_route(name: str) -> dict[str, Any]:
     client = _get_warehouse_client()
     result = test_connection(profile, client=client)
     return result.model_dump(mode="json")
+
+
+def _profile_from_body(body: dict[str, Any]) -> WarehouseConnectionProfile | LlmConnectionProfile:
+    """Construct a WarehouseConnectionProfile or LlmConnectionProfile from a request body dict.
+
+    Dispatches on the body's 'kind' field ('warehouse' default, or 'llm'). Raises
+    ProfileValidationError for an unrecognized kind, or pydantic.ValidationError for a body
+    that fails the chosen model's field validation -- both are caught by _safe_json's generic
+    exception handler in app.py and surfaced as a 422 with the exception's message.
+    """
+    from emergentflow.connections.profiles import (
+        LlmConnectionProfile,
+        ProfileValidationError,
+        WarehouseConnectionProfile,
+    )
+
+    kind = body.get("kind", "warehouse")
+    if kind == "warehouse":
+        return WarehouseConnectionProfile(**body)
+    if kind == "llm":
+        return LlmConnectionProfile(**body)
+    raise ProfileValidationError(f"Unknown connection kind {kind!r}; must be 'warehouse' or 'llm'.")
+
+
+def create_connection(body: dict[str, Any]) -> dict[str, Any]:
+    """Create a new connection profile (POST /connections).
+
+    *body* must include a non-empty 'name' and may include 'kind' ('warehouse', the default, or
+    'llm') plus that kind's fields. Names are one global namespace across both kinds -- creating
+    a profile whose name already exists (of either kind) raises ValueError rather than silently
+    overwriting it (use PUT /connections/{name} to update an existing profile instead).
+    """
+    from emergentflow.connections.profiles import load_profiles, save_profiles
+
+    name = body.get("name")
+    if not name:
+        raise ValueError("Connection profile body must include a non-empty 'name'.")
+    store = load_profiles()
+    if name in store:
+        raise ValueError(f"A connection profile named {name!r} already exists.")
+    profile = _profile_from_body(body)
+    store.add(profile)
+    save_profiles(store)
+    return profile.model_dump(mode="json")
+
+
+def update_connection(name: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Update an existing connection profile by name (PUT /connections/{name}).
+
+    *name* (from the URL) is authoritative: any 'name' in *body* is ignored, so a client can
+    never rename a profile via a body/URL mismatch (renaming means delete + create). If *body*
+    omits 'kind', the existing profile's kind is kept rather than silently defaulting to
+    'warehouse' (which would corrupt an LLM profile update that forgot to send 'kind').
+    """
+    from emergentflow.connections.profiles import (
+        UnknownConnectionError,
+        load_profiles,
+        save_profiles,
+    )
+
+    store = load_profiles()
+    if name not in store:
+        raise UnknownConnectionError(f"No connection profile named {name!r} to update.")
+    existing = store.get(name)
+    payload = {**body, "name": name}
+    payload.setdefault("kind", existing.kind)
+    profile = _profile_from_body(payload)
+    store.add(profile)
+    save_profiles(store)
+    return profile.model_dump(mode="json")
+
+
+def delete_connection(name: str) -> dict[str, Any]:
+    """Delete a connection profile by name (DELETE /connections/{name})."""
+    from emergentflow.connections.profiles import load_profiles, save_profiles
+
+    store = load_profiles()
+    store.remove(name)  # raises UnknownConnectionError -> 422 if absent
+    save_profiles(store)
+    return {"deleted": name}
 
 
 def get_connection_schema(

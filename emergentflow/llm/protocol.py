@@ -38,6 +38,13 @@ class LLMRequest:
     api_key_env: name of the environment variable holding the provider API
         key (never the key itself — ADR 0017 secrets rule). ``None`` lets the
         client fall back to a provider-conventional env-var name.
+    llm_connection: name of a registered LLM credential profile
+        (``emergentflow.connections.profiles.LlmConnectionProfile``) whose ``api_key_env`` field
+        should be used instead. Resolved to a real env-var name only inside
+        `GatewayClient.complete()` / the pre-flight check — never here, and never in
+        `compile_to_code`/`execute` (ADR 0002 purity: resolving a profile NAME requires reading
+        connections.toml, which is I/O). ``None`` means no profile reference; fall back to
+        `api_key_env` / the provider-conventional default.
     """
 
     provider: str
@@ -48,6 +55,7 @@ class LLMRequest:
     response_format: str = "text"
     response_schema: dict[str, Any] | None = None
     api_key_env: str | None = None
+    llm_connection: str | None = None
 
     def content_hash(self) -> str:
         """Return a stable sha256 hex digest identifying this request's content.
@@ -64,11 +72,10 @@ class LLMRequest:
             "max_tokens": self.max_tokens,
             "response_format": self.response_format,
             "response_schema": self.response_schema,
-            # api_key_env is deliberately excluded: it names an env var, not a
-            # secret, but it also has no bearing on what response a given
-            # request content should replay -- two requests that are
-            # otherwise identical should hit the same fixture regardless of
-            # which env var name was configured.
+            # api_key_env / llm_connection are deliberately excluded: they name an env var or a
+            # connection profile, not a secret, but neither has any bearing on what response a
+            # given request content should replay -- two requests that are otherwise identical
+            # should hit the same fixture regardless of which credential reference was configured.
         }
         blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()

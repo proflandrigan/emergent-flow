@@ -67,6 +67,24 @@ export interface CreateReviewInput {
   fix?: GraphMutation | null;
 }
 
+export type ChatTurnStatus = "running" | "completed" | "failed" | "interrupted";
+
+export interface ChatTurn {
+  id: string;
+  backend: string;
+  user_message: string;
+  narration: string[];
+  agent_message: string | null;
+  status: ChatTurnStatus;
+  error: string | null;
+}
+
+export interface ChatState {
+  backend: string | null;
+  backend_thread_id: string | null;
+  turns: ChatTurn[];
+}
+
 export interface GraphSession {
   id: string;
   graph: Graph;
@@ -75,6 +93,7 @@ export interface GraphSession {
   collab?: {
     reviews: Record<string, ReviewThread>;
     gates: Record<string, Gate>;
+    chat: ChatState;
   };
 }
 
@@ -219,6 +238,38 @@ export async function postGateDecision(
     decision,
   );
   return (await res.json()) as Gate;
+}
+
+export interface StartChatInput {
+  backend: string;
+  message: string;
+}
+
+export async function startChat(
+  sessionId: string,
+  input: StartChatInput,
+): Promise<ChatTurn> {
+  const res = await postJson(`/sessions/${sessionId}/chat`, input);
+  return (await res.json()) as ChatTurn;
+}
+
+export async function stopChatTurn(
+  sessionId: string,
+  turnId: string,
+): Promise<ChatTurn> {
+  const res = await postJson(`/sessions/${sessionId}/chat/${turnId}/stop`, {});
+  return (await res.json()) as ChatTurn;
+}
+
+export async function endChat(sessionId: string): Promise<GraphSession> {
+  const res = await postJson(`/sessions/${sessionId}/chat/end`, {});
+  return (await res.json()) as GraphSession;
+}
+
+export async function getAvailableAgents(): Promise<string[]> {
+  const res = await requestJson("/agents", { method: "GET" });
+  const body = (await res.json()) as { agents: string[] };
+  return body.agents;
 }
 
 export interface SessionEventSubscription {

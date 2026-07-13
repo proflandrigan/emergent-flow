@@ -12,6 +12,7 @@ export interface PortModel {
   direction: Direction;
   dataType: string;
   cardinality: Cardinality;
+  label?: string | null;
 }
 
 export interface ParamModel {

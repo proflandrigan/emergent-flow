@@ -20,6 +20,7 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
 
 from emergentflow.codegen.validation import Diagnostic
+from emergentflow.collab.chat import ChatState
 from emergentflow.collab.gates import Gate
 from emergentflow.ir.common import new_id
 from emergentflow.ir.graph import Graph
@@ -74,13 +75,15 @@ class CollaborationState(BaseModel):
     never a ``Graph`` field. Holds review threads and checkpoint gates: ``reviews`` are agent
     critiques (Story 6), ``gates`` are workflow checkpoints an agent opens and the human
     (or another agent) closes/skips, with ``Decision`` s recording what was decided along
-    the way (Story 9).
+    the way (Story 9). ``chat`` holds the transcript and lifecycle state of any spawned
+    coding-agent chat session (emergentflow/collab/chat.py).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     reviews: dict[str, ReviewThread] = Field(default_factory=dict)
     gates: dict[str, Gate] = Field(default_factory=dict)
+    chat: ChatState = Field(default_factory=ChatState)
 
 
 def validate_anchors(graph: Graph, findings: list[Diagnostic]) -> None:

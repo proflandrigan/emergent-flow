@@ -8,6 +8,9 @@ import type { EdgeModel, NodeModel } from "../store/model";
 import type { NodeStatus, Payload } from "../store/execution";
 import type { EfEdgeData } from "./edges/EfEdge";
 import type { EfNodeData } from "./nodes/EfNode";
+import type { NoteNodeData } from "./nodes/NoteNode";
+
+const NOTE_NODE_TYPE = "notes.markdown";
 
 export function toRFNode(
   node: NodeModel,
@@ -15,7 +18,25 @@ export function toRFNode(
   status: NodeStatus | null | undefined,
   results: Record<string, Payload> | null | undefined,
   family: string | null | undefined,
-): RFNode<EfNodeData> {
+): RFNode<EfNodeData> | RFNode<NoteNodeData> {
+  if (node.type === NOTE_NODE_TYPE) {
+    const paramValue = (name: string): unknown =>
+      node.params.find((p) => p.name === name)?.value;
+    const content = paramValue("content");
+    const color = paramValue("color");
+    const anchorId = paramValue("anchor_id");
+    return {
+      id: node.id,
+      type: "noteNode",
+      position: node.position,
+      selected,
+      data: {
+        content: typeof content === "string" ? content : "",
+        color: typeof color === "string" ? color : "yellow",
+        anchorId: typeof anchorId === "string" ? anchorId : null,
+      },
+    };
+  }
   return {
     id: node.id,
     type: "efNode",
@@ -28,6 +49,7 @@ export function toRFNode(
         id: port.id,
         name: port.name,
         direction: port.direction,
+        label: port.label ?? null,
       })),
       status: status ?? null,
       results: results ?? null,

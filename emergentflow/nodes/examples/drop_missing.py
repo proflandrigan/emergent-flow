@@ -39,12 +39,14 @@ class DropMissing(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.IN,
             data_type="DataFrame",
             help="The input DataFrame from which rows/columns with NA should be dropped.",
         ),
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.OUT,
             data_type="DataFrame",
             help="The DataFrame with missing-value rows or columns removed.",
@@ -73,7 +75,7 @@ class DropMissing(NodeDefinition):
             default=None,
             label="Subset",
             help="Columns to check for NA (row-axis only); empty/unset checks all.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
     ]
 

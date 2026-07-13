@@ -22,7 +22,8 @@
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {
@@ -57,14 +58,16 @@
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-drop-out",
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {
@@ -128,14 +131,16 @@
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-pipeline-model",
           "name": "model",
           "direction": "out",
           "data_type": "Model",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {
@@ -157,21 +162,24 @@
           "name": "model",
           "direction": "in",
           "data_type": "Model",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-eval-frame",
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-eval-result",
           "name": "result",
           "direction": "out",
           "data_type": "EvaluationResult",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {

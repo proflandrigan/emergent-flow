@@ -46,6 +46,7 @@ class DescribeRelation(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.OUT,
             data_type="DataFrame",
             help="The relation's column schema as a tidy pandas DataFrame.",

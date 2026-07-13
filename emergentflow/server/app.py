@@ -50,6 +50,17 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
+from emergentflow.collab.agents import list_available_adapter_names
+from emergentflow.collab.chat import (
+    ChatAlreadyActiveError,
+    ChatTurnAlreadyResolvedError,
+    UnknownChatTurnError,
+)
+from emergentflow.collab.chat_runner import (  # noqa: F401
+    UnknownBackendError,
+    start_chat_turn,
+    stop_chat_turn,
+)
 from emergentflow.collab.gates import (
     Decision,
     Gate,
@@ -80,6 +91,8 @@ from emergentflow.server.service import (
     compile_session,
     consult_graph,
     consult_session,
+    create_connection,
+    delete_connection,
     execute_graph,
     execute_graph_stream,
     execute_node,
@@ -98,6 +111,7 @@ from emergentflow.server.service import (
     list_knowledge,
     save_knowledge,
     test_connection_route,
+    update_connection,
     validate_graph,
 )
 
@@ -205,8 +219,10 @@ async def _safe_json(fn: Callable[[], dict[str, Any]]) -> Response:
 async def _session_json(fn: Callable[[], dict[str, Any]]) -> Response:
     """Run *fn* off the event loop; map collab session errors to their HTTP codes.
 
-    ``UnknownSessionError`` / ``UnknownProposalError`` / ``UnknownReviewError`` -> 404,
-    ``StaleVersionError`` / ``ProposalAlreadyResolvedError`` -> 409
+    ``UnknownSessionError`` / ``UnknownProposalError`` / ``UnknownReviewError`` /
+    ``UnknownChatTurnError`` -> 404,
+    ``StaleVersionError`` / ``ProposalAlreadyResolvedError`` / ``ChatAlreadyActiveError`` /
+    ``ChatTurnAlreadyResolvedError`` -> 409
     (optimistic-concurrency / proposal-lifecycle conflicts -- caller sent a
     stale expected/base version, or tried to re-resolve a decided proposal),
     ``AnchorError`` -> 422 with an ``anchor_error:`` prefix (a review finding's
@@ -223,6 +239,7 @@ async def _session_json(fn: Callable[[], dict[str, Any]]) -> Response:
         UnknownProposalError,
         UnknownReviewError,
         UnknownGateError,
+        UnknownChatTurnError,
     ) as exc:
         return _error_json(404, str(exc))
     except StaleVersionError as exc:
@@ -233,6 +250,10 @@ async def _session_json(fn: Callable[[], dict[str, Any]]) -> Response:
         return _error_json(409, f"gates_open: {exc}")
     except GateAlreadyResolvedError as exc:
         return _error_json(409, f"gate_already_resolved: {exc}")
+    except ChatAlreadyActiveError as exc:
+        return _error_json(409, f"chat_already_active: {exc}")
+    except ChatTurnAlreadyResolvedError as exc:
+        return _error_json(409, f"chat_turn_already_resolved: {exc}")
     except AnchorError as exc:
         return _error_json(422, f"anchor_error: {exc}")
     except Exception as exc:  # noqa: BLE001 - any other failure -> 422, never crash the server
@@ -531,6 +552,26 @@ def create_app() -> FastAPI:
     async def connection_test(name: str) -> Response:
         return await _safe_json(lambda: test_connection_route(name))
 
+    @application.post("/connections")
+    async def connection_create(request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+        return await _safe_json(lambda: create_connection(body))
+
+    @application.put("/connections/{name}")
+    async def connection_update(name: str, request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+        return await _safe_json(lambda: update_connection(name, body))
+
+    @application.delete("/connections/{name}")
+    async def connection_delete(name: str) -> Response:
+        return await _safe_json(lambda: delete_connection(name))
+
     @application.get("/connections/{name}/schema")
     async def connection_schema(name: str, request: Request) -> Response:
         database = request.query_params.get("database")
@@ -825,6 +866,62 @@ def create_app() -> FastAPI:
             return consult_session(session_id, body, client=client)
 
         return await _session_json(_consult)
+
+    @application.get("/agents")
+    async def list_agents() -> Response:
+        return await _safe_json(lambda: {"agents": list_available_adapter_names()})
+
+    @application.post("/sessions/{session_id}/chat", dependencies=[Depends(_require_session_auth)])
+    async def start_chat(session_id: str, request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        backend = body.get("backend")
+        if not isinstance(backend, str) or not backend:
+            return _error_json(
+                400, "POST /sessions/{id}/chat requires a non-empty 'backend' string"
+            )
+        message = body.get("message")
+        if not isinstance(message, str) or not message:
+            return _error_json(
+                400, "POST /sessions/{id}/chat requires a non-empty 'message' string"
+            )
+
+        base_url = str(request.base_url)
+        auth_token = _session_auth_token if _session_auth_required else None
+
+        def _start() -> dict[str, Any]:
+            turn = start_chat_turn(
+                session_id, backend, message, base_url=base_url, auth_token=auth_token
+            )
+            return turn.model_dump(mode="json")
+
+        return await _session_json(_start)
+
+    @application.post(
+        "/sessions/{session_id}/chat/{turn_id}/stop",
+        dependencies=[Depends(_require_session_auth)],
+    )
+    async def stop_chat(session_id: str, turn_id: str) -> Response:
+        def _stop() -> dict[str, Any]:
+            stop_chat_turn(session_id, turn_id)
+            session = get_default_session_store().get(session_id)
+            turn = next(t for t in session.collab.chat.turns if t.id == turn_id)
+            return turn.model_dump(mode="json")
+
+        return await _session_json(_stop)
+
+    @application.post(
+        "/sessions/{session_id}/chat/end", dependencies=[Depends(_require_session_auth)]
+    )
+    async def end_chat_route(session_id: str) -> Response:
+        def _end() -> dict[str, Any]:
+            session = get_default_session_store().end_chat(session_id)
+            return session.model_dump(mode="json")
+
+        return await _session_json(_end)
 
     # Catch-all GET: serves static asset -> demo page (for "/" and "/index.html") -> 404.
     # Declared last so the explicit GET routes above take precedence.

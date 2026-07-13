@@ -515,6 +515,25 @@
       "task": null
     },
     {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Thresholds feature values to 0/1 based on a configurable cutoff.",
+      "import_path": "sklearn.preprocessing.Binarizer",
+      "key": "Binarizer",
+      "label": "Binarizer",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "choices": null,
+          "default": 0.0,
+          "help": "Values above this are set to 1; at or below to 0.",
+          "name": "threshold",
+          "type": "float"
+        }
+      ],
+      "task": null
+    },
+    {
       "archetype": "cluster_detect",
       "category": "Cluster",
       "description": "Incrementally builds a tree of cluster summaries for memory-efficient clustering of large datasets.",
@@ -1067,6 +1086,39 @@
       "task": null
     },
     {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Bins continuous features into discrete intervals (uniform, quantile, or k-means).",
+      "import_path": "sklearn.preprocessing.KBinsDiscretizer",
+      "key": "KBinsDiscretizer",
+      "label": "K Bins Discretizer",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "choices": null,
+          "default": "ordinal",
+          "help": "Encoding method ('onehot'/'onehot-dense'/'ordinal').",
+          "name": "encode",
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": 5,
+          "help": "Number of bins to produce.",
+          "name": "n_bins",
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": "quantile",
+          "help": "Binning strategy ('uniform'/'quantile'/'kmeans').",
+          "name": "strategy",
+          "type": "str"
+        }
+      ],
+      "task": null
+    },
+    {
       "archetype": "cluster_detect",
       "category": "Cluster",
       "description": "Partitions data into k clusters by minimizing within-cluster variance.",
@@ -1301,6 +1353,17 @@
         }
       ],
       "task": "classification"
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Scales each feature by its maximum absolute value, preserving sparsity.",
+      "import_path": "sklearn.preprocessing.MaxAbsScaler",
+      "key": "MaxAbsScaler",
+      "label": "Max Abs Scaler",
+      "node_type": "ml.fit_transform",
+      "params": [],
+      "task": null
     },
     {
       "archetype": "cluster_detect",
@@ -1572,6 +1635,32 @@
           "default": true,
           "help": "Include a bias (intercept) column of all ones.",
           "name": "include_bias",
+          "type": "bool"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Applies a power transform (Yeo-Johnson or Box-Cox) to make data more Gaussian-like.",
+      "import_path": "sklearn.preprocessing.PowerTransformer",
+      "key": "PowerTransformer",
+      "label": "Power Transformer",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "choices": null,
+          "default": "yeo-johnson",
+          "help": "Power transform method ('yeo-johnson'/'box-cox').",
+          "name": "method",
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": true,
+          "help": "Apply zero-mean, unit-variance normalization after transform.",
+          "name": "standardize",
           "type": "bool"
         }
       ],
@@ -1971,6 +2060,32 @@
     },
     {
       "archetype": "fit_transform",
+      "category": "Preprocessing",
+      "description": "Encodes categorical features using the target mean, with built-in shrinkage to prevent overfitting.",
+      "import_path": "sklearn.preprocessing.TargetEncoder",
+      "key": "TargetEncoder",
+      "label": "Target Encoder",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "choices": null,
+          "default": 0,
+          "help": "Seed for reproducibility.",
+          "name": "random_state",
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": "auto",
+          "help": "Smoothing factor ('auto' or a positive float).",
+          "name": "smooth",
+          "type": "str"
+        }
+      ],
+      "task": null
+    },
+    {
+      "archetype": "fit_transform",
       "category": "Decomposition",
       "description": "Reduces dimensionality via truncated singular value decomposition, effective on sparse data.",
       "import_path": "sklearn.decomposition.TruncatedSVD",
@@ -2029,6 +2144,7 @@
           "help": "Mapping of column name to dtype (int/float/str/bool/category).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2049,7 +2165,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose columns should be cast.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -2058,7 +2174,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The DataFrame with cast columns.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2082,6 +2198,7 @@
               "rows",
               "columns"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2103,6 +2220,7 @@
               "any",
               "all"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2121,13 +2239,14 @@
           "help": "Columns to check for NA (row-axis only); empty/unset checks all.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Subset",
           "name": "subset",
@@ -2141,7 +2260,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame from which rows/columns with NA should be dropped.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -2150,7 +2269,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The DataFrame with missing-value rows or columns removed.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2171,13 +2290,14 @@
           "help": "Column to test.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Column",
           "name": "column",
@@ -2197,6 +2317,7 @@
               ">=",
               "isin"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2215,6 +2336,7 @@
           "help": "Scalar to compare against; for 'isin' provide a list.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2235,7 +2357,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame to filter.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -2244,7 +2366,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The filtered DataFrame containing only rows that match the predicate.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2269,6 +2391,7 @@
               "median",
               "most_frequent"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2287,13 +2410,14 @@
           "help": "Columns to impute; empty/unset imputes every column.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -2307,7 +2431,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose missing cells should be filled.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -2316,7 +2440,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The DataFrame with missing cells imputed.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2337,13 +2461,14 @@
           "help": "Column names to keep or drop.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -2355,6 +2480,7 @@
           "help": "If True, drop the named columns; if False, keep only them.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2375,7 +2501,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose columns should be selected.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -2384,7 +2510,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The DataFrame with selected columns kept or dropped.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2405,6 +2531,7 @@
           "help": "The named connection profile to run against (from your local store).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2423,6 +2550,7 @@
           "help": "The relation (table) name to describe.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2441,6 +2569,7 @@
           "help": "Optional database/catalog to disambiguate a relation name that exists in more than one database.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2459,6 +2588,7 @@
           "help": "Optional schema (or, for BigQuery, dataset) to disambiguate a relation name that exists in more than one schema.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2479,7 +2609,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The relation's column schema as a tidy pandas DataFrame.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2500,6 +2630,7 @@
           "help": "Filesystem path to the .csv file to load.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2518,6 +2649,7 @@
           "help": "Text encoding used to read the file.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2538,7 +2670,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The loaded data as a pandas DataFrame.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2559,6 +2691,7 @@
           "help": "Filesystem path to the .json file to load.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2588,7 +2721,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The loaded data as a pandas DataFrame.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2609,6 +2742,7 @@
           "help": "Filesystem path to the .parquet file to load.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2638,7 +2772,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The loaded data as a pandas DataFrame.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2663,6 +2797,7 @@
               "wine",
               "diabetes"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2683,7 +2818,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The loaded data as a pandas DataFrame.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         }
@@ -2704,6 +2839,7 @@
           "help": "The base relation to query (e.g. 'sales').",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2722,6 +2858,7 @@
           "help": "Columns / aggregates to select. Each item is a string or {'column': ..., 'agg': ..., 'alias': ...}.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2740,6 +2877,7 @@
           "help": "Filter predicates. Each: {'column': ..., 'op': ..., 'value': ...}.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2758,6 +2896,7 @@
           "help": "Join specs. Each: {'relation': ..., 'on': [...], 'type': ...}.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2776,6 +2915,7 @@
           "help": "Column names to group by.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2794,6 +2934,7 @@
           "help": "HAVING filter predicates (same format as where).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2812,6 +2953,7 @@
           "help": "Ordering specs. Each: a string or {'column': ..., 'desc': bool}.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2830,6 +2972,7 @@
           "help": "Row limit applied in the compiled SQL.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": 1.0,
@@ -2848,6 +2991,7 @@
           "help": "When True, adds SELECT DISTINCT.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2866,6 +3010,7 @@
           "help": "The named connection profile to run against (from your local store).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2889,6 +3034,7 @@
               "redshift",
               "postgres"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2907,6 +3053,7 @@
           "help": "Optional row cap (injected as LIMIT if absent).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": 1.0,
@@ -2925,6 +3072,7 @@
           "help": "Return a cost estimate without running.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2945,7 +3093,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The query result as a pandas DataFrame. Always a genuine (possibly empty) DataFrame, including under dry_run -- see cost_estimate for the byte-scan/cost metadata dry_run reports instead of real rows.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -2975,6 +3123,7 @@
           "help": "The SQL query to run (SELECT/WITH only under read-only connections).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -2993,6 +3142,7 @@
           "help": "The named connection profile to run against (from your local store).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3016,6 +3166,7 @@
               "redshift",
               "postgres"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3034,6 +3185,7 @@
           "help": "Optional row cap; injects LIMIT when absent from the SQL.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": 1.0,
@@ -3052,6 +3204,7 @@
           "help": "When True, return a cost estimate without running the query.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3072,7 +3225,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The query result as a pandas DataFrame. Always a genuine (possibly empty) DataFrame, including under dry_run -- see cost_estimate for the byte-scan/cost metadata dry_run reports instead of real rows.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -3142,6 +3295,7 @@
           "help": "System-message template, e.g. 'You are a {{persona}} assistant.'",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3160,6 +3314,7 @@
           "help": "User-message template, e.g. 'Answer this: {{question}}'",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3178,6 +3333,7 @@
           "help": "Model variants, e.g. [{'provider': 'anthropic', 'model': 'claude-sonnet-5'}].",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3217,6 +3373,411 @@
     },
     {
       "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Return the top-N worst-error rows for a fitted model.",
+      "family": "explain",
+      "label": "Error Table",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": 20,
+          "help": "Number of worst-error rows to return.",
+          "hints": null,
+          "label": "Top N",
+          "name": "top_n",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted, supervised model to score.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Labeled data to score the model against.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The top-N worst-error rows, sorted worst-first.",
+          "label": null,
+          "name": "error_table",
+          "required": true
+        }
+      ],
+      "type": "explain.error_table",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Render a reliability diagram for a fitted binary classifier.",
+      "family": "explain",
+      "label": "Plot Calibration",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": 10,
+          "help": "Number of probability buckets to bin predictions into.",
+          "hints": null,
+          "label": "Number of bins",
+          "name": "n_bins",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted, binary-classification model to score.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Labeled data to score the model against.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered calibration curve as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "explain.plot_calibration",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Render a predicted-vs-actual scatter for a fitted regression model.",
+      "family": "explain",
+      "label": "Plot Predicted vs Actual",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted, regression-task model to score.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Labeled data to score the model against.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered predicted-vs-actual scatter as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "explain.plot_predicted_vs_actual",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Render a predicted-vs-residual scatter for a fitted regression model.",
+      "family": "explain",
+      "label": "Plot Residuals",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted, regression-task model to score.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Labeled data to score the model against.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered predicted-vs-residual scatter as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "explain.plot_residuals",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Render an ROC or Precision-Recall curve for a fitted binary classifier.",
+      "family": "explain",
+      "label": "Plot ROC / PR",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "roc",
+          "help": "Which curve to render.",
+          "hints": {
+            "choices": [
+              "roc",
+              "pr"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Curve",
+          "name": "curve",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted, binary-classification model to score.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Labeled data to score the model against.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered ROC or Precision-Recall curve as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "explain.plot_roc_pr",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Render a jittered strip plot (beeswarm approximation) of SHAP values.",
+      "family": "explain",
+      "label": "Plot SHAP Beeswarm",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The tidy SHAP values frame (explain.shap_values's output); single-output only.",
+          "label": null,
+          "name": "shap_values",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered beeswarm-style plot as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "explain.plot_shap_beeswarm",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Render a ranked bar chart of mean |SHAP value| per feature.",
+      "family": "explain",
+      "label": "Plot SHAP Importance",
+      "paradigm": "functional",
+      "params": [],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The tidy SHAP values frame (explain.shap_values's output).",
+          "label": null,
+          "name": "shap_values",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered feature-importance bar chart as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "explain.plot_shap_importance",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Render a waterfall chart explaining one row's prediction.",
+      "family": "explain",
+      "label": "Plot SHAP Waterfall",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which row (0-indexed position in the frame shap_values was run on) to explain.",
+          "hints": null,
+          "label": "Row index",
+          "name": "row_index",
+          "required": true,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The tidy SHAP values frame (explain.shap_values's output); single-output only.",
+          "label": null,
+          "name": "shap_values",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered waterfall chart as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "explain.plot_shap_waterfall",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Model Explainability",
+      "description": "Compute per-feature SHAP attributions for a fitted model.",
+      "family": "explain",
+      "label": "SHAP Values",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Random seed for background sampling (required for reproducibility).",
+          "hints": null,
+          "label": "Random seed",
+          "name": "seed",
+          "required": true,
+          "type_token": "int"
+        },
+        {
+          "default": 100,
+          "help": "Maximum number of rows to sample as the SHAP background dataset.",
+          "hints": null,
+          "label": "Background samples",
+          "name": "background_samples",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted, supervised model to explain.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The data to compute SHAP attributions over.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Tidy, long-format SHAP attributions: one row per (row_index, feature[, class]).",
+          "label": null,
+          "name": "shap_values",
+          "required": true
+        }
+      ],
+      "type": "explain.shap_values",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "LLM",
       "description": "Run one completion call against a provider through the unified gateway.",
       "family": "llm",
@@ -3228,6 +3789,7 @@
           "help": "Gateway provider key, e.g. 'anthropic', 'openai', 'gemini'.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3246,6 +3808,7 @@
           "help": "Provider model id, e.g. 'claude-sonnet-5'.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3264,6 +3827,7 @@
           "help": "Literal [{role, content}] messages (superseded by wired 'prompt' port later).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3282,6 +3846,7 @@
           "help": "Sampling temperature; 0 for reproducible output.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": 2.0,
             "max_length": null,
             "min": 0.0,
@@ -3300,6 +3865,7 @@
           "help": "Optional output token cap.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": 1.0,
@@ -3321,6 +3887,7 @@
               "text",
               "json"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3339,6 +3906,7 @@
           "help": "Optional JSON Schema the parsed 'json' output must satisfy.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3354,19 +3922,20 @@
         },
         {
           "default": null,
-          "help": "Env-var name holding the provider API key (never the key itself; ADR 0017).",
+          "help": "Name of a registered LLM credential profile (Manage Connections -> LLM Credentials). Resolves to an env-var name at call time; never a literal secret. Leave blank to use the provider's conventional default env var.",
           "hints": {
             "choices": null,
+            "connection_kind": "llm",
             "max": null,
             "max_length": null,
             "min": null,
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "connection"
           },
-          "label": "API key env var",
-          "name": "api_key_env",
+          "label": "LLM connection",
+          "name": "llm_connection",
           "required": false,
           "type_token": "str"
         }
@@ -3383,7 +3952,7 @@
         }
       ],
       "type": "llm.call",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -3398,6 +3967,7 @@
           "help": "System-message template, e.g. 'You are a {{persona}} assistant.'",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3416,6 +3986,7 @@
           "help": "User-message template, e.g. 'Answer this: {{question}}'",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3434,6 +4005,7 @@
           "help": "Documentary name -> type-token map shown in the canvas (e.g. {'q': 'str'}).",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3487,6 +4059,7 @@
               "predict",
               "score_samples"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3516,7 +4089,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The data to apply the model to.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -3560,6 +4133,7 @@
               "OneClassSVM",
               "SpectralClustering"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3576,7 +4150,17 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -3598,7 +4182,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -3667,6 +4251,7 @@
               "SVC",
               "SVR"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3683,7 +4268,17 @@
         {
           "default": null,
           "help": "Column to predict.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": true,
@@ -3692,7 +4287,17 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -3732,7 +4337,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features and the target column.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -3772,7 +4377,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "Labeled data to score the model against.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -3832,6 +4437,7 @@
               "SVC",
               "SVR"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3848,7 +4454,17 @@
         {
           "default": null,
           "help": "Column to predict.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": true,
@@ -3857,7 +4473,17 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -3879,7 +4505,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features and the target column.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -3909,9 +4535,12 @@
           "help": "Which allow-listed sklearn transformer to fit.",
           "hints": {
             "choices": [
+              "Binarizer",
               "FactorAnalysis",
               "FastICA",
               "Isomap",
+              "KBinsDiscretizer",
+              "MaxAbsScaler",
               "MinMaxScaler",
               "NMF",
               "Normalizer",
@@ -3919,13 +4548,16 @@
               "OrdinalEncoder",
               "PCA",
               "PolynomialFeatures",
+              "PowerTransformer",
               "RobustScaler",
               "SelectKBest",
               "StandardScaler",
               "TSNE",
+              "TargetEncoder",
               "TruncatedSVD",
               "VarianceThreshold"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -3942,7 +4574,17 @@
         {
           "default": null,
           "help": "Only needed for supervised feature selectors (e.g. SelectKBest); leave unset for unsupervised transformers.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": false,
@@ -3951,7 +4593,17 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column (excluding the target column, if given).",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -3973,7 +4625,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features (and, for supervised feature selectors, the target column).",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4042,6 +4694,7 @@
               "SVC",
               "SVR"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4067,7 +4720,17 @@
         {
           "default": null,
           "help": "Column to predict.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": true,
@@ -4076,7 +4739,17 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -4107,7 +4780,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features and the target column.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4153,7 +4826,17 @@
         {
           "default": null,
           "help": "Column to predict; required only when the final step is a fit-archetype (supervised) estimator.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": false,
@@ -4162,7 +4845,17 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -4175,7 +4868,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features and (if the final step is supervised) the target column.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4215,7 +4908,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The data to predict on.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4274,7 +4967,17 @@
         {
           "default": null,
           "help": "Column to predict.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": true,
@@ -4283,7 +4986,17 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -4294,6 +5007,7 @@
           "help": "Fraction of rows held out for evaluation.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": 1.0,
             "max_length": null,
             "min": 0.0,
@@ -4312,6 +5026,7 @@
           "help": "Seed controlling the train/test split and model fit.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4332,7 +5047,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features and the target column.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4360,7 +5075,17 @@
         {
           "default": null,
           "help": "Column to predict.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": true,
@@ -4369,7 +5094,17 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -4383,6 +5118,7 @@
               "classification",
               "regression"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4401,6 +5137,7 @@
           "help": "Number of trees in the forest.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": 1.0,
@@ -4419,6 +5156,7 @@
           "help": "Seed for reproducibility.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4439,7 +5177,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features and the target column.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4467,7 +5205,17 @@
         {
           "default": null,
           "help": "Column to predict.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Target column",
           "name": "target",
           "required": true,
@@ -4476,7 +5224,17 @@
         {
           "default": null,
           "help": "Columns to use as features; empty/unset uses every other column.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Feature columns",
           "name": "features",
           "required": false,
@@ -4489,7 +5247,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing features and the target column.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4519,6 +5277,7 @@
           "help": "Fraction of rows held out for evaluation.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": 1.0,
             "max_length": null,
             "min": 0.0,
@@ -4537,6 +5296,7 @@
           "help": "Seed controlling the train/test split.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4557,7 +5317,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame to split.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4599,6 +5359,7 @@
               "transform",
               "score_samples"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4628,7 +5389,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The data to apply the transformer to.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4740,6 +5501,72 @@
     },
     {
       "advisor_persona": null,
+      "category": "Annotation",
+      "description": "A markdown note for narrating the pipeline; no data flows through it.",
+      "family": "notes",
+      "label": "Note",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "",
+          "help": "Markdown note body.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "markdown"
+          },
+          "label": "Text",
+          "name": "content",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Id of a node or edge in this graph this note narrates. Unset means the note floats freely.",
+          "hints": null,
+          "label": "Anchor",
+          "name": "anchor_id",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "yellow",
+          "help": "Background color swatch for the note.",
+          "hints": {
+            "choices": [
+              "yellow",
+              "pink",
+              "blue",
+              "green",
+              "purple"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Color",
+          "name": "color",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [],
+      "type": "notes.markdown",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "Reporting",
       "description": "Generate an HTML profiling report summarising a DataFrame.",
       "family": "reports",
@@ -4751,6 +5578,7 @@
           "help": "Title shown at the top of the report.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4771,7 +5599,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The DataFrame to profile.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4790,6 +5618,57 @@
     },
     {
       "advisor_persona": null,
+      "category": "Custom Code",
+      "description": "Run a user-authored Python transform() function against an input value.",
+      "family": "script",
+      "label": "Custom Code",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "",
+          "help": "A Python function named 'transform' taking one argument, e.g. 'def transform(value):\\n    return value'. Any imports needed go inside the function body.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "code"
+          },
+          "label": "Code",
+          "name": "code",
+          "required": true,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "any",
+          "direction": "in",
+          "help": "The value passed as transform()'s argument -- any upstream type.",
+          "label": null,
+          "name": "value",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "any",
+          "direction": "out",
+          "help": "transform(value)'s return value.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "script.custom_code",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "Statistics",
       "description": "One-way ANOVA testing a numeric column across groups.",
       "family": "stats",
@@ -4799,7 +5678,17 @@
         {
           "default": null,
           "help": "Column whose distinct values define the groups.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Group column",
           "name": "group_col",
           "required": true,
@@ -4808,7 +5697,17 @@
         {
           "default": null,
           "help": "Column whose values are compared across groups.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Value column",
           "name": "value_col",
           "required": true,
@@ -4819,6 +5718,7 @@
           "help": "Significance level recorded alongside the result.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": 1.0,
             "max_length": null,
             "min": 0.0,
@@ -4839,7 +5739,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing the group and value columns.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4869,13 +5769,14 @@
           "help": "Columns to analyze; empty/unset analyzes all columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -4889,7 +5790,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame to analyze.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4898,7 +5799,7 @@
           "data_type": "DataFrame",
           "direction": "out",
           "help": "The input DataFrame, passed through unchanged so this node can sit inline.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -4977,6 +5878,7 @@
               "spearman",
               "kendall"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -4995,13 +5897,14 @@
           "help": "Columns to correlate; empty/unset correlates all numeric columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -5015,7 +5918,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose columns should be correlated.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5045,13 +5948,14 @@
           "help": "Columns to describe; empty/unset describes all numeric columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -5065,7 +5969,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose columns should be described.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5097,6 +6001,7 @@
             "choices": [
               "vif"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5126,7 +6031,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame to diagnose.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5160,6 +6065,7 @@
               "heteroscedasticity",
               "normality"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5219,13 +6125,14 @@
           "help": "Columns to summarize; empty/unset summarizes all numeric columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -5239,7 +6146,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose numeric columns should be summarized.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5269,13 +6176,14 @@
           "help": "Columns to profile; empty/unset profiles all columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -5289,7 +6197,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose columns should be profiled.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5309,41 +6217,25 @@
     {
       "advisor_persona": "researcher",
       "category": "Statistics",
-      "description": "Fit a curated, allow-listed statistical model (regression/GLM/...).",
+      "description": "Fit a Bayesian GLM (optionally hierarchical), via bambi/PyMC, summarized with ArviZ.",
       "family": "stats",
-      "label": "Fit Statistical Model",
+      "label": "Fit Bayesian Model",
       "paradigm": "functional",
       "params": [
         {
           "default": null,
-          "help": "Which allow-listed statistical model to fit.",
+          "help": "Column to predict.",
           "hints": {
-            "choices": [
-              "BayesianGLM",
-              "GAM",
-              "GLM",
-              "GLS",
-              "MixedLM",
-              "OLS",
-              "WLS"
-            ],
+            "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "select"
+            "widget": "column"
           },
-          "label": "Model",
-          "name": "model",
-          "required": true,
-          "type_token": "str"
-        },
-        {
-          "default": null,
-          "help": "Column to predict.",
-          "hints": null,
           "label": "Target column",
           "name": "target",
           "required": true,
@@ -5352,7 +6244,17 @@
         {
           "default": null,
           "help": "Predictor columns (fixed effects).",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Fixed effects",
           "name": "fixed_effects",
           "required": false,
@@ -5360,8 +6262,18 @@
         },
         {
           "default": null,
-          "help": "Random-effect columns (mixed-effects models only).",
-          "hints": null,
+          "help": "Random-effect columns (random slopes, hierarchical models only).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Random effects",
           "name": "random_effects",
           "required": false,
@@ -5369,17 +6281,18 @@
         },
         {
           "default": null,
-          "help": "Unpenalized linear predictor columns (GAM only; smooth terms are configured via 'Additional spec fields').",
-          "hints": null,
-          "label": "Linear terms",
-          "name": "linear_terms",
-          "required": false,
-          "type_token": "list[str]"
-        },
-        {
-          "default": null,
-          "help": "Grouping-factor column (mixed-effects models only).",
-          "hints": null,
+          "help": "Grouping-factor column; setting this fits a hierarchical (random-intercept/slope) model.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Grouping factor",
           "name": "groups",
           "required": false,
@@ -5387,8 +6300,24 @@
         },
         {
           "default": null,
-          "help": "GLM family (gaussian/binomial/poisson/negativebinomial/gamma).",
-          "hints": null,
+          "help": "GLM family; defaults to gaussian if unset.",
+          "hints": {
+            "choices": [
+              "binomial",
+              "gamma",
+              "gaussian",
+              "negativebinomial",
+              "poisson"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
           "label": "Family",
           "name": "family",
           "required": false,
@@ -5396,30 +6325,39 @@
         },
         {
           "default": null,
-          "help": "GLM link function; defaults to the family's canonical link if unset.",
+          "help": "Random seed for MCMC sampling (required for reproducibility).",
           "hints": null,
-          "label": "Link",
-          "name": "link",
-          "required": false,
-          "type_token": "str"
+          "label": "Random seed",
+          "name": "seed",
+          "required": true,
+          "type_token": "int"
         },
         {
           "default": null,
-          "help": "Column of observation weights (WLS, or weighted GLM).",
+          "help": "Number of MCMC posterior samples to draw per chain.",
           "hints": null,
-          "label": "Weights column",
-          "name": "weights",
-          "required": false,
-          "type_token": "str"
+          "label": "Draws",
+          "name": "draws",
+          "required": true,
+          "type_token": "int"
         },
         {
-          "default": {},
-          "help": "Any additional model-specific structured-spec fields not covered above.",
+          "default": null,
+          "help": "Number of MCMC tuning (warm-up) steps per chain.",
           "hints": null,
-          "label": "Additional spec fields",
-          "name": "spec_extra",
-          "required": false,
-          "type_token": "dict[str, any]"
+          "label": "Tune steps",
+          "name": "tune",
+          "required": true,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Number of independent MCMC chains to run.",
+          "hints": null,
+          "label": "Chains",
+          "name": "chains",
+          "required": true,
+          "type_token": "int"
         }
       ],
       "ports": [
@@ -5428,7 +6366,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing the target and predictor columns.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5442,7 +6380,463 @@
           "required": true
         }
       ],
-      "type": "stats.fit_model",
+      "type": "stats.fit_bayesian_model",
+      "version": 1
+    },
+    {
+      "advisor_persona": "researcher",
+      "category": "Statistics",
+      "description": "Fit a generalized additive model: linear terms + B-spline smooth terms (statsmodels GLMGam, unpenalized).",
+      "family": "stats",
+      "label": "Fit GAM",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Unpenalized linear predictor columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Linear terms",
+          "name": "linear_terms",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Spline smooth terms: a list of {'column': str, 'df': int (default 4), 'degree': int (default 3)} dicts, one per smoothed predictor column.",
+          "hints": null,
+          "label": "Smooth terms",
+          "name": "smooth_terms",
+          "required": true,
+          "type_token": "list[dict[str, any]]"
+        },
+        {
+          "default": null,
+          "help": "GLM family for the additive model; defaults to gaussian if unset.",
+          "hints": {
+            "choices": [
+              "binomial",
+              "gamma",
+              "gaussian",
+              "negativebinomial",
+              "poisson"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Family",
+          "name": "family",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "GLM link function; defaults to the family's canonical link if unset.",
+          "hints": null,
+          "label": "Link",
+          "name": "link",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the target and predictor columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "StatsModel",
+          "direction": "out",
+          "help": "The fitted statistical model.",
+          "label": null,
+          "name": "model",
+          "required": true
+        }
+      ],
+      "type": "stats.fit_gam",
+      "version": 1
+    },
+    {
+      "advisor_persona": "researcher",
+      "category": "Statistics",
+      "description": "Fit a generalized linear model (Gaussian/Binomial/Poisson/NegativeBinomial/Gamma, statsmodels).",
+      "family": "stats",
+      "label": "Fit GLM",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Predictor columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Predictor columns",
+          "name": "fixed_effects",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "GLM family.",
+          "hints": {
+            "choices": [
+              "binomial",
+              "gamma",
+              "gaussian",
+              "negativebinomial",
+              "poisson"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Family",
+          "name": "family",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "GLM link function; defaults to the family's canonical link if unset. Valid per family: gaussian=identity/log/inverse, binomial=logit/probit/cloglog, poisson=log/identity/sqrt, negativebinomial=log/identity, gamma=inverse/log/identity.",
+          "hints": null,
+          "label": "Link",
+          "name": "link",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column of observation weights (for weighted GLM).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Weights column",
+          "name": "weights",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the target and predictor columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "StatsModel",
+          "direction": "out",
+          "help": "The fitted statistical model.",
+          "label": null,
+          "name": "model",
+          "required": true
+        }
+      ],
+      "type": "stats.fit_glm",
+      "version": 1
+    },
+    {
+      "advisor_persona": "researcher",
+      "category": "Statistics",
+      "description": "Fit OLS/WLS/GLS linear regression (statsmodels).",
+      "family": "stats",
+      "label": "Fit Linear Regression",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which linear-regression estimator to fit.",
+          "hints": {
+            "choices": [
+              "GLS",
+              "OLS",
+              "WLS"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Estimator",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Predictor columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Predictor columns",
+          "name": "fixed_effects",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Column of observation weights; required when Estimator = WLS, unused otherwise.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Weights column",
+          "name": "weights",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the target and predictor columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "StatsModel",
+          "direction": "out",
+          "help": "The fitted statistical model.",
+          "label": null,
+          "name": "model",
+          "required": true
+        }
+      ],
+      "type": "stats.fit_linear_regression",
+      "version": 1
+    },
+    {
+      "advisor_persona": "researcher",
+      "category": "Statistics",
+      "description": "Fit a linear mixed-effects / hierarchical model with random intercepts and slopes, grouped (statsmodels MixedLM).",
+      "family": "stats",
+      "label": "Fit Mixed Model",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Predictor columns (fixed effects).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Fixed effects",
+          "name": "fixed_effects",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Random-effect columns (random slopes); leave unset for a random-intercept-only model.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Random effects",
+          "name": "random_effects",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Grouping-factor column (e.g. subject/site/region).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Grouping factor",
+          "name": "groups",
+          "required": true,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the target and predictor columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "StatsModel",
+          "direction": "out",
+          "help": "The fitted statistical model.",
+          "label": null,
+          "name": "model",
+          "required": true
+        }
+      ],
+      "type": "stats.fit_mixed_model",
       "version": 1
     },
     {
@@ -5456,7 +6850,17 @@
         {
           "default": null,
           "help": "Grouping column(s).",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Group by",
           "name": "by",
           "required": true,
@@ -5475,6 +6879,7 @@
               "count",
               "std"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5493,13 +6898,14 @@
           "help": "Columns to aggregate; unset aggregates all numeric non-group columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Value columns",
           "name": "columns",
@@ -5513,7 +6919,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame to group and aggregate.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5543,13 +6949,14 @@
           "help": "Columns to analyze; empty/unset analyzes all columns.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "column"
           },
           "label": "Columns",
           "name": "columns",
@@ -5563,7 +6970,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame whose columns should be analyzed for nulls.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5591,7 +6998,17 @@
         {
           "default": null,
           "help": "Column with exactly two groups.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Group column",
           "name": "group_col",
           "required": true,
@@ -5600,7 +7017,17 @@
         {
           "default": null,
           "help": "Numeric column to compare.",
-          "hints": null,
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
           "label": "Value column",
           "name": "value_col",
           "required": true,
@@ -5611,6 +7038,7 @@
           "help": "Assume equal variance (Student's); off = Welch's.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5629,6 +7057,7 @@
           "help": "Significance level recorded alongside the result.",
           "hints": {
             "choices": null,
+            "connection_kind": null,
             "max": 1.0,
             "max_length": null,
             "min": 0.0,
@@ -5649,7 +7078,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame containing the group and value columns.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5664,6 +7093,393 @@
         }
       ],
       "type": "stats.ttest",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Feature Transform",
+      "description": "Discretize continuous features using a curated sklearn discretizer (KBinsDiscretizer or Binarizer).",
+      "family": "transform",
+      "label": "Discretize",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which discretization algorithm to use.",
+          "hints": {
+            "choices": [
+              "Binarizer",
+              "KBinsDiscretizer"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Discretizer",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to discretize; empty/unset uses all numeric columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": {},
+          "help": "Constructor kwargs for the chosen discretizer (allow-listed per discretizer).",
+          "hints": null,
+          "label": "Discretizer params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing continuous features to discretize.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Transformer",
+          "direction": "out",
+          "help": "The fitted discretizer (reusable on new data via ml.transform).",
+          "label": null,
+          "name": "transformer",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input frame with discretized feature columns appended.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "transform.discretize",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Feature Transform",
+      "description": "Encode categorical features using a curated sklearn encoder (OneHotEncoder, OrdinalEncoder, or TargetEncoder).",
+      "family": "transform",
+      "label": "Encode Categorical",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which categorical encoding algorithm to use.",
+          "hints": {
+            "choices": [
+              "OneHotEncoder",
+              "OrdinalEncoder",
+              "TargetEncoder"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Encoder",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Required for TargetEncoder (supervised); leave unset for OneHotEncoder/OrdinalEncoder.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Categorical columns to encode; empty/unset uses all columns (excluding target, if given).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": {},
+          "help": "Constructor kwargs for the chosen encoder (allow-listed per encoder).",
+          "hints": null,
+          "label": "Encoder params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing categorical features to encode.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Transformer",
+          "direction": "out",
+          "help": "The fitted encoder (reusable on new data via ml.transform).",
+          "label": null,
+          "name": "transformer",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input frame with encoded feature columns appended.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "transform.encode_categorical",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Feature Transform",
+      "description": "Generate new features from existing ones using a curated sklearn feature generator (PolynomialFeatures).",
+      "family": "transform",
+      "label": "Generate Features",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which feature generation algorithm to use.",
+          "hints": {
+            "choices": [
+              "PolynomialFeatures"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Generator",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to generate features from; empty/unset uses all numeric columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": {},
+          "help": "Constructor kwargs for the chosen generator (allow-listed per generator).",
+          "hints": null,
+          "label": "Generator params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing features to generate from.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Transformer",
+          "direction": "out",
+          "help": "The fitted generator (reusable on new data via ml.transform).",
+          "label": null,
+          "name": "transformer",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input frame with generated feature columns appended.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "transform.generate_features",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Feature Transform",
+      "description": "Scale numeric features using a curated sklearn scaler (StandardScaler, MinMaxScaler, RobustScaler, MaxAbsScaler, Normalizer, or PowerTransformer).",
+      "family": "transform",
+      "label": "Scale Features",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which scaling algorithm to use.",
+          "hints": {
+            "choices": [
+              "MaxAbsScaler",
+              "MinMaxScaler",
+              "Normalizer",
+              "PowerTransformer",
+              "RobustScaler",
+              "StandardScaler"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Scaler",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to scale; empty/unset uses all numeric columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": {},
+          "help": "Constructor kwargs for the chosen scaler (allow-listed per scaler).",
+          "hints": null,
+          "label": "Scaler params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing features to scale.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Transformer",
+          "direction": "out",
+          "help": "The fitted scaler (reusable on new data via ml.transform).",
+          "label": null,
+          "name": "transformer",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input frame with scaled feature columns appended.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "transform.scale_features",
       "version": 1
     },
     {
@@ -5691,6 +7507,7 @@
               "strip",
               "violin"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5729,7 +7546,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "The input DataFrame to chart.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },
@@ -5762,6 +7579,7 @@
               "acf",
               "pacf"
             ],
+            "connection_kind": null,
             "max": null,
             "max_length": null,
             "min": null,
@@ -5862,7 +7680,7 @@
           "data_type": "DataFrame",
           "direction": "in",
           "help": "Labeled data to score the classifier against.",
-          "label": null,
+          "label": "Data",
           "name": "frame",
           "required": true
         },

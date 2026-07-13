@@ -39,6 +39,7 @@ class EdaProfile(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.IN,
             data_type="DataFrame",
             help="The input DataFrame whose columns should be profiled.",
@@ -57,7 +58,7 @@ class EdaProfile(NodeDefinition):
             default=None,
             label="Columns",
             help="Columns to profile; empty/unset profiles all columns.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
     ]
 

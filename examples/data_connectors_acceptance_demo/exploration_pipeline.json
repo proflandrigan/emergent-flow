@@ -46,14 +46,16 @@
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-query-cost",
           "name": "cost_estimate",
           "direction": "out",
           "data_type": "CostEstimate",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {
@@ -75,14 +77,16 @@
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-describe-summary",
           "name": "summary",
           "direction": "out",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {
@@ -104,14 +108,16 @@
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-corr-matrix",
           "name": "matrix",
           "direction": "out",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {
@@ -133,14 +139,16 @@
           "name": "matrix",
           "direction": "in",
           "data_type": "DataFrame",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         },
         {
           "id": "p-heatmap-plot",
           "name": "plot",
           "direction": "out",
           "data_type": "PlotSpec",
-          "cardinality": "one"
+          "cardinality": "one",
+          "label": null
         }
       ],
       "position": {

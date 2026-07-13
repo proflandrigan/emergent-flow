@@ -3,7 +3,7 @@ Golden + equivalence tests for the Epic 12 Story 6 GAM catalog entry (statsmodel
 
 Mirrors ``tests/test_stats_regression_catalog.py``'s two-part shape:
 
-1. Golden-code quality: a representative GAM graph (LoadSample -> FitModel) compiles to
+1. Golden-code quality: a representative GAM graph (LoadSample -> FitGAM) compiles to
    syntactically valid, ruff-clean Python.
 2. ADR-0002 equivalence: ``execute()`` and running the code ``codegen()`` emits produce the
    same coefficient frame and fit_stats for a GAM fit (linear term + one smooth term).
@@ -23,7 +23,7 @@ from emergentflow.codegen.compiler import compile_to_code
 from emergentflow.ir.common import Direction
 from emergentflow.ir.edge import Edge, PortRef
 from emergentflow.ir.graph import Graph
-from emergentflow.nodes.examples import FitModel, LoadSample
+from emergentflow.nodes.examples import FitGAM, LoadSample
 
 
 def _out_port(node, name):
@@ -47,14 +47,11 @@ def _run_codegen(definition, node, scope):
 
 def _build_load_fit_graph() -> Graph:
     load = LoadSample().instantiate(name="diabetes", label="Load Sample")
-    fit = FitModel().instantiate(
-        model="GAM",
+    fit = FitGAM().instantiate(
         target="target",
         label="Fit GAM",
-        spec_extra={
-            "linear_terms": ["age"],
-            "smooth_terms": [{"column": "bmi", "df": 6, "degree": 3}],
-        },
+        linear_terms=["age"],
+        smooth_terms=[{"column": "bmi", "df": 6, "degree": 3}],
     )
     edge = Edge(
         source=PortRef(node_id=load.id, port_id=_out_port(load, "frame").id),
@@ -99,15 +96,12 @@ def test_gam_equivalence() -> None:
     """ADR 0002: execute == running the emitted code, for GAM."""
     df = _gam_df()
     fit_kwargs = {
-        "model": "GAM",
         "target": "y",
-        "spec_extra": {
-            "linear_terms": ["x1"],
-            "smooth_terms": [{"column": "x2", "df": 6, "degree": 3}],
-        },
+        "linear_terms": ["x1"],
+        "smooth_terms": [{"column": "x2", "df": 6, "degree": 3}],
     }
 
-    defn = FitModel()
+    defn = FitGAM()
     node = defn.instantiate(**fit_kwargs)
     executed_model = defn.execute(node, inputs={"frame": df.copy()})["model"]
     scope = _run_codegen(defn, node, {"frame": df.copy()})

@@ -41,6 +41,17 @@ from emergentflow.nodes import get as get_node_definition
 from emergentflow.nodes import registry as default_node_registry
 from emergentflow.nodes.contract import CodeFragment
 
+# The catalog key of the markdown-note node type (emergentflow/nodes/examples/
+# markdown_note.py). The compiler special-cases this one node type so an
+# *anchored* note's text is emitted as a comment adjacent to whatever it
+# annotates -- a note has zero ports/edges, so plain topological order alone
+# can't place its text near its anchor. This is intentionally a small,
+# contained exception in the assembly pass, not a change to topological_sort
+# itself or to the generic per-node codegen contract (the note's own
+# `codegen()` still always returns an empty body; this string constant is the
+# only place compiler.py knows about a specific node type).
+_NOTE_NODE_TYPE = "notes.markdown"
+
 
 def _describe(node: Node) -> str:
     """Human-readable identifier for a node in error messages."""
@@ -48,6 +59,32 @@ def _describe(node: Node) -> str:
     if label:
         return f"{label!r} (id={node.id})"
     return f"{node.type!r} (id={node.id})"
+
+
+def _note_target_node_id(graph: Graph, anchor_id: str) -> str | None:
+    """Resolve a note's `anchor_id` to the node id it should be emitted next to.
+
+    `anchor_id` may name a node directly, or an edge (in which case the note
+    is emitted next to the edge's *target* node -- by the time that node's
+    code runs, both the connection's source and target are bound, so the
+    comment reads naturally as explaining the incoming connection). A stale
+    or unresolvable `anchor_id` returns None (not an error -- see
+    markdown_note.py's docstring: this node type does not validate
+    `anchor_id` against the graph).
+    """
+    if anchor_id in graph.nodes:
+        return anchor_id
+    edge = graph.edges.get(anchor_id)
+    if edge is not None:
+        return edge.target.node_id
+    return None
+
+
+def _format_note_comment(content: str) -> str:
+    """Render a note's markdown `content` as a Python comment block."""
+    lines = content.splitlines() or [""]
+    commented = "\n".join(f"# {line}" if line else "#" for line in lines)
+    return f"# --- Note ---\n{commented}"
 
 
 @dataclass(frozen=True)
@@ -62,6 +99,8 @@ class _AssembledModule:
     needs_llm: bool  # True iff any node needs the LLM client seam (ADR 0017/0018)
     needs_warehouse: bool  # True iff any node needs the warehouse client seam (ADR 0018)
     env_hints: tuple[str, ...]  # sorted, deduped env vars a standalone run of this script needs
+    connection_hints: tuple[str, ...]  # sorted, deduped LLM connection profile NAMES referenced
+    # by nodes whose credential can't be resolved to a real env var without I/O (ADR 0002)
 
 
 def _assemble(graph: Graph) -> _AssembledModule:
@@ -114,6 +153,32 @@ def _assemble(graph: Graph) -> _AssembledModule:
     needs_llm = False
     needs_warehouse = False
     env_hint_set: set[str] = set()
+    connection_hint_set: set[str] = set()
+
+    # Anchored notes: map each resolved target node id -> ordered list of
+    # comment-formatted note bodies. Built in graph insertion order for
+    # determinism when more than one note anchors to the same target (graph
+    # insertion order matters when UUID-based ids make topo-order unstable
+    # for zero-dependency nodes).
+    note_comments_by_target: dict[str, list[str]] = {}
+    for node_id in graph.nodes:
+        node = graph.nodes[node_id]
+        if node.type != _NOTE_NODE_TYPE:
+            continue
+        values = {p.name: p.value for p in node.params}
+        raw_anchor_id = values.get("anchor_id")
+        raw_content = values.get("content")
+        if not isinstance(raw_anchor_id, str) or not isinstance(raw_content, str):
+            continue
+        anchor_id: str = raw_anchor_id
+        content: str = raw_content
+        if not anchor_id or not content:
+            continue
+        target_id = _note_target_node_id(graph, anchor_id)
+        if target_id is None:
+            continue
+        note_comments_by_target.setdefault(target_id, []).append(content)
+
     for node_id in topo_order_ids:
         node = graph.nodes[node_id]
         definition_cls = get_node_definition(node.type)
@@ -121,7 +186,13 @@ def _assemble(graph: Graph) -> _AssembledModule:
         kinds = definition_cls.required_client_kinds()
         if ClientKind.LLM in kinds:
             needs_llm = True
-            for provider, api_key_env in provider_api_key_pairs(node):
+            for provider, api_key_env, llm_connection in provider_api_key_pairs(node):
+                if llm_connection:
+                    # A profile-name reference can't be resolved to a real env-var name here
+                    # without reading connections.toml (I/O), which compile_to_code must never
+                    # do (ADR 0002 purity) -- hint at the profile name itself instead.
+                    connection_hint_set.add(llm_connection)
+                    continue
                 # Best-effort hint only -- an unresolvable provider/api_key_env pair here is a
                 # real problem for an actual run (GatewayClient/the pre-flight check in
                 # emergentflow.llm.secrets will raise clearly when it matters), but
@@ -134,6 +205,8 @@ def _assemble(graph: Graph) -> _AssembledModule:
         ctx = build_codegen_context(node, name_map, wiring_map)
         fragment = definition.codegen(node, ctx)
         code_fragments.append(fragment)
+        for note_content in note_comments_by_target.get(node_id, []):
+            code_fragments.append(CodeFragment(imports=[], body=_format_note_comment(note_content)))
 
     # Step 5: Import collection
     all_imports: set[str] = set()
@@ -170,6 +243,7 @@ def _assemble(graph: Graph) -> _AssembledModule:
         needs_llm=needs_llm,
         needs_warehouse=needs_warehouse,
         env_hints=tuple(sorted(env_hint_set)),
+        connection_hints=tuple(sorted(connection_hint_set)),
     )
 
 
@@ -266,21 +340,24 @@ def compile_to_code(graph: Graph) -> str:
         main_call = "    _results = main()"
 
     # Step 7: Module assembly
-    if assembled.needs_llm and assembled.env_hints:
-        export_lines = "\n".join(f"    export {name}=..." for name in assembled.env_hints)
+    if assembled.needs_llm and (assembled.env_hints or assembled.connection_hints):
+        hint_lines = [f"    export {name}=..." for name in assembled.env_hints]
+        hint_lines += [
+            f"    uses LLM connection profile {name!r} -- configure it via the canvas's "
+            "Manage Connections panel or `emergentflow connections list`"
+            for name in assembled.connection_hints
+        ]
         docstring_body = (
             "Generated by Emergent Flow. Do not edit by hand.\n\n"
-            "This script calls an LLM provider. Before running it, set:\n"
-            f"{export_lines}"
+            "This script calls an LLM provider. Before running it, set:\n" + "\n".join(hint_lines)
         )
     else:
         docstring_body = "Generated by Emergent Flow. Do not edit by hand."
 
-    # `docstring_body` embeds env-var names sourced from the graph's `api_key_env`
-    # node params (free-text, no format validation, emergentflow/nodes/examples/
-    # llm_call.py) -- escape backslashes and double quotes so a value containing
-    # `"""` can't break out of the docstring literal and inject statements into
-    # the generated module (unlike the sibling `api_key_env!r` in each node's own
+    # `docstring_body` embeds env-var names (from `api_key_env` node params) and LLM connection
+    # profile names (from `llm_connection` node params) -- escape backslashes and double quotes
+    # so a value containing `"""` can't break out of the docstring literal and inject statements
+    # into the generated module (unlike the sibling `!r`-formatted values in each node's own
     # codegen, this hint is assembled here as raw text, not through `repr`).
     escaped_docstring_body = docstring_body.replace("\\", "\\\\").replace('"', '\\"')
     module_source = f'''

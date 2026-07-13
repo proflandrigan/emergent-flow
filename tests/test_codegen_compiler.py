@@ -25,6 +25,7 @@ from emergentflow.nodes.examples import (
 )
 from emergentflow.nodes.examples.eval_run import EvalRun
 from emergentflow.nodes.examples.llm_call import LlmCall
+from emergentflow.nodes.examples.markdown_note import MarkdownNote
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent
 
@@ -281,17 +282,18 @@ def test_llm_graph_docstring_hints_default_provider_env_var() -> None:
     assert source.index("export ANTHROPIC_API_KEY=...") < source.index("def main")
 
 
-def test_llm_graph_docstring_hints_explicit_api_key_env() -> None:
-    """An explicit api_key_env overrides the provider's conventional default."""
+def test_llm_graph_docstring_hints_llm_connection_profile_name() -> None:
+    """An llm_connection profile name is hinted by name (compile_to_code can't resolve it to a
+    real env-var name without I/O, which it must never do -- ADR 0002 purity)."""
     node = LlmCall().instantiate(
         messages=[{"role": "user", "content": "hi"}],
         provider="anthropic",
-        api_key_env="MY_CUSTOM_KEY",
+        llm_connection="my_anthropic_profile",
     )
     graph = _graph([node])
     source = compile_to_code(graph)
 
-    assert "export MY_CUSTOM_KEY=..." in source
+    assert "my_anthropic_profile" in source
     assert "export ANTHROPIC_API_KEY=..." not in source
 
 
@@ -317,17 +319,17 @@ def test_llm_graph_docstring_hints_deduped_across_variants() -> None:
 
 
 def test_llm_graph_docstring_hint_escapes_triple_quote_breakout() -> None:
-    """A malicious api_key_env can't break out of the generated docstring and inject code.
+    """A malicious llm_connection value can't break out of the generated docstring and inject code.
 
     Regression test: `compile_to_code` used to splice the resolved env-var name into the
-    module docstring unescaped, so an `api_key_env` value containing `\"\"\"` would terminate
+    module docstring unescaped, so an `llm_connection` value containing `\"\"\"` would terminate
     the docstring early and turn the rest of the value into live top-level statements in the
     emitted module.
     """
     node = LlmCall().instantiate(
         messages=[{"role": "user", "content": "hi"}],
         provider="anthropic",
-        api_key_env='X"""\nimport os\nos.system("echo pwned")\n#',
+        llm_connection='X"""\nimport os\nos.system("echo pwned")\n#',
     )
     graph = _graph([node])
     source = compile_to_code(graph)
@@ -368,3 +370,53 @@ assert 'emergentflow.codegen' in sys.modules
     )
     assert result.returncode == 0, f"Subprocess failed:\n{result.stderr}\n{result.stdout}"
     assert "compile_to_code" in ef.__all__
+
+
+class TestAnchoredNoteComments:
+    def test_note_anchored_to_node_emits_comment_after_it(self):
+        load_csv_node = LoadCsv().instantiate(path="x.csv")
+        note_node = MarkdownNote().instantiate(
+            content="Loaded the raw source file here.",
+            anchor_id=load_csv_node.id,
+        )
+        code = compile_to_code(_graph([load_csv_node, note_node]))
+        load_line_idx = code.index("ef.data.load_csv(")
+        comment_idx = code.index("Loaded the raw source file here.")
+        assert comment_idx > load_line_idx
+        assert "# --- Note ---" in code
+
+    def test_note_anchored_to_edge_emits_comment_after_target(self):
+        load_csv_node = LoadCsv().instantiate(path="x.csv")
+        impute_node = ImputeMissing().instantiate()
+        edge = Edge(
+            source=PortRef(node_id=load_csv_node.id, port_id=_out_port(load_csv_node, "frame").id),
+            target=PortRef(node_id=impute_node.id, port_id=_in_port(impute_node, "frame").id),
+        )
+        note_node = MarkdownNote().instantiate(
+            content="Why we impute right after loading.",
+            anchor_id=edge.id,
+        )
+        code = compile_to_code(_graph([load_csv_node, impute_node, note_node], edges=[edge]))
+        impute_line_idx = code.index("ef.clean.impute_missing(")
+        comment_idx = code.index("Why we impute right after loading.")
+        assert comment_idx > impute_line_idx
+
+    def test_unanchored_note_emits_nothing(self):
+        note_node = MarkdownNote().instantiate(content="Just a floating thought.")
+        code = compile_to_code(_graph([note_node]))
+        assert "Just a floating thought." not in code
+        assert "--- Note ---" not in code
+
+    def test_note_with_stale_anchor_does_not_raise(self):
+        note_node = MarkdownNote().instantiate(
+            content="Points at nothing real.", anchor_id="does-not-exist"
+        )
+        code = compile_to_code(_graph([note_node]))
+        assert "Points at nothing real." not in code
+
+    def test_two_notes_same_anchor_both_emitted_in_order(self):
+        load_csv_node = LoadCsv().instantiate(path="x.csv")
+        note_a = MarkdownNote().instantiate(content="First note.", anchor_id=load_csv_node.id)
+        note_b = MarkdownNote().instantiate(content="Second note.", anchor_id=load_csv_node.id)
+        code = compile_to_code(_graph([load_csv_node, note_a, note_b]))
+        assert code.index("First note.") < code.index("Second note.")

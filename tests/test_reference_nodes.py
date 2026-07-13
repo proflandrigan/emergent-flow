@@ -33,6 +33,7 @@ from emergentflow.nodes.examples import (
     LoadJson,
     LoadParquet,
     LoadSample,
+    MarkdownNote,
     Predict,
     SelectColumns,
     Summarize,
@@ -874,3 +875,51 @@ class TestApplyEstimator:
         frame_copy = df.copy()
         apply_defn.execute(apply_node, inputs={"model": model, "frame": frame_copy})
         assert frame_copy.equals(df)
+
+
+# ---------------------------------------------------------------------------
+# notes.markdown
+# ---------------------------------------------------------------------------
+
+
+class TestMarkdownNote:
+    def test_to_spec(self):
+        defn = MarkdownNote()
+        spec = defn.to_spec()
+        assert spec.type == "notes.markdown"
+        assert spec.ports == []
+        assert {p.name for p in spec.params} == {"content", "anchor_id", "color"}
+
+    def test_instantiate_defaults(self):
+        defn = MarkdownNote()
+        node = defn.instantiate()
+        assert node.ports == []
+        values = {p.name: p.value for p in node.params}
+        assert values["content"] == ""
+        assert values["anchor_id"] is None
+        assert values["color"] == "yellow"
+
+    def test_codegen_is_true_noop(self):
+        defn = MarkdownNote()
+        node = defn.instantiate(content="# Why this pipeline exists\n\nSome rationale.")
+        frag = defn.preview(node)
+        assert frag.imports == []
+        assert frag.body == ""
+
+    def test_execute_returns_empty_dict(self):
+        defn = MarkdownNote()
+        node = defn.instantiate(content="hello")
+        assert defn.execute(node, inputs={}) == {}
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code (both no-ops)."""
+        defn = MarkdownNote()
+        node = defn.instantiate(content="anything")
+        executed = defn.execute(node, inputs={})
+        scope: dict[str, object] = {}
+        _run_codegen(defn, node, scope)
+        # A true no-op: nothing bound in scope, empty dict returned by execute.
+        assert executed == {}
+        # exec adds __builtins__; no user variables should be set.
+        user_keys = {k for k in scope if not k.startswith("__")}
+        assert user_keys == set()

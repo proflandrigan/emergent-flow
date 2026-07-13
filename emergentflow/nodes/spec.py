@@ -118,6 +118,11 @@ class ValidationHints(IRModel):
     widget:
         UI widget hint, e.g. ``"text"``, ``"number"``, ``"select"``,
         ``"slider"``, ``"checkbox"``, ``"file"``.  Advisory only.
+    connection_kind:
+        When `widget == "connection"`, which connection-profile kind this param's dropdown
+        should be filtered to — `"warehouse"` or `"llm"`. `None` (the default) means
+        `"warehouse"`, matching every pre-existing `connection`-widget param, which predates
+        this field and was always warehouse-only.
     """
 
     min: float | None = None
@@ -128,6 +133,7 @@ class ValidationHints(IRModel):
     max_length: int | None = None
     pattern: str | None = None
     widget: str | None = None
+    connection_kind: str | None = None
 
 
 # ---------------------------------------------------------------------------

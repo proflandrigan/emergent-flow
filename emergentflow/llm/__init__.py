@@ -71,6 +71,7 @@ def call(
     response_format: str = "text",
     response_schema: dict[str, Any] | None = None,
     api_key_env: str | None = None,
+    llm_connection: str | None = None,
 ) -> LLMResponse:
     """Run one LLM completion call through *client* and return an `LLMResponse`.
 
@@ -104,6 +105,7 @@ def call(
         response_format=response_format,
         response_schema=response_schema,
         api_key_env=api_key_env,
+        llm_connection=llm_connection,
     )
     response = client.complete(request)
 

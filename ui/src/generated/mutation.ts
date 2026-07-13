@@ -56,6 +56,7 @@ export type DataType = string;
  */
 export type Direction = "in" | "out";
 export type Id2 = string;
+export type Label1 = string | null;
 export type Name1 = string;
 export type Ports = Port[];
 export type X = number;
@@ -245,12 +246,16 @@ export interface ArtifactRef {
  *     data_type: Data-type token (default "any"); validated against the type
  *         registry and resolved by inference during ``ef.validate``.
  *     cardinality: How many edges may attach (ONE or MANY; default ONE).
+ *     label: Optional human-friendly display label for the port, copied from
+ *         the originating ``PortSpec`` at instantiation time. Falls back to
+ *         ``name`` for display when unset.
  */
 export interface Port {
   cardinality?: Cardinality;
   data_type?: DataType;
   direction: Direction;
   id?: Id2;
+  label?: Label1;
   name: Name1;
 }
 /**

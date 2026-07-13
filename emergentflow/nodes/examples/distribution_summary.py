@@ -39,6 +39,7 @@ class DistributionSummary(NodeDefinition):
     ports = [
         PortSpec(
             name="frame",
+            label="Data",
             direction=Direction.IN,
             data_type="DataFrame",
             help="The input DataFrame whose numeric columns should be summarized.",
@@ -57,7 +58,7 @@ class DistributionSummary(NodeDefinition):
             default=None,
             label="Columns",
             help="Columns to summarize; empty/unset summarizes all numeric columns.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="column"),
         ),
     ]
 
