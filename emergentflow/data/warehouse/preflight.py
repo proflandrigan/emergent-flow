@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 from collections.abc import Collection
 
-from emergentflow.data.warehouse.credentials import required_env_vars
+from emergentflow.data.warehouse.credentials import IMPLICIT_AUTH_METHODS, required_env_vars
 from emergentflow.data.warehouse.profiles import ProfileStore
 from emergentflow.ir import Graph, Node
 
@@ -70,6 +70,10 @@ def validate_connections_present(
                 f"{', '.join(store.names()) or '<none>'}."
             )
         profile = store.get(name)
+        if profile.auth_method in IMPLICIT_AUTH_METHODS:
+            # ADC/implicit/none profiles resolve their credential outside credential_refs
+            # (gcloud ADC, libpq env vars/.pgpass) — nothing for pre-flight to check here.
+            continue
         for env_name in required_env_vars(profile):
             if not os.environ.get(env_name):
                 raise MissingConnectionCredentialError(
