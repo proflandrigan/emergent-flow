@@ -46,7 +46,7 @@ const STATUS_COLOR: Record<ServerStatus, string> = {
 // Estimated single-row height of the floating command bar (32px button row + --space-2
 // vertical padding on each side); panels below it use this to clear the bar with a gutter
 // gap, per spec `calc(100vh - 2*gutter - commandbar)`.
-const COMMAND_BAR_CLEARANCE = "calc(var(--space-4) * 2 + 56px)";
+export const COMMAND_BAR_CLEARANCE = "calc(var(--space-4) * 2 + 56px)";
 
 function Divider(): JSX.Element {
   return (

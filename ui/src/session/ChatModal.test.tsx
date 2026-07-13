@@ -394,3 +394,95 @@ test("the pill shows a working indicator while a turn is running", () => {
     "claude is working",
   );
 });
+
+test("the dock's close button calls onClose", () => {
+  useSessionStore.setState({
+    sessionId: "abc",
+    version: 0,
+    status: "connected",
+    chat: {
+      backend: "claude",
+      backend_thread_id: null,
+      turns: [
+        {
+          id: "turn-1",
+          backend: "claude",
+          user_message: "hello",
+          narration: [],
+          agent_message: "hi",
+          status: "completed",
+          error: null,
+        },
+      ],
+    },
+  });
+  const onClose = vi.fn();
+
+  render(<ChatModal onClose={onClose} />);
+  fireEvent.click(screen.getByTestId("chat-dock-close"));
+
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+test("a failed turn's activity log auto-expands", () => {
+  useSessionStore.setState({
+    sessionId: "abc",
+    version: 0,
+    status: "connected",
+    chat: {
+      backend: "claude",
+      backend_thread_id: null,
+      turns: [
+        {
+          id: "turn-1",
+          backend: "claude",
+          user_message: "add a cleaning step",
+          narration: ["proposing mutation: add node clean.drop_na"],
+          agent_message: null,
+          status: "failed",
+          error: "boom",
+        },
+      ],
+    },
+  });
+
+  render(<ChatModal onClose={vi.fn()} />);
+
+  const details = screen.getByTestId(
+    "chat-turn-activity",
+  ) as HTMLDetailsElement;
+  expect(details.open).toBe(true);
+  expect(screen.getByTestId("chat-turn-activity-summary")).toHaveTextContent(
+    "Worked through 1 step",
+  );
+});
+
+test("a completed turn's activity log stays collapsed by default", () => {
+  useSessionStore.setState({
+    sessionId: "abc",
+    version: 0,
+    status: "connected",
+    chat: {
+      backend: "claude",
+      backend_thread_id: null,
+      turns: [
+        {
+          id: "turn-1",
+          backend: "claude",
+          user_message: "add a cleaning step",
+          narration: ["proposing mutation: add node clean.drop_na"],
+          agent_message: "Added the node.",
+          status: "completed",
+          error: null,
+        },
+      ],
+    },
+  });
+
+  render(<ChatModal onClose={vi.fn()} />);
+
+  const details = screen.getByTestId(
+    "chat-turn-activity",
+  ) as HTMLDetailsElement;
+  expect(details.open).toBe(false);
+});
