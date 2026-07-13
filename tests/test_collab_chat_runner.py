@@ -210,3 +210,24 @@ class TestStopChatTurn:
 
         status = _wait_for_status(store, session.id, turn.id, timeout=10.0)
         assert status == ChatTurnStatus.INTERRUPTED
+
+    def test_stop_immediately_after_start_still_interrupts(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Regression test: stop_chat_turn called with NO delay, racing _run_turn's own
+        subprocess spawn -- closes the window where a fast Stop click (or a slow-to-cold-start
+        CLI) could leave the spawned process running unstopped even though the UI shows the
+        turn as interrupted. Without the _STOP_REQUESTED handshake this would very likely (not
+        just theoretically) resolve as COMPLETED after the full 30-second sleep script runs to
+        completion, timing out this test's 10-second wait."""
+        store = SessionStore()
+        monkeypatch.setattr(chat_runner, "get_default_store", lambda: store)
+        session = store.create()
+
+        turn = chat_runner.start_chat_turn(
+            session.id, "fake-chat-slow", "hello", base_url="http://127.0.0.1:8765"
+        )
+        chat_runner.stop_chat_turn(session.id, turn.id)
+
+        status = _wait_for_status(store, session.id, turn.id, timeout=10.0)
+        assert status == ChatTurnStatus.INTERRUPTED

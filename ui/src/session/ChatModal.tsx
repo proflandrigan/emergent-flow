@@ -14,7 +14,7 @@
 // chat" is disabled while the latest turn is RUNNING -- SessionStore.end_chat (server) doesn't
 // itself interrupt a running turn, so the UI must route through Stop first.
 
-import { useEffect, useState, type JSX } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
 
 import { Button } from "../ui/Button";
 import { OverlayModal } from "../ui/OverlayModal";
@@ -374,10 +374,23 @@ export function ChatModal({ onClose }: ChatModalProps): JSX.Element {
   const backend = useSessionStore((s) => s.chat.backend);
   const turns = useSessionStore((s) => s.chat.turns);
   const latestTurn = turns[turns.length - 1];
+  // Guards against React StrictMode's synchronous double-invoke of this effect on mount,
+  // which would otherwise fire createAndJoin() twice and orphan the first session -- the flag
+  // is set before the async call starts and cleared once it settles, so a StrictMode replay
+  // (which happens before the promise resolves) is skipped, but a later genuine retry (e.g.
+  // status flipping to "error") is not permanently blocked.
+  const autoCreateInFlight = useRef(false);
 
   useEffect(() => {
-    if (sessionId === null && status !== "connecting") {
-      void createAndJoin();
+    if (
+      sessionId === null &&
+      status !== "connecting" &&
+      !autoCreateInFlight.current
+    ) {
+      autoCreateInFlight.current = true;
+      void createAndJoin().finally(() => {
+        autoCreateInFlight.current = false;
+      });
     }
   }, [sessionId, status, createAndJoin]);
 

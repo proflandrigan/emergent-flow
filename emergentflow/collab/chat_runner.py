@@ -50,6 +50,14 @@ _PROTOCOL_DOC_PATH = (
 )
 
 _RUNNING_PROCESSES: dict[str, subprocess.Popen[str]] = {}
+# Registered synchronously in start_chat_turn, BEFORE the background thread is even started --
+# closes the race where stop_chat_turn is called before _run_turn has gotten far enough to
+# register its Popen in _RUNNING_PROCESSES (fast Stop click, or a slow-to-cold-start CLI). Both
+# _run_turn and stop_chat_turn only ever touch this (and _RUNNING_PROCESSES) while holding
+# _PROCESS_LOCK, so whichever of "spawn" and "stop" happens second always observes the other's
+# effect: a stop that lands first is seen by _run_turn right after it registers the process; a
+# stop that lands after registration finds the process directly. Popped once the turn resolves.
+_STOP_REQUESTED: dict[str, threading.Event] = {}
 _PROCESS_LOCK = threading.Lock()
 
 
@@ -112,6 +120,7 @@ def _run_turn(
     turn: ChatTurn,
     prompt: str,
     resume_id: str | None,
+    stop_event: threading.Event,
 ) -> None:
     adapter = get_adapter(backend)
     argv = adapter.build_command(prompt=prompt, resume_id=resume_id)
@@ -124,12 +133,19 @@ def _run_turn(
             bufsize=1,
         )
     except OSError as exc:
+        with _PROCESS_LOCK:
+            _STOP_REQUESTED.pop(turn.id, None)
         with contextlib.suppress(ChatTurnAlreadyResolvedError):
             store.fail_chat_turn(session_id, turn.id, error=f"failed to start {backend!r}: {exc}")
         return
 
     with _PROCESS_LOCK:
         _RUNNING_PROCESSES[turn.id] = proc
+        stop_already_requested = stop_event.is_set()
+    if stop_already_requested:
+        # stop_chat_turn ran before this point saw the process registered -- it already marked
+        # the turn INTERRUPTED, so just make sure the process it couldn't find gets killed too.
+        proc.terminate()
 
     try:
         assert proc.stdout is not None
@@ -139,6 +155,7 @@ def _run_turn(
     finally:
         with _PROCESS_LOCK:
             _RUNNING_PROCESSES.pop(turn.id, None)
+            _STOP_REQUESTED.pop(turn.id, None)
 
     try:
         if exit_code != 0:
@@ -188,9 +205,16 @@ def start_chat_turn(
     else:
         prompt = user_message
 
+    # Registered here, synchronously, BEFORE the background thread starts -- so a stop_chat_turn
+    # call racing the thread's own startup (fast Stop click, or a slow-to-cold-start CLI) always
+    # has a _STOP_REQUESTED entry to set, even if _run_turn hasn't reached Popen() yet.
+    stop_event = threading.Event()
+    with _PROCESS_LOCK:
+        _STOP_REQUESTED[turn.id] = stop_event
+
     thread = threading.Thread(
         target=_run_turn,
-        args=(store, session_id, backend, turn, prompt, resume_id),
+        args=(store, session_id, backend, turn, prompt, resume_id, stop_event),
         daemon=True,
     )
     thread.start()
@@ -200,7 +224,8 @@ def start_chat_turn(
 def stop_chat_turn(session_id: str, turn_id: str) -> None:
     """Interrupt a RUNNING chat turn: mark it INTERRUPTED first (so the background reader
     thread's own resolve attempt sees it already resolved and no-ops), then terminate its
-    subprocess (escalating to kill if it doesn't exit within 5 seconds).
+    subprocess (escalating to kill if it doesn't exit within 5 seconds) if one has been spawned
+    yet -- if not, setting the stop event makes _run_turn terminate it the moment it is.
 
     Raises
     ------
@@ -210,6 +235,9 @@ def stop_chat_turn(session_id: str, turn_id: str) -> None:
     store = get_default_store()
     store.interrupt_chat_turn(session_id, turn_id)
     with _PROCESS_LOCK:
+        stop_event = _STOP_REQUESTED.get(turn_id)
+        if stop_event is not None:
+            stop_event.set()
         proc = _RUNNING_PROCESSES.get(turn_id)
     if proc is not None:
         proc.terminate()
