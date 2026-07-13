@@ -20,19 +20,50 @@ Python — eliminating vendor lock-in and preserving true developer freedom.
 > **Status:** Phases 1–2 are implemented and CI-tested; Phase 3 is partially built. Done: the
 > graph IR with its node contract/registry and type-validated connections (Epics 1, 3); the
 > `ef.compile_to_code` / `ef.execute` codegen engine, including the declarative `nn.Module`
-> seam (Epic 2); a broad node library spanning data/clean/stats/viz, a full scikit-learn
-> adapter (Epic 8), data-warehouse connectors — DuckDB, Postgres, BigQuery, Redshift (Epic
-> 13) — and LLM nodes behind an injected, replayable client seam plus a Prompt Lab for
-> eval/labeling (Epic 9); the `ui/` canvas (React Flow + Zustand) and a bundled local
-> FastAPI server (`emergentflow serve`) with streaming execution, DAG-aware incremental
-> caching, and visual results (Epics 5–7); and a collaboration layer
-> (`emergentflow/collab/`) letting an AI agent — Claude Code, Shards, or any HTTP client —
-> propose graph edits as reviewable `GraphMutation`s alongside a human on the same canvas
-> (Epic 14). Still stubs: full multi-step agentic orchestration / LangGraph codegen (Epic
-> 10), RAG (Epic 11), and real-time multiplayer. See [`epics/README.md`](./epics/README.md)
-> for the epic-by-epic delivery status, the
+> seam (Epic 2); a broad node library spanning data/clean/stats/viz, dedicated per-family
+> statistical modeling nodes (linear regression, GLM, GAM, mixed models, Bayesian), feature
+> transformation nodes (scaling, encoding, discretization, feature generation), a full
+> scikit-learn adapter (Epic 8), SHAP-based model explainability with diagnostic plots
+> (ADR 0020), custom-code nodes for user-defined Python transforms, data-warehouse
+> connectors — DuckDB, Postgres, BigQuery, Redshift (Epic 13) — and LLM nodes behind an
+> injected, replayable client seam plus a Prompt Lab for eval/labeling (Epic 9); the `ui/`
+> canvas (React Flow + Zustand) with CodeMirror 6 code editing, column-aware parameter
+> widgets, expandable inspector panels, and markdown notes for graph annotation; a bundled
+> local FastAPI server (`emergentflow serve`) with streaming execution, DAG-aware incremental
+> caching, and visual results (Epics 5–7); a collaboration layer (`emergentflow/collab/`)
+> with an in-app agent chat panel and multi-backend agent adapters (Claude, Gemini, Codex,
+> OpenCode) letting an AI agent propose graph edits as reviewable `GraphMutation`s alongside a
+> human on the same canvas (Epic 14); and a unified connection manager for warehouse, LLM,
+> and agent profiles. Still stubs: full multi-step agentic orchestration / LangGraph codegen
+> (Epic 10), RAG (Epic 11), and real-time multiplayer. See
+> [`epics/README.md`](./epics/README.md) for the epic-by-epic delivery status, the
 > [Technical Roadmap](./planning_docs/technical_roadmap.md) for the engineering
 > decomposition, and the [Product Proposal](./planning_docs/proposal.md) for the vision.
+
+---
+
+## Installation
+
+```bash
+pip install emergentflow[server]  # SDK + server + bundled canvas
+emergentflow serve                # opens localhost:8765 in your browser
+```
+
+A bare `pip install emergentflow` installs the SDK for programmatic use (notebooks, scripts,
+CI). The `[server]` extra adds FastAPI/Uvicorn so `emergentflow serve` (alias `emergentflow lab`)
+can boot the local canvas. Optional extras for specific node families:
+
+```bash
+pip install emergentflow[llm]       # LiteLLM gateway for LLM nodes
+pip install emergentflow[explain]   # SHAP-based model explainability
+pip install emergentflow[bayes]     # Bayesian modeling (PyMC/Bambi/ArviZ)
+pip install emergentflow[bigquery]  # BigQuery warehouse adapter
+pip install emergentflow[postgres]  # Postgres warehouse adapter
+pip install emergentflow[redshift]  # Redshift warehouse adapter
+pip install emergentflow[mcp]       # MCP tool wrapper for agent collaboration
+```
+
+Combine extras as needed: `pip install emergentflow[server,llm,explain]`.
 
 ---
 
@@ -61,15 +92,17 @@ stack:
 
 ## Architecture
 
-Emergent Flow ships as **one repository and one bundled `pip install emergentflow`** — the
-JupyterLab model: the Python data-science engine *and* a local web canvas in a single install,
-launched with `emergentflow serve` (alias `ef lab`). The canvas and the SDK are separate
-toolchains that couple **only** through three published artifacts (the IR JSON Schema, the
-`compile_to_code` output string, and the connection-validation rules-as-data) — the UI never
-imports Python. See [ADR 0013](./docs/adr/0013-single-repo-bundled-ui-topology.md).
+Emergent Flow ships as **one repository and one bundled `pip install emergentflow[server]`** —
+the JupyterLab model: the Python data-science engine *and* a local web canvas in a single
+install, launched with `emergentflow serve` (alias `emergentflow lab`). A bare
+`pip install emergentflow` gives the SDK for programmatic use; the `[server]` extra adds
+FastAPI/Uvicorn for the canvas. The canvas and the SDK are separate toolchains that couple
+**only** through published contract artifacts (the IR JSON Schema, the node catalog, the
+`GraphMutation`/session-event schemas, and the connection-validation rules-as-data) — the UI
+never imports Python. See [ADR 0013](./docs/adr/0013-single-repo-bundled-ui-topology.md).
 
 ```
-            pip install emergentflow  →  emergentflow serve  (alias: ef lab)
+    pip install emergentflow[server]  →  emergentflow serve  (alias: emergentflow lab)
 ┌──────────────────────────────────────────────────────────┐
 │   ui/  —  CANVAS (React Flow / @xyflow, Zustand, Vite)    │  bundled into the wheel
 │         talks only via IR schema · codegen · rules-data  │  (never imports emergentflow)
@@ -86,7 +119,7 @@ imports Python. See [ADR 0013](./docs/adr/0013-single-repo-bundled-ui-topology.m
 ┌──────────────────────────────────────────────────────────┐
 │   emergentflow/  —  CORE PYTHON SDK & EXECUTION          │
 │  Pandas | Statsmodels | Scikit-Learn | Plotly | DuckDB    │
-│  SQLAlchemy/BigQuery/Redshift | LiteLLM | PyTorch (nn seam)│
+│  SHAP | SQLAlchemy/BigQuery/Redshift | LiteLLM | PyTorch  │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -144,7 +177,8 @@ consequences of each: [ADR 0001](./docs/adr/0001-graph-is-single-source-of-truth
 [ADR 0016](./docs/adr/0016-sklearn-estimator-adapter.md),
 [ADR 0017](./docs/adr/0017-llm-nodes-injected-effectful-client.md),
 [ADR 0018](./docs/adr/0018-data-source-connector-seam.md),
-[ADR 0019](./docs/adr/0019-graph-sessions-and-agent-collaboration.md).
+[ADR 0019](./docs/adr/0019-graph-sessions-and-agent-collaboration.md),
+[ADR 0020](./docs/adr/0020-model-explainability-family.md).
 
 ### Example of generated code
 
@@ -184,16 +218,19 @@ See the [Declarative Codegen Seam](./docs/codegen-declarative.md) for the worked
 
 | Layer | Technologies |
 | :--- | :--- |
-| **Canvas (`ui/` tree, bundled)** | React + `@xyflow/react` (React Flow), Zustand, Vite, TypeScript |
-| **Local server (`emergentflow/server/`)** | FastAPI + Uvicorn (optional `[server]` extra) — REST, SSE streaming execution, session/collab routes, in-process `ef.*` |
-| **Collaboration (`emergentflow/collab/`)** | `GraphMutation` proposals, sessions, review threads, gates, personas; optional MCP tool wrapper (`[mcp]` extra, FastMCP) — ADR 0019 |
+| **Canvas (`ui/` tree, bundled)** | React + `@xyflow/react` (React Flow), Zustand, CodeMirror 6, Vite, TypeScript |
+| **Local server (`emergentflow/server/`)** | FastAPI + Uvicorn (optional `[server]` extra) — REST, SSE streaming execution, session/collab routes, connection management, in-process `ef.*` |
+| **Collaboration (`emergentflow/collab/`)** | `GraphMutation` proposals, sessions, review threads, gates, personas, in-app agent chat, multi-backend agent adapters (Claude, Gemini, Codex, OpenCode); optional MCP tool wrapper (`[mcp]` extra, FastMCP) — ADR 0019 |
 | **Backend engine (hosted tier)** | Celery, Redis — *deferred to the hosted product (ADR 0013 / §A6)* |
 | **Data wrangling** | Pandas, PyArrow (Parquet) |
+| **Feature transforms (`emergentflow/nodes/examples/`)** | Scaling, categorical encoding, discretization, polynomial/interaction feature generation — all via scikit-learn |
 | **Data warehouses (`emergentflow/data/warehouse/`)** | DuckDB (in-process, credential-free), Postgres (SQLAlchemy + psycopg, `[postgres]`), BigQuery (`[bigquery]`), Redshift (`[redshift]`); sqlglot for dialect SQL — ADR 0018 |
-| **Statistics** | Statsmodels, SciPy; optional Bayesian family via PyMC/Bambi/ArviZ (`[bayes]`) |
+| **Statistics** | Statsmodels, SciPy; dedicated per-family nodes (linear regression, GLM, GAM, mixed models); optional Bayesian family via PyMC/Bambi/ArviZ (`[bayes]`) |
 | **Machine learning** | Scikit-Learn |
+| **Model explainability (`emergentflow/explain/`)** | SHAP-based feature attribution, error tables, diagnostic plots (residuals, calibration, ROC/PR, predicted-vs-actual) — optional `[explain]` extra for SHAP; diagnostic plots need no extra deps (ADR 0020) |
 | **Deep learning** | PyTorch (declarative `nn.Module` codegen seam; not a runtime dependency) |
 | **Visualization** | Plotly |
+| **Custom code (`emergentflow/script/`)** | User-defined `def transform(value)` Python nodes compiled and executed in-process |
 | **GenAI / LLM (`emergentflow/llm/`, `emergentflow/eval/`)** | LiteLLM gateway behind an injected client seam (`[llm]` extra), replay/record fixtures for offline CI, Prompt Lab eval/label/export — ADR 0017. Multi-agent orchestration (LangGraph) is planned, not yet implemented (Epic 10). |
 | **Diagnostics** | YData-Profiling |
 
@@ -221,11 +258,19 @@ auth/multi-tenancy/deploy — stays **deferred to the gated hosted product** (AD
 ### Phase 3 — Frontier (Deep Learning, GenAI & agents) — **in progress**
 Delivered so far: LLM/Prompt Lab nodes with an injected, replayable client seam and an
 eval/label/export workflow (Epic 9); data-warehouse connectors as a second injected-client
-seam (Epic 13); and agent collaboration — an AI agent proposes `GraphMutation`s that a human
-reviews on the same canvas via ghost-diffs, gates, and review threads (Epic 14, ADR 0019).
-Still ahead: visual PyTorch composition with real-time tensor-shape resolution, multi-step
-agentic orchestration / LangGraph codegen (Epic 10), RAG (Epic 11), and real-time
-multiplayer editing, with the IR designed CRDT-ready from the start.
+seam (Epic 13); agent collaboration with an in-app chat panel and multi-backend agent
+adapters (Claude, Gemini, Codex, OpenCode) — an AI agent proposes `GraphMutation`s that a
+human reviews on the same canvas via ghost-diffs, gates, and review threads (Epic 14,
+ADR 0019); dedicated per-family statistical modeling nodes (linear regression, GLM, GAM,
+mixed models, Bayesian); feature transformation nodes (scaling, encoding, discretization,
+feature generation); SHAP-based model explainability with diagnostic plots (ADR 0020);
+custom-code nodes for user-defined Python transforms; markdown notes for graph annotation;
+a unified connection manager for warehouse, LLM, and agent profiles; and canvas UX
+improvements including CodeMirror 6 code editing, column-aware parameter widgets, and
+expandable inspector panels. Still ahead: visual PyTorch composition with real-time
+tensor-shape resolution, multi-step agentic orchestration / LangGraph codegen (Epic 10),
+RAG (Epic 11), and real-time multiplayer editing, with the IR designed CRDT-ready from
+the start.
 
 ---
 
@@ -240,15 +285,18 @@ emergent-flow/
 │   ├── types/                # Type catalog, compatibility rules, rules-as-data artifact
 │   ├── data/                 # ef.data (+ data/warehouse/: DuckDB/Postgres/BigQuery/Redshift adapters, query builder)
 │   ├── clean, stats, ml, viz, reports/   # Reference node-family SDK wrappers
+│   ├── explain/              # SHAP-based model explainability and diagnostic plots (ADR 0020, [explain] extra)
+│   ├── script/               # Custom-code node: user-defined Python transform functions
+│   ├── connections/          # Unified connection-profile store (warehouse + LLM + agent, TOML-backed)
 │   ├── llm/                   # Injected LLM client seam (Gateway/Replay), prompt templating, budget/pricing
 │   ├── eval/                  # Prompt Lab eval run / label / export
-│   ├── collab/                # Agent collaboration: GraphMutation, sessions, gates, review, personas, MCP (Epic 14)
+│   ├── collab/                # Agent collaboration: sessions, chat, agent adapters, GraphMutation, gates, review, MCP (Epic 14)
 │   ├── server/                # Local FastAPI/Uvicorn server (ef.* in-process) — `emergentflow serve`
 │   ├── clients.py             # Injected-client bundle threaded through execute()/compiled main()
 │   ├── cli.py                 # `emergentflow` console entry point (serve / lab)
 │   └── api.py                 # @public_op decorator + inspectable-return contract
 ├── ui/                        # TypeScript/React canvas (Vite), bundled into the wheel — never imports emergentflow
-│   └── src/                   # canvas, palette, inspector, exec, session (collab UX), promptlab, connections, store
+│   └── src/                   # canvas, palette, inspector, exec, session (chat/collab UX), promptlab, connections, store
 ├── agents/                    # Persona files for AI agents collaborating on a graph over HTTP (Epic 14)
 ├── docs/
 │   ├── adr/                  # Architecture Decision Records (foundational decisions)
