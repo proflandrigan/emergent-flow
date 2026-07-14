@@ -32,6 +32,7 @@ _LAZY_FAMILIES = frozenset(
         "explain",
         "viz",
         "timeseries",
+        "recommend",
     }
 )
 
@@ -67,6 +68,7 @@ if TYPE_CHECKING:  # let type-checkers resolve ef.data, ef.codegen, ... statical
         explain,
         llm,
         ml,
+        recommend,
         reports,
         script,
         stats,
@@ -93,6 +95,7 @@ __all__ = [
     "stats",
     "timeseries",
     "ml",
+    "recommend",
     "reports",
     "script",
     "llm",

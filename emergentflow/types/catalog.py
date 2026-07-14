@@ -159,3 +159,25 @@ register_type(
         ),
     )
 )
+register_type(
+    TypeDef(
+        token="Recommender",
+        description=(
+            "A fitted recommender model produced by ef.recommend.fit (Epic 15): baseline, "
+            "content-based, collaborative, or deep-learning. Distinct from Epic 8's 'Model' and "
+            "Epic 12's 'StatsModel' -- it wires into recommend/evaluate/similar-items nodes, not "
+            "into a DataFrame input."
+        ),
+    )
+)
+register_type(
+    TypeDef(
+        token="InteractionMatrix",
+        description=(
+            "A prepared sparse user-item interaction dataset produced by "
+            "ef.recommend.prepare_interactions (Epic 15): wraps a scipy CSR matrix plus "
+            "user/item id mappings, inspectable via a tidy summary. Wires into recommender-fit "
+            "nodes, not into a plain DataFrame consumer."
+        ),
+    )
+)
