@@ -15,7 +15,7 @@
 // itself interrupt a running turn, so the UI must route through Stop first.
 
 import { useEffect, useRef, useState, type JSX } from "react";
-import { X } from "lucide-react";
+import { Maximize2, Minus, Minimize2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -23,9 +23,8 @@ import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
 import { Select } from "../ui/Select";
 import { COMMAND_BAR_CLEARANCE } from "../App";
-import { GatePanel } from "./GatePanel";
-import { ProposalPanel } from "./ProposalPanel";
-import { ReviewPanel } from "./ReviewPanel";
+import { OverlayModal } from "../ui/OverlayModal";
+
 import { getAvailableAgents, type ChatTurn } from "./sessionClient";
 import { useSessionStore } from "./sessionStore";
 
@@ -180,41 +179,116 @@ function ChatTurnActivity({ turn }: { turn: ChatTurn }): JSX.Element | null {
   if (turn.narration.length === 0) return null;
   const n = turn.narration.length;
   return (
-    <details
+    <div
       data-testid="chat-turn-activity"
-      open={open}
-      onToggle={(e) => setOpen(e.currentTarget.open)}
       style={{
         margin: "0 0 var(--space-1)",
-        color: "var(--text-secondary)",
         fontSize: "var(--text-sm)",
       }}
     >
-      <summary
+      <div
         data-testid="chat-turn-activity-summary"
-        style={{ cursor: "pointer" }}
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen((o) => !o);
+          }
+        }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--space-2)",
+          cursor: "pointer",
+          color: "var(--text-secondary)",
+          padding: "var(--space-1) 0",
+          borderLeft: "2px solid var(--border-subtle)",
+          paddingLeft: "var(--space-2)",
+          userSelect: "none",
+        }}
       >
-        Worked through {n} step{n === 1 ? "" : "s"}
-      </summary>
-      <div style={{ marginTop: "var(--space-1)" }}>
-        {turn.narration.map((line, i) => (
-          <div key={i}>&rarr; {line}</div>
-        ))}
+        <span
+          style={{
+            fontSize: "8px",
+            display: "inline-block",
+            transition: "transform 0.2s",
+            transform: open ? "rotate(90deg)" : "rotate(0deg)",
+          }}
+        >
+          &#9654;
+        </span>
+        Used {n} tool{n === 1 ? "" : "s"}
       </div>
-    </details>
+      {open ? (
+        <div
+          style={{
+            paddingLeft: "var(--space-3)",
+            borderLeft: "2px solid var(--border-subtle)",
+            marginLeft: 0,
+          }}
+        >
+          {turn.narration.map((line, i) => (
+            <div
+              key={i}
+              style={{
+                padding: "2px 0",
+                fontSize: "var(--text-xs)",
+                color: "var(--text-secondary)",
+              }}
+            >
+              <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                &rarr;
+              </span>{" "}
+              {line}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
 function ChatTurnView({ turn }: { turn: ChatTurn }): JSX.Element {
   return (
     <div data-testid="chat-turn" style={{ marginBottom: "var(--space-3)" }}>
-      <div style={{ marginBottom: "var(--space-1)" }}>
-        <strong>You:</strong> {turn.user_message}
+      <div
+        style={{
+          marginBottom: "var(--space-2)",
+          display: "flex",
+          justifyContent: "flex-end",
+        }}
+      >
+        <div
+          data-testid="chat-turn-user-message"
+          style={{
+            background: "rgba(59, 130, 246, 0.15)",
+            border: "1px solid rgba(59, 130, 246, 0.25)",
+            borderRadius: "var(--radius-md) var(--radius-md) 0 var(--radius-md)",
+            padding: "var(--space-2) var(--space-3)",
+            maxWidth: "85%",
+            fontSize: "var(--text-sm)",
+            color: "var(--text-primary)",
+          }}
+        >
+          {turn.user_message}
+        </div>
       </div>
       <ChatTurnActivity turn={turn} />
       {turn.status === "completed" && turn.agent_message !== null ? (
-        <div data-testid="chat-turn-agent-message">
-          <strong>Agent:</strong>
+        <div
+          data-testid="chat-turn-agent-message"
+          style={{
+            background: "rgba(255, 255, 255, 0.08)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            borderRadius: "0 var(--radius-md) var(--radius-md) var(--radius-md)",
+            padding: "var(--space-2) var(--space-3)",
+            maxWidth: "85%",
+            fontSize: "var(--text-sm)",
+            color: "var(--text-primary)",
+          }}
+        >
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {turn.agent_message}
           </ReactMarkdown>
@@ -358,33 +432,11 @@ function ActiveChat({ backend }: { backend: string }): JSX.Element {
   );
 }
 
-function ChatModalContent({
-  onCollapse,
-}: {
-  onCollapse: () => void;
-}): JSX.Element {
+function ChatModalContent(): JSX.Element {
   const backend = useSessionStore((s) => s.chat.backend);
   return (
     <div data-testid="chat-modal-content">
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          marginBottom: "var(--space-2)",
-        }}
-      >
-        <Button
-          variant="ghost"
-          data-testid="chat-collapse-button"
-          onClick={onCollapse}
-        >
-          Collapse
-        </Button>
-      </div>
       {backend === null ? <BackendPicker /> : <ActiveChat backend={backend} />}
-      <ProposalPanel />
-      <ReviewPanel />
-      <GatePanel />
     </div>
   );
 }
@@ -393,8 +445,10 @@ const MIN_CHAT_WIDTH = 360;
 const MAX_CHAT_WIDTH = 720;
 const DEFAULT_CHAT_WIDTH = 400;
 
+type ViewMode = "docked" | "collapsed" | "expanded";
+
 export function ChatModal({ onClose }: ChatModalProps): JSX.Element {
-  const [collapsed, setCollapsed] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("docked");
   const [chatWidth, setChatWidth] = useState<number>(() => {
     try {
       const stored = localStorage.getItem("ef-panel-chat-width");
@@ -433,13 +487,14 @@ export function ChatModal({ onClose }: ChatModalProps): JSX.Element {
   }, [sessionId, status, createAndJoin]);
 
   useEffect(() => {
-    if (collapsed) return;
+    if (viewMode === "collapsed") return;
+    if (viewMode === "expanded") return;
     function handleKeyDown(e: KeyboardEvent): void {
       if (e.key === "Escape") onClose();
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, collapsed]);
+  }, [onClose, viewMode]);
 
   useEffect(() => {
     try {
@@ -449,14 +504,65 @@ export function ChatModal({ onClose }: ChatModalProps): JSX.Element {
     }
   }, [chatWidth]);
 
-  if (collapsed) {
+  if (viewMode === "collapsed") {
     const label =
       backend === null
         ? "Chat"
         : latestTurn?.status === "running"
           ? `${backend} is working\u2026`
           : `${backend} chat`;
-    return <ChatPill label={label} onExpand={() => setCollapsed(false)} />;
+    return <ChatPill label={label} onExpand={() => setViewMode("docked")} />;
+  }
+
+  const chatBody =
+    sessionId === null ? (
+      <div data-testid="chat-connecting">
+        {status === "error" ? (
+          <div style={{ color: "var(--danger)" }}>
+            {error ?? "Failed to start a session."}
+          </div>
+        ) : (
+          <p style={{ color: "var(--text-secondary)" }}>
+            Starting session&hellip;
+          </p>
+        )}
+      </div>
+    ) : (
+      <ChatModalContent />
+    );
+
+  if (viewMode === "expanded") {
+    return (
+      <OverlayModal width={640} onClose={() => setViewMode("docked")}>
+        <div
+          data-testid="chat-expanded"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: "var(--space-2)",
+              right: "calc(var(--space-2) + 28px)",
+              display: "flex",
+              gap: "var(--space-1)",
+            }}
+          >
+            <IconButton
+              aria-label="Dock chat"
+              data-testid="chat-expanded-dock"
+              onClick={() => setViewMode("docked")}
+            >
+              <Minimize2 size={16} />
+            </IconButton>
+          </div>
+          {chatBody}
+        </div>
+      </OverlayModal>
+    );
   }
 
   return (
@@ -530,8 +636,23 @@ export function ChatModal({ onClose }: ChatModalProps): JSX.Element {
           display: "flex",
           justifyContent: "flex-end",
           padding: "var(--space-1)",
+          gap: "var(--space-1)",
         }}
       >
+        <IconButton
+          aria-label="Expand chat"
+          data-testid="chat-dock-expand"
+          onClick={() => setViewMode("expanded")}
+        >
+          <Maximize2 size={16} />
+        </IconButton>
+        <IconButton
+          aria-label="Minimize chat"
+          data-testid="chat-dock-minimize"
+          onClick={() => setViewMode("collapsed")}
+        >
+          <Minus size={16} />
+        </IconButton>
         <IconButton
           aria-label="Close chat"
           data-testid="chat-dock-close"
@@ -540,21 +661,7 @@ export function ChatModal({ onClose }: ChatModalProps): JSX.Element {
           <X size={16} />
         </IconButton>
       </div>
-      {sessionId === null ? (
-        <div data-testid="chat-connecting">
-          {status === "error" ? (
-            <div style={{ color: "var(--danger)" }}>
-              {error ?? "Failed to start a session."}
-            </div>
-          ) : (
-            <p style={{ color: "var(--text-secondary)" }}>
-              Starting session&hellip;
-            </p>
-          )}
-        </div>
-      ) : (
-        <ChatModalContent onCollapse={() => setCollapsed(true)} />
-      )}
+      {chatBody}
     </div>
   );
 }

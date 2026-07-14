@@ -10,9 +10,20 @@ const SERVER_ROUTES = [
   "/schema",
   "/catalog",
   "/compile",
+  "/compile-spec",
   "/validate",
   "/execute",
   "/execute_node",
+  "/sessions",
+  "/agents",
+  "/consult",
+  "/connections",
+  "/reports",
+  "/export",
+  "/personas",
+  "/knowledge",
+  "/mutation-schema",
+  "/session-event-schema",
 ];
 
 export default defineConfig({

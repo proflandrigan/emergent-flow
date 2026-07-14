@@ -251,6 +251,7 @@ test("renders each turn's user message, narration, and agent reply", () => {
 
   const turnEl = screen.getByTestId("chat-turn");
   expect(turnEl).toHaveTextContent("add a cleaning step");
+  fireEvent.click(screen.getByTestId("chat-turn-activity-summary"));
   expect(turnEl).toHaveTextContent(
     "proposing mutation: add node clean.drop_na",
   );
@@ -355,7 +356,7 @@ test("Collapse button switches to the pill view, which expands back on click", (
   render(<ChatModal onClose={vi.fn()} />);
   expect(screen.getByTestId("chat-active-view")).toBeInTheDocument();
 
-  fireEvent.click(screen.getByTestId("chat-collapse-button"));
+  fireEvent.click(screen.getByTestId("chat-dock-minimize"));
 
   expect(screen.queryByTestId("chat-active-view")).not.toBeInTheDocument();
   expect(screen.getByTestId("chat-modal-pill")).toHaveTextContent("claude chat");
@@ -388,7 +389,7 @@ test("the pill shows a working indicator while a turn is running", () => {
   });
 
   render(<ChatModal onClose={vi.fn()} />);
-  fireEvent.click(screen.getByTestId("chat-collapse-button"));
+  fireEvent.click(screen.getByTestId("chat-dock-minimize"));
 
   expect(screen.getByTestId("chat-modal-pill")).toHaveTextContent(
     "claude is working",
@@ -448,12 +449,10 @@ test("a failed turn's activity log auto-expands", () => {
 
   render(<ChatModal onClose={vi.fn()} />);
 
-  const details = screen.getByTestId(
-    "chat-turn-activity",
-  ) as HTMLDetailsElement;
-  expect(details.open).toBe(true);
+  const activity = screen.getByTestId("chat-turn-activity");
+  expect(activity).toHaveTextContent("proposing mutation");
   expect(screen.getByTestId("chat-turn-activity-summary")).toHaveTextContent(
-    "Worked through 1 step",
+    "Used 1 tool",
   );
 });
 
@@ -481,8 +480,6 @@ test("a completed turn's activity log stays collapsed by default", () => {
 
   render(<ChatModal onClose={vi.fn()} />);
 
-  const details = screen.getByTestId(
-    "chat-turn-activity",
-  ) as HTMLDetailsElement;
-  expect(details.open).toBe(false);
+  const activity = screen.getByTestId("chat-turn-activity");
+  expect(activity).not.toHaveTextContent("proposing mutation");
 });

@@ -18,6 +18,7 @@ import { Inspector } from "./inspector/Inspector";
 import { IRToolbar } from "./io/IRToolbar";
 import { Palette } from "./palette/Palette";
 import { useGraphStore } from "./store/graphStore";
+import { useSessionStore } from "./session/sessionStore";
 import { useTheme } from "./theme/useTheme";
 import { IconButton } from "./ui/IconButton";
 import { Menu, type MenuItem } from "./ui/Menu";
@@ -68,6 +69,7 @@ export function App(): JSX.Element {
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const past = useGraphStore((s) => s.past);
   const future = useGraphStore((s) => s.future);
+  const sessionId = useSessionStore((s) => s.sessionId);
   const canUndo = past.length > 0;
   const canRedo = future.length > 0;
   const { theme, toggleTheme } = useTheme();
@@ -220,7 +222,7 @@ export function App(): JSX.Element {
       },
     },
     {
-      label: "Start chat",
+      label: sessionId !== null ? "Open chat" : "Start chat",
       onSelect: () => {
         setChatModalOpen(true);
         setMenuOpen(false);
