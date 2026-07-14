@@ -64,6 +64,21 @@ server surface — and records the works-without-agents invariant that governs
 | :-- | :------- | :----- |
 | [0019](./0019-graph-sessions-and-agent-collaboration.md) | Graph sessions and agent collaboration: stateful sessions beside a stateless IR; collaboration state never on the `Graph`; optimistic concurrency; HTTP-first agent surface; gate policy at the routes; works-without-agents enforced by regression suite | Accepted |
 
+The following decision introduces SHAP-based explainability and error analysis as a new `explain`
+family; it governs Epic 11 (Model Explainability).
+
+| ADR | Decision | Status |
+| :-- | :------- | :----- |
+| [0020](./0020-model-explainability-family.md) | SHAP-based explainability and error analysis is a new `explain` family, a pure allow-listed reader of `ml.FittedModel` | Accepted |
+
+The following decision locks the recommender-systems architecture — archetypes, representations,
+and the optional-extra boundary; it governs [Epic 15](../../epics/epic-15-recommender-systems.md)
+(Recommender Systems).
+
+| ADR | Decision | Status |
+| :-- | :------- | :----- |
+| [0021](./0021-recommender-systems-architecture.md) | Recommender systems are a parallel `recommend` family with their own archetypes, representations, and optional-extra boundary — not an extension of the sklearn estimator adapter | Accepted |
+
 ## Conventions
 
 - Filenames: `NNNN-kebab-case-title.md`, numbered sequentially from `0001`.
