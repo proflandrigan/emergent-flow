@@ -24,13 +24,15 @@ def test_postgres_explicit_auth_engine_creation() -> None:
     from emergentflow.data.warehouse.adapters.postgres_adapter import PostgresAdapter
 
     adapter = PostgresAdapter()
-    engine = adapter._engine({
-        "host": "db.internal",
-        "port": "5432",
-        "database": "mydb",
-        "user": "admin",
-        "password": "secret",
-    })
+    engine = adapter._engine(
+        {
+            "host": "db.internal",
+            "port": "5432",
+            "database": "mydb",
+            "user": "admin",
+            "password": "secret",
+        }
+    )
     url_str = str(engine.url)
     assert "admin" in url_str
     assert "db.internal" in url_str
