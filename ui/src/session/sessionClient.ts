@@ -280,7 +280,9 @@ export interface SessionEventSubscription {
 // (matches the server's plain `data: <json>\n\n` SSE frames with no custom event name, so
 // `onmessage` receives every frame directly). Falls back to polling GET /sessions/{id} when
 // EventSource is unavailable (e.g. some test/SSR environments): on every version bump it
-// synthesizes a `graph_replaced` event so callers behave the same regardless of transport.
+// synthesizes a `graph_replaced` event, and on any change to the chat state (which never
+// bumps `version` -- see the poll loop below) a `chat_narration_added` event, so callers
+// behave the same regardless of transport.
 export function subscribeToSessionEvents(
   sessionId: string,
   onEvent: (event: SessionEvent) => void,
@@ -305,6 +307,13 @@ export function subscribeToSessionEvents(
   }
 
   let lastVersion: number | null = null;
+  // Chat turns (start/narrate/complete/fail) never bump `session.version` -- only the two
+  // graph-mutation paths in collab/session.py do -- so version alone can't detect a chat
+  // update. Track a snapshot of the chat state too, and synthesize an event on either
+  // changing, or a chat turn started/streamed/finished while polling would silently never
+  // reach the UI (it would sit on "working..." until an unrelated version bump happened to
+  // trigger a refetch).
+  let lastChatSnapshot: string | null = null;
   let stopped = false;
   const intervalMs = options?.pollIntervalMs ?? 2000;
 
@@ -315,14 +324,22 @@ export function subscribeToSessionEvents(
     if (typeof document === "undefined" || !document.hidden) {
       try {
         const session = await getSession(sessionId);
+        const chatSnapshot = JSON.stringify(session.collab?.chat ?? null);
         if (lastVersion !== null && session.version !== lastVersion) {
           onEvent({
             type: "graph_replaced",
             session_id: sessionId,
             version: session.version,
           });
+        } else if (lastChatSnapshot !== null && chatSnapshot !== lastChatSnapshot) {
+          onEvent({
+            type: "chat_narration_added",
+            session_id: sessionId,
+            version: session.version,
+          });
         }
         lastVersion = session.version;
+        lastChatSnapshot = chatSnapshot;
       } catch {
         // Network hiccup -- try again next tick rather than tearing down the subscription.
       }

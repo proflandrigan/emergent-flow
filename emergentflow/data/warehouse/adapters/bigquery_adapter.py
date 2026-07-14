@@ -70,7 +70,7 @@ class BigQueryAdapter:
         elapsed_ms = (time.monotonic() - start) * 1000
 
         truncated = False
-        if request.max_rows is not None and len(df) >= request.max_rows:
+        if request.max_rows is not None and len(df) > request.max_rows:
             df = df.head(request.max_rows)
             truncated = True
 

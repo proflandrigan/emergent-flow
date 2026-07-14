@@ -274,3 +274,35 @@ class TestTools:
         assert isinstance(result, dict)
         assert result["status"] == "timeout"
         assert result["proposal_id"] == proposal.id
+
+    def test_await_verdict_unknown_proposal_fails_fast(self) -> None:
+        """An unknown proposal_id must raise immediately, not block for the full timeout.
+
+        Regression test: await_verdict used to fall through into the poll loop for a
+        nonexistent proposal_id (no early return, no matching event possible), blocking
+        for the entire timeout_seconds window before returning an indistinguishable
+        {"status": "timeout"}.
+        """
+        import time
+
+        from fastmcp.exceptions import ToolError
+
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+
+        mcp = create_mcp_server()
+        start = time.monotonic()
+        with pytest.raises(ToolError):
+            _run_async(
+                _call_tool(
+                    mcp,
+                    "await_verdict",
+                    {
+                        "session_id": session.id,
+                        "proposal_id": "does-not-exist",
+                        "timeout_seconds": 5.0,
+                    },
+                )
+            )
+        assert time.monotonic() - start < 1.0

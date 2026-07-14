@@ -229,6 +229,30 @@ def test_tuple_typed_param_accepts_list_override() -> None:
 
 
 # ---------------------------------------------------------------------------
+# 4b. A sparse-output transformer (OneHotEncoder with sparse_output=True, a legal
+#     caller-supplied override) must produce dense component columns, not crash.
+# ---------------------------------------------------------------------------
+
+
+def test_sparse_output_estimator_produces_dense_component_columns() -> None:
+    """``OneHotEncoder``'s ``sparse_output`` kwarg is caller-overridable through the free-form
+    ``params`` dict. When True, ``.fit_transform()`` returns a scipy.sparse matrix; ``ml.
+    fit_transform`` must densify it before assigning component columns rather than raising
+    ``ValueError: Columns must be same length as key``."""
+    df = _fit_transform_df()
+    fit_defn = FitTransform()
+    fit_node = fit_defn.instantiate(
+        estimator="OneHotEncoder",
+        features=["cat"],
+        params={"sparse_output": True},
+    )
+    result = fit_defn.execute(fit_node, inputs={"frame": df})["result"]
+    component_cols = [c for c in result.columns if c.startswith("component_")]
+    assert component_cols
+    assert set(result[component_cols].to_numpy().ravel()) <= {0.0, 1.0}
+
+
+# ---------------------------------------------------------------------------
 # 5. SelectKBest.score_func: the curated default (f_classif) must not silently degenerate to
 #    NaN scores for a continuous (regression) target -- score_func must be overridable.
 # ---------------------------------------------------------------------------

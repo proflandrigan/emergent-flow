@@ -50,6 +50,7 @@ def create_mcp_server() -> Any:
     mcp = fastmcp.FastMCP("emergent-flow-collaboration")
 
     from emergentflow.collab.review import ReviewThread
+    from emergentflow.collab.session import UnknownProposalError
     from emergentflow.collab.session import get_default_store as get_default_session_store
     from emergentflow.ir.mutation import GraphMutation
     from emergentflow.server.service import (
@@ -131,14 +132,19 @@ def create_mcp_server() -> Any:
         ``proposal_rejected`` event whose ``proposal_id`` matches. Returns immediately
         if the proposal already has a verdict (e.g. it was resolved before this tool was
         called) or when a matching event arrives, else ``{"status": "timeout", ...}``
-        once the deadline is exceeded.
+        once the deadline is exceeded. Raises ``UnknownProposalError`` immediately for an
+        unknown *proposal_id* rather than blocking for the full timeout.
         """
         store = get_default_session_store()
         q = store.subscribe(session_id)
         start = time.monotonic()
         try:
-            proposal = store.get(session_id).proposals.get(proposal_id)
-            if proposal is not None and proposal.status.value != "pending":
+            if proposal_id not in store.get(session_id).proposals:
+                raise UnknownProposalError(
+                    f"no proposal with id {proposal_id!r} on session {session_id!r}."
+                )
+            proposal = store.get(session_id).proposals[proposal_id]
+            if proposal.status.value != "pending":
                 return {
                     "status": proposal.status.value,
                     "session_id": session_id,

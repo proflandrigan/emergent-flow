@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 import pandas as pd
+import scipy.sparse as sp
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import (
@@ -546,6 +547,9 @@ def fit_transform(
         transformed = est.fit_transform(df[feature_names], df[target])
     else:
         transformed = est.fit_transform(df[feature_names])
+
+    if sp.issparse(transformed):
+        transformed = transformed.toarray()
 
     component_cols = [f"component_{i}" for i in range(transformed.shape[1])]
     collisions = [c for c in component_cols if c in df.columns]
