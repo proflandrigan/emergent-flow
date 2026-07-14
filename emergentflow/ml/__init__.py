@@ -979,7 +979,7 @@ def compare_models(
             # MultinomialNB on negative features) must not abort comparing the rest; its row
             # is marked failed instead, mirroring how sklearn's own cross_validate already
             # degrades a PARTIAL fold failure to NaN rather than raising.
-            row["status"] = str(exc).strip().splitlines()[0][:200]
+            row["status"] = (str(exc).strip().splitlines() or ["Unknown error"])[0][:200]
             for metric_name in scoring:
                 row[metric_name] = float("nan")
             row["fit_time"] = float("nan")
