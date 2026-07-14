@@ -147,6 +147,14 @@ def _prepare_interactions(
     The single shared validation gate for the recommend family (Epic 15, Story 3). See the
     module-level docstring of ``emergentflow.recommend.interactions`` for the full contract.
 
+    ``min_user_interactions``/``min_item_interactions`` filtering (``cold_start_mode=
+    "warn-and-skip"``) is applied to a fixed point: dropping low-count items can knock a
+    previously-fine user's remaining interaction count below ``min_user_interactions`` (and
+    vice versa), so counts are recomputed and the drop repeated until neither threshold is
+    violated by what remains. ``cold_start_mode="error"`` only inspects the pre-filter counts
+    and raises if *any* user/item would need dropping -- it never partially filters, so no
+    cascade can occur there.
+
     Never mutates *df*.
     """
     columns = set(df.columns)
@@ -188,10 +196,9 @@ def _prepare_interactions(
         resolved_value_col = "__interaction_count__"
 
     if min_user_interactions > 0 or min_item_interactions > 0:
-        item_counts = deduped[item_col].value_counts()
-        user_counts = deduped[user_col].value_counts()
-
         if cold_start_mode == "error":
+            item_counts = deduped[item_col].value_counts()
+            user_counts = deduped[user_col].value_counts()
             low_items = item_counts[item_counts < min_item_interactions]
             low_users = user_counts[user_counts < min_user_interactions]
             if not low_items.empty or not low_users.empty:
@@ -210,18 +217,32 @@ def _prepare_interactions(
                     f"cold-start filter would drop {'; '.join(parts)}."
                 )
         elif cold_start_mode == "warn-and-skip":
-            low_items = item_counts[item_counts < min_item_interactions]
-            low_users = user_counts[user_counts < min_user_interactions]
-            if not low_items.empty or not low_users.empty:
-                parts = []
+            dropped_users: set[Any] = set()
+            dropped_items: set[Any] = set()
+            while True:
+                item_counts = deduped[item_col].value_counts()
+                user_counts = deduped[user_col].value_counts()
+                low_items = item_counts[item_counts < min_item_interactions]
+                low_users = user_counts[user_counts < min_user_interactions]
+                if low_items.empty and low_users.empty:
+                    break
+                dropped_items.update(low_items.index)
+                dropped_users.update(low_users.index)
+                if not low_items.empty:
+                    deduped = deduped[~deduped[item_col].isin(low_items.index)]
                 if not low_users.empty:
+                    deduped = deduped[~deduped[user_col].isin(low_users.index)]
+
+            if dropped_users or dropped_items:
+                parts = []
+                if dropped_users:
                     parts.append(
-                        f"{len(low_users)} user(s) below "
+                        f"{len(dropped_users)} user(s) below "
                         f"min_user_interactions={min_user_interactions}"
                     )
-                if not low_items.empty:
+                if dropped_items:
                     parts.append(
-                        f"{len(low_items)} item(s) below "
+                        f"{len(dropped_items)} item(s) below "
                         f"min_item_interactions={min_item_interactions}"
                     )
                 warnings.warn(
@@ -229,10 +250,6 @@ def _prepare_interactions(
                     UserWarning,
                     stacklevel=2,
                 )
-            if not low_items.empty:
-                deduped = deduped[~deduped[item_col].isin(low_items.index)]
-            if not low_users.empty:
-                deduped = deduped[~deduped[user_col].isin(low_users.index)]
 
     return InteractionMatrix.from_dataframe(
         deduped,

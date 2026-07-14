@@ -12,6 +12,10 @@ correctness, and ``Recommender``/``InteractionMatrix`` type-token catalog regist
 3. **Type-token compatibility (Part C):** ``Recommender`` and ``InteractionMatrix``
    are registered in the default type catalog, are subtypes of ``any``, are flat
    (unrelated to ``DataFrame`` or each other), and are self-compatible.
+4. **Cold-start filtering (Part D):** ``min_user_interactions``/``min_item_interactions``
+   filtering under every ``cold_start_mode`` -- including the cascade case where dropping
+   low-count items pushes a user below ``min_user_interactions`` (and vice versa), which
+   the gate must resolve to a fixed point rather than leaving stragglers below threshold.
 """
 
 from __future__ import annotations
@@ -28,7 +32,7 @@ from emergentflow.ir.common import Direction
 from emergentflow.ir.edge import Edge, PortRef
 from emergentflow.ir.graph import Graph
 from emergentflow.nodes.examples import LoadSample, PrepareInteractions
-from emergentflow.recommend import random_split, temporal_split
+from emergentflow.recommend import prepare_interactions, random_split, temporal_split
 from emergentflow.recommend.errors import InvalidRecommenderParamsError
 from emergentflow.types import registry
 from emergentflow.types.compatibility import Compatibility, is_compatible
@@ -293,3 +297,80 @@ def test_recommender_and_interaction_matrix_self_compatible() -> None:
     assert result.verdict == Compatibility.COMPATIBLE
     result = is_compatible("InteractionMatrix", "InteractionMatrix")
     assert result.verdict == Compatibility.COMPATIBLE
+
+
+# ---------------------------------------------------------------------------
+# Part D — cold-start filtering (min_user_interactions / min_item_interactions)
+# ---------------------------------------------------------------------------
+
+
+def test_warn_and_skip_resolves_cascade_to_a_fixed_point() -> None:
+    """u1 has 2 interactions (i1, i2) and clears min_user_interactions=2 on the raw counts,
+    but i1 is a singleton and gets dropped as a low-count item; that leaves u1 with only 1
+    interaction, which must also be dropped rather than silently left below threshold."""
+    df = pd.DataFrame(
+        {
+            "user": ["u1", "u1", "u2"],
+            "item": ["i1", "i2", "i2"],
+        }
+    )
+    with pytest.warns(UserWarning):
+        im = prepare_interactions(
+            df,
+            user_col="user",
+            item_col="item",
+            min_user_interactions=2,
+            min_item_interactions=2,
+            cold_start_mode="warn-and-skip",
+        )
+    assert im.n_interactions == 0
+    assert im.user_ids == []
+    assert im.item_ids == []
+
+
+def test_warn_and_skip_keeps_every_remaining_user_and_item_above_threshold() -> None:
+    df = pd.DataFrame(
+        {
+            "user": ["u1", "u1", "u1", "u2", "u2", "u3"],
+            "item": ["i1", "i2", "i3", "i2", "i3", "i3"],
+        }
+    )
+    with pytest.warns(UserWarning):
+        im = prepare_interactions(
+            df,
+            user_col="user",
+            item_col="item",
+            min_user_interactions=2,
+            min_item_interactions=2,
+            cold_start_mode="warn-and-skip",
+        )
+    for uid in im.user_ids:
+        assert im.matrix[im.user_index[uid]].nnz >= 2
+    for iid in im.item_ids:
+        assert im.matrix[:, im.item_index[iid]].nnz >= 2
+
+
+def test_error_mode_raises_on_below_threshold_counts() -> None:
+    df = pd.DataFrame({"user": ["u1", "u2"], "item": ["i1", "i1"]})
+    with pytest.raises(InvalidRecommenderParamsError):
+        prepare_interactions(
+            df,
+            user_col="user",
+            item_col="item",
+            min_user_interactions=2,
+            cold_start_mode="error",
+        )
+
+
+def test_include_mode_does_not_filter() -> None:
+    df = pd.DataFrame({"user": ["u1", "u2"], "item": ["i1", "i1"]})
+    im = prepare_interactions(
+        df,
+        user_col="user",
+        item_col="item",
+        min_user_interactions=2,
+        min_item_interactions=2,
+        cold_start_mode="include",
+    )
+    assert im.n_interactions == 2
+    assert set(im.user_ids) == {"u1", "u2"}
