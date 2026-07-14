@@ -53,6 +53,8 @@ from sklearn.ensemble import (
     RandomForestRegressor,
 )
 from sklearn.feature_selection import (
+    RFE,
+    SelectFromModel,
     SelectKBest,
     VarianceThreshold,
     f_classif,
@@ -1108,6 +1110,7 @@ register_estimator(
         import_path="sklearn.feature_selection.SelectKBest",
         sklearn_class=SelectKBest,
         archetype="fit_transform",
+        is_feature_selector=True,
         accepted_kwargs={
             "k": KwargSpec(default=10, help="Number of top features to select."),
             "score_func": KwargSpec(
@@ -1134,10 +1137,64 @@ register_estimator(
         import_path="sklearn.feature_selection.VarianceThreshold",
         sklearn_class=VarianceThreshold,
         archetype="fit_transform",
+        is_feature_selector=True,
         accepted_kwargs={
             "threshold": KwargSpec(
                 default=0.0, help="Features with variance below this are removed."
             ),
+        },
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="RFE",
+        description="Recursively eliminates the lowest-ranked features using a fit-archetype "
+        "estimator's coefficients or feature importances.",
+        import_path="sklearn.feature_selection.RFE",
+        sklearn_class=RFE,
+        archetype="fit_transform",
+        is_feature_selector=True,
+        accepted_kwargs={
+            "estimator": KwargSpec(
+                default="LogisticRegression",
+                estimator_ref=True,
+                help="Fit-archetype estimator used to rank features via coef_/"
+                "feature_importances_.",
+            ),
+            "n_features_to_select": KwargSpec(
+                default=None,
+                help="Number (int) or fraction (float) of features to select; unset selects half.",
+            ),
+            "step": KwargSpec(
+                default=1,
+                help="Number (int) or fraction (float) of features to remove at each iteration.",
+            ),
+        },
+    )
+)
+
+register_estimator(
+    EstimatorSpec(
+        key="SelectFromModel",
+        description="Selects features whose importance/coefficient from a fit-archetype "
+        "estimator meets a threshold.",
+        import_path="sklearn.feature_selection.SelectFromModel",
+        sklearn_class=SelectFromModel,
+        archetype="fit_transform",
+        is_feature_selector=True,
+        accepted_kwargs={
+            "estimator": KwargSpec(
+                default="RandomForestClassifier",
+                estimator_ref=True,
+                help="Fit-archetype estimator whose feature_importances_/coef_ scores features.",
+            ),
+            "threshold": KwargSpec(
+                default=None,
+                help="Importance threshold below which features are dropped; unset uses "
+                "the estimator's default heuristic ('mean').",
+            ),
+            "max_features": KwargSpec(default=None, help="Maximum number of features to select."),
         },
     )
 )

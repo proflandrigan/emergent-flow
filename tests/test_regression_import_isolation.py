@@ -21,6 +21,7 @@ _EXPECTED_BASE_DEPENDENCIES = [
     "pandas>=2,<3",
     "statsmodels>=0.14,<1",
     "scikit-learn>=1.4",
+    "tqdm>=4,<5",
     "scipy>=1.10",
     "pyarrow>=15",
     "plotly>=5,<7",
