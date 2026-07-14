@@ -1686,6 +1686,39 @@
       "task": "classification"
     },
     {
+      "archetype": "fit_transform",
+      "category": "Feature Selection",
+      "description": "Recursively eliminates the lowest-ranked features using a fit-archetype estimator's coefficients or feature importances.",
+      "import_path": "sklearn.feature_selection.RFE",
+      "key": "RFE",
+      "label": "RFE",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "choices": null,
+          "default": "LogisticRegression",
+          "help": "Fit-archetype estimator used to rank features via coef_/feature_importances_.",
+          "name": "estimator",
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number (int) or fraction (float) of features to select; unset selects half.",
+          "name": "n_features_to_select",
+          "type": "any"
+        },
+        {
+          "choices": null,
+          "default": 1,
+          "help": "Number (int) or fraction (float) of features to remove at each iteration.",
+          "name": "step",
+          "type": "int"
+        }
+      ],
+      "task": null
+    },
+    {
       "archetype": "fit",
       "category": "Ensemble",
       "description": "An ensemble of randomized decision trees combined by majority vote for classification.",
@@ -1941,6 +1974,39 @@
         }
       ],
       "task": "regression"
+    },
+    {
+      "archetype": "fit_transform",
+      "category": "Feature Selection",
+      "description": "Selects features whose importance/coefficient from a fit-archetype estimator meets a threshold.",
+      "import_path": "sklearn.feature_selection.SelectFromModel",
+      "key": "SelectFromModel",
+      "label": "Select From Model",
+      "node_type": "ml.fit_transform",
+      "params": [
+        {
+          "choices": null,
+          "default": "RandomForestClassifier",
+          "help": "Fit-archetype estimator whose feature_importances_/coef_ scores features.",
+          "name": "estimator",
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Maximum number of features to select.",
+          "name": "max_features",
+          "type": "any"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Importance threshold below which features are dropped; unset uses the estimator's default heuristic ('mean').",
+          "name": "threshold",
+          "type": "any"
+        }
+      ],
+      "task": null
     },
     {
       "archetype": "fit_transform",
@@ -4220,6 +4286,174 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "description": "Cross-validate multiple curated estimators and rank them by held-out score.",
+      "family": "ml",
+      "label": "Compare Models",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Whether to compare classifiers or regressors.",
+          "hints": {
+            "choices": [
+              "classification",
+              "regression"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Task",
+          "name": "task",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to use as features; empty/unset uses every other column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Subset of curated fit-archetype estimators to compare; empty/unset compares every curated estimator matching the chosen task.",
+          "hints": {
+            "choices": [
+              "AdaBoostClassifier",
+              "AdaBoostRegressor",
+              "BaggingClassifier",
+              "BaggingRegressor",
+              "DecisionTreeClassifier",
+              "DecisionTreeRegressor",
+              "ElasticNet",
+              "ExtraTreesClassifier",
+              "ExtraTreesRegressor",
+              "GaussianNB",
+              "GradientBoostingClassifier",
+              "GradientBoostingRegressor",
+              "HistGradientBoostingClassifier",
+              "HistGradientBoostingRegressor",
+              "KNeighborsClassifier",
+              "KNeighborsRegressor",
+              "Lasso",
+              "LinearDiscriminantAnalysis",
+              "LinearSVC",
+              "LogisticRegression",
+              "MultinomialNB",
+              "QuadraticDiscriminantAnalysis",
+              "RandomForestClassifier",
+              "RandomForestRegressor",
+              "Ridge",
+              "SGDClassifier",
+              "SGDRegressor",
+              "SVC",
+              "SVR"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Estimators",
+          "name": "estimators",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": 5,
+          "help": "Number of cross-validation folds.",
+          "hints": null,
+          "label": "CV folds",
+          "name": "cv",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Metric to rank by; unset uses accuracy (classification) or r2 (regression).",
+          "hints": null,
+          "label": "Sort by",
+          "name": "sort_by",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing features and the target column.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "One row per compared estimator, with cross-validated metrics, sorted by the ranking metric.",
+          "label": null,
+          "name": "comparison",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "out",
+          "help": "The top-ranked estimator, refit on the full input frame.",
+          "label": null,
+          "name": "model",
+          "required": true
+        }
+      ],
+      "type": "ml.compare_models",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Machine Learning",
       "description": "Cross-validate a curated, fit-archetype sklearn estimator.",
       "family": "ml",
       "label": "Cross Validate",
@@ -4558,7 +4792,9 @@
               "PCA",
               "PolynomialFeatures",
               "PowerTransformer",
+              "RFE",
               "RobustScaler",
+              "SelectFromModel",
               "SelectKBest",
               "StandardScaler",
               "TSNE",
@@ -4932,6 +5168,127 @@
         }
       ],
       "type": "ml.predict",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Machine Learning",
+      "description": "Fit a curated feature-selector estimator and keep only the selected features.",
+      "family": "ml",
+      "label": "Select Features",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which curated feature-selector estimator to fit.",
+          "hints": {
+            "choices": [
+              "RFE",
+              "SelectFromModel",
+              "SelectKBest",
+              "VarianceThreshold"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Selector",
+          "name": "selector",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Only needed for supervised selectors (SelectKBest, RFE, SelectFromModel); leave unset for VarianceThreshold.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Candidate columns to select among; empty/unset uses every other column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": {},
+          "help": "Constructor kwargs for the chosen selector (allow-listed per selector).",
+          "hints": null,
+          "label": "Selector params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing candidate feature columns (and, for supervised selectors, the target column).",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Transformer",
+          "direction": "out",
+          "help": "The fitted feature-selector.",
+          "label": null,
+          "name": "transformer",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input frame with unselected feature columns dropped.",
+          "label": null,
+          "name": "result",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "One row per candidate feature, with selected (bool) and, when available, score/ranking.",
+          "label": null,
+          "name": "summary",
+          "required": true
+        }
+      ],
+      "type": "ml.select_features",
       "version": 1
     },
     {

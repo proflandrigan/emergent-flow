@@ -120,6 +120,8 @@ def test_seed_catalog_registers_expected_keys() -> None:
         "Isomap",
         "SelectKBest",
         "VarianceThreshold",
+        "RFE",
+        "SelectFromModel",
     }
 
 

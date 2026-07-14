@@ -19,6 +19,7 @@ from .apply_estimator import ApplyEstimator
 from .auto_eda import AutoEda
 from .cast_types import CastTypes
 from .cluster_detect import ClusterDetect
+from .compare_models import CompareModels
 from .correlation import Correlation
 from .cross_validate import CrossValidate
 from .custom_code import CustomCode
@@ -75,6 +76,7 @@ from .report import GenerateHtmlSummary
 from .scale_features import ScaleFeatures
 from .seasonal_decompose import SeasonalDecompose
 from .select_columns import SelectColumns
+from .select_features import SelectFeatures
 from .sql_query import SqlQuery
 from .summarize import Summarize
 from .train import TrainClassifier
@@ -102,6 +104,7 @@ __all__ = [
     "AutoEda",
     "CastTypes",
     "ClusterDetect",
+    "CompareModels",
     "Correlation",
     "CrossValidate",
     "CustomCode",
@@ -158,6 +161,7 @@ __all__ = [
     "ScaleFeatures",
     "SeasonalDecompose",
     "SelectColumns",
+    "SelectFeatures",
     "SqlQuery",
     "Summarize",
     "TrainClassifier",

@@ -20,6 +20,7 @@ See ``docs/public-api-conventions.md`` and ``docs/sdk-design-philosophy.md``.
 from __future__ import annotations
 
 import contextlib
+import sys
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -42,14 +43,16 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import cross_validate as _sk_cross_validate
 from sklearn.model_selection import train_test_split as _sk_split
 from sklearn.pipeline import Pipeline as _SkPipeline
+from tqdm import tqdm
 
 from emergentflow.api import public_op
 from emergentflow.ml.errors import InvalidEstimatorParamsError, UnknownEstimatorError
-from emergentflow.ml.registry import get_estimator_spec
+from emergentflow.ml.registry import get_estimator_spec, keys_for_archetype
 
 __all__ = [
     "FOREST_TASKS",
     "apply_estimator",
+    "compare_models",
     "cross_validate",
     "evaluate",
     "fit_and_label",
@@ -58,6 +61,7 @@ __all__ = [
     "fit_transform",
     "grid_search",
     "predict",
+    "select_features",
     "summarize",
     "train_classifier",
     "train_random_forest",
@@ -411,7 +415,16 @@ def _resolve_estimator_and_kwargs(
     kwargs: dict[str, Any] = {}
     for name, kwarg_spec in spec.accepted_kwargs.items():
         value = provided_params.get(name, kwarg_spec.default)
-        if kwarg_spec.choices is not None:
+        if kwarg_spec.estimator_ref:
+            nested_spec = get_estimator_spec(cast(str, value))
+            if nested_spec.archetype != "fit":
+                raise InvalidEstimatorParamsError(
+                    f"{value!r} is not a fit-archetype estimator; {name!r} on "
+                    f"estimator {estimator!r} requires a supervised classifier/regressor."
+                )
+            _, nested_kwargs = _resolve_estimator_and_kwargs(cast(str, value), None)
+            value = nested_spec.sklearn_class(**nested_kwargs)
+        elif kwarg_spec.choices is not None:
             if value not in kwarg_spec.choices:
                 raise InvalidEstimatorParamsError(
                     f"{value!r} is not a valid {name!r} for estimator {estimator!r}; "
@@ -564,6 +577,74 @@ def fit_transform(
         transformer=est,
     )
     return transformer, result
+
+
+@public_op(name="ef.ml.select_features")
+def select_features(
+    df: pd.DataFrame,
+    *,
+    selector: str,
+    target: str | None = None,
+    features: list[str] | None = None,
+    params: dict[str, Any] | None = None,
+) -> tuple[FittedTransformer, pd.DataFrame, pd.DataFrame]:
+    """Fit a curated feature-selector estimator and report which features it kept.
+
+    The ``ml.select_features`` node's backend. Restricted to estimators registered with
+    ``EstimatorSpec.is_feature_selector=True`` (``SelectKBest``, ``VarianceThreshold``,
+    ``RFE``, ``SelectFromModel``); raises ``ValueError`` for any other estimator key. Some
+    curated selectors are supervised (``SelectKBest``, ``RFE``, ``SelectFromModel`` need
+    ``target`` to score/rank features); ``VarianceThreshold`` is unsupervised and ignores it.
+
+    Returns ``(selector, result, summary)``:
+
+    * ``selector`` is a :class:`FittedTransformer` (``feature_names`` is the FULL candidate
+      column list the selector was fit on, matching :func:`fit_transform`'s convention --
+      not just the ones it kept).
+    * ``result`` is a NEW frame (``df`` is never mutated): every column NOT among the
+      candidate feature columns (e.g. ``target``, id columns) is kept untouched; among the
+      candidate feature columns, only the ones the selector selected are kept.
+    * ``summary`` is a NEW, tidy DataFrame, one row per candidate feature, with columns
+      ``feature`` and ``selected`` (bool, from the fitted selector's ``get_support()`` mask --
+      every curated selector implements sklearn's ``SelectorMixin``), plus ``score`` when the
+      fitted selector exposes ``scores_`` (e.g. ``SelectKBest``) and/or ``ranking`` when it
+      exposes ``ranking_`` (e.g. ``RFE``). Neither extra column is added when the selector
+      exposes neither attribute (e.g. ``VarianceThreshold``, ``SelectFromModel``).
+
+    Raises :class:`~emergentflow.ml.errors.UnknownEstimatorError` /
+    :class:`~emergentflow.ml.errors.InvalidEstimatorParamsError` exactly like
+    :func:`fit_estimator`. Raises ``ValueError`` if *selector* is not a curated feature
+    selector, or if ``target`` is given but missing from ``df``.
+    """
+    spec, kwargs = _resolve_estimator_and_kwargs(selector, params)
+    if not spec.is_feature_selector:
+        raise ValueError(f"{selector!r} is not a curated feature-selector estimator.")
+
+    feature_names = _resolve_features_for_fit(df, features, target=target)
+    est = spec.sklearn_class(**kwargs)
+    if target is not None:
+        if target not in df.columns:
+            raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+        est.fit(df[feature_names], df[target])
+    else:
+        est.fit(df[feature_names])
+
+    support = est.get_support()
+    selected = [f for f, keep in zip(feature_names, support, strict=True) if keep]
+
+    summary = pd.DataFrame({"feature": feature_names, "selected": list(support)})
+    if hasattr(est, "scores_"):
+        summary["score"] = est.scores_
+    if hasattr(est, "ranking_"):
+        summary["ranking"] = est.ranking_
+
+    dropped = [f for f in feature_names if f not in selected]
+    result = df.drop(columns=dropped)
+
+    transformer = FittedTransformer(
+        estimator_type=spec.key, feature_names=list(feature_names), transformer=est
+    )
+    return transformer, result, summary
 
 
 @public_op(name="ef.ml.fit_pipeline")
@@ -786,6 +867,157 @@ def cross_validate(
             "score_time": cv_result["score_time"],
         }
     )
+
+
+@public_op(name="ef.ml.compare_models")
+def compare_models(
+    df: pd.DataFrame,
+    *,
+    task: str,
+    target: str,
+    features: list[str] | None = None,
+    estimators: list[str] | None = None,
+    cv: int = 5,
+    sort_by: str | None = None,
+) -> tuple[pd.DataFrame, FittedModel]:
+    """Cross-validate every curated fit-archetype estimator matching *task* and rank them.
+
+    The ``ml.compare_models`` node's backend: a PyCaret-style "run every curated baseline
+    model and see which wins" step. Cross-validates each candidate estimator (curated
+    defaults only -- no per-estimator hyperparameter overrides; use ``ml.grid_search`` on the
+    winner for that) via ``sklearn.model_selection.cross_validate`` with a fixed,
+    task-appropriate set of scoring metrics, computed in one pass per estimator (sklearn's
+    ``cross_validate`` accepts a list of scorer names directly).
+
+    ``task="classification"`` scores ``accuracy`` and ``f1`` (weighted, safe for binary and
+    multiclass alike) always, plus ``roc_auc`` only when ``target`` has exactly two distinct
+    values (sklearn's ``roc_auc`` scorer raises for multiclass targets, so it is omitted
+    rather than attempted-and-failed for a >2-class target). ``task="regression"`` scores
+    ``r2``, ``mae``, ``rmse``. ``estimators`` defaults to every curated ``fit``-archetype
+    estimator whose registered ``task`` matches; passing an explicit list restricts (and
+    validates against) that set -- every key must be a ``fit``-archetype estimator whose
+    ``task`` matches *task*, or this raises ``ValueError``.
+
+    Prints a ``tqdm`` progress bar to stderr over the per-estimator loop -- a deliberate,
+    narrowly-scoped exception to this module's usual purity: the bar is pure console/log
+    output, never touches the return value, filesystem, or network, and behaves identically
+    whether this function is called via ``execute()`` or from the compiled script's
+    ``ef.ml.compare_models(...)`` call (ADR-0002 equivalence holds on the RESULT either way).
+
+    Returns ``(comparison, best_model)``:
+
+    * ``comparison`` is a NEW, tidy DataFrame, one row per candidate estimator, with an
+      ``estimator`` column, a ``status`` column (``"ok"``, or the first line of the exception
+      message when an estimator is fundamentally incompatible with this data -- e.g.
+      ``MultinomialNB`` on negative features -- so one bad-fit candidate degrades to a NaN row
+      instead of aborting the whole comparison), one column per scoring metric (mean across
+      folds, NaN for a failed row), and ``fit_time`` (mean fit seconds per fold), sorted by
+      ``sort_by`` (or the task's default: ``"accuracy"`` for classification, ``"r2"`` for
+      regression) -- descending for higher-is-better metrics (accuracy/f1/roc_auc/r2),
+      ascending for lower-is-better metrics (mae/rmse); failed (NaN) rows always sort last.
+    * ``best_model`` is a :class:`FittedModel` wrapping the top-ranked estimator among the
+      ones that actually fit, refit on the FULL ``df`` (mirrors :func:`grid_search`'s
+      refit-on-full-data convention) -- directly usable with
+      :func:`evaluate`/:func:`apply_estimator`.
+
+    Raises ``ValueError`` if *task* is not one of ``FOREST_TASKS``, if ``target`` is missing
+    from ``df``, if no candidate estimators exist for *task*, if any explicit ``estimators``
+    entry is not a ``fit``-archetype estimator matching *task*, if ``sort_by`` is not one of
+    the task's scoring metric names, or if every candidate estimator failed to fit. ``df`` is
+    never mutated.
+    """
+    if task not in FOREST_TASKS:
+        raise ValueError(f"unknown task {task!r}; expected one of {list(FOREST_TASKS)!r}.")
+    if target not in df.columns:
+        raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+
+    candidate_keys = (
+        estimators
+        if estimators is not None
+        else [k for k in keys_for_archetype("fit") if get_estimator_spec(k).task == task]
+    )
+    if not candidate_keys:
+        raise ValueError(f"no curated estimators to compare for task {task!r}.")
+    for key in candidate_keys:
+        candidate_spec = get_estimator_spec(key)
+        if candidate_spec.archetype != "fit":
+            raise ValueError(f"{key!r} is not a fit-archetype estimator.")
+        if candidate_spec.task != task:
+            raise ValueError(f"{key!r} is a {candidate_spec.task!r} estimator; expected {task!r}.")
+
+    feature_names = _resolve_features_for_fit(df, features, target=target)
+    X = df[feature_names]
+    y = df[target]
+
+    if task == "classification":
+        scoring = {"accuracy": "accuracy", "f1": "f1_weighted"}
+        if y.nunique() == 2:
+            scoring["roc_auc"] = "roc_auc"
+        higher_is_better = {"accuracy": True, "f1": True, "roc_auc": True}
+        default_sort = "accuracy"
+    else:
+        scoring = {
+            "r2": "r2",
+            "mae": "neg_mean_absolute_error",
+            "rmse": "neg_root_mean_squared_error",
+        }
+        higher_is_better = {"r2": True, "mae": False, "rmse": False}
+        default_sort = "r2"
+
+    sort_metric = sort_by or default_sort
+    if sort_metric not in scoring:
+        raise ValueError(f"sort_by {sort_metric!r} must be one of {sorted(scoring)!r}.")
+
+    rows: list[dict[str, Any]] = []
+    for key in tqdm(candidate_keys, desc="Comparing models", file=sys.stderr):
+        row_spec, row_kwargs = _resolve_estimator_and_kwargs(key, None)
+        est = row_spec.sklearn_class(**row_kwargs)
+        row: dict[str, Any] = {"estimator": key, "status": "ok"}
+        try:
+            cv_result = _sk_cross_validate(est, X, y, cv=cv, scoring=list(scoring.values()))
+        except Exception as exc:  # noqa: BLE001 -- one incompatible curated estimator (e.g.
+            # MultinomialNB on negative features) must not abort comparing the rest; its row
+            # is marked failed instead, mirroring how sklearn's own cross_validate already
+            # degrades a PARTIAL fold failure to NaN rather than raising.
+            row["status"] = (str(exc).strip().splitlines() or ["Unknown error"])[0][:200]
+            for metric_name in scoring:
+                row[metric_name] = float("nan")
+            row["fit_time"] = float("nan")
+            rows.append(row)
+            continue
+        for metric_name, sk_scorer_name in scoring.items():
+            mean_score = float(cv_result[f"test_{sk_scorer_name}"].mean())
+            if sk_scorer_name.startswith("neg_"):
+                mean_score = -mean_score
+            row[metric_name] = mean_score
+        row["fit_time"] = float(cv_result["fit_time"].mean())
+        rows.append(row)
+
+    comparison = (
+        pd.DataFrame(rows)
+        .sort_values(sort_metric, ascending=not higher_is_better[sort_metric], na_position="last")
+        .reset_index(drop=True)
+    )
+
+    fit_rows = comparison[comparison["status"] == "ok"]
+    if fit_rows.empty:
+        raise ValueError(
+            f"every candidate estimator failed to fit for task {task!r}; see the "
+            "'status' column for details."
+        )
+
+    best_key = cast(str, fit_rows.iloc[0]["estimator"])
+    best_spec, best_kwargs = _resolve_estimator_and_kwargs(best_key, None)
+    best_estimator = best_spec.sklearn_class(**best_kwargs).fit(X, y)
+    best_model = FittedModel(
+        estimator_type=best_key,
+        task=task,
+        feature_names=list(feature_names),
+        target=target,
+        estimator=best_estimator,
+    )
+
+    return comparison, best_model
 
 
 @public_op(name="ef.ml.apply_estimator")

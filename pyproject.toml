@@ -38,6 +38,11 @@ dependencies = [
     # (see docs/licensing-and-dependencies.md).
     "statsmodels>=0.14,<1",
     "scikit-learn>=1.4",
+    # tqdm (MIT) backs the ef.ml.compare_models progress bar over its per-estimator
+    # cross-validation loop; MIT is compatible with this SDK's Apache-2.0 license (see
+    # docs/licensing-and-dependencies.md). A hard dependency because the ml family always
+    # needs it.
+    "tqdm>=4,<5",
     # scipy (BSD-3-Clause) backs ef.stats.ttest (scipy.stats.ttest_ind). It is already present
     # transitively via scikit-learn/statsmodels, but ef.stats imports it directly, so it is
     # declared explicitly here (see docs/licensing-and-dependencies.md). Not a GPL dep.
@@ -239,6 +244,8 @@ module = [
     "torch.*",
     "matplotlib.*",
     "litellm.*",
+    # tqdm (MIT) ships no py.typed marker; it backs the ef.ml.compare_models progress bar.
+    "tqdm.*",
     # plotly (MIT) ships no py.typed marker; it is the Epic 12 viz backend, imported
     # lazily inside `ef.viz.plot`. The wrapper stays fully annotated at its boundary.
     "plotly.*",

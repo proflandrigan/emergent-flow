@@ -33,6 +33,7 @@ __all__ = [
     "get_estimator_spec",
     "known_estimator_keys",
     "keys_for_archetype",
+    "feature_selector_keys",
 ]
 
 #: The three fixed adapter shapes locked by ADR 0016 subsection 3. ("apply" is not an
@@ -54,11 +55,18 @@ class KwargSpec:
     of ``choices``' keys; the adapter resolves the string to ``choices[value]`` before
     constructing the estimator. Left ``None`` for kwargs whose curated default is already the
     literal constructor value (the common case).
+
+    ``estimator_ref``, when True, designates this kwarg's curated default and any
+    caller-supplied override as a string key naming another registered, ``archetype="fit"``
+    estimator; the adapter resolves it to a constructed instance (using that estimator's own
+    curated defaults) before passing it to this estimator's constructor. Mutually exclusive
+    with ``choices``.
     """
 
     default: Any
     help: str = ""
     choices: dict[str, Any] | None = None
+    estimator_ref: bool = False
 
 
 @dataclass(frozen=True)
@@ -84,6 +92,9 @@ class EstimatorSpec:
         Keys not present here are rejected by the adapter as unknown params.
     summary_builder: optional inspectable-summary builder for this estimator's family;
         left ``None`` for entries registered before Story 3 builds per-family summaries.
+    is_feature_selector: whether this estimator is curated for feature selection (surfaced
+        via ``feature_selector_keys()`` for the ``ml.select_features`` node's dropdown);
+        default ``False``.
     """
 
     key: str
@@ -94,6 +105,7 @@ class EstimatorSpec:
     description: str = ""
     accepted_kwargs: dict[str, KwargSpec] = field(default_factory=dict)
     summary_builder: Callable[[Any], dict[str, Any]] | None = None
+    is_feature_selector: bool = False
 
 
 _REGISTRY: dict[str, EstimatorSpec] = {}
@@ -138,3 +150,11 @@ def keys_for_archetype(archetype: Archetype) -> list[str]:
     fit/fit_transform/cluster_detect filter logic has exactly one implementation.
     """
     return sorted(k for k, spec in _REGISTRY.items() if spec.archetype == archetype)
+
+
+def feature_selector_keys() -> list[str]:
+    """Every registered estimator key flagged as a feature selector, sorted.
+
+    Shared by the ``ml.select_features`` node's ``selector`` dropdown (``choices=`` hint).
+    """
+    return sorted(k for k, spec in _REGISTRY.items() if spec.is_feature_selector)

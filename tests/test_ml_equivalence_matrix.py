@@ -109,6 +109,8 @@ _FIT_TRANSFORM_OVERRIDES: dict[str, dict] = {
         "target": "y",
         "params": {"k": 2},
     },
+    "RFE": {"features": _FIT_TRANSFORM_NUMERIC_FEATURES, "target": "y"},
+    "SelectFromModel": {"features": _FIT_TRANSFORM_NUMERIC_FEATURES, "target": "y"},
     "TargetEncoder": {"features": ["cat"], "target": "y"},
     "TSNE": {"features": _FIT_TRANSFORM_NUMERIC_FEATURES, "params": {"perplexity": 5}},
 }
