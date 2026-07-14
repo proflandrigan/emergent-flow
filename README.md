@@ -22,7 +22,9 @@ Python — eliminating vendor lock-in and preserving true developer freedom.
 > `ef.compile_to_code` / `ef.execute` codegen engine, including the declarative `nn.Module`
 > seam (Epic 2); a broad node library spanning data/clean/stats/viz, dedicated per-family
 > statistical modeling nodes (linear regression, GLM, GAM, mixed models, Bayesian), feature
-> transformation nodes (scaling, encoding, discretization, feature generation), a full
+> transformation nodes (scaling, encoding, discretization, feature generation), a
+> time-series family with forecasting (ARIMA, exponential smoothing, seasonal decomposition)
+> and feature transforms (EWMA, lag features, rolling/time-weighted aggregates), a full
 > scikit-learn adapter (Epic 8), SHAP-based model explainability with diagnostic plots
 > (ADR 0020), custom-code nodes for user-defined Python transforms, data-warehouse
 > connectors — DuckDB, Postgres, BigQuery, Redshift (Epic 13) — and LLM nodes behind an
@@ -228,6 +230,7 @@ See the [Declarative Codegen Seam](./docs/codegen-declarative.md) for the worked
 | **Feature transforms (`emergentflow/nodes/examples/`)** | Scaling, categorical encoding, discretization, polynomial/interaction feature generation — all via scikit-learn |
 | **Data warehouses (`emergentflow/data/warehouse/`)** | DuckDB (in-process, credential-free), Postgres (SQLAlchemy + psycopg, `[postgres]`), BigQuery (`[bigquery]`), Redshift (`[redshift]`); sqlglot for dialect SQL — ADR 0018 |
 | **Statistics** | Statsmodels, SciPy; dedicated per-family nodes (linear regression, GLM, GAM, mixed models); optional Bayesian family via PyMC/Bambi/ArviZ (`[bayes]`) |
+| **Time series (`emergentflow/timeseries/`)** | Statsmodels-backed forecasting (ARIMA/SARIMAX, Holt-Winters ETS, seasonal decomposition) and pandas-backed feature transforms (EWMA, lag features, rolling/time-weighted aggregates) |
 | **Machine learning** | Scikit-Learn |
 | **Model explainability (`emergentflow/explain/`)** | SHAP-based feature attribution, error tables, diagnostic plots (residuals, calibration, ROC/PR, predicted-vs-actual) — optional `[explain]` extra for SHAP; diagnostic plots need no extra deps (ADR 0020) |
 | **Deep learning** | PyTorch (declarative `nn.Module` codegen seam; not a runtime dependency) |
@@ -265,7 +268,9 @@ adapters (Claude, Gemini, Codex, OpenCode) — an AI agent proposes `GraphMutati
 human reviews on the same canvas via ghost-diffs, gates, and review threads (Epic 14,
 ADR 0019); dedicated per-family statistical modeling nodes (linear regression, GLM, GAM,
 mixed models, Bayesian); feature transformation nodes (scaling, encoding, discretization,
-feature generation); SHAP-based model explainability with diagnostic plots (ADR 0020);
+feature generation); a time-series family with forecasting (ARIMA, exponential smoothing,
+seasonal decomposition) and feature transforms (EWMA, lag features, rolling/time-weighted
+aggregates); SHAP-based model explainability with diagnostic plots (ADR 0020);
 custom-code nodes for user-defined Python transforms; markdown notes for graph annotation;
 a unified connection manager for warehouse, LLM, and agent profiles; and canvas UX
 improvements including CodeMirror 6 code editing, column-aware parameter widgets, and
@@ -287,6 +292,7 @@ emergent-flow/
 │   ├── types/                # Type catalog, compatibility rules, rules-as-data artifact
 │   ├── data/                 # ef.data (+ data/warehouse/: DuckDB/Postgres/BigQuery/Redshift adapters, query builder)
 │   ├── clean, stats, ml, viz, reports/   # Reference node-family SDK wrappers
+│   ├── timeseries/            # ef.timeseries: forecasting (ARIMA/ETS/decomposition) + feature transforms
 │   ├── explain/              # SHAP-based model explainability and diagnostic plots (ADR 0020, [explain] extra)
 │   ├── script/               # Custom-code node: user-defined Python transform functions
 │   ├── connections/          # Unified connection-profile store (warehouse + LLM + agent, TOML-backed)
