@@ -109,7 +109,10 @@ def _inject_limit(sql: str, dialect: str, max_rows: int | None) -> str:
     arg (``stmt.args.get("limit")``, not a recursive ``.find()`` — a subquery's
     LIMIT must not be mistaken for the outer statement already having one, which
     would let an unbounded outer query slip past the *max_rows* cap). If none is
-    found and *max_rows* is not None, appends ``LIMIT max_rows``. Returns the
+    found and *max_rows* is not None, appends ``LIMIT max_rows + 1`` — one row
+    past the cap, so the adapter can tell "there were exactly max_rows matching
+    rows" apart from "there were more and we got cut off" (it truncates back down
+    to max_rows itself; see the adapters' ``truncated`` check). Returns the
     modified SQL string rendered in *dialect*. If max_rows is None, returns sql
     unchanged.
     """
@@ -118,7 +121,7 @@ def _inject_limit(sql: str, dialect: str, max_rows: int | None) -> str:
     statements = [s for s in sqlglot.parse(sql, dialect=dialect) if s is not None]
     for stmt in statements:
         if stmt.args.get("limit") is None:
-            stmt.set("limit", exp.Limit(expression=exp.Literal.number(max_rows)))
+            stmt.set("limit", exp.Limit(expression=exp.Literal.number(max_rows + 1)))
     return "; ".join(stmt.sql(dialect=dialect) for stmt in statements)
 
 

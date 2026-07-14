@@ -15,6 +15,7 @@ import {
   startChat,
   stopChatTurn,
   subscribeToSessionEvents,
+  type ChatTurn,
   type GraphSession,
 } from "./sessionClient";
 
@@ -273,6 +274,63 @@ describe("subscribeToSessionEvents", () => {
       type: "graph_replaced",
       session_id: "abc",
     });
+
+    sub.close();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  test("polling fallback detects a chat update even when version doesn't change", async () => {
+    // Regression test: chat turns never bump `session.version` (only the two graph-mutation
+    // paths in collab/session.py do), so the polling fallback used to synthesize an event only
+    // on a version change -- a chat turn that starts and completes while polling never reached
+    // the UI, leaving it stuck on "working..." indefinitely.
+    vi.stubGlobal("EventSource", undefined);
+    vi.useFakeTimers();
+
+    const runningTurn: ChatTurn = {
+      id: "turn-1",
+      backend: "claude",
+      user_message: "hi",
+      narration: [],
+      agent_message: null,
+      status: "running",
+      error: null,
+    };
+    const completedTurn: ChatTurn = {
+      ...runningTurn,
+      status: "completed",
+      agent_message: "hello!",
+    };
+
+    let call = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      call += 1;
+      const turn = call === 1 ? runningTurn : completedTurn;
+      return new Response(
+        JSON.stringify(
+          fakeSession({
+            version: 0,
+            collab: { reviews: {}, gates: {}, chat: { backend: "claude", backend_thread_id: null, turns: [turn] } },
+          }),
+        ),
+        { status: 200 },
+      );
+    });
+
+    const received: unknown[] = [];
+    const sub = subscribeToSessionEvents(
+      "abc",
+      (event) => received.push(event),
+      { pollIntervalMs: 100 },
+    );
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(100);
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(received.length).toBeGreaterThan(0);
+    expect(received[0]).toMatchObject({ session_id: "abc" });
 
     sub.close();
     vi.useRealTimers();

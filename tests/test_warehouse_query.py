@@ -205,7 +205,9 @@ def test_query_injects_limit_when_absent() -> None:
     spy = _SpyClient()
     query(sql="SELECT x FROM t", dialect="duckdb", connection="c", client=spy, max_rows=100)
     assert len(spy.requests) == 1
-    assert "LIMIT 100" in spy.requests[0].sql.upper()
+    # One row past the cap is injected so the adapter can distinguish "exactly
+    # max_rows rows" from "truncated" -- see _inject_limit's docstring.
+    assert "LIMIT 101" in spy.requests[0].sql.upper()
 
 
 def test_query_preserves_existing_limit() -> None:
@@ -247,5 +249,48 @@ def test_query_injects_limit_when_only_a_subquery_has_one() -> None:
     )
     assert len(spy.requests) == 1
     sql_upper = spy.requests[0].sql.upper()
-    assert "LIMIT 100" in sql_upper
+    assert "LIMIT 101" in sql_upper
     assert "LIMIT 5" in sql_upper  # the subquery's own LIMIT is left untouched
+
+
+class _DuckDBOnlyClient:
+    """Routes ``query()`` straight to a real ``DuckDBAdapter``, skipping profile resolution."""
+
+    def __init__(self) -> None:
+        from emergentflow.data.warehouse.adapters.duckdb_adapter import DuckDBAdapter
+
+        self._adapter = DuckDBAdapter()
+
+    def run(self, request: QueryRequest) -> QueryResult:
+        return self._adapter.execute(request, {})
+
+
+def test_query_not_truncated_when_true_result_exactly_fills_max_rows() -> None:
+    """A result whose true size exactly equals max_rows must not be reported as truncated.
+
+    Regression test: ``_inject_limit`` used to bake ``LIMIT max_rows`` straight into the SQL,
+    so the adapter's ``len(df) >= max_rows`` check couldn't tell "exactly max_rows rows exist"
+    apart from "there were more and we got cut off" -- it always flagged the boundary case as
+    truncated.
+    """
+    result = query(
+        sql="SELECT * FROM (VALUES (1), (2), (3), (4), (5)) AS t(x)",
+        dialect="duckdb",
+        connection="c",
+        client=_DuckDBOnlyClient(),
+        max_rows=5,
+    )
+    assert result.row_count == 5
+    assert result.truncated is False
+
+
+def test_query_truncated_when_result_genuinely_exceeds_max_rows() -> None:
+    result = query(
+        sql="SELECT * FROM range(10) t(x)",
+        dialect="duckdb",
+        connection="c",
+        client=_DuckDBOnlyClient(),
+        max_rows=5,
+    )
+    assert result.row_count == 5
+    assert result.truncated is True

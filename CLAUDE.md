@@ -206,6 +206,23 @@ MinMaxScaler/RobustScaler), `encode_categorical` (OneHotEncoder/OrdinalEncoder/T
 `discretize` (KBinsDiscretizer), and `generate_features` (PolynomialFeatures/interaction
 terms). All route through scikit-learn and follow the standard node contract.
 
+### Timeseries (`emergentflow/timeseries/`)
+
+`ef.timeseries` is a thin wrapper family over statsmodels (forecasting/decomposition) and
+pandas (feature transforms) — no reimplementation of the underlying algorithms. Forecasting
+ops (`forecast_arima` → SARIMAX, `forecast_ets` → Holt-Winters exponential smoothing,
+`seasonal_decompose`) return a dataclass (`ForecastResult`/`DecomposeResult`) pairing a tidy,
+inspectable summary DataFrame with the live statsmodels results object (registered in the type
+catalog, `emergentflow/types/catalog.py`, so the canvas can wire them). Feature-transform ops
+(`ewma`, `lag_features`, `rolling_aggregate`, `difference`, `time_weighted_aggregate`) return
+an augmented copy of the input DataFrame and never mutate it, guarding against silently
+overwriting existing columns the way `ml.fit_transform` does. Errors are typed
+(`TimeseriesError`, a `ValueError` subclass, `emergentflow/timeseries/errors.py`), mirroring
+`stats.errors.StatsError`. Reference nodes live alongside the other node families in
+`emergentflow/nodes/examples/` (`forecast_arima`, `forecast_ets`, `seasonal_decompose`,
+`ts_ewma`, `ts_lag_features`, `ts_rolling_aggregate`, `ts_difference`,
+`ts_time_weighted_aggregate`).
+
 ### Local server (`emergentflow/server/`)
 
 A FastAPI/Uvicorn app (optional `[server]` extra; `emergentflow serve` / `emergentflow lab`)
