@@ -7106,6 +7106,878 @@
     },
     {
       "advisor_persona": null,
+      "category": "Time Series",
+      "description": "Append first-difference and optional seasonal-difference columns.",
+      "family": "timeseries",
+      "label": "Difference",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Columns to difference.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": 1,
+          "help": "Number of periods to difference by.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Periods",
+          "name": "periods",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Additional seasonal differencing period.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Seasonal periods",
+          "name": "seasonal_periods",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The augmented DataFrame with differenced columns.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "timeseries.difference",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Time Series",
+      "description": "Append exponentially-weighted moving-average columns.",
+      "family": "timeseries",
+      "label": "EWMA",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Columns to compute EWMA for.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Decay in terms of span.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Span",
+          "name": "span",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Decay in terms of halflife.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Halflife",
+          "name": "halflife",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Smoothing factor (0 < alpha <= 1).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Alpha",
+          "name": "alpha",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": "_ewma",
+          "help": "Suffix appended to new column names.",
+          "hints": null,
+          "label": "Suffix",
+          "name": "suffix",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The augmented DataFrame with EWMA columns.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "timeseries.ewma",
+      "version": 1
+    },
+    {
+      "advisor_persona": "researcher",
+      "category": "Time Series",
+      "description": "Fit a SARIMAX model and forecast future values (statsmodels).",
+      "family": "timeseries",
+      "label": "Forecast ARIMA",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column containing the time series to forecast.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": [
+            1,
+            0,
+            0
+          ],
+          "help": "ARIMA order: (p, d, q).",
+          "hints": null,
+          "label": "Order (p,d,q)",
+          "name": "order",
+          "required": false,
+          "type_token": "list[int]"
+        },
+        {
+          "default": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "help": "Seasonal ARIMA order: (P, D, Q, s).",
+          "hints": null,
+          "label": "Seasonal order (P,D,Q,s)",
+          "name": "seasonal_order",
+          "required": false,
+          "type_token": "list[int]"
+        },
+        {
+          "default": 10,
+          "help": "Number of steps ahead to forecast.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Forecast horizon",
+          "name": "horizon",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Optional datetime column to use as the index.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Date column",
+          "name": "date_col",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame with the target time series column.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "ForecastResult",
+          "direction": "out",
+          "help": "The fitted model and forecast.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "timeseries.forecast_arima",
+      "version": 1
+    },
+    {
+      "advisor_persona": "researcher",
+      "category": "Time Series",
+      "description": "Fit a Holt-Winters exponential smoothing model and forecast (statsmodels).",
+      "family": "timeseries",
+      "label": "Forecast ETS",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column containing the time series to forecast.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "add",
+          "help": "Trend component type.",
+          "hints": {
+            "choices": [
+              "add",
+              "mul",
+              null
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Trend",
+          "name": "trend",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Seasonal component type.",
+          "hints": {
+            "choices": [
+              "add",
+              "mul",
+              null
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Seasonal",
+          "name": "seasonal",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Number of periods in a seasonal cycle. Required when seasonal is set.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 2.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Seasonal periods",
+          "name": "seasonal_periods",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": 10,
+          "help": "Number of steps ahead to forecast.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Forecast horizon",
+          "name": "horizon",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Optional datetime column to use as the index.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Date column",
+          "name": "date_col",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame with the target time series column.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "ForecastResult",
+          "direction": "out",
+          "help": "The fitted model and forecast.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "timeseries.forecast_ets",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Time Series",
+      "description": "Create lagged feature columns for time series data.",
+      "family": "timeseries",
+      "label": "Lag Features",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Columns to create lags for.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "List of lag periods (e.g. [1, 2, 3]).",
+          "hints": null,
+          "label": "Lags",
+          "name": "lags",
+          "required": true,
+          "type_token": "list[int]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The augmented DataFrame with lag columns.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "timeseries.lag_features",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Time Series",
+      "description": "Append rolling-window aggregate columns (mean, sum, std, min, max).",
+      "family": "timeseries",
+      "label": "Rolling Aggregate",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Columns to aggregate.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Rolling window size.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Window",
+          "name": "window",
+          "required": true,
+          "type_token": "int"
+        },
+        {
+          "default": "mean",
+          "help": "Aggregation function.",
+          "hints": {
+            "choices": [
+              "mean",
+              "sum",
+              "std",
+              "min",
+              "max"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Aggregation",
+          "name": "agg",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Minimum number of observations required. Defaults to window size.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Min periods",
+          "name": "min_periods",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The augmented DataFrame with rolling aggregate columns.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "timeseries.rolling_aggregate",
+      "version": 1
+    },
+    {
+      "advisor_persona": "researcher",
+      "category": "Time Series",
+      "description": "Decompose a time series into trend, seasonal, and residual components.",
+      "family": "timeseries",
+      "label": "Seasonal Decompose",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column to decompose.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "additive",
+          "help": "Decomposition model type.",
+          "hints": {
+            "choices": [
+              "additive",
+              "multiplicative"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Model",
+          "name": "model",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Seasonal period (number of observations per cycle).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Period",
+          "name": "period",
+          "required": true,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Optional datetime column to use as the index.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Date column",
+          "name": "date_col",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame with the target time series column.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DecomposeResult",
+          "direction": "out",
+          "help": "The decomposed time series components.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "timeseries.seasonal_decompose",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Time Series",
+      "description": "Append recency-weighted aggregate columns (linear or exponential decay).",
+      "family": "timeseries",
+      "label": "Time-Weighted Aggregate",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Columns to aggregate.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Column establishing chronological order.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Date column",
+          "name": "date_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "linear",
+          "help": "Decay method for recency weighting.",
+          "hints": {
+            "choices": [
+              "linear",
+              "exponential"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Decay",
+          "name": "decay",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Rolling window size. If unset, uses all preceding rows.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Window",
+          "name": "window",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The augmented DataFrame with time-weighted aggregate columns.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "timeseries.time_weighted_aggregate",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "Feature Transform",
       "description": "Discretize continuous features using a curated sklearn discretizer (KBinsDiscretizer or Binarizer).",
       "family": "transform",

@@ -20,7 +20,19 @@ __version__ = "0.2.2"
 # ``import emergentflow`` stays light — the heavy scientific stack (pandas,
 # scikit-learn, ydata-profiling) is only pulled in when a family is first used.
 _LAZY_FAMILIES = frozenset(
-    {"data", "clean", "stats", "ml", "reports", "script", "llm", "eval", "explain", "viz"}
+    {
+        "data",
+        "clean",
+        "stats",
+        "ml",
+        "reports",
+        "script",
+        "llm",
+        "eval",
+        "explain",
+        "viz",
+        "timeseries",
+    }
 )
 
 # Whole-graph code-generation engine namespace (Epic 2). Imported lazily like the
@@ -58,6 +70,7 @@ if TYPE_CHECKING:  # let type-checkers resolve ef.data, ef.codegen, ... statical
         reports,
         script,
         stats,
+        timeseries,
         viz,
     )
     from emergentflow.codegen.compiler import compile_to_code
@@ -78,6 +91,7 @@ __all__ = [
     "data",
     "clean",
     "stats",
+    "timeseries",
     "ml",
     "reports",
     "script",

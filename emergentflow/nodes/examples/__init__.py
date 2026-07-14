@@ -51,6 +51,8 @@ from .fit_glm import FitGLM
 from .fit_linear_regression import FitLinearRegression
 from .fit_mixed_model import FitMixedModel
 from .fit_transform import FitTransform
+from .forecast_arima import ForecastArima
+from .forecast_ets import ForecastEts
 from .generate_features import GenerateFeatures
 from .grid_search import GridSearch
 from .group_by_aggregate import GroupByAggregate
@@ -71,6 +73,7 @@ from .predict import Predict
 from .query_builder import QueryBuilder
 from .report import GenerateHtmlSummary
 from .scale_features import ScaleFeatures
+from .seasonal_decompose import SeasonalDecompose
 from .select_columns import SelectColumns
 from .sql_query import SqlQuery
 from .summarize import Summarize
@@ -79,6 +82,11 @@ from .train_random_forest import TrainRandomForest
 from .train_regressor import TrainRegressor
 from .train_test_split import TrainTestSplit
 from .transform import Transform
+from .ts_difference import TsDifference
+from .ts_ewma import TsEwma
+from .ts_lag_features import TsLagFeatures
+from .ts_rolling_aggregate import TsRollingAggregate
+from .ts_time_weighted_aggregate import TsTimeWeightedAggregate
 from .ttest import TTest
 from .viz_plot import VizPlot
 from .viz_plot_acf import VizPlotAcf
@@ -119,6 +127,8 @@ __all__ = [
     "ExplainPlotShapWaterfall",
     "ExplainShapValues",
     "FilterRows",
+    "ForecastArima",
+    "ForecastEts",
     "FitBayesianModel",
     "FitEstimator",
     "FitGAM",
@@ -146,6 +156,7 @@ __all__ = [
     "Predict",
     "QueryBuilder",
     "ScaleFeatures",
+    "SeasonalDecompose",
     "SelectColumns",
     "SqlQuery",
     "Summarize",
@@ -154,6 +165,11 @@ __all__ = [
     "TrainRegressor",
     "TrainTestSplit",
     "Transform",
+    "TsDifference",
+    "TsEwma",
+    "TsLagFeatures",
+    "TsRollingAggregate",
+    "TsTimeWeightedAggregate",
     "TTest",
     "VizPlot",
     "VizPlotAcf",
