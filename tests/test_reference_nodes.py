@@ -745,7 +745,9 @@ class TestLoadJson:
         node = defn.instantiate(path=json_file, orient="records")
         frag = defn.preview(node)
         assert frag.imports == ["import emergentflow as ef"]
-        assert frag.body == f"frame = ef.data.load_json({json_file!r}, orient='records')"
+        assert frag.body == (
+            f"frame = ef.data.load_json({json_file!r}, orient='records', lines=False)"
+        )
 
     def test_codegen_matches_execute(self, json_file):
         """ADR 0002: execute == result of running the emitted code."""
@@ -753,6 +755,18 @@ class TestLoadJson:
         node = defn.instantiate(path=json_file, orient="records")
         executed = defn.execute(node, inputs={})
         scope = _run_codegen(defn, node, {})
+        assert scope["frame"].equals(executed["frame"])
+
+    def test_lines_true_reads_jsonl(self, tmp_path):
+        jsonl_path = tmp_path / "data.jsonl"
+        jsonl_path.write_text('{"a": 1, "b": "x"}\n{"a": 2, "b": "y"}\n')
+
+        defn = LoadJson()
+        node = defn.instantiate(path=str(jsonl_path), lines=True)
+        executed = defn.execute(node, inputs={})
+        scope = _run_codegen(defn, node, {})
+
+        assert list(executed["frame"].columns) == ["a", "b"]
         assert scope["frame"].equals(executed["frame"])
 
 

@@ -58,7 +58,9 @@ class AdapterWarehouseClient:
 
     def _resolve(self, connection: str) -> tuple[ConnectionProfile, dict[str, str]]:
         profile = self._store.get(connection)  # raises UnknownConnectionError if absent
-        return profile, resolve_credentials(profile)
+        resolved = resolve_credentials(profile)
+        merged = {**profile.coordinates, **resolved}
+        return profile, merged
 
     def _execute_with_timeout(
         self,

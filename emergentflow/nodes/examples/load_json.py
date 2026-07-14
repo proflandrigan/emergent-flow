@@ -29,11 +29,11 @@ class LoadJson(NodeDefinition):
     """Load a JSON file into a pandas DataFrame."""
 
     type = "data.load_json"
-    version = 1
+    version = 2
     family = "data"
     label = "Load JSON"
     category = "Ingest"
-    description = "Load a JSON file into a pandas DataFrame."
+    description = "Load a JSON or JSON Lines (.jsonl) file into a pandas DataFrame."
     # execute() re-reads the file at `path` on every call; the file's content can
     # change without the `path` param changing, so this is not a pure function of
     # its declared params (see NodeDefinition.cacheable's docstring).
@@ -64,19 +64,32 @@ class LoadJson(NodeDefinition):
             label="Orient",
             help="pandas read_json orient (e.g. 'records'); unset uses pandas' default.",
         ),
+        ParamSpec(
+            name="lines",
+            type_token="bool",
+            default=False,
+            label="JSON Lines",
+            help="Read the file as JSON Lines / newline-delimited JSON (.jsonl): one JSON "
+            "object per line.",
+        ),
     ]
 
-    def _args(self, node: Node) -> tuple[str, str | None]:
+    def _args(self, node: Node) -> tuple[str, str | None, bool]:
         values = {p.name: p.value for p in node.params}
-        return cast(str, values.get("path")), cast("str | None", values.get("orient"))
+        return (
+            cast(str, values.get("path")),
+            cast("str | None", values.get("orient")),
+            cast(bool, values.get("lines", False)),
+        )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        path, orient = self._args(node)
+        path, orient, lines = self._args(node)
         return CodeFragment(
             imports=["import emergentflow as ef"],
-            body=f"{ctx.out_var('frame')} = ef.data.load_json({path!r}, orient={orient!r})",
+            body=f"{ctx.out_var('frame')} = ef.data.load_json("
+            f"{path!r}, orient={orient!r}, lines={lines!r})",
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        path, orient = self._args(node)
-        return {"frame": load_json(path, orient=orient)}
+        path, orient, lines = self._args(node)
+        return {"frame": load_json(path, orient=orient, lines=lines)}

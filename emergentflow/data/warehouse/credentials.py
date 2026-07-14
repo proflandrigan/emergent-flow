@@ -18,6 +18,13 @@ import os
 
 from emergentflow.data.warehouse.profiles import ConnectionProfile
 
+IMPLICIT_AUTH_METHODS = frozenset({"adc", "implicit", "none"})
+"""``auth_method`` values that carry no ``credential_refs`` — the platform resolves the
+credential implicitly (BigQuery Application Default Credentials, Postgres peer/implicit
+auth). Profiles using one of these methods have empty ``credential_refs`` by construction,
+so ``resolve_credentials``/``required_env_vars`` already no-op correctly; this constant
+documents the known set and lets the pre-flight module skip the env-var check explicitly."""
+
 
 class MissingConnectionCredentialError(RuntimeError):
     """Raised when a profile's referenced credential env var is unset (names the var only)."""

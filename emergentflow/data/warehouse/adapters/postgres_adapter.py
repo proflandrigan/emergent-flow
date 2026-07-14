@@ -57,14 +57,29 @@ class PostgresAdapter:
     dialect: str = "postgres"
 
     def _engine(self, credentials: Mapping[str, str]) -> _sa.Engine:
-        """Build a SQLAlchemy engine from resolved credentials."""
+        """Build a SQLAlchemy engine from resolved credentials.
+
+        Uses ``sqlalchemy.engine.URL.create`` rather than string interpolation so a
+        ``coordinates``-sourced value (e.g. a ``host``/``database`` containing ``@``, ``:``,
+        or ``/``) is percent-encoded into its URL component instead of corrupting — or
+        redirecting — the connection URL.
+        """
         _require_driver()
-        host = credentials["host"]
+        host = credentials.get("host", "localhost")
         port = credentials.get("port", "5432")
-        database = credentials["database"]
-        user = credentials["user"]
-        password = credentials["password"]
-        url = f"postgresql+psycopg://{user}:{password}@{host}:{port}/{database}"
+        database = credentials.get("database", "")
+        user = credentials.get("user")
+        # A password without a user is meaningless for libpq — drop it, matching the
+        # pre-existing (pre-URL.create) behavior of ignoring password when user is absent.
+        password = credentials.get("password") if user else None
+        url = _sa.engine.URL.create(
+            drivername="postgresql+psycopg",
+            username=user or None,
+            password=password or None,
+            host=host,
+            port=int(port),
+            database=database or None,
+        )
         return _sa.create_engine(url)
 
     def execute(

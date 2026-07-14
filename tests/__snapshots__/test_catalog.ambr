@@ -2585,7 +2585,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Ingest',
-        'description': 'Load a JSON file into a pandas DataFrame.',
+        'description': 'Load a JSON or JSON Lines (.jsonl) file into a pandas DataFrame.',
         'family': 'data',
         'label': 'Load JSON',
         'paradigm': 'functional',
@@ -2618,6 +2618,15 @@
             'required': False,
             'type_token': 'str',
           }),
+          dict({
+            'default': False,
+            'help': 'Read the file as JSON Lines / newline-delimited JSON (.jsonl): one JSON object per line.',
+            'hints': None,
+            'label': 'JSON Lines',
+            'name': 'lines',
+            'required': False,
+            'type_token': 'bool',
+          }),
         ]),
         'ports': list([
           dict({
@@ -2631,7 +2640,7 @@
           }),
         ]),
         'type': 'data.load_json',
-        'version': 1,
+        'version': 2,
       }),
       dict({
         'advisor_persona': None,

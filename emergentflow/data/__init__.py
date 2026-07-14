@@ -54,17 +54,18 @@ def load_parquet(filepath: str, *, columns: list[str] | None = None) -> pd.DataF
 
 
 @public_op(name="ef.data.load_json")
-def load_json(filepath: str, *, orient: str | None = None) -> pd.DataFrame:
-    """Load a JSON file into a tidy pandas DataFrame.
+def load_json(filepath: str, *, orient: str | None = None, lines: bool = False) -> pd.DataFrame:
+    """Load a JSON or JSON Lines file into a tidy pandas DataFrame.
 
     Thin wrapper over ``pandas.read_json``. Validates the path at the boundary and performs no
     other transformation. ``orient`` is passed through to pandas when given (e.g. ``"records"``).
+    Set ``lines=True`` to read a ``.jsonl``/newline-delimited-JSON file (one JSON object per line).
     """
     if not filepath or not isinstance(filepath, str):
         raise ValueError(f"filepath must be a non-empty string, got {filepath!r}")
     if not Path(filepath).exists():
         raise FileNotFoundError(f"JSON file not found: {filepath!r}")
-    return pd.read_json(filepath, orient=orient)
+    return pd.read_json(filepath, orient=orient, lines=lines)
 
 
 #: Bundled, permissively-licensed (BSD) sample datasets from scikit-learn, keyed by name.

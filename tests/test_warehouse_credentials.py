@@ -58,3 +58,24 @@ def test_required_env_vars_lists_only_env_keys() -> None:
     profile = _profile(password_env="PGPASSWORD", keyring_handle="svc/acct")
 
     assert required_env_vars(profile) == ["PGPASSWORD"]
+
+
+def test_resolve_empty_credential_refs_returns_empty() -> None:
+    """ADC/implicit profiles have no credential_refs — resolve returns {}."""
+    profile = ConnectionProfile(
+        name="bq_adc",
+        dialect="bigquery",
+        auth_method="adc",
+        credential_refs={},
+    )
+    assert resolve_credentials(profile) == {}
+
+
+def test_required_env_vars_empty_for_adc_profile() -> None:
+    profile = ConnectionProfile(
+        name="bq_adc",
+        dialect="bigquery",
+        auth_method="adc",
+        credential_refs={},
+    )
+    assert required_env_vars(profile) == []
