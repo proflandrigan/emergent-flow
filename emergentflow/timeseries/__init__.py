@@ -5,8 +5,9 @@ Time-series forecasting and feature-transform operations.
 
 Thin wrappers over statsmodels and pandas (both hard deps) — no reimplementation of
 forecasting or feature-engineering algorithms. Each public operation validates its
-inputs at the boundary (fail fast, clear typed ``ValueError``s) and otherwise defers
-entirely to the underlying, trusted library. Forecasting functions (``forecast_arima``,
+inputs at the boundary (fail fast, clear typed :class:`TimeseriesError`s, a
+:class:`ValueError` subclass) and otherwise defers entirely to the underlying, trusted
+library. Forecasting functions (``forecast_arima``,
 ``forecast_ets``, ``seasonal_decompose``) return a live statsmodels results object
 alongside tidy, inspectable summary frames; feature-transform functions
 (``ewma``, ``lag_features``, ``rolling_aggregate``, ``difference``,
@@ -28,10 +29,12 @@ from statsmodels.tsa.seasonal import seasonal_decompose as _sm_seasonal_decompos
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
 from emergentflow.api import public_op
+from emergentflow.timeseries.errors import TimeseriesError
 
 __all__ = [
     "ForecastResult",
     "DecomposeResult",
+    "TimeseriesError",
     "forecast_arima",
     "forecast_ets",
     "seasonal_decompose",
@@ -95,13 +98,15 @@ def _prepare_series(df: pd.DataFrame, *, target: str, date_col: str | None) -> p
     Never mutates ``df``.
     """
     if target not in df.columns:
-        raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+        raise TimeseriesError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
     if date_col is None:
         return df[target]
     if date_col not in df.columns:
-        raise ValueError(f"unknown date_col {date_col!r}; expected one of {list(df.columns)!r}.")
+        raise TimeseriesError(
+            f"unknown date_col {date_col!r}; expected one of {list(df.columns)!r}."
+        )
     if date_col == target:
-        raise ValueError(f"date_col and target must differ; both were {date_col!r}.")
+        raise TimeseriesError(f"date_col and target must differ; both were {date_col!r}.")
     work = df.copy()
     work[date_col] = pd.to_datetime(work[date_col])
     work = work.set_index(date_col)
@@ -110,15 +115,15 @@ def _prepare_series(df: pd.DataFrame, *, target: str, date_col: str | None) -> p
 
 def _validate_horizon(horizon: int) -> None:
     if horizon < 1:
-        raise ValueError(f"horizon must be >= 1; got {horizon}.")
+        raise TimeseriesError(f"horizon must be >= 1; got {horizon}.")
 
 
 def _validate_columns(df: pd.DataFrame, columns: list[str]) -> None:
     if not columns:
-        raise ValueError("columns must be a non-empty list.")
+        raise TimeseriesError("columns must be a non-empty list.")
     unknown = [c for c in columns if c not in df.columns]
     if unknown:
-        raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+        raise TimeseriesError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
 
 
 @public_op(name="ef.timeseries.forecast_arima")
@@ -139,9 +144,11 @@ def forecast_arima(
     ``df``. Returns a :class:`ForecastResult` with ``model="ARIMA"``.
     """
     if len(order) != 3:
-        raise ValueError(f"order must have length 3 (p, d, q); got {order!r}.")
+        raise TimeseriesError(f"order must have length 3 (p, d, q); got {order!r}.")
     if len(seasonal_order) != 4:
-        raise ValueError(f"seasonal_order must have length 4 (P, D, Q, s); got {seasonal_order!r}.")
+        raise TimeseriesError(
+            f"seasonal_order must have length 4 (P, D, Q, s); got {seasonal_order!r}."
+        )
     _validate_horizon(horizon)
     series = _prepare_series(df, target=target, date_col=date_col)
 
@@ -191,11 +198,11 @@ def forecast_ets(
     since plain exponential smoothing does not produce prediction intervals.
     """
     if trend is not None and trend not in ("add", "mul"):
-        raise ValueError(f"trend must be 'add', 'mul', or None; got {trend!r}.")
+        raise TimeseriesError(f"trend must be 'add', 'mul', or None; got {trend!r}.")
     if seasonal is not None and seasonal not in ("add", "mul"):
-        raise ValueError(f"seasonal must be 'add', 'mul', or None; got {seasonal!r}.")
+        raise TimeseriesError(f"seasonal must be 'add', 'mul', or None; got {seasonal!r}.")
     if seasonal is not None and seasonal_periods is None:
-        raise ValueError("seasonal_periods is required when seasonal is set.")
+        raise TimeseriesError("seasonal_periods is required when seasonal is set.")
     _validate_horizon(horizon)
     series = _prepare_series(df, target=target, date_col=date_col)
 
@@ -244,11 +251,11 @@ def seasonal_decompose(
     datetime and set as the index first; never mutates ``df``.
     """
     if model not in _DECOMPOSE_MODELS:
-        raise ValueError(f"model must be one of {list(_DECOMPOSE_MODELS)!r}; got {model!r}.")
+        raise TimeseriesError(f"model must be one of {list(_DECOMPOSE_MODELS)!r}; got {model!r}.")
     if period is None:
-        raise ValueError("period is required for seasonal_decompose.")
+        raise TimeseriesError("period is required for seasonal_decompose.")
     if period < 1:
-        raise ValueError(f"period must be >= 1; got {period}.")
+        raise TimeseriesError(f"period must be >= 1; got {period}.")
     series = _prepare_series(df, target=target, date_col=date_col)
 
     result = _sm_seasonal_decompose(series, model=model, period=period)
@@ -283,7 +290,9 @@ def ewma(
     _validate_columns(df, columns)
     given = [v for v in (span, halflife, alpha) if v is not None]
     if len(given) != 1:
-        raise ValueError(f"exactly one of span, halflife, alpha must be given; got {len(given)}.")
+        raise TimeseriesError(
+            f"exactly one of span, halflife, alpha must be given; got {len(given)}."
+        )
     result = df.copy()
     for col in columns:
         result[f"{col}{suffix}"] = df[col].ewm(span=span, halflife=halflife, alpha=alpha).mean()
@@ -304,9 +313,9 @@ def lag_features(
     """
     _validate_columns(df, columns)
     if not lags:
-        raise ValueError("lags must be a non-empty list of integers.")
+        raise TimeseriesError("lags must be a non-empty list of integers.")
     if any(lag < 1 for lag in lags):
-        raise ValueError(f"all lags must be >= 1; got {lags!r}.")
+        raise TimeseriesError(f"all lags must be >= 1; got {lags!r}.")
     result = df.copy()
     for col in columns:
         for lag in lags:
@@ -331,9 +340,9 @@ def rolling_aggregate(
     """
     _validate_columns(df, columns)
     if agg not in _ROLLING_AGGS:
-        raise ValueError(f"unknown agg {agg!r}; expected one of {list(_ROLLING_AGGS)!r}.")
+        raise TimeseriesError(f"unknown agg {agg!r}; expected one of {list(_ROLLING_AGGS)!r}.")
     if window < 1:
-        raise ValueError(f"window must be >= 1; got {window}.")
+        raise TimeseriesError(f"window must be >= 1; got {window}.")
     result = df.copy()
     for col in columns:
         rolling = df[col].rolling(window, min_periods=min_periods)
@@ -357,9 +366,9 @@ def difference(
     """
     _validate_columns(df, columns)
     if periods < 1:
-        raise ValueError(f"periods must be >= 1; got {periods}.")
+        raise TimeseriesError(f"periods must be >= 1; got {periods}.")
     if seasonal_periods is not None and seasonal_periods < 1:
-        raise ValueError(f"seasonal_periods must be >= 1; got {seasonal_periods}.")
+        raise TimeseriesError(f"seasonal_periods must be >= 1; got {seasonal_periods}.")
     result = df.copy()
     for col in columns:
         result[f"{col}_diff_{periods}"] = df[col].diff(periods)
@@ -400,11 +409,13 @@ def time_weighted_aggregate(
     """
     _validate_columns(df, columns)
     if date_col not in df.columns:
-        raise ValueError(f"unknown date_col {date_col!r}; expected one of {list(df.columns)!r}.")
+        raise TimeseriesError(
+            f"unknown date_col {date_col!r}; expected one of {list(df.columns)!r}."
+        )
     if decay not in _DECAY_METHODS:
-        raise ValueError(f"decay must be one of {list(_DECAY_METHODS)!r}; got {decay!r}.")
+        raise TimeseriesError(f"decay must be one of {list(_DECAY_METHODS)!r}; got {decay!r}.")
     if window is not None and window < 1:
-        raise ValueError(f"window must be >= 1; got {window}.")
+        raise TimeseriesError(f"window must be >= 1; got {window}.")
 
     fn = _linear_weighted_mean if decay == "linear" else _exponential_weighted_mean
     result = df.copy()

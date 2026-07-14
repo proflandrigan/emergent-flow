@@ -139,3 +139,23 @@ register_type(
         ),
     )
 )
+register_type(
+    TypeDef(
+        token="ForecastResult",
+        description=(
+            "A fitted forecast produced by ef.timeseries.forecast_arima/forecast_ets: a "
+            "tidy step/forecast/lower_ci/upper_ci frame, JSON-native fit stats, and the live "
+            "statsmodels results object."
+        ),
+    )
+)
+register_type(
+    TypeDef(
+        token="DecomposeResult",
+        description=(
+            "The trend/seasonal/residual decomposition produced by "
+            "ef.timeseries.seasonal_decompose: a tidy observed/trend/seasonal/residual frame "
+            "plus the model and period used."
+        ),
+    )
+)
