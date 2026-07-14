@@ -114,6 +114,17 @@ def test_load_json_registered_as_public_op() -> None:
     assert "ef.data.load_json" in PUBLIC_OPS
 
 
+def test_load_json_lines_reads_jsonl(tmp_path: Path) -> None:
+    jsonl_path = tmp_path / "d.jsonl"
+    jsonl_path.write_text('{"a": 1, "b": "x"}\n{"a": 2, "b": "y"}\n')
+
+    result = load_json(str(jsonl_path), lines=True)
+
+    assert isinstance(result, pd.DataFrame)
+    assert list(result.columns) == ["a", "b"]
+    assert result.shape == (2, 2)
+
+
 def test_load_sample_default_returns_dataframe_with_target() -> None:
     result = load_sample()
 

@@ -2681,7 +2681,7 @@
     {
       "advisor_persona": null,
       "category": "Ingest",
-      "description": "Load a JSON file into a pandas DataFrame.",
+      "description": "Load a JSON or JSON Lines (.jsonl) file into a pandas DataFrame.",
       "family": "data",
       "label": "Load JSON",
       "paradigm": "functional",
@@ -2713,6 +2713,15 @@
           "name": "orient",
           "required": false,
           "type_token": "str"
+        },
+        {
+          "default": false,
+          "help": "Read the file as JSON Lines / newline-delimited JSON (.jsonl): one JSON object per line.",
+          "hints": null,
+          "label": "JSON Lines",
+          "name": "lines",
+          "required": false,
+          "type_token": "bool"
         }
       ],
       "ports": [
@@ -2727,7 +2736,7 @@
         }
       ],
       "type": "data.load_json",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
