@@ -71,6 +71,7 @@ from .nn_module import NnModule
 from .nn_relu import NnReLU
 from .pipeline import Pipeline
 from .predict import Predict
+from .prepare_interactions import PrepareInteractions
 from .query_builder import QueryBuilder
 from .report import GenerateHtmlSummary
 from .scale_features import ScaleFeatures
@@ -157,6 +158,7 @@ __all__ = [
     "NnReLU",
     "Pipeline",
     "Predict",
+    "PrepareInteractions",
     "QueryBuilder",
     "ScaleFeatures",
     "SeasonalDecompose",

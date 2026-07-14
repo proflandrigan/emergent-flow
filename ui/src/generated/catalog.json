@@ -5933,6 +5933,189 @@
     },
     {
       "advisor_persona": null,
+      "category": "Recommenders",
+      "description": "Validate and deduplicate raw user-item interaction data into a sparse InteractionMatrix.",
+      "family": "recommend",
+      "label": "Prepare Interactions",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column identifying the user/entity.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "User column",
+          "name": "user_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column identifying the item/content.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Item column",
+          "name": "item_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column of interaction values (ratings, counts). None means implicit feedback.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Value column",
+          "name": "value_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": true,
+          "help": "True for implicit feedback (counts/binary); False for explicit ratings.",
+          "hints": null,
+          "label": "Implicit feedback",
+          "name": "implicit",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": "sum",
+          "help": "How to aggregate duplicate (user, item) pairs.",
+          "hints": {
+            "choices": [
+              "sum",
+              "mean",
+              "max",
+              "last"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Aggregation",
+          "name": "agg",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 0,
+          "help": "Minimum distinct items a user must have interacted with to keep.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Min user interactions",
+          "name": "min_user_interactions",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": 0,
+          "help": "Minimum distinct users who must have interacted with an item to keep it.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Min item interactions",
+          "name": "min_item_interactions",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": "warn-and-skip",
+          "help": "How to handle users/items below the minimum-interaction thresholds.",
+          "hints": {
+            "choices": [
+              "error",
+              "warn-and-skip",
+              "include"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Cold start mode",
+          "name": "cold_start_mode",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing user, item, and optional value columns.",
+          "label": "Events",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "InteractionMatrix",
+          "direction": "out",
+          "help": "The validated, deduplicated sparse interaction matrix.",
+          "label": null,
+          "name": "interactions",
+          "required": true
+        }
+      ],
+      "type": "recommend.prepare_interactions",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "Reporting",
       "description": "Generate an HTML profiling report summarising a DataFrame.",
       "family": "reports",

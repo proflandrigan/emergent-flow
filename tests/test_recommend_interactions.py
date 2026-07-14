@@ -1,0 +1,295 @@
+"""
+Tests for the Epic 15 Story 3 recommend interactions feature:
+``PrepareInteractions`` node golden codegen, ``temporal_split``/``random_split``
+correctness, and ``Recommender``/``InteractionMatrix`` type-token catalog registration.
+
+1. **Golden-code quality (Part A):** ``compile_to_code`` for a
+   ``LoadSample -> PrepareInteractions`` graph is syntactically valid Python and
+   passes ``ruff check`` — parse/lint only, never executed.
+2. **Split correctness & determinism (Part B):** ``temporal_split`` and
+   ``random_split`` return correct ``InteractionMatrix`` pairs, are deterministic,
+   do not mutate input, and raise typed errors on invalid args.
+3. **Type-token compatibility (Part C):** ``Recommender`` and ``InteractionMatrix``
+   are registered in the default type catalog, are subtypes of ``any``, are flat
+   (unrelated to ``DataFrame`` or each other), and are self-compatible.
+"""
+
+from __future__ import annotations
+
+import ast
+import subprocess
+import sys
+
+import pandas as pd
+import pytest
+
+from emergentflow.codegen.compiler import compile_to_code
+from emergentflow.ir.common import Direction
+from emergentflow.ir.edge import Edge, PortRef
+from emergentflow.ir.graph import Graph
+from emergentflow.nodes.examples import LoadSample, PrepareInteractions
+from emergentflow.recommend import random_split, temporal_split
+from emergentflow.recommend.errors import InvalidRecommenderParamsError
+from emergentflow.types import registry
+from emergentflow.types.compatibility import Compatibility, is_compatible
+from emergentflow.types.registry import TOP_TYPE
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _out_port(node, name):
+    return next(p for p in node.ports if p.direction == Direction.OUT and p.name == name)
+
+
+def _in_port(node, name):
+    return next(p for p in node.ports if p.direction == Direction.IN and p.name == name)
+
+
+# ---------------------------------------------------------------------------
+# Part A — Golden ast.parse / ruff check for PrepareInteractions codegen
+# ---------------------------------------------------------------------------
+
+
+def _build_prepare_interactions_graph() -> Graph:
+    load = LoadSample().instantiate(name="iris", label="Load Sample")
+    prepare = PrepareInteractions().instantiate(
+        label="Prepare Interactions",
+        user_col="sepal length (cm)",
+        item_col="sepal width (cm)",
+    )
+    edge = Edge(
+        source=PortRef(node_id=load.id, port_id=_out_port(load, "frame").id),
+        target=PortRef(node_id=prepare.id, port_id=_in_port(prepare, "frame").id),
+    )
+    return Graph(nodes={load.id: load, prepare.id: prepare}, edges={edge.id: edge})
+
+
+def test_prepare_interactions_codegen_is_parseable() -> None:
+    code = compile_to_code(_build_prepare_interactions_graph())
+    ast.parse(code)
+
+
+def test_prepare_interactions_codegen_is_ruff_clean() -> None:
+    code = compile_to_code(_build_prepare_interactions_graph())
+    result = subprocess.run(
+        [sys.executable, "-m", "ruff", "check", "-"],
+        input=code,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+# ---------------------------------------------------------------------------
+# Part B — temporal_split / random_split correctness + determinism +
+#          no-mutation + typed errors
+# ---------------------------------------------------------------------------
+
+
+def test_temporal_split_returns_interaction_matrices() -> None:
+    df = pd.DataFrame(
+        {
+            "user": ["u1"] * 5,
+            "item": [f"i{j}" for j in range(5)],
+            "ts": list(range(5)),
+        }
+    )
+    train, test = temporal_split(
+        df,
+        user_col="user",
+        item_col="item",
+        timestamp_col="ts",
+        test_ratio=0.4,
+    )
+    assert train.n_interactions == 3
+    assert test.n_interactions == 2
+    assert "i3" in test.item_index and "i4" in test.item_index
+    assert "i3" not in train.item_index and "i4" not in train.item_index
+
+
+def test_temporal_split_is_deterministic() -> None:
+    df = pd.DataFrame(
+        {
+            "user": ["u1"] * 5,
+            "item": [f"i{j}" for j in range(5)],
+            "ts": list(range(5)),
+        }
+    )
+    train_a, test_a = temporal_split(
+        df,
+        user_col="user",
+        item_col="item",
+        timestamp_col="ts",
+        test_ratio=0.4,
+    )
+    train_b, test_b = temporal_split(
+        df,
+        user_col="user",
+        item_col="item",
+        timestamp_col="ts",
+        test_ratio=0.4,
+    )
+    assert train_a.n_interactions == train_b.n_interactions
+    assert test_a.n_interactions == test_b.n_interactions
+
+
+def test_temporal_split_does_not_mutate_input() -> None:
+    df = pd.DataFrame(
+        {
+            "user": ["u1"] * 5,
+            "item": [f"i{j}" for j in range(5)],
+            "ts": list(range(5)),
+        }
+    )
+    df_before = df.copy()
+    temporal_split(
+        df,
+        user_col="user",
+        item_col="item",
+        timestamp_col="ts",
+        test_ratio=0.4,
+    )
+    pd.testing.assert_frame_equal(df, df_before)
+
+
+def test_temporal_split_missing_timestamp_col_raises() -> None:
+    df = pd.DataFrame({"user": ["u1"], "item": ["i0"], "ts": [0]})
+    with pytest.raises(InvalidRecommenderParamsError):
+        temporal_split(
+            df,
+            user_col="user",
+            item_col="item",
+            timestamp_col="not_a_col",
+            test_ratio=0.4,
+        )
+
+
+@pytest.mark.parametrize("bad_ratio", [0.0, 1.0])
+def test_temporal_split_bad_test_ratio_raises(bad_ratio: float) -> None:
+    df = pd.DataFrame({"user": ["u1"], "item": ["i0"], "ts": [0]})
+    with pytest.raises(InvalidRecommenderParamsError):
+        temporal_split(
+            df,
+            user_col="user",
+            item_col="item",
+            timestamp_col="ts",
+            test_ratio=bad_ratio,
+        )
+
+
+def test_random_split_is_deterministic_given_seed() -> None:
+    df = pd.DataFrame(
+        {
+            "user": ["u1"] * 5,
+            "item": [f"i{j}" for j in range(5)],
+        }
+    )
+    train_a, test_a = random_split(
+        df,
+        user_col="user",
+        item_col="item",
+        test_ratio=0.4,
+        seed=0,
+    )
+    train_b, test_b = random_split(
+        df,
+        user_col="user",
+        item_col="item",
+        test_ratio=0.4,
+        seed=0,
+    )
+    assert train_a.n_interactions == train_b.n_interactions
+    assert test_a.n_interactions == test_b.n_interactions
+
+
+def test_random_split_differs_across_seeds() -> None:
+    df = pd.DataFrame(
+        {
+            "user": [f"u{j}" for j in range(30)],
+            "item": [f"i{j}" for j in range(30)],
+        }
+    )
+    _, test_a = random_split(
+        df,
+        user_col="user",
+        item_col="item",
+        test_ratio=0.2,
+        seed=0,
+    )
+    _, test_b = random_split(
+        df,
+        user_col="user",
+        item_col="item",
+        test_ratio=0.2,
+        seed=42,
+    )
+    assert set(test_a.item_index) != set(test_b.item_index)
+
+
+def test_random_split_does_not_mutate_input() -> None:
+    df = pd.DataFrame(
+        {
+            "user": ["u1"] * 5,
+            "item": [f"i{j}" for j in range(5)],
+        }
+    )
+    df_before = df.copy()
+    random_split(df, user_col="user", item_col="item", test_ratio=0.4, seed=0)
+    pd.testing.assert_frame_equal(df, df_before)
+
+
+@pytest.mark.parametrize("bad_ratio", [0.0, 1.0])
+def test_random_split_bad_test_ratio_raises(bad_ratio: float) -> None:
+    df = pd.DataFrame({"user": ["u1"], "item": ["i0"]})
+    with pytest.raises(InvalidRecommenderParamsError):
+        random_split(
+            df,
+            user_col="user",
+            item_col="item",
+            test_ratio=bad_ratio,
+            seed=0,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Part C — Type-token compatibility tests for Recommender / InteractionMatrix
+# ---------------------------------------------------------------------------
+
+
+def test_recommender_and_interaction_matrix_tokens_registered() -> None:
+    assert registry.is_registered("Recommender")
+    assert registry.is_registered("InteractionMatrix")
+
+
+def test_recommender_and_interaction_matrix_are_subtypes_of_any() -> None:
+    assert registry.is_subtype("Recommender", TOP_TYPE)
+    assert registry.is_subtype("InteractionMatrix", TOP_TYPE)
+
+
+def test_recommender_and_interaction_matrix_are_flat_not_subtypes_of_each_other_or_dataframe() -> (
+    None
+):
+    assert not registry.is_subtype("Recommender", "DataFrame")
+    assert not registry.is_subtype("InteractionMatrix", "DataFrame")
+    assert not registry.is_subtype("Recommender", "InteractionMatrix")
+    assert not registry.is_subtype("InteractionMatrix", "Recommender")
+
+
+def test_recommender_incompatible_with_dataframe() -> None:
+    result = is_compatible("Recommender", "DataFrame")
+    assert result.verdict == Compatibility.INCOMPATIBLE
+
+
+def test_interaction_matrix_incompatible_with_dataframe() -> None:
+    result = is_compatible("InteractionMatrix", "DataFrame")
+    assert result.verdict == Compatibility.INCOMPATIBLE
+
+
+def test_recommender_and_interaction_matrix_self_compatible() -> None:
+    result = is_compatible("Recommender", "Recommender")
+    assert result.verdict == Compatibility.COMPATIBLE
+    result = is_compatible("InteractionMatrix", "InteractionMatrix")
+    assert result.verdict == Compatibility.COMPATIBLE

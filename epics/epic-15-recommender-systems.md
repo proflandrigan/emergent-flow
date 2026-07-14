@@ -172,31 +172,31 @@ NL->graph agent (the recommender surface it can target widens).
 > load-bearing seam: get it right and every algorithm inherits ADR-0002 equivalence and the
 > `@public_op` inspectable contract — exactly the Epic 8 Story 2 / Epic 12 Story 2 pattern.
 
-- [ ] Implement `InteractionMatrix` as a dataclass wrapping a scipy CSR sparse matrix + user/item
+- [x] Implement `InteractionMatrix` as a dataclass wrapping a scipy CSR sparse matrix + user/item
   ID-to-index mappings (bidirectional) + metadata (n_users, n_items, n_interactions, density,
   explicit-vs-implicit flag). Inspectable via a tidy summary dict on the result-payload contract;
   the raw sparse matrix is **never** serialized. Provide `from_dataframe(df, *, user_col, item_col,
   value_col, implicit)` as the canonical constructor from a tidy events/ratings DataFrame.
-- [ ] Implement `FittedRecommender` (+ per-algorithm-family fields where needed) as a dataclass
+- [x] Implement `FittedRecommender` (+ per-algorithm-family fields where needed) as a dataclass
   whose live-model field degrades to `{"kind": "unsupported"}` on the result-payload contract.
   Confirm the degrade path against the Epic 8/12 precedent. Fields: `algorithm` (str),
   `algorithm_family` (str — baseline/content/collaborative/deep), `n_users` (int), `n_items` (int),
   `fit_stats` (dict — training metrics, sparsity, coverage), `model` (Any — live model object).
-- [ ] Implement `RecommendationResult` wrapping a tidy DataFrame (user_id, item_id, rank, score);
+- [x] Implement `RecommendationResult` wrapping a tidy DataFrame (user_id, item_id, rank, score);
   confirm it is JSON-native and round-trips through the result-payload contract untouched.
-- [ ] `ef.recommend.fit(interactions, *, algorithm, params) -> FittedRecommender` — validates the
+- [x] `ef.recommend.fit(interactions, *, algorithm, params) -> FittedRecommender` — validates the
   algorithm key + params, fits the model on the interaction matrix, and wraps the live model in
   `FittedRecommender` with fit stats. One function; every recommender node's `codegen` emits an
   `ef.recommend.fit(...)` call and its `execute` calls the same function -> ADR-0002 by
   construction.
-- [ ] `ef.recommend.recommend(recommender, *, user_ids, n, exclude_known) ->
+- [x] `ef.recommend.recommend(recommender, *, user_ids, n, exclude_known) ->
   RecommendationResult` — generates top-N recommendations for the given users (or all users),
   optionally excluding items already in the training interactions. One function; every recommend
   node routes through it.
-- [ ] `ef.recommend.similar_items(recommender, *, item_ids, n) -> RecommendationResult` —
+- [x] `ef.recommend.similar_items(recommender, *, item_ids, n) -> RecommendationResult` —
   returns the N most similar items to each given item, for content-based and collaborative models
   that support item-item similarity.
-- [ ] Every wrapper is a `@public_op` returning an inspectable value. Unit tests on the seams
+- [x] Every wrapper is a `@public_op` returning an inspectable value. Unit tests on the seams
   themselves: unknown algorithm key -> typed error; bad params -> typed error; determinism given
   a fixed seed; **no input mutation**; live object never present in the serialized payload.
 
@@ -208,22 +208,22 @@ NL->graph agent (the recommender surface it can target widens).
 > Register them before the algorithm families widen so every new node validates for free. Mirror
 > Epic 8 Story 3 / Epic 12 Story 3.
 
-- [ ] Register `Recommender` (a fitted recommender model — distinct from Epic 8's `Model` and
+- [x] Register `Recommender` (a fitted recommender model — distinct from Epic 8's `Model` and
   Epic 12's `StatsModel`) and `InteractionMatrix` (a prepared user-item interaction dataset) type
   tokens; add Epic 3 rules-as-data compatibility rows to `docs/type-system-spec.md` (a
   `Recommender` wires into recommend/evaluate/similar-items nodes, not into a `DataFrame` input;
   an `InteractionMatrix` wires into recommender-fit nodes, not into a plain `DataFrame` consumer).
-- [ ] Implement `_prepare_interactions` — the **single** interaction-data validation gate shared by
+- [x] Implement `_prepare_interactions` — the **single** interaction-data validation gate shared by
   both `codegen` and `execute` (as `_prepare_declarative` is shared by the compiler and executor /
   `_prepare_model_spec` is shared by stats models): user column exists, item column exists, value
   column exists (or defaults to 1 for implicit), no duplicate user-item pairs (or aggregation
   strategy: sum/mean/max/last), minimum interaction count filters (per-user and per-item), and
   cold-start handling mode (error / warn-and-skip / include).
-- [ ] Implement the `prepare_interactions` node: `DataFrame (+ user_col, item_col, value_col,
+- [x] Implement the `prepare_interactions` node: `DataFrame (+ user_col, item_col, value_col,
   implicit flag, min_user_interactions, min_item_interactions)` -> `InteractionMatrix`. This is
   the recommender family's analog to `train_test_split` — the data-shape boundary between tidy
   DataFrames and the sparse interaction world.
-- [ ] **Temporal train/test splitting for recommenders.** `ef.recommend.temporal_split(interactions,
+- [x] **Temporal train/test splitting for recommenders.** `ef.recommend.temporal_split(interactions,
   *, timestamp_col, test_ratio)` -> `(train_interactions, test_interactions)` — splits by
   timestamp (each user's last N% of interactions go to test), the standard recommender evaluation
   split. Also provide a random split as a simpler alternative. Both return `InteractionMatrix`
