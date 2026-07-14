@@ -159,6 +159,7 @@ Thumbs.db
 .cache/
 tmp/
 temp/
+.serena/
 
 # Bundled UI build artifact (vite build ui/ -> emergentflow/_static/, ADR 0013)
 /emergentflow/_static/
