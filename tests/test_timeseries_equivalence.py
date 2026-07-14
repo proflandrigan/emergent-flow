@@ -48,6 +48,15 @@ def _ts_df(seed: int = 42) -> pd.DataFrame:
     )
 
 
+def test_forecast_arima_args_rejects_explicit_empty_order():
+    """An explicitly-set empty ``order``/``seasonal_order`` must not silently fall back
+    to the default -- it should reach ``forecast_arima``'s length validation and raise."""
+    defn = ForecastArima()
+    node = defn.instantiate(target="value", order=[])
+    with pytest.raises(ValueError):
+        defn.execute(node, inputs={"frame": _ts_df()})
+
+
 # ---------------------------------------------------------------------------
 # Forecasting / decomposition nodes -- dataclass output.
 # ---------------------------------------------------------------------------

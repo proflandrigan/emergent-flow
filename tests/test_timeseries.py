@@ -256,3 +256,39 @@ def test_twa_no_mutation(ts_df):
     before = ts_df.copy(deep=True)
     time_weighted_aggregate(ts_df, columns=["value"], date_col="date", decay="linear", window=5)
     pd.testing.assert_frame_equal(ts_df, before)
+
+
+# --------------------------------------------------------------------------
+# output column collisions -- must raise rather than silently overwrite,
+# mirroring emergentflow.ml.fit_transform's collision check.
+# --------------------------------------------------------------------------
+
+
+def test_ewma_raises_on_existing_output_column(ts_df):
+    ts_df["value_ewma"] = "should-not-be-overwritten"
+    with pytest.raises(ValueError):
+        ewma(ts_df, columns=["value"], span=10)
+
+
+def test_lag_features_raises_on_existing_output_column(ts_df):
+    ts_df["value_lag_1"] = "should-not-be-overwritten"
+    with pytest.raises(ValueError):
+        lag_features(ts_df, columns=["value"], lags=[1, 3])
+
+
+def test_rolling_aggregate_raises_on_existing_output_column(ts_df):
+    ts_df["value_rolling_mean_5"] = "should-not-be-overwritten"
+    with pytest.raises(ValueError):
+        rolling_aggregate(ts_df, columns=["value"], window=5, agg="mean")
+
+
+def test_difference_raises_on_existing_output_column(ts_df):
+    ts_df["value_diff_1"] = "should-not-be-overwritten"
+    with pytest.raises(ValueError):
+        difference(ts_df, columns=["value"], periods=1)
+
+
+def test_time_weighted_aggregate_raises_on_existing_output_column(ts_df):
+    ts_df["value_tw_linear"] = "should-not-be-overwritten"
+    with pytest.raises(ValueError):
+        time_weighted_aggregate(ts_df, columns=["value"], date_col="date", decay="linear", window=5)

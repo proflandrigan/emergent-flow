@@ -126,6 +126,16 @@ def _validate_columns(df: pd.DataFrame, columns: list[str]) -> None:
         raise TimeseriesError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
 
 
+def _check_new_columns(df: pd.DataFrame, new_columns: list[str]) -> None:
+    """Guard against silently overwriting existing columns, mirroring
+    ``emergentflow.ml.fit_transform``'s collision check."""
+    collisions = [c for c in new_columns if c in df.columns]
+    if collisions:
+        raise TimeseriesError(
+            f"df already has columns {collisions!r}; rename them before transforming."
+        )
+
+
 @public_op(name="ef.timeseries.forecast_arima")
 def forecast_arima(
     df: pd.DataFrame,
@@ -293,6 +303,7 @@ def ewma(
         raise TimeseriesError(
             f"exactly one of span, halflife, alpha must be given; got {len(given)}."
         )
+    _check_new_columns(df, [f"{col}{suffix}" for col in columns])
     result = df.copy()
     for col in columns:
         result[f"{col}{suffix}"] = df[col].ewm(span=span, halflife=halflife, alpha=alpha).mean()
@@ -316,6 +327,7 @@ def lag_features(
         raise TimeseriesError("lags must be a non-empty list of integers.")
     if any(lag < 1 for lag in lags):
         raise TimeseriesError(f"all lags must be >= 1; got {lags!r}.")
+    _check_new_columns(df, [f"{col}_lag_{lag}" for col in columns for lag in lags])
     result = df.copy()
     for col in columns:
         for lag in lags:
@@ -343,6 +355,7 @@ def rolling_aggregate(
         raise TimeseriesError(f"unknown agg {agg!r}; expected one of {list(_ROLLING_AGGS)!r}.")
     if window < 1:
         raise TimeseriesError(f"window must be >= 1; got {window}.")
+    _check_new_columns(df, [f"{col}_rolling_{agg}_{window}" for col in columns])
     result = df.copy()
     for col in columns:
         rolling = df[col].rolling(window, min_periods=min_periods)
@@ -369,6 +382,10 @@ def difference(
         raise TimeseriesError(f"periods must be >= 1; got {periods}.")
     if seasonal_periods is not None and seasonal_periods < 1:
         raise TimeseriesError(f"seasonal_periods must be >= 1; got {seasonal_periods}.")
+    new_columns = [f"{col}_diff_{periods}" for col in columns]
+    if seasonal_periods is not None:
+        new_columns += [f"{col}_seasonal_diff_{seasonal_periods}" for col in columns]
+    _check_new_columns(df, new_columns)
     result = df.copy()
     for col in columns:
         result[f"{col}_diff_{periods}"] = df[col].diff(periods)
@@ -416,6 +433,7 @@ def time_weighted_aggregate(
         raise TimeseriesError(f"decay must be one of {list(_DECAY_METHODS)!r}; got {decay!r}.")
     if window is not None and window < 1:
         raise TimeseriesError(f"window must be >= 1; got {window}.")
+    _check_new_columns(df, [f"{col}_tw_{decay}" for col in columns])
 
     fn = _linear_weighted_mean if decay == "linear" else _exponential_weighted_mean
     result = df.copy()

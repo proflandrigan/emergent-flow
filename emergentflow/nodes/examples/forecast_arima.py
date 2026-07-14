@@ -92,8 +92,8 @@ class ForecastArima(NodeDefinition):
 
     def _args(self, node: Node) -> dict[str, Any]:
         values = {p.name: p.value for p in node.params}
-        order = tuple(cast("list[int]", values.get("order") or [1, 0, 0]))
-        seasonal_order = tuple(cast("list[int]", values.get("seasonal_order") or [0, 0, 0, 0]))
+        order = tuple(cast("list[int]", values.get("order", [1, 0, 0])))
+        seasonal_order = tuple(cast("list[int]", values.get("seasonal_order", [0, 0, 0, 0])))
         return {
             "target": cast(str, values.get("target")),
             "order": order,
