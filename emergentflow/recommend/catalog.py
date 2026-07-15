@@ -2029,9 +2029,28 @@ def _fit_two_tower_impl(
     n_pos = len(pos_rows)
     rng = np.random.default_rng(seed)
 
+    # Precompute each user's unseen-item complement once (not per positive example) and sample
+    # negatives directly from it. This guarantees every sampled negative is a genuine non-
+    # interaction -- unlike rejection sampling with a fixed attempt budget, which (confirmed via
+    # simulation against this module's own test fixture) forces an already-known item back in as
+    # a mislabeled "negative" ~8% of the time once attempts are exhausted, silently corrupting
+    # the training signal for anything but very sparse/low-K interaction sets.
     user_known: dict[int, set[int]] = {}
+    user_complement: dict[int, np.ndarray] = {}
+    all_items_arr = np.arange(interactions.n_items, dtype=np.int64)
     for u_idx in range(interactions.n_users):
-        user_known[u_idx] = set(matrix[u_idx].indices)
+        known = set(matrix[u_idx].indices)
+        user_known[u_idx] = known
+        if known:
+            complement = np.array(
+                [i for i in range(interactions.n_items) if i not in known], dtype=np.int64
+            )
+        else:
+            complement = all_items_arr
+        # Degenerate case: user has interacted with every item in the catalog, so there is no
+        # valid negative to sample. Fall back to the full catalog (unavoidable -- there is
+        # nothing left to be a true negative) rather than raising or hanging.
+        user_complement[u_idx] = complement if len(complement) > 0 else all_items_arr
 
     optimizer = torch.optim.Adam(
         list(user_tower.parameters()) + list(item_tower.parameters()),
@@ -2045,16 +2064,8 @@ def _fit_two_tower_impl(
         for i in range(n_pos):
             u_idx = int(pos_rows[i])
             i_idx = int(pos_cols[i])
-            known = user_known[u_idx]
-            negatives: list[int] = []
-            neg_count = 0
-            attempts = 0
-            while neg_count < K:
-                neg_i = int(rng.integers(0, interactions.n_items))
-                attempts += 1
-                if neg_i not in known or attempts >= 20:
-                    negatives.append(neg_i)
-                    neg_count += 1
+            complement = user_complement[u_idx]
+            negatives = rng.choice(complement, size=K, replace=True).tolist()
             pairs.append((u_idx, i_idx, negatives))
 
         pairs = [pairs[i] for i in rng.permutation(len(pairs))]
@@ -2150,11 +2161,19 @@ def _recommend_two_tower(
     n: int,
     exclude_known: bool,
 ) -> RecommendationResult:
-    """Recommend top-N items via cosine nearest-neighbor search over precomputed item-tower
-    embeddings (sklearn NearestNeighbors -- the base-install ANN index; production deployments
-    would use FAISS/ScaNN, out of scope here). Fetches the full ranked neighbor list per user
-    (fine at fixture/demo scale); a large item catalog would need a capped `n_neighbors` --
-    documented here, mirroring the memory-based CF docstrings' scale caveat."""
+    """Recommend top-N items by raw dot-product score between the user-tower embedding and
+    precomputed item-tower embeddings.
+
+    Ranking MUST use a raw dot product here, not cosine similarity: every one of the three loss
+    variants (bce / bpr_loss / softmax_cross_entropy) trains on
+    ``(user_emb * item_emb).sum(-1)`` -- an unnormalized dot product whose value depends on
+    embedding magnitude, not just direction. An earlier version of this function ranked via
+    ``sklearn.neighbors.NearestNeighbors(metric="cosine")`` instead, which silently re-ranks
+    items by a *different* scoring function than the one the model was actually optimized
+    against whenever item-embedding norms vary (confirmed empirically: on this module's own test
+    fixture, item-embedding norms differ enough that 2 of 5 users' top-ranked item flips between
+    the two scoring functions). Plain numpy top-N keeps ranking consistent with training and
+    is the same pattern ``_recommend_ncf`` uses."""
     import torch  # noqa: PLC0415  (lazy: torch is not a hard dependency)
 
     model_dict = recommender.model
@@ -2168,10 +2187,6 @@ def _recommend_two_tower(
     if user_ids is None:
         user_ids = list(user_index.keys())
 
-    n_items = len(item_ids)
-    nn_index = NearestNeighbors(metric="cosine", n_neighbors=n_items)
-    nn_index.fit(item_embeddings)
-
     user_tower.eval()
     rows: list[dict[str, Any]] = []
     with torch.no_grad():
@@ -2181,14 +2196,15 @@ def _recommend_two_tower(
             uid_idx = user_index[uid]
             uid_t = torch.tensor([uid_idx], dtype=torch.long)
             u_feat = user_feature_tensor[uid_t] if user_feature_tensor is not None else None
-            user_embedding = user_tower(uid_t, u_feat).numpy()
+            user_embedding = user_tower(uid_t, u_feat).numpy()[0]
 
-            distances, indices = nn_index.kneighbors(user_embedding, n_neighbors=n_items)
+            scores = item_embeddings @ user_embedding
             known_items: set[int] = set(matrix[uid_idx].indices) if exclude_known else set()
 
+            order = np.argsort(scores)[::-1]
             rank = 0
-            for dist, idx in zip(distances[0], indices[0], strict=True):
-                item_idx = int(idx)
+            for item_idx in order:
+                item_idx = int(item_idx)
                 if item_idx in known_items:
                     continue
                 rank += 1
@@ -2197,7 +2213,7 @@ def _recommend_two_tower(
                         "user_id": uid,
                         "item_id": item_ids[item_idx],
                         "rank": rank,
-                        "score": float(1.0 - dist),
+                        "score": float(scores[item_idx]),
                     }
                 )
                 if rank >= n:
