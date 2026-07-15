@@ -1677,3 +1677,578 @@ register_recommender(
         "emergentflow[recommend] extra. Deterministic given seed.",
     )
 )
+
+
+# ===================================================================
+# ncf (deep, requires torch)
+# ===================================================================
+
+
+def _fit_ncf(
+    interactions: InteractionMatrix,
+    item_features: pd.DataFrame | None,
+    params: dict[str, Any],
+) -> FittedRecommender:
+    """Fit a Neural Collaborative Filtering model (GMF + MLP, He et al. 2017). Requires torch
+    (checked by ``ef.recommend.fit`` before this fitter ever runs -- see module/task docs).
+
+    ``item_features`` is accepted but ignored: NCF is a pure collaborative deep model using only
+    the interaction matrix."""
+    import torch  # noqa: PLC0415  (lazy: torch is not a hard dependency)
+    import torch.nn as nn  # noqa: PLC0415  (lazy: torch is not a hard dependency)
+
+    embedding_dim = int(params.get("embedding_dim", 8))
+    mlp_layers: list = list(params.get("mlp_layers", [32, 16, 8]))
+    epochs = int(params.get("epochs", 20))
+    batch_size = int(params.get("batch_size", 256))
+    learning_rate = float(params.get("learning_rate", 0.01))
+    negative_samples = int(params.get("negative_samples", 4))
+    seed = int(params.get("seed", 0))
+
+    torch.manual_seed(seed)
+    torch.use_deterministic_algorithms(True)
+
+    n_users = interactions.n_users
+    n_items = interactions.n_items
+    matrix = interactions.matrix
+
+    class _NCFModel(nn.Module):
+        def __init__(
+            self, n_users: int, n_items: int, embedding_dim: int, mlp_layers: list[int]
+        ) -> None:
+            super().__init__()
+            self.user_emb_gmf = nn.Embedding(n_users, embedding_dim)
+            self.item_emb_gmf = nn.Embedding(n_items, embedding_dim)
+            self.user_emb_mlp = nn.Embedding(n_users, embedding_dim)
+            self.item_emb_mlp = nn.Embedding(n_items, embedding_dim)
+
+            layers: list[nn.Module] = []
+            prev_dim = 2 * embedding_dim
+            for layer_size in mlp_layers:
+                layers.append(nn.Linear(prev_dim, layer_size))
+                layers.append(nn.ReLU())
+                prev_dim = layer_size
+            self.mlp = nn.Sequential(*layers)
+
+            self.output = nn.Linear(embedding_dim + mlp_layers[-1], 1)
+
+        def forward(self, user_idx: torch.LongTensor, item_idx: torch.LongTensor) -> torch.Tensor:
+            gmf = self.user_emb_gmf(user_idx) * self.item_emb_gmf(item_idx)
+            mlp_in = torch.cat([self.user_emb_mlp(user_idx), self.item_emb_mlp(item_idx)], dim=-1)
+            mlp_out = self.mlp(mlp_in)
+            combined = torch.cat([gmf, mlp_out], dim=-1)
+            return self.output(combined).squeeze(-1)
+
+    model = _NCFModel(n_users, n_items, embedding_dim, mlp_layers)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    criterion = nn.BCEWithLogitsLoss()
+
+    pos_rows, pos_cols = matrix.nonzero()
+    n_pos = len(pos_rows)
+    rng = np.random.default_rng(seed)
+
+    user_known: dict[int, set[int]] = {}
+    for u_idx in range(n_users):
+        user_known[u_idx] = set(matrix[u_idx].indices)
+
+    final_loss = 0.0
+    for _epoch in range(epochs):
+        train_users: list[int] = []
+        train_items: list[int] = []
+        train_labels: list[float] = []
+
+        for i in range(n_pos):
+            u_idx = int(pos_rows[i])
+            i_idx = int(pos_cols[i])
+
+            train_users.append(u_idx)
+            train_items.append(i_idx)
+            train_labels.append(1.0)
+
+            known = user_known[u_idx]
+            neg_count = 0
+            attempts = 0
+            while neg_count < negative_samples and attempts < 20:
+                neg_i = int(rng.integers(0, n_items))
+                attempts += 1
+                if neg_i not in known:
+                    train_users.append(u_idx)
+                    train_items.append(neg_i)
+                    train_labels.append(0.0)
+                    neg_count += 1
+
+        indices = rng.permutation(len(train_users))
+        train_users_arr = np.array(train_users, dtype=np.int64)[indices]
+        train_items_arr = np.array(train_items, dtype=np.int64)[indices]
+        train_labels_arr = np.array(train_labels, dtype=np.float32)[indices]
+
+        n_train = len(train_users_arr)
+        epoch_loss = 0.0
+        n_batches = 0
+
+        for start in range(0, n_train, batch_size):
+            end = start + batch_size
+            u_batch = torch.from_numpy(train_users_arr[start:end])
+            i_batch = torch.from_numpy(train_items_arr[start:end])
+            l_batch = torch.from_numpy(train_labels_arr[start:end])
+
+            optimizer.zero_grad()
+            outputs = model(u_batch, i_batch)
+            loss = criterion(outputs, l_batch)
+            loss.backward()
+            optimizer.step()
+
+            epoch_loss += loss.item()
+            n_batches += 1
+
+        final_loss = epoch_loss / max(n_batches, 1)
+
+    model.eval()
+
+    return FittedRecommender(
+        algorithm="ncf",
+        algorithm_family="deep",
+        n_users=interactions.n_users,
+        n_items=interactions.n_items,
+        fit_stats={
+            "n_interactions": interactions.n_interactions,
+            "sparsity": 1.0 - interactions.density,
+            "embedding_dim": embedding_dim,
+            "epochs": epochs,
+            "final_loss": final_loss,
+        },
+        model={
+            "model": model,
+            "item_ids": interactions.item_ids,
+            "matrix": interactions.matrix,
+            "user_index": interactions.user_index,
+            "item_index": interactions.item_index,
+        },
+    )
+
+
+def _recommend_ncf(
+    recommender: FittedRecommender,
+    user_ids: list[Any] | None,
+    n: int,
+    exclude_known: bool,
+) -> RecommendationResult:
+    """Recommend top-N unseen items via a fitted NCF model."""
+    import torch  # noqa: PLC0415  (lazy: torch is not a hard dependency)
+
+    model_dict = recommender.model
+    model = model_dict["model"]
+    item_ids = model_dict["item_ids"]
+    matrix = model_dict["matrix"]
+    user_index = model_dict["user_index"]
+
+    if user_ids is None:
+        user_ids = list(user_index.keys())
+
+    n_items = len(item_ids)
+    model.eval()
+
+    rows: list[dict[str, Any]] = []
+    with torch.no_grad():
+        for uid in user_ids:
+            if uid not in user_index:
+                continue
+            uid_idx = user_index[uid]
+            known_items: set[int] = set(matrix[uid_idx].indices) if exclude_known else set()
+            candidates = [i for i in range(n_items) if i not in known_items]
+            if not candidates:
+                continue
+
+            user_idx_t = torch.full((len(candidates),), uid_idx, dtype=torch.long)
+            item_idx_t = torch.tensor(candidates, dtype=torch.long)
+            scores = torch.sigmoid(model(user_idx_t, item_idx_t)).numpy()
+
+            top_positions = np.argsort(scores)[::-1][:n]
+            for rank, pos in enumerate(top_positions, start=1):
+                rows.append(
+                    {
+                        "user_id": uid,
+                        "item_id": item_ids[candidates[pos]],
+                        "rank": rank,
+                        "score": float(scores[pos]),
+                    }
+                )
+
+    return RecommendationResult(recommendations=pd.DataFrame(rows))
+
+
+register_recommender(
+    RecommenderSpec(
+        key="ncf",
+        family="deep",
+        fitter=_fit_ncf,
+        recommend_fn=_recommend_ncf,
+        similar_items_fn=None,
+        required_params=(),
+        optional_params=(
+            "embedding_dim",
+            "mlp_layers",
+            "epochs",
+            "batch_size",
+            "learning_rate",
+            "negative_samples",
+            "n",
+            "seed",
+        ),
+        requires_extra="torch",
+        handles_cold_start_users=False,
+        handles_cold_start_items=False,
+        description="Neural Collaborative Filtering (GMF + MLP, He et al. 2017) -- "
+        "requires the optional torch dependency. Deterministic given seed.",
+    )
+)
+
+
+# ===================================================================
+# two_tower (deep, requires torch)
+# ===================================================================
+
+
+def _align_user_features(
+    user_features: pd.DataFrame,
+    user_id_col: str,
+    interactions: InteractionMatrix,
+) -> pd.DataFrame:
+    """Reindex *user_features* to ``interactions.user_ids`` order -- the user-side sibling of
+    ``_align_item_features``, used only by the two-tower model's optional user-feature input.
+
+    Users in ``interactions.user_ids`` missing a row in *user_features* get an all-NaN row (the
+    caller degrades this to a zero feature vector); rows in *user_features* for users not in
+    ``interactions.user_index`` are dropped. Raises :class:`InvalidRecommenderParamsError` if
+    *user_id_col* has duplicate values.
+    """
+    duplicated = user_features[user_id_col].duplicated()
+    if duplicated.any():
+        dupes = sorted(user_features.loc[duplicated, user_id_col].unique().tolist())
+        raise InvalidRecommenderParamsError(
+            f"user_features has duplicate {user_id_col!r} value(s): {dupes!r}; "
+            "each user must appear at most once."
+        )
+    return user_features.set_index(user_id_col).reindex(interactions.user_ids)
+
+
+def _fit_two_tower_impl(
+    interactions: InteractionMatrix,
+    item_features: pd.DataFrame | None,
+    user_features: pd.DataFrame | None,
+    params: dict[str, Any],
+) -> FittedRecommender:
+    import torch  # noqa: PLC0415  (lazy: torch is not a hard dependency)
+    import torch.nn as nn  # noqa: PLC0415  (lazy: torch is not a hard dependency)
+    import torch.nn.functional as F  # noqa: PLC0415  (lazy: torch is not a hard dependency)
+
+    embedding_dim = int(params.get("user_embedding_dim", 16))
+    item_embedding_dim = int(params.get("item_embedding_dim", 16))
+    if embedding_dim != item_embedding_dim:
+        raise InvalidRecommenderParamsError(
+            "two_tower requires user_embedding_dim == item_embedding_dim "
+            f"(dot-product scoring needs a shared embedding space); got "
+            f"user_embedding_dim={embedding_dim!r}, "
+            f"item_embedding_dim={item_embedding_dim!r}."
+        )
+    user_tower_layers = list(params.get("user_tower_layers", [32]))
+    item_tower_layers = list(params.get("item_tower_layers", [32]))
+    loss = str(params.get("loss", "bce"))
+    if loss not in {"bce", "softmax_cross_entropy", "bpr_loss"}:
+        raise InvalidRecommenderParamsError(
+            f"unknown loss {loss!r} for two_tower; expected one of "
+            "{'bce', 'softmax_cross_entropy', 'bpr_loss'}."
+        )
+    negative_sampling_ratio = int(params.get("negative_sampling_ratio", 4))
+    epochs = int(params.get("epochs", 10))
+    batch_size = int(params.get("batch_size", 64))
+    learning_rate = float(params.get("learning_rate", 0.01))
+    seed = int(params.get("seed", 0))
+    item_id_col = str(params.get("item_id_col", "item_id"))
+    user_id_col = str(params.get("user_id_col", "user_id"))
+
+    torch.manual_seed(seed)
+    torch.use_deterministic_algorithms(True)
+
+    if item_features is not None:
+        aligned_items = _align_item_features(item_features, item_id_col, interactions)
+        item_numeric_cols = aligned_items.select_dtypes(include="number").columns.tolist()
+        if item_numeric_cols:
+            item_feat_tensor = torch.tensor(
+                aligned_items[item_numeric_cols].fillna(0.0).to_numpy(dtype=np.float32)
+            )
+            item_feature_dim = len(item_numeric_cols)
+        else:
+            item_feat_tensor = None
+            item_feature_dim = 0
+    else:
+        item_feat_tensor = None
+        item_feature_dim = 0
+
+    if user_features is not None:
+        aligned_users = _align_user_features(user_features, user_id_col, interactions)
+        user_numeric_cols = aligned_users.select_dtypes(include="number").columns.tolist()
+        if user_numeric_cols:
+            user_feat_tensor = torch.tensor(
+                aligned_users[user_numeric_cols].fillna(0.0).to_numpy(dtype=np.float32)
+            )
+            user_feature_dim = len(user_numeric_cols)
+        else:
+            user_feat_tensor = None
+            user_feature_dim = 0
+    else:
+        user_feat_tensor = None
+        user_feature_dim = 0
+
+    class _Tower(nn.Module):
+        def __init__(self, n_ids, feature_dim, hidden_layers, output_dim):
+            super().__init__()
+            self.id_embedding = nn.Embedding(n_ids, output_dim)
+            input_dim = output_dim + feature_dim
+            layers: list[nn.Module] = []
+            prev_dim = input_dim
+            for h in hidden_layers:
+                layers.append(nn.Linear(prev_dim, h))
+                layers.append(nn.ReLU())
+                prev_dim = h
+            layers.append(nn.Linear(prev_dim, output_dim))
+            self.mlp = nn.Sequential(*layers)
+
+        def forward(
+            self, ids: torch.LongTensor, features: torch.Tensor | None = None
+        ) -> torch.Tensor:
+            emb = self.id_embedding(ids)
+            x = torch.cat([emb, features], dim=-1) if features is not None else emb
+            return self.mlp(x)
+
+    user_tower = _Tower(interactions.n_users, user_feature_dim, user_tower_layers, embedding_dim)
+    item_tower = _Tower(interactions.n_items, item_feature_dim, item_tower_layers, embedding_dim)
+
+    matrix = interactions.matrix
+    pos_rows, pos_cols = matrix.nonzero()
+    n_pos = len(pos_rows)
+    rng = np.random.default_rng(seed)
+
+    user_known: dict[int, set[int]] = {}
+    for u_idx in range(interactions.n_users):
+        user_known[u_idx] = set(matrix[u_idx].indices)
+
+    optimizer = torch.optim.Adam(
+        list(user_tower.parameters()) + list(item_tower.parameters()),
+        lr=learning_rate,
+    )
+
+    K = negative_sampling_ratio
+    final_loss = 0.0
+    for _epoch in range(epochs):
+        pairs: list[tuple[int, int, list[int]]] = []
+        for i in range(n_pos):
+            u_idx = int(pos_rows[i])
+            i_idx = int(pos_cols[i])
+            known = user_known[u_idx]
+            negatives: list[int] = []
+            neg_count = 0
+            attempts = 0
+            while neg_count < K:
+                neg_i = int(rng.integers(0, interactions.n_items))
+                attempts += 1
+                if neg_i not in known or attempts >= 20:
+                    negatives.append(neg_i)
+                    neg_count += 1
+            pairs.append((u_idx, i_idx, negatives))
+
+        pairs = [pairs[i] for i in rng.permutation(len(pairs))]
+        n_pairs = len(pairs)
+        epoch_loss = 0.0
+        n_batches = 0
+
+        for start in range(0, n_pairs, batch_size):
+            end = min(start + batch_size, n_pairs)
+            batch = pairs[start:end]
+
+            u_batch = torch.tensor([p[0] for p in batch], dtype=torch.long)
+            pos_batch = torch.tensor([p[1] for p in batch], dtype=torch.long)
+            neg_batch = torch.tensor([p[2] for p in batch], dtype=torch.long)
+
+            u_feat = user_feat_tensor[u_batch] if user_feat_tensor is not None else None
+            pos_feat = item_feat_tensor[pos_batch] if item_feat_tensor is not None else None
+            neg_flat = neg_batch.reshape(-1)
+            neg_feat = item_feat_tensor[neg_flat] if item_feat_tensor is not None else None
+
+            user_emb = user_tower(u_batch, u_feat)
+            pos_item_emb = item_tower(pos_batch, pos_feat)
+            neg_item_emb = item_tower(neg_flat, neg_feat).reshape(len(batch), -1, embedding_dim)
+
+            pos_score = (user_emb * pos_item_emb).sum(dim=-1)
+            neg_score = (user_emb.unsqueeze(1) * neg_item_emb).sum(dim=-1)
+
+            if loss == "bce":
+                all_scores = torch.cat([pos_score.unsqueeze(1), neg_score], dim=1).reshape(-1)
+                all_labels = torch.cat(
+                    [
+                        torch.ones_like(pos_score).unsqueeze(1),
+                        torch.zeros_like(neg_score),
+                    ],
+                    dim=1,
+                ).reshape(-1)
+                batch_loss = nn.BCEWithLogitsLoss()(all_scores, all_labels)
+            elif loss == "bpr_loss":
+                diff = pos_score.unsqueeze(1) - neg_score
+                batch_loss = -F.logsigmoid(diff).mean()
+            else:  # softmax_cross_entropy
+                logits = torch.cat([pos_score.unsqueeze(1), neg_score], dim=1)
+                target = torch.zeros(len(batch), dtype=torch.long)
+                batch_loss = nn.CrossEntropyLoss()(logits, target)
+
+            optimizer.zero_grad()
+            batch_loss.backward()
+            optimizer.step()
+
+            epoch_loss += batch_loss.item()
+            n_batches += 1
+
+        final_loss = epoch_loss / max(n_batches, 1)
+
+    user_tower.eval()
+    item_tower.eval()
+
+    with torch.no_grad():
+        all_item_ids_t = torch.arange(interactions.n_items, dtype=torch.long)
+        item_embeddings = item_tower(all_item_ids_t, item_feat_tensor).numpy()
+
+    return FittedRecommender(
+        algorithm="two_tower",
+        algorithm_family="deep",
+        n_users=interactions.n_users,
+        n_items=interactions.n_items,
+        fit_stats={
+            "n_interactions": interactions.n_interactions,
+            "sparsity": 1.0 - interactions.density,
+            "embedding_dim": embedding_dim,
+            "epochs": epochs,
+            "loss": loss,
+            "final_loss": final_loss,
+            "item_feature_dim": item_feature_dim,
+            "user_feature_dim": user_feature_dim,
+        },
+        model={
+            "user_tower": user_tower,
+            "item_embeddings": item_embeddings,
+            "user_feature_tensor": user_feat_tensor,
+            "item_ids": interactions.item_ids,
+            "matrix": interactions.matrix,
+            "user_index": interactions.user_index,
+            "item_index": interactions.item_index,
+            "embedding_dim": embedding_dim,
+        },
+    )
+
+
+def _recommend_two_tower(
+    recommender: FittedRecommender,
+    user_ids: list[Any] | None,
+    n: int,
+    exclude_known: bool,
+) -> RecommendationResult:
+    """Recommend top-N items via cosine nearest-neighbor search over precomputed item-tower
+    embeddings (sklearn NearestNeighbors -- the base-install ANN index; production deployments
+    would use FAISS/ScaNN, out of scope here). Fetches the full ranked neighbor list per user
+    (fine at fixture/demo scale); a large item catalog would need a capped `n_neighbors` --
+    documented here, mirroring the memory-based CF docstrings' scale caveat."""
+    import torch  # noqa: PLC0415  (lazy: torch is not a hard dependency)
+
+    model_dict = recommender.model
+    user_tower = model_dict["user_tower"]
+    item_embeddings = model_dict["item_embeddings"]
+    user_feature_tensor = model_dict["user_feature_tensor"]
+    item_ids = model_dict["item_ids"]
+    matrix = model_dict["matrix"]
+    user_index = model_dict["user_index"]
+
+    if user_ids is None:
+        user_ids = list(user_index.keys())
+
+    n_items = len(item_ids)
+    nn_index = NearestNeighbors(metric="cosine", n_neighbors=n_items)
+    nn_index.fit(item_embeddings)
+
+    user_tower.eval()
+    rows: list[dict[str, Any]] = []
+    with torch.no_grad():
+        for uid in user_ids:
+            if uid not in user_index:
+                continue
+            uid_idx = user_index[uid]
+            uid_t = torch.tensor([uid_idx], dtype=torch.long)
+            u_feat = user_feature_tensor[uid_t] if user_feature_tensor is not None else None
+            user_embedding = user_tower(uid_t, u_feat).numpy()
+
+            distances, indices = nn_index.kneighbors(user_embedding, n_neighbors=n_items)
+            known_items: set[int] = set(matrix[uid_idx].indices) if exclude_known else set()
+
+            rank = 0
+            for dist, idx in zip(distances[0], indices[0], strict=True):
+                item_idx = int(idx)
+                if item_idx in known_items:
+                    continue
+                rank += 1
+                rows.append(
+                    {
+                        "user_id": uid,
+                        "item_id": item_ids[item_idx],
+                        "rank": rank,
+                        "score": float(1.0 - dist),
+                    }
+                )
+                if rank >= n:
+                    break
+
+    return RecommendationResult(recommendations=pd.DataFrame(rows))
+
+
+def _fit_two_tower(
+    interactions: InteractionMatrix,
+    item_features: pd.DataFrame | None,
+    params: dict[str, Any],
+) -> FittedRecommender:
+    """Fitter shim satisfying the shared 3-argument Fitter callable type (Story 2) so
+    'two_tower' also works through the generic RecommendFit node with item-features only
+    (no user_features port exists on that generic node). Full item + user side-feature
+    support is available via the dedicated ef.recommend.fit_two_tower() wrapper / the
+    dedicated RecommendFitTwoTower node (Story 11), both of which call
+    _fit_two_tower_impl directly with a real user_features argument."""
+    return _fit_two_tower_impl(interactions, item_features, None, params)
+
+
+register_recommender(
+    RecommenderSpec(
+        key="two_tower",
+        family="deep",
+        fitter=_fit_two_tower,
+        recommend_fn=_recommend_two_tower,
+        similar_items_fn=None,
+        required_params=(),
+        optional_params=(
+            "user_embedding_dim",
+            "item_embedding_dim",
+            "user_tower_layers",
+            "item_tower_layers",
+            "loss",
+            "negative_sampling_ratio",
+            "epochs",
+            "batch_size",
+            "learning_rate",
+            "seed",
+            "item_id_col",
+            "user_id_col",
+            "n",
+        ),
+        requires_extra="torch",
+        handles_cold_start_users=False,
+        handles_cold_start_items=False,
+        description="Two-tower retrieval model (separate user/item encoder towers, dot-product "
+        "scoring) -- requires the optional torch dependency. Optionally consumes item-side "
+        "features via the generic node; full item+user side features via "
+        "ef.recommend.fit_two_tower(). Deterministic given seed.",
+    )
+)
