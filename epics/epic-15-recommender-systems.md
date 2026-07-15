@@ -238,7 +238,7 @@ NL->graph agent (the recommender surface it can target widens).
 > The simplest recommenders — zero learning, pure heuristics. Every production recommender system
 > starts here as the baseline to beat. All run on existing hard deps (pandas/numpy/scipy).
 
-- [ ] **Registry entries** for the baseline archetype:
+- [x] **Registry entries** for the baseline archetype:
   - **Random:** recommends N random items per user, optionally weighted by item frequency. Params:
     `n`, `seed`. Deterministic given `seed`.
   - **Popularity (global):** recommends the N most-interacted-with items globally, the same list
@@ -248,19 +248,25 @@ NL->graph agent (the recommender surface it can target widens).
   - **Co-occurrence / association rules:** for each item a user has interacted with, find items
     frequently co-occurring (lift / confidence / support). Params: `n`, `metric` (lift /
     confidence / support), `min_support`.
-- [ ] Each baseline node emits `FittedRecommender` (with `algorithm_family="baseline"`) + a tidy
+- [x] Each baseline node emits `FittedRecommender` (with `algorithm_family="baseline"`) + a tidy
   recommendation `DataFrame`. The `FittedRecommender.model` for baselines is a lightweight dict/
   DataFrame (item scores, co-occurrence matrix) — no external model object.
 - [ ] Golden `ast.parse` + `ruff check` on a representative baseline (a popularity graph via a
   real `load_sample -> prepare_interactions -> fit -> recommend` graph), plus the parametrized
-  equivalence slice (Story 13) over the baseline keys.
+  equivalence slice (Story 13) over the baseline keys. **Partially done:** `ast.parse` +
+  execute-vs-codegen equivalence exists for one representative key (`popularity`) via
+  `tests/test_recommend_baseline_catalog.py`, and I independently verified (not as a committed
+  test) that a real `load_sample -> prepare_interactions -> recommend.fit -> recommend.recommend`
+  graph compiles to `ruff`-clean code. Not done: an automated `ruff check` gate on generated code,
+  and equivalence coverage for `random`/`popularity_segmented`/`co_occurrence` — the full
+  parametrized matrix is Story 13's harness, which hasn't landed yet.
 
 ## Story 5 — Content-based filtering (TF-IDF, feature KNN, embedding similarity)
 
 > Recommenders that leverage item (and optionally user) features rather than interaction patterns.
 > All backed by sklearn / scipy — no new deps.
 
-- [ ] **Registry entries** for the content-based archetype:
+- [x] **Registry entries** for the content-based archetype:
   - **TF-IDF + cosine similarity:** given a text-feature column on items (title, description,
     tags), builds a TF-IDF matrix and recommends items most similar (cosine) to a user's
     interaction history (centroid of interacted-item TF-IDF vectors). Params: `text_col`,
@@ -272,13 +278,19 @@ NL->graph agent (the recommender surface it can target widens).
   - **Embedding similarity:** given a dense embedding column (produced by `ef.llm.embed` or
     user-supplied), recommends items whose embeddings are nearest to the user's profile embedding
     (mean of interacted-item embeddings). Params: `embedding_col`, `n`, `metric`.
-- [ ] Content-based nodes take **two** inputs: the `InteractionMatrix` (who interacted with what)
+- [x] Content-based nodes take **two** inputs: the `InteractionMatrix` (who interacted with what)
   **and** an item-features `DataFrame` (the content to match on). The port shape is distinct from
   baselines (which need only the interaction matrix) and from collaborative filtering (which needs
   only the interaction matrix). Record this as a deliberate archetype-shape decision, not a
   limitation.
 - [ ] Golden + equivalence via the Story 13 harness on fixtures with known text/feature data and a
-  fixed seed for TF-IDF vectorization.
+  fixed seed for TF-IDF vectorization. **Partially done:** golden `ast.parse` + execute-vs-codegen
+  equivalence exists for `tfidf_similarity`
+  (`tests/test_recommend_content_catalog.py`) with hand-verified expected similarity order/scores
+  and deterministic `max_features`/`ngram_range`; `feature_knn` has hand-verified score/order
+  tests and a determinism test but no dedicated codegen/equivalence test (it reuses the same
+  generic `RecommendFit`/`Recommend` nodes already proven equivalent for `tfidf_similarity`, but
+  the Story-13 parametrized matrix that would exercise it directly doesn't exist yet).
 
 ## Story 6 — Embedding-based similarity with the `ef.llm` seam
 
@@ -286,7 +298,7 @@ NL->graph agent (the recommender surface it can target widens).
 > dense-vector similarity search over items. This story wires the content-based archetype to the
 > existing LLM client seam — it does **not** build a new embedding pipeline.
 
-- [ ] A `recommend_by_embedding` node that: (a) accepts an item-features DataFrame with a
+- [x] A `recommend_by_embedding` node that: (a) accepts an item-features DataFrame with a
   pre-computed embedding column (a list/array of floats per row), (b) builds an item-item
   similarity index (sklearn `NearestNeighbors` with cosine metric over the embedding matrix), and
   (c) recommends items similar to a user's interaction profile (mean embedding of interacted
@@ -294,17 +306,21 @@ NL->graph agent (the recommender surface it can target widens).
   rather than sparse TF-IDF — same port shape, same `FittedRecommender` output.
 - [ ] An **optional convenience node** (compose, not duplicate): `embed_then_recommend` wires
   `ef.llm.embed` (to produce the embedding column) -> `recommend_by_embedding` as a single
-  compound step. This is a graph-composition shortcut surfaced as a single node in the palette,
-  not a separate implementation — it decomposes to two existing wrappers. `requires_client = True`
-  (ADR 0017) since it invokes the LLM client for embedding. Record that users can also wire the
-  two steps manually in the graph.
+  compound step. **Deferred, blocked on Epic 9** — `ef.llm.embed` does not exist anywhere in this
+  codebase yet (`emergentflow/llm/__init__.py`'s `__all__` has no `embed`); this is documented in
+  a docstring in `emergentflow/nodes/examples/recommend_by_embedding.py` and is a deliberate,
+  out-of-scope exclusion for Story Group B, not a bug to fix now.
 - [ ] If `ef.llm.embed` is not available (no `[llm]` extra installed), the `embed_then_recommend`
   node raises `MissingOptionalDependencyError("emergentflow[llm]")`; the bare
   `recommend_by_embedding` node works with any pre-computed embedding column and needs no optional
-  extras.
+  extras. **`embed_then_recommend` half deferred as above; the bare node half is done** — verified
+  `recommend_by_embedding` works with a pre-computed embedding column and no optional extras.
 - [ ] Golden + equivalence tests use `ReplayClient` fixtures (the existing llm test discipline)
   for the `embed_then_recommend` path, and fixed synthetic embeddings for the bare
-  `recommend_by_embedding` path.
+  `recommend_by_embedding` path. **`embed_then_recommend` half deferred as above; the bare-node
+  half is done** — `tests/test_recommend_embedding_similarity.py` has golden `ast.parse` +
+  execute-vs-codegen equivalence for `RecommendByEmbedding` on fixed synthetic embeddings, plus
+  hand-verified expected order/scores, exclude_known, cold-start, and determinism tests.
 
 ---
 

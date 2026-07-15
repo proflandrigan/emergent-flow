@@ -16,11 +16,13 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import pytest
 from scipy import sparse
 
 from emergentflow.nodes.examples.recommend_fit import RecommendFit
 from emergentflow.nodes.examples.recommend_recommend import Recommend
 from emergentflow.recommend import registry as _reg
+from emergentflow.recommend.errors import InvalidRecommenderParamsError
 from emergentflow.recommend.interactions import InteractionMatrix
 from emergentflow.recommend.models import FittedRecommender, RecommendationResult
 
@@ -183,6 +185,22 @@ def test_tfidf_cold_start_user():
     assert len(result2.recommendations) == 0
 
 
+def test_tfidf_duplicate_item_features_raises_typed_error():
+    """Duplicate item_id_col values in item_features must raise a typed error, not a raw
+    pandas ValueError from .reindex()."""
+    im = _make_tfidf_interactions()
+    item_features = pd.DataFrame(
+        {
+            "item_id": ["A", "A", "B", "C"],
+            "description": ["cat dog", "cat dog dup", "car truck", "cat dog pet"],
+        }
+    )
+    spec = _reg.get_recommender_spec("tfidf_similarity")
+
+    with pytest.raises(InvalidRecommenderParamsError, match="duplicate"):
+        spec.fitter(im, item_features, {"item_id_col": "item_id", "text_col": "description"})
+
+
 def test_tfidf_exclude_known():
     """User 1 known items (A, B) are excluded from recommendations."""
     im = _make_tfidf_interactions()
@@ -296,6 +314,23 @@ def test_feature_knn_cold_start_user():
     )
     result = spec.recommend_fn(fitted, [99], 5, exclude_known=False)
     assert len(result.recommendations) == 0
+
+
+def test_feature_knn_duplicate_item_features_raises_typed_error():
+    """Duplicate item_id_col values in item_features must raise a typed error, not a raw
+    pandas ValueError from .reindex()."""
+    im = _make_fknn_interactions()
+    item_features = pd.DataFrame(
+        {
+            "item_id": ["A", "A", "B", "C"],
+            "f1": [1.0, 2.0, 0.0, 1.0],
+            "f2": [0.0, 0.0, 1.0, 1.0],
+        }
+    )
+    spec = _reg.get_recommender_spec("feature_knn")
+
+    with pytest.raises(InvalidRecommenderParamsError, match="duplicate"):
+        spec.fitter(im, item_features, {"item_id_col": "item_id", "feature_cols": ["f1", "f2"]})
 
 
 def test_feature_knn_exclude_known():

@@ -10,9 +10,11 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from emergentflow.nodes.examples.recommend_by_embedding import RecommendByEmbedding
 from emergentflow.recommend import registry as _reg
+from emergentflow.recommend.errors import InvalidRecommenderParamsError
 from emergentflow.recommend.interactions import InteractionMatrix
 from emergentflow.recommend.models import FittedRecommender, RecommendationResult
 
@@ -129,6 +131,22 @@ def test_embedding_recommend_expected_order_and_scores():
     expected_b_dist = 1.0 - 0.0
     assert abs(scores[0] - (-expected_c_dist)) < 1e-10
     assert abs(scores[1] - (-expected_b_dist)) < 1e-10
+
+
+def test_embedding_duplicate_item_features_raises_typed_error():
+    """Duplicate item_id_col values in item_features must raise a typed error, not a raw
+    pandas ValueError from .reindex()."""
+    im = _make_interactions()
+    item_features = pd.DataFrame(
+        {
+            "item_id": ["A", "A", "B", "C"],
+            "embedding": [[1.0, 0.0], [2.0, 0.0], [0.0, 1.0], [1.0, 1.0]],
+        }
+    )
+    spec = _reg.get_recommender_spec("embedding_similarity")
+
+    with pytest.raises(InvalidRecommenderParamsError, match="duplicate"):
+        spec.fitter(im, item_features, {"item_id_col": "item_id", "embedding_col": "embedding"})
 
 
 def test_embedding_exclude_known():

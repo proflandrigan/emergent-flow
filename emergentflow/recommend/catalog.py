@@ -71,6 +71,31 @@ def _compute_popularity_scores(matrix, score_type: str) -> np.ndarray:
     raise ValueError(f"unknown score_type: {score_type!r}")
 
 
+def _align_item_features(
+    item_features: pd.DataFrame,
+    item_id_col: str,
+    interactions: InteractionMatrix,
+) -> pd.DataFrame:
+    """Reindex *item_features* to ``interactions.item_ids`` order (the content-based
+    archetype's shared alignment step).
+
+    Items in ``interactions.item_ids`` missing a row in *item_features* get an all-NaN row
+    (the caller degrades this to a zero feature vector); rows in *item_features* for items
+    not in ``interactions.item_index`` are dropped. Raises
+    :class:`InvalidRecommenderParamsError` — rather than letting a raw pandas
+    ``ValueError`` ("cannot reindex on an axis with duplicate labels") escape — if
+    *item_id_col* has duplicate values, since reindexing would otherwise be ambiguous.
+    """
+    duplicated = item_features[item_id_col].duplicated()
+    if duplicated.any():
+        dupes = sorted(item_features.loc[duplicated, item_id_col].unique().tolist())
+        raise InvalidRecommenderParamsError(
+            f"item_features has duplicate {item_id_col!r} value(s): {dupes!r}; "
+            "each item must appear at most once."
+        )
+    return item_features.set_index(item_id_col).reindex(interactions.item_ids)
+
+
 def _co_occurrence_metric(
     co_count: float,
     count_i: float,
@@ -611,7 +636,7 @@ def _fit_tfidf_similarity(
     max_features = params.get("max_features")
     ngram_range = tuple(params.get("ngram_range", (1, 1)))
 
-    aligned = item_features.set_index(item_id_col).reindex(interactions.item_ids)
+    aligned = _align_item_features(item_features, item_id_col, interactions)
     aligned[text_col] = aligned[text_col].fillna("")
 
     vectorizer = TfidfVectorizer(max_features=max_features, ngram_range=ngram_range)
@@ -729,7 +754,7 @@ def _fit_feature_knn(
     metric = str(params.get("metric", "cosine"))
     algorithm = str(params.get("algorithm", "brute"))
 
-    aligned = item_features.set_index(item_id_col).reindex(interactions.item_ids)
+    aligned = _align_item_features(item_features, item_id_col, interactions)
     feature_matrix = aligned[feature_cols].fillna(0.0).to_numpy()
 
     nn = NearestNeighbors(metric=metric, algorithm=algorithm)
@@ -859,7 +884,7 @@ def _fit_embedding_similarity(
     embedding_col = str(params["embedding_col"])
     metric = str(params.get("metric", "cosine"))
 
-    aligned = item_features.set_index(item_id_col).reindex(interactions.item_ids)
+    aligned = _align_item_features(item_features, item_id_col, interactions)
 
     embeddings_raw = aligned[embedding_col].tolist()
     try:
