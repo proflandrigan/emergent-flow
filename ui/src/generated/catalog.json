@@ -5944,13 +5944,19 @@
           "help": "Which curated recommender algorithm to fit.",
           "hints": {
             "choices": [
+              "als",
+              "bpr",
               "co_occurrence",
               "embedding_similarity",
               "feature_knn",
+              "item_knn_cf",
+              "nmf_cf",
               "popularity",
               "popularity_segmented",
               "random",
-              "tfidf_similarity"
+              "svd_cf",
+              "tfidf_similarity",
+              "user_knn_cf"
             ],
             "connection_kind": null,
             "max": null,
@@ -6006,6 +6012,174 @@
         }
       ],
       "type": "recommend.fit",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
+      "description": "Route cold-start users to one recommender and warm users to another, based on known-interaction count.",
+      "family": "recommend",
+      "label": "Hybrid (Switching)",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Users with fewer known interactions than this go to the first recommender; users with this many or more go to the second.",
+          "hints": null,
+          "label": "Cold-start threshold",
+          "name": "cold_start_threshold",
+          "required": true,
+          "type_token": "int"
+        },
+        {
+          "default": 10,
+          "help": "Number of recommendations to generate per user.",
+          "hints": null,
+          "label": "Recommendations per user",
+          "name": "n",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Users to recommend for; empty/unset means every user in the interactions.",
+          "hints": null,
+          "label": "User IDs",
+          "name": "user_ids",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": true,
+          "help": "Drop items already present in each user's training interactions.",
+          "hints": null,
+          "label": "Exclude known items",
+          "name": "exclude_known",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "many",
+          "data_type": "Recommender",
+          "direction": "in",
+          "help": "Exactly two fitted recommenders: [cold_start_recommender, warm_recommender].",
+          "label": "Recommenders",
+          "name": "recommenders",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "InteractionMatrix",
+          "direction": "in",
+          "help": "Used only to look up each user's known-interaction count.",
+          "label": "Interactions",
+          "name": "interactions",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "RecommendationResult",
+          "direction": "out",
+          "help": "The routed top-N recommendations per user.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "recommend.hybrid_switching",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
+      "description": "Blend two or more fitted recommenders' recommendations by weighted score.",
+      "family": "recommend",
+      "label": "Hybrid (Weighted)",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "One weight per recommender, same order as the connected inputs. Unset means equal weighting.",
+          "hints": null,
+          "label": "Weights",
+          "name": "weights",
+          "required": false,
+          "type_token": "list[float]"
+        },
+        {
+          "default": 10,
+          "help": "Number of blended recommendations to generate per user.",
+          "hints": null,
+          "label": "Recommendations per user",
+          "name": "n",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": "weighted_sum",
+          "help": "How to combine the input recommenders' scores.",
+          "hints": {
+            "choices": [
+              "weighted_sum",
+              "rank_fusion",
+              "cascade"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Blend strategy",
+          "name": "blend_strategy",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Users to recommend for; empty/unset means every user seen across inputs.",
+          "hints": null,
+          "label": "User IDs",
+          "name": "user_ids",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": true,
+          "help": "Drop items already present in each recommender's training interactions.",
+          "hints": null,
+          "label": "Exclude known items",
+          "name": "exclude_known",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "many",
+          "data_type": "Recommender",
+          "direction": "in",
+          "help": "Two or more already-fitted recommenders to blend.",
+          "label": "Recommenders",
+          "name": "recommenders",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "RecommendationResult",
+          "direction": "out",
+          "help": "The blended top-N recommendations per user.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "recommend.hybrid_weighted",
       "version": 1
     },
     {

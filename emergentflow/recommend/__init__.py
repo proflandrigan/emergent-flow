@@ -34,6 +34,8 @@ from emergentflow.recommend.registry import RecommenderSpec, get_recommender_spe
 
 __all__ = [
     "fit",
+    "hybrid_switching",
+    "hybrid_weighted",
     "prepare_interactions",
     "random_split",
     "recommend",
@@ -152,6 +154,194 @@ def similar_items(
             f"algorithm {recommender.algorithm!r} does not support item-item similarity."
         )
     return spec.similar_items_fn(recommender, item_ids, n)
+
+
+_VALID_BLEND_STRATEGIES = frozenset({"weighted_sum", "rank_fusion", "cascade"})
+
+
+@public_op(name="ef.recommend.hybrid_weighted")
+def hybrid_weighted(
+    recommenders: list[FittedRecommender],
+    *,
+    weights: list[float] | None = None,
+    n: int = 10,
+    blend_strategy: str = "weighted_sum",
+    user_ids: list[Any] | None = None,
+    exclude_known: bool = True,
+) -> RecommendationResult:
+    """Blend two or more fitted recommenders' recommendations into one ranked list.
+
+    A composition layer (Epic 15, Story 9), not a new algorithm family -- each input
+    recommender is scored by calling the existing `recommend()` wrapper (the same seam
+    every other recommend node routes through), so ADR-0002 equivalence for each input
+    recommender is untouched; this function only combines their already-produced outputs.
+
+    ``weights``: one weight per recommender, in the same order as `recommenders`.
+    `None` (the default) means equal weighting. ``blend_strategy``:
+      - "weighted_sum": each item's per-recommender score is multiplied by that
+        recommender's weight and summed across recommenders; ranked descending.
+      - "rank_fusion": each item's per-recommender RANK (not raw score, which may not
+        be comparable across algorithms with different scales) contributes
+        `weight / (60 + rank)` (reciprocal rank fusion, a standard IR technique);
+        summed across recommenders and ranked descending.
+      - "cascade": recommenders are tried in descending-weight priority order; each
+        recommender's ranked items are appended in order, skipping items already
+        added by a higher-priority recommender, until `n` items are collected.
+
+    Raises `InvalidRecommenderParamsError` if `recommenders` has fewer than 2 entries,
+    `weights` (when given) doesn't have one entry per recommender, or `blend_strategy`
+    is not one of the three values above. Never mutates `recommenders`.
+    """
+    if len(recommenders) < 2:
+        raise InvalidRecommenderParamsError(
+            f"hybrid_weighted requires at least 2 recommenders; got {len(recommenders)}."
+        )
+    if weights is None:
+        weights = [1.0] * len(recommenders)
+    if len(weights) != len(recommenders):
+        raise InvalidRecommenderParamsError(
+            f"weights must have one entry per recommender; got {len(weights)} "
+            f"weight(s) for {len(recommenders)} recommender(s)."
+        )
+    if blend_strategy not in _VALID_BLEND_STRATEGIES:
+        raise InvalidRecommenderParamsError(
+            f"unknown blend_strategy {blend_strategy!r}; expected one of "
+            f"{sorted(_VALID_BLEND_STRATEGIES)!r}."
+        )
+
+    # Over-fetch more candidates per recommender than the final `n` so blending has
+    # enough overlap to work with; candidates unique to one recommender are still
+    # eligible, just at a disadvantage under weighted_sum/rank_fusion.
+    n_candidates = max(n * 5, 50)
+    per_recommender_results = [
+        recommend(rec, user_ids=user_ids, n=n_candidates, exclude_known=exclude_known)
+        for rec in recommenders
+    ]
+
+    target_user_ids = user_ids
+    if target_user_ids is None:
+        seen_users: list[Any] = []
+        seen_users_set: set[Any] = set()
+        for result in per_recommender_results:
+            for uid in result.recommendations["user_id"].tolist():
+                if uid not in seen_users_set:
+                    seen_users_set.add(uid)
+                    seen_users.append(uid)
+        target_user_ids = seen_users
+
+    rows: list[dict[str, Any]] = []
+    for uid in target_user_ids:
+        user_frames = [
+            result.recommendations[result.recommendations["user_id"] == uid]
+            for result in per_recommender_results
+        ]
+
+        ranked: list[tuple[Any, float]]
+        if blend_strategy == "cascade":
+            priority = sorted(range(len(recommenders)), key=lambda i: -weights[i])
+            seen_items: set[Any] = set()
+            ranked = []
+            for i in priority:
+                for item_id, score in zip(
+                    user_frames[i]["item_id"], user_frames[i]["score"], strict=True
+                ):
+                    if item_id in seen_items:
+                        continue
+                    seen_items.add(item_id)
+                    ranked.append((item_id, float(score)))
+                if len(ranked) >= n:
+                    break
+        else:
+            item_scores: dict[Any, float] = {}
+            for weight, frame in zip(weights, user_frames, strict=True):
+                if blend_strategy == "weighted_sum":
+                    for item_id, score in zip(frame["item_id"], frame["score"], strict=True):
+                        item_scores[item_id] = item_scores.get(item_id, 0.0) + weight * float(score)
+                else:  # rank_fusion
+                    for item_id, rank in zip(frame["item_id"], frame["rank"], strict=True):
+                        item_scores[item_id] = item_scores.get(item_id, 0.0) + weight / (
+                            60 + int(rank)
+                        )
+            ranked = sorted(item_scores.items(), key=lambda kv: -kv[1])
+
+        for rank, (item_id, score) in enumerate(ranked[:n], start=1):
+            rows.append({"user_id": uid, "item_id": item_id, "rank": rank, "score": float(score)})
+
+    return RecommendationResult(recommendations=pd.DataFrame(rows))
+
+
+@public_op(name="ef.recommend.hybrid_switching")
+def hybrid_switching(
+    recommenders: list[FittedRecommender],
+    interactions: InteractionMatrix,
+    *,
+    cold_start_threshold: int,
+    n: int = 10,
+    user_ids: list[Any] | None = None,
+    exclude_known: bool = True,
+) -> RecommendationResult:
+    """Route each user to one of two fitted recommenders by their known-interaction
+    count (Epic 15, Story 9): a composition layer, not a new algorithm family,
+    addressing the cold-start problem directly.
+
+    `recommenders` must have EXACTLY 2 entries: `recommenders[0]` is used for
+    cold-start users (fewer than `cold_start_threshold` known interactions in
+    `interactions`, including users entirely absent from it), `recommenders[1]` for
+    warm users (`cold_start_threshold` or more known interactions). `interactions`
+    is only used to look up each user's known-interaction count -- it is never
+    refit here. `user_ids=None` means every user in `interactions`.
+
+    Raises `InvalidRecommenderParamsError` if `recommenders` does not have exactly
+    2 entries. Never mutates `recommenders` or `interactions`.
+    """
+    if len(recommenders) != 2:
+        raise InvalidRecommenderParamsError(
+            "hybrid_switching requires exactly 2 recommenders "
+            f"([cold_start_recommender, warm_recommender]); got {len(recommenders)}."
+        )
+    cold_recommender, warm_recommender = recommenders
+
+    target_user_ids = user_ids if user_ids is not None else list(interactions.user_index.keys())
+
+    cold_users: list[Any] = []
+    warm_users: list[Any] = []
+    for uid in target_user_ids:
+        if uid in interactions.user_index:
+            count = interactions.matrix[interactions.user_index[uid]].nnz
+        else:
+            count = 0
+        if count < cold_start_threshold:
+            cold_users.append(uid)
+        else:
+            warm_users.append(uid)
+
+    rows: list[dict[str, Any]] = []
+    if cold_users:
+        cold_result = recommend(
+            cold_recommender, user_ids=cold_users, n=n, exclude_known=exclude_known
+        )
+        rows.extend(cold_result.recommendations.to_dict("records"))
+    if warm_users:
+        warm_result = recommend(
+            warm_recommender, user_ids=warm_users, n=n, exclude_known=exclude_known
+        )
+        rows.extend(warm_result.recommendations.to_dict("records"))
+
+    if not rows:
+        combined = pd.DataFrame(columns=["user_id", "item_id", "rank", "score"])
+    else:
+        # Reorder to match target_user_ids (cold users were appended before warm
+        # users above; this restores the caller's requested/observed user order).
+        order = {uid: i for i, uid in enumerate(target_user_ids)}
+        combined = pd.DataFrame(rows)
+        combined["__order__"] = combined["user_id"].map(order)
+        combined = (
+            combined.sort_values(["__order__", "rank"], kind="stable")
+            .drop(columns="__order__")
+            .reset_index(drop=True)
+        )
+
+    return RecommendationResult(recommendations=combined)
 
 
 @public_op(name="ef.recommend.prepare_interactions")

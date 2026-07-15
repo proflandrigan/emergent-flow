@@ -117,11 +117,14 @@ def test_build_codegen_context_dangling_in_port_binds_to_none_literal() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 6. fan-in raises
+# 6. fan-in binds a list-literal expression
 # ---------------------------------------------------------------------------
 
 
-def test_build_codegen_context_fan_in_raises_value_error() -> None:
+def test_build_codegen_context_fan_in_binds_list_literal_of_sources() -> None:
+    """A MANY-cardinality IN port fed by 2+ sources binds to a Python list-literal
+    expression string over all sources' variable names, in the same deterministic
+    (node_id, port_id) order build_wiring_map already defines."""
     source_a = Node(
         type="test.source", label="A", ports=[Port(name="out", direction=Direction.OUT)]
     )
@@ -147,5 +150,27 @@ def test_build_codegen_context_fan_in_raises_value_error() -> None:
     name_map = build_name_map(graph)
     wiring_map = build_wiring_map(graph)
 
-    with pytest.raises(ValueError, match="in0"):
-        build_codegen_context(sink, name_map, wiring_map)
+    ctx = build_codegen_context(sink, name_map, wiring_map)
+
+    in0_port = _in_port(sink, "in0")
+    sources = wiring_map.upstream(sink.id, in0_port.id)
+    assert len(sources) == 2
+    expected_names = [name_map.var_for(s.node_id, s.port_id) for s in sources]
+    assert ctx.in_var("in0") == "[" + ", ".join(expected_names) + "]"
+
+
+def test_build_codegen_context_many_port_no_sources_binds_empty_list() -> None:
+    """A MANY-cardinality IN port with zero incoming edges binds to '[]', not
+    'None' (which is reserved for a dangling Cardinality.ONE optional port)."""
+    sink = Node(
+        type="test.sink",
+        label="Sink",
+        ports=[Port(name="in0", direction=Direction.IN, cardinality=Cardinality.MANY)],
+    )
+    graph = _graph([sink], [])
+    name_map = build_name_map(graph)
+    wiring_map = build_wiring_map(graph)
+
+    ctx = build_codegen_context(sink, name_map, wiring_map)
+
+    assert ctx.in_var("in0") == "[]"

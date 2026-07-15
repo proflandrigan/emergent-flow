@@ -63,6 +63,14 @@ downstream into any other node.
 port and a prepared interaction matrix does not satisfy a plain `DataFrame` consumer, keeping
 recommender-family nodes from being accidentally wired into unrelated ports.
 
+`recommend.hybrid_weighted` (Epic 15, Story 9) is the first node type with a
+`Cardinality.MANY` IN port in the reference catalog: its `recommenders` port accepts two or
+more upstream `Recommender`-typed edges at once. The type-compatibility rule is unchanged --
+each individual edge into a MANY port is still validated as `Recommender -> Recommender`, one
+edge at a time -- cardinality only changes how many edges a port accepts, not what type they
+must carry. See `emergentflow/codegen/context.py`/`executor.py` for how the compiler/executor
+resolve a MANY port's multiple upstream sources into a single Python list.
+
 ## Cardinality
 
 Each port has a declared `Cardinality.ONE` or `Cardinality.MANY`. A `Cardinality.ONE` IN port rejects a second inbound edge; `Cardinality.MANY` permits fan-in.

@@ -50,6 +50,31 @@ rather than an opaque `ImportError`. This mirrors the repo's existing optional-d
 discipline (the `torch`-style `pytest.importorskip` pattern and the existing `[server]`/`[llm]`
 extras).
 
+## Optional extra: `[recommend]` (implicit)
+
+Epic 15's collaborative-filtering recommender family (Story 8) ships optimized implicit-feedback
+matrix factorization (ALS, BPR) as an **optional extra**, installed with
+`pip install emergentflow[recommend]`, never as part of the base install. Its one dependency is
+permissively licensed and compatible with Apache-2.0:
+
+| Dependency | Version constraint | License | Compatible with Apache-2.0? |
+|---|---|---|---|
+| implicit | >=0.7,<1 | MIT | Yes |
+
+The base install already covers the sklearn-backed matrix-factorization path (`TruncatedSVD`,
+`NMF`) without this extra — `implicit` is kept optional because its ALS/BPR implementations pull
+C++/Cython extension builds that would slow every base install and CI run, and most users never
+need the optimized implicit-feedback path. The base package must import and run with `implicit`
+absent; an ALS/BPR recommender node invoked in a base install raises a typed
+`MissingOptionalDependencyError("emergentflow[recommend]")` rather than an opaque `ImportError`.
+This mirrors the repo's existing optional-dependency discipline (the `torch`-style
+`pytest.importorskip` pattern and the existing `[bayes]`/`[explain]` extras).
+
+`surprise` (BSD-3 but less maintained, pure Python, slower than sklearn's own SVD/NMF), `LensKit`
+(MIT but heavy transitive deps), and `RecBole` (MIT but torch-only, overlapping the repo's own
+torch-optional deep-recommender path) were all considered and deliberately not added — `implicit`
+is the only library needed to cover the optimized implicit-feedback surface.
+
 ## Deliberately not added: seaborn
 
 `plotly` (MIT) covers the interactive-charting surface Epic 12 needs, so **seaborn is intentionally

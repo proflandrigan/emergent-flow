@@ -112,6 +112,16 @@ bayes = [
     "bambi>=0.13,<1",
     "arviz>=0.17,<1",
 ]
+# `pip install emergentflow[recommend]` enables the optional implicit-feedback matrix
+# factorization algorithms (ALS, BPR) for the recommender-systems family (Epic 15, Story 8):
+# implicit (MIT license) provides optimized C++/Cython-backed ALS/BPR. Kept optional so a bare
+# SDK install stays light (ADR 0007); the base install covers sklearn-backed SVD/NMF
+# matrix factorization without this extra. An implicit-backed recommender node invoked in a
+# base install raises a typed MissingOptionalDependencyError("emergentflow[recommend]"),
+# never an opaque ImportError.
+recommend = [
+    "implicit>=0.7,<1",
+]
 # `pip install emergentflow[explain]` enables the optional model-explainability family
 # (SHAP-based feature attribution + error analysis, ADR 0020): shap (MIT license) computes
 # per-feature attributions for a fitted ml.FittedModel. Kept optional so a bare SDK install
@@ -266,5 +276,9 @@ module = [
     # imported lazily inside `emergentflow/explain/_shap.py`, absent from the bare
     # `uv sync --locked` CI env (like torch/litellm/pymc).
     "shap.*",
+    # The optional `emergentflow[recommend]` extra (Epic 15 Story 8): implicit ships no type
+    # stubs and is imported lazily inside `emergentflow/recommend/catalog.py`'s ALS/BPR
+    # fitters, absent from the bare `uv sync --locked` CI env (like torch/litellm/pymc).
+    "implicit.*",
 ]
 ignore_missing_imports = true
