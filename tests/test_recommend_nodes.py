@@ -10,12 +10,14 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from emergentflow.nodes.examples.recommend_compare import RecommendCompare
+from emergentflow.nodes.examples.recommend_evaluate import RecommendEvaluate
 from emergentflow.nodes.examples.recommend_fit import RecommendFit
 from emergentflow.nodes.examples.recommend_recommend import Recommend
 from emergentflow.nodes.examples.recommend_similar_items import SimilarItems
 from emergentflow.recommend import registry as _reg
 from emergentflow.recommend.interactions import InteractionMatrix
-from emergentflow.recommend.models import FittedRecommender, RecommendationResult
+from emergentflow.recommend.models import EvalResult, FittedRecommender, RecommendationResult
 from emergentflow.recommend.registry import RecommenderSpec, register_recommender
 from emergentflow.types.registry import registry as type_registry
 
@@ -230,3 +232,78 @@ def test_similar_items_node_codegen_and_execute_are_equivalent():
 
 def test_recommendation_result_type_token_is_registered():
     assert type_registry.is_registered("RecommendationResult")
+
+
+def test_evalresult_type_token_is_registered():
+    assert type_registry.is_registered("EvalResult")
+
+
+def test_recommend_evaluate_node_codegen_and_execute_are_equivalent():
+    register_recommender(_TestPopSpec)
+    try:
+        im = _make_interaction_matrix()
+        test_df = pd.DataFrame(
+            {
+                "user_id": ["alice", "bob", "carol"],
+                "item_id": ["item_c", "item_b", "item_a"],
+            }
+        )
+        test_im = InteractionMatrix.from_dataframe(test_df, user_col="user_id", item_col="item_id")
+
+        fit_def = RecommendFit()
+        fit_node = fit_def.instantiate(algorithm="_TestPop", params={})
+        fit_result = fit_def.execute(fit_node, {"interactions": im})
+
+        eval_def = RecommendEvaluate()
+        eval_node = eval_def.instantiate(k=10)
+
+        exec_result = eval_def.execute(
+            eval_node,
+            {"recommender": fit_result["recommender"], "test_interactions": test_im},
+        )
+        assert isinstance(exec_result["result"], EvalResult)
+
+        scope = {"interactions": im, "item_features": None}
+        _run_codegen(fit_def, fit_node, scope)
+        scope_eval = {"recommender": scope["recommender"], "test_interactions": test_im}
+        _run_codegen(eval_def, eval_node, scope_eval)
+        codegen_result = scope_eval["result"]
+        assert isinstance(codegen_result, EvalResult)
+
+        assert exec_result["result"].k == codegen_result.k
+        assert exec_result["result"].algorithm == codegen_result.algorithm
+        assert exec_result["result"].aggregate == codegen_result.aggregate
+        pd.testing.assert_frame_equal(exec_result["result"].per_user, codegen_result.per_user)
+    finally:
+        _reg._REGISTRY.pop("_TestPop", None)
+
+
+def test_recommend_compare_node_codegen_and_execute_are_equivalent():
+    register_recommender(_TestPopSpec)
+    register_recommender(_TestSimilarSpec)
+    try:
+        im = _make_interaction_matrix()
+
+        fit_def = RecommendFit()
+        fit_pop_node = fit_def.instantiate(algorithm="_TestPop", params={})
+        fit_sim_node = fit_def.instantiate(algorithm="_TestSimilar", params={})
+
+        rec_a = fit_def.execute(fit_pop_node, {"interactions": im})["recommender"]
+        rec_b = fit_def.execute(fit_sim_node, {"interactions": im})["recommender"]
+
+        compare_def = RecommendCompare()
+        compare_node = compare_def.instantiate(k=10)
+
+        exec_result = compare_def.execute(
+            compare_node,
+            {"recommenders": [rec_a, rec_b], "test_interactions": im},
+        )
+
+        scope = {"recommenders": [rec_a, rec_b], "test_interactions": im}
+        _run_codegen(compare_def, compare_node, scope)
+        codegen_result = scope["result"]
+
+        pd.testing.assert_frame_equal(exec_result["result"], codegen_result)
+    finally:
+        _reg._REGISTRY.pop("_TestPop", None)
+        _reg._REGISTRY.pop("_TestSimilar", None)

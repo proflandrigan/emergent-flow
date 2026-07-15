@@ -74,11 +74,14 @@ from .predict import Predict
 from .prepare_interactions import PrepareInteractions
 from .query_builder import QueryBuilder
 from .recommend_by_embedding import RecommendByEmbedding
+from .recommend_compare import RecommendCompare
+from .recommend_evaluate import RecommendEvaluate
 from .recommend_fit import RecommendFit
 from .recommend_hybrid_switching import HybridSwitching
 from .recommend_hybrid_weighted import HybridWeighted
 from .recommend_recommend import Recommend
 from .recommend_similar_items import SimilarItems
+from .recommend_temporal_split import RecommendTemporalSplit
 from .report import GenerateHtmlSummary
 from .scale_features import ScaleFeatures
 from .seasonal_decompose import SeasonalDecompose
@@ -102,6 +105,10 @@ from .viz_plot_acf import VizPlotAcf
 from .viz_plot_coefficients import VizPlotCoefficients
 from .viz_plot_confusion_matrix import VizPlotConfusionMatrix
 from .viz_plot_correlation_heatmap import VizPlotCorrelationHeatmap
+from .viz_plot_coverage_vs_accuracy import VizPlotCoverageVsAccuracy
+from .viz_plot_metric_comparison import VizPlotMetricComparison
+from .viz_plot_popularity_distribution import VizPlotPopularityDistribution
+from .viz_plot_precision_recall_curve import VizPlotPrecisionRecallCurve
 from .viz_plot_qq import VizPlotQQ
 from .viz_plot_residuals import VizPlotResiduals
 
@@ -170,7 +177,10 @@ __all__ = [
     "QueryBuilder",
     "Recommend",
     "RecommendByEmbedding",
+    "RecommendCompare",
+    "RecommendEvaluate",
     "RecommendFit",
+    "RecommendTemporalSplit",
     "ScaleFeatures",
     "SeasonalDecompose",
     "SelectColumns",
@@ -194,6 +204,10 @@ __all__ = [
     "VizPlotCoefficients",
     "VizPlotConfusionMatrix",
     "VizPlotCorrelationHeatmap",
+    "VizPlotCoverageVsAccuracy",
+    "VizPlotMetricComparison",
+    "VizPlotPopularityDistribution",
+    "VizPlotPrecisionRecallCurve",
     "VizPlotQQ",
     "VizPlotResiduals",
 ]

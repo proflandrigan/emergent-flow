@@ -18,6 +18,7 @@ module (Epic 15, Story 4 onward), imported here for its side effect once it exis
 from __future__ import annotations
 
 import importlib.util
+import math
 from typing import Any
 
 import numpy as np
@@ -29,10 +30,19 @@ from emergentflow.recommend.errors import (
     MissingOptionalDependencyError,
 )
 from emergentflow.recommend.interactions import InteractionMatrix, _prepare_interactions
-from emergentflow.recommend.models import FittedRecommender, RecommendationResult
+from emergentflow.recommend.metrics import (
+    _average_precision_at_k,
+    _hit,
+    _ndcg_at_k,
+    _precision_at_k,
+    _recall_at_k,
+)
+from emergentflow.recommend.models import EvalResult, FittedRecommender, RecommendationResult
 from emergentflow.recommend.registry import RecommenderSpec, get_recommender_spec
 
 __all__ = [
+    "compare",
+    "evaluate",
     "fit",
     "fit_two_tower",
     "hybrid_switching",
@@ -183,6 +193,226 @@ def similar_items(
             f"algorithm {recommender.algorithm!r} does not support item-item similarity."
         )
     return spec.similar_items_fn(recommender, item_ids, n)
+
+
+_VALID_EVAL_METRICS = frozenset(
+    {
+        "precision_at_k",
+        "recall_at_k",
+        "ndcg_at_k",
+        "map_at_k",
+        "hit_rate",
+        "coverage",
+        "diversity",
+        "novelty",
+    }
+)
+
+
+@public_op(name="ef.recommend.evaluate")
+def evaluate(
+    recommender: FittedRecommender,
+    test_interactions: InteractionMatrix,
+    *,
+    k: int = 10,
+    metrics: list[str] | None = None,
+) -> EvalResult:
+    """Score a fitted recommender's top-k recommendations against held-out interactions.
+
+    The single seam every ``recommend.evaluate`` node routes through (Epic 15, Story 12). For
+    each user present in ``test_interactions`` (i.e. with at least one held-out interaction),
+    generates top-``k`` recommendations via the existing :func:`recommend` wrapper
+    (``exclude_known=True``, so items already seen in the recommender's own training
+    interactions are excluded) and scores them against that user's held-out item set. Users the
+    recommender cannot score for (absent from the fitted recommender's training user index) are
+    still scored -- ``recommend()`` handles unknown/cold-start users per the algorithm's own
+    cold-start behavior.
+
+    ``metrics`` selects the subset of ``{"precision_at_k", "recall_at_k", "ndcg_at_k",
+    "map_at_k", "hit_rate", "coverage", "diversity", "novelty"}`` to compute; ``None`` (the
+    default) computes all eight. Raises
+    :class:`~emergentflow.recommend.errors.InvalidRecommenderParamsError` for an unknown metric
+    name or ``k <= 0``.
+
+    Three of the eight metrics are system-level (computed once across all users, never per-user):
+    coverage = fraction of catalog items appearing in any user's top-k; diversity = 1 -- mean
+    pairwise cosine similarity of users' top-k item sets; novelty = mean ``-log2(popularity)`` of
+    recommended items, popularity measured within ``test_interactions``. These appear only in
+    ``aggregate``, not in ``per_user``.
+
+    Returns an :class:`EvalResult` with a tidy per-user metrics frame and an aggregate dict
+    (``mean_<metric>`` for the four per-user metrics, plus ``hit_rate`` -- the mean of the
+    per-user ``hit`` column -- and ``map_at_k`` -- the mean of the per-user
+    ``average_precision`` column). Never mutates ``recommender`` or ``test_interactions``.
+    """
+    if k <= 0:
+        raise InvalidRecommenderParamsError(f"k must be positive; got {k!r}.")
+    requested = set(metrics) if metrics is not None else set(_VALID_EVAL_METRICS)
+    unknown = requested - _VALID_EVAL_METRICS
+    if unknown:
+        raise InvalidRecommenderParamsError(
+            f"unknown metric(s) {sorted(unknown)!r}; expected a subset of "
+            f"{sorted(_VALID_EVAL_METRICS)!r}."
+        )
+
+    test_users = [
+        uid
+        for uid in test_interactions.user_ids
+        if test_interactions.matrix.getrow(test_interactions.user_index[uid]).nnz > 0
+    ]
+
+    rows: list[dict[str, Any]] = []
+    if test_users:
+        result = recommend(recommender, user_ids=test_users, n=k, exclude_known=True)
+        recs_by_user: dict[Any, list[Any]] = {uid: [] for uid in test_users}
+        for uid, item_id, rank in zip(
+            result.recommendations["user_id"],
+            result.recommendations["item_id"],
+            result.recommendations["rank"],
+            strict=True,
+        ):
+            recs_by_user[uid].append((int(rank), item_id))
+        for uid in recs_by_user:
+            recs_by_user[uid] = [
+                item_id for _, item_id in sorted(recs_by_user[uid], key=lambda pair: pair[0])
+            ]
+
+        for uid in test_users:
+            row_idx = test_interactions.user_index[uid]
+            relevant = {
+                test_interactions.item_ids[col]
+                for col in test_interactions.matrix.getrow(row_idx).indices
+            }
+            recommended = recs_by_user[uid]
+            row: dict[str, Any] = {"user_id": uid}
+            if "precision_at_k" in requested:
+                row["precision_at_k"] = _precision_at_k(recommended, relevant, k)
+            if "recall_at_k" in requested:
+                row["recall_at_k"] = _recall_at_k(recommended, relevant, k)
+            if "ndcg_at_k" in requested:
+                row["ndcg_at_k"] = _ndcg_at_k(recommended, relevant, k)
+            if "hit_rate" in requested:
+                row["hit"] = _hit(recommended, relevant, k)
+            if "map_at_k" in requested:
+                row["average_precision"] = _average_precision_at_k(recommended, relevant, k)
+            rows.append(row)
+
+    per_user = pd.DataFrame(rows) if rows else pd.DataFrame(columns=["user_id"])
+
+    aggregate: dict[str, Any] = {}
+    if "precision_at_k" in requested:
+        aggregate["mean_precision_at_k"] = float(per_user["precision_at_k"].mean()) if rows else 0.0
+    if "recall_at_k" in requested:
+        aggregate["mean_recall_at_k"] = float(per_user["recall_at_k"].mean()) if rows else 0.0
+    if "ndcg_at_k" in requested:
+        aggregate["mean_ndcg_at_k"] = float(per_user["ndcg_at_k"].mean()) if rows else 0.0
+    if "hit_rate" in requested:
+        aggregate["hit_rate"] = float(per_user["hit"].mean()) if rows else 0.0
+    if "map_at_k" in requested:
+        aggregate["map_at_k"] = float(per_user["average_precision"].mean()) if rows else 0.0
+
+    if "coverage" in requested:
+        if test_users and test_interactions.n_items > 0:
+            recommended_union: set[Any] = set()
+            for items in recs_by_user.values():
+                recommended_union.update(items[:k])
+            aggregate["coverage"] = len(recommended_union) / test_interactions.n_items
+        else:
+            aggregate["coverage"] = 0.0
+
+    if "diversity" in requested:
+        user_sets = (
+            [set(items[:k]) for items in recs_by_user.values() if items] if test_users else []
+        )
+        if len(user_sets) >= 2:
+            similarities: list[float] = []
+            for i in range(len(user_sets)):
+                for j in range(i + 1, len(user_sets)):
+                    a, b = user_sets[i], user_sets[j]
+                    denom = math.sqrt(len(a)) * math.sqrt(len(b))
+                    similarities.append(len(a & b) / denom if denom > 0 else 0.0)
+            aggregate["diversity"] = 1.0 - (sum(similarities) / len(similarities))
+        else:
+            aggregate["diversity"] = 0.0
+
+    if "novelty" in requested:
+        n_users_total = test_interactions.n_users
+        novelty_scores: list[float] = []
+        if test_users and n_users_total > 0:
+            for items in recs_by_user.values():
+                for item_id in items[:k]:
+                    col = test_interactions.item_index.get(item_id)
+                    if col is None:
+                        popularity = 0.0
+                    else:
+                        popularity = test_interactions.matrix.getcol(col).nnz / n_users_total
+                    popularity = max(popularity, 1.0 / n_users_total)
+                    novelty_scores.append(-math.log2(popularity))
+        aggregate["novelty"] = sum(novelty_scores) / len(novelty_scores) if novelty_scores else 0.0
+
+    return EvalResult(algorithm=recommender.algorithm, k=k, per_user=per_user, aggregate=aggregate)
+
+
+@public_op(name="ef.recommend.compare")
+def compare(
+    test_interactions: InteractionMatrix,
+    *,
+    recommenders: list[FittedRecommender],
+    k: int = 10,
+) -> pd.DataFrame:
+    """Evaluate multiple fitted recommenders on the same held-out test set and rank them.
+
+    The recommend-family analog to ``ef.ml.compare_models`` (Epic 15, Story 12). Unlike
+    ``compare_models``, every candidate here arrives already fitted -- ``compare`` does not fit
+    anything except the automatic popularity baseline described below. Calls the existing
+    :func:`evaluate` wrapper once per recommender (all 8 metrics -- see ``evaluate``'s
+    ``_VALID_EVAL_METRICS``), and returns a tidy comparison DataFrame: one row per recommender,
+    with an ``algorithm`` column, an ``is_baseline`` bool column, and one column per evaluation
+    metric (``mean_precision_at_k``, ``mean_recall_at_k``, ``mean_ndcg_at_k``, ``hit_rate``,
+    ``map_at_k``, ``coverage``, ``diversity``, ``novelty``). Sorted by ``mean_ndcg_at_k``
+    descending -- the "baseline-to-beat" framing: the strongest recommender by ranking quality is
+    always first.
+
+    The baseline-to-beat framing: if none of ``recommenders`` has ``algorithm == "popularity"``,
+    an extra popularity-baseline recommender is automatically fit (via the existing :func:`fit`
+    wrapper) and appended as one more row with ``is_baseline=True``; every explicitly-supplied
+    recommender gets ``is_baseline=False`` even if one of them happens to already be a popularity
+    recommender. NOTE: the auto-fit baseline is trained on ``test_interactions`` itself (this
+    function receives no separate training-interactions argument), so it is a rough contextual
+    reference point, not trained on the same data as the other recommenders -- document this
+    plainly so a caller isn't misled into thinking it's an apples-to-apples baseline.
+
+    Raises :class:`~emergentflow.recommend.errors.InvalidRecommenderParamsError` if
+    ``recommenders`` is empty. Never mutates ``test_interactions`` or ``recommenders``.
+    """
+    if not recommenders:
+        raise InvalidRecommenderParamsError(
+            f"compare requires at least 1 recommender; got {len(recommenders)}."
+        )
+
+    to_compare = list(recommenders)
+    auto_baseline_index: int | None = None
+    if not any(rec.algorithm == "popularity" for rec in to_compare):
+        baseline = fit(test_interactions, algorithm="popularity", params={})
+        auto_baseline_index = len(to_compare)
+        to_compare = [*to_compare, baseline]
+
+    rows: list[dict[str, Any]] = []
+    for i, rec in enumerate(to_compare):
+        result = evaluate(rec, test_interactions, k=k)
+        row: dict[str, Any] = {
+            "algorithm": rec.algorithm,
+            "is_baseline": i == auto_baseline_index,
+        }
+        row.update(result.aggregate)
+        rows.append(row)
+
+    comparison = pd.DataFrame(rows)
+    if "mean_ndcg_at_k" in comparison.columns:
+        comparison = comparison.sort_values(
+            "mean_ndcg_at_k", ascending=False, kind="stable"
+        ).reset_index(drop=True)
+    return comparison
 
 
 _VALID_BLEND_STRATEGIES = frozenset({"weighted_sum", "rank_fusion", "cascade"})

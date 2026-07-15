@@ -17,6 +17,9 @@ import pandas as pd
 
 from emergentflow.api import public_op
 from emergentflow.ml import FittedModel
+from emergentflow.recommend import evaluate, recommend
+from emergentflow.recommend.interactions import InteractionMatrix
+from emergentflow.recommend.models import FittedRecommender
 from emergentflow.stats.models import FittedStatsModel
 from emergentflow.viz._model_data import model_fitted, model_residuals
 from emergentflow.viz.errors import (
@@ -43,6 +46,10 @@ __all__ = [
     "plot_correlation_heatmap",
     "plot_missingness_heatmap",
     "plot_confusion_matrix",
+    "plot_precision_recall_curve",
+    "plot_metric_comparison",
+    "plot_coverage_vs_accuracy",
+    "plot_popularity_distribution",
 ]
 
 
@@ -338,6 +345,222 @@ def plot_confusion_matrix(model: FittedModel, frame: pd.DataFrame) -> PlotSpec:
         yaxis_title="Actual",
     )
     return PlotSpec.from_figure("confusion_matrix", fig)
+
+
+@public_op(name="ef.viz.plot_precision_recall_curve")
+def plot_precision_recall_curve(
+    recommender: FittedRecommender,
+    test_interactions: InteractionMatrix,
+    *,
+    k_max: int = 50,
+) -> PlotSpec:
+    """Sweep k=1..k_max and plot the precision@k / recall@k trade-off for a fitted recommender.
+
+    Calls the existing :func:`emergentflow.recommend.evaluate` once per k value (there is no
+    single-call sklearn shortcut for recommender ranking metrics, unlike
+    ``ef.explain.plot_roc_pr``'s ``sklearn.metrics.precision_recall_curve``), collecting
+    ``(k, precision@k, recall@k)`` triples, then renders the classic precision-recall trade-off
+    curve (x=recall, y=precision, one point per k, connected in k order). Raises
+    :class:`~emergentflow.viz.errors.VizError` if ``k_max`` is not a positive integer.
+    """
+    import plotly.graph_objects as go
+
+    if k_max < 1:
+        raise VizError(f"k_max must be a positive integer; got {k_max!r}.")
+
+    ks = list(range(1, k_max + 1))
+    precisions = []
+    recalls = []
+    for k in ks:
+        result = evaluate(
+            recommender, test_interactions, k=k, metrics=["precision_at_k", "recall_at_k"]
+        )
+        precisions.append(result.aggregate["mean_precision_at_k"])
+        recalls.append(result.aggregate["mean_recall_at_k"])
+
+    fig = go.Figure(
+        data=[
+            go.Scatter(
+                x=recalls,
+                y=precisions,
+                mode="lines+markers",
+                text=[f"k={k}" for k in ks],
+                hovertemplate="recall=%{x:.3f}<br>precision=%{y:.3f}<br>%{text}<extra></extra>",
+            )
+        ]
+    )
+    fig.update_layout(
+        title=f"Precision-Recall Trade-off (k=1..{k_max}): {recommender.algorithm}",
+        xaxis_title="Recall@k",
+        yaxis_title="Precision@k",
+    )
+    return PlotSpec.from_figure("recommend_precision_recall_curve", fig)
+
+
+#: Metric columns ef.recommend.compare() always produces (excluding "algorithm"/"is_baseline"),
+#: in a sensible default display order.
+_COMPARE_METRIC_COLUMNS = (
+    "mean_precision_at_k",
+    "mean_recall_at_k",
+    "mean_ndcg_at_k",
+    "hit_rate",
+    "map_at_k",
+    "coverage",
+    "diversity",
+    "novelty",
+)
+
+
+@public_op(name="ef.viz.plot_metric_comparison")
+def plot_metric_comparison(
+    comparison: pd.DataFrame,
+    *,
+    metrics: list[str] | None = None,
+) -> PlotSpec:
+    """Grouped bar chart comparing multiple recommenders across metrics.
+
+    Consumes the tidy comparison DataFrame produced by :func:`emergentflow.recommend.compare`
+    (one row per recommender, an ``algorithm`` column, and one column per evaluation metric).
+    One bar GROUP per recommender (x-axis = ``algorithm``), one COLOR per metric. ``metrics``
+    selects which metric columns to plot; ``None`` (the default) plots every column in
+    ``comparison`` that is one of the standard compare() metric columns
+    (``mean_precision_at_k``, ``mean_recall_at_k``, ``mean_ndcg_at_k``, ``hit_rate``,
+    ``map_at_k``, ``coverage``, ``diversity``, ``novelty``) and is actually present in
+    ``comparison`` (a caller may have passed a narrower ``metrics=`` subset into ``compare()``
+    directly, in which case only the columns that survive are used). Raises
+    :class:`~emergentflow.viz.errors.VizError` if ``comparison`` has no ``algorithm`` column,
+    if an explicitly-requested metric in ``metrics`` is not a column of ``comparison``, or if
+    the resolved metric list ends up empty.
+    """
+    import plotly.graph_objects as go
+
+    if "algorithm" not in comparison.columns:
+        raise VizError(
+            f"comparison frame is missing an 'algorithm' column; got columns "
+            f"{list(comparison.columns)!r}."
+        )
+
+    if metrics is not None:
+        unknown = [m for m in metrics if m not in comparison.columns]
+        if unknown:
+            raise VizError(
+                f"unknown metric column(s) {unknown!r}; comparison frame has columns "
+                f"{list(comparison.columns)!r}."
+            )
+        resolved_metrics = list(metrics)
+    else:
+        resolved_metrics = [m for m in _COMPARE_METRIC_COLUMNS if m in comparison.columns]
+
+    if not resolved_metrics:
+        raise VizError("no metric columns to plot (resolved metric list is empty).")
+
+    algorithms = comparison["algorithm"].tolist()
+    fig = go.Figure(
+        data=[
+            go.Bar(name=metric, x=algorithms, y=comparison[metric].tolist())
+            for metric in resolved_metrics
+        ]
+    )
+    fig.update_layout(
+        title="Recommender Metric Comparison",
+        xaxis_title="Recommender",
+        yaxis_title="Score",
+        barmode="group",
+    )
+    return PlotSpec.from_figure("recommend_metric_comparison", fig)
+
+
+@public_op(name="ef.viz.plot_coverage_vs_accuracy")
+def plot_coverage_vs_accuracy(
+    comparison: pd.DataFrame,
+    *,
+    accuracy_metric: str = "mean_ndcg_at_k",
+) -> PlotSpec:
+    """Scatter plot of each recommender's coverage against an accuracy metric (default NDCG@k).
+
+    Consumes the tidy comparison DataFrame produced by :func:`emergentflow.recommend.compare`
+    (one row per recommender, an ``algorithm`` column, a ``coverage`` column, and one column per
+    other evaluation metric). Surfaces the classic accuracy/diversity trade-off: recommenders
+    that concentrate on a narrow, highly-accurate slice of the catalog cluster in the top-left
+    (high accuracy, low coverage); recommenders with broad catalog coverage but weaker accuracy
+    cluster toward the bottom-right. Each point is labeled with its ``algorithm`` name. Raises
+    :class:`~emergentflow.viz.errors.VizError` if ``comparison`` is missing an ``algorithm``
+    column, a ``coverage`` column, or the requested ``accuracy_metric`` column.
+    """
+    import plotly.graph_objects as go
+
+    missing = [c for c in ("algorithm", "coverage", accuracy_metric) if c not in comparison.columns]
+    if missing:
+        raise VizError(
+            f"comparison frame is missing column(s) {missing!r}; got columns "
+            f"{list(comparison.columns)!r}."
+        )
+
+    fig = go.Figure(
+        data=[
+            go.Scatter(
+                x=comparison["coverage"].tolist(),
+                y=comparison[accuracy_metric].tolist(),
+                mode="markers+text",
+                text=comparison["algorithm"].tolist(),
+                textposition="top center",
+            )
+        ]
+    )
+    fig.update_layout(
+        title="Coverage vs. Accuracy",
+        xaxis_title="Coverage",
+        yaxis_title=accuracy_metric,
+    )
+    return PlotSpec.from_figure("recommend_coverage_vs_accuracy", fig)
+
+
+@public_op(name="ef.viz.plot_popularity_distribution")
+def plot_popularity_distribution(
+    recommender: FittedRecommender,
+    interactions: InteractionMatrix,
+    *,
+    n: int = 10,
+) -> PlotSpec:
+    """Long-tail histogram: recommendation frequency vs. item popularity rank (log scale).
+
+    Ranks every item in *interactions* by total interaction count (rank 1 = most popular),
+    generates top-``n`` recommendations for every user in *interactions* via the existing
+    :func:`emergentflow.recommend.recommend` wrapper, and tallies how often each item appears
+    across all users' recommendation lists. Plots recommendation frequency (y) against item
+    popularity rank (x, log scale) -- a recommender biased toward popular items shows tall bars
+    only at low rank (the left edge); a recommender that surfaces the long tail shows frequency
+    spread across higher ranks too. Never densifies ``interactions.matrix``. Raises
+    :class:`~emergentflow.viz.errors.VizError` if ``n`` is not a positive integer or
+    ``interactions`` has zero items.
+    """
+    import numpy as np
+    import plotly.graph_objects as go
+
+    if n < 1:
+        raise VizError(f"n must be a positive integer; got {n!r}.")
+    if interactions.n_items == 0:
+        raise VizError("interactions has zero items; cannot rank popularity.")
+
+    popularity_counts = np.asarray(interactions.matrix.sum(axis=0)).ravel()
+    order = np.argsort(-popularity_counts)
+    ranked_item_ids = [interactions.item_ids[i] for i in order]
+    rank_of_item = {item_id: rank + 1 for rank, item_id in enumerate(ranked_item_ids)}
+
+    result = recommend(recommender, user_ids=None, n=n, exclude_known=True)
+    frequency = result.recommendations["item_id"].value_counts()
+
+    ranks = [rank_of_item[item_id] for item_id in ranked_item_ids]
+    counts = [int(frequency.get(item_id, 0)) for item_id in ranked_item_ids]
+
+    fig = go.Figure(data=[go.Bar(x=ranks, y=counts)])
+    fig.update_xaxes(type="log")
+    fig.update_layout(
+        title=f"Item Popularity Distribution: {recommender.algorithm}",
+        xaxis_title="Item Popularity Rank (log scale)",
+        yaxis_title="Recommendation Frequency",
+    )
+    return PlotSpec.from_figure("recommend_popularity_distribution", fig)
 
 
 # Register the curated seed chart catalog as an import-time side effect (mirrors

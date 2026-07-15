@@ -13,6 +13,7 @@
     "CostEstimate",
     "DataFrame",
     "DecomposeResult",
+    "EvalResult",
     "EvaluationResult",
     "ForecastResult",
     "HTML",

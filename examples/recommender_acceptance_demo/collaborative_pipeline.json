@@ -1,0 +1,594 @@
+{
+  "schema_version": 1,
+  "paradigm": "functional",
+  "name": "Recommender Acceptance Demo -- Collaborative Filtering",
+  "nodes": {
+    "n-cf-load": {
+      "id": "n-cf-load",
+      "type": "data.load_sample",
+      "label": "Load Sample",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "name",
+          "type_token": "str",
+          "value": "iris",
+          "default": "iris"
+        }
+      ],
+      "ports": [
+        {
+          "id": "n-cf-load::frame",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-cf-add-timestamp": {
+      "id": "n-cf-add-timestamp",
+      "type": "script.custom_code",
+      "label": "Add Timestamp",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "code",
+          "type_token": "str",
+          "value": "def transform(value):\n    value = value.reset_index(drop=True).copy()\n    value[\"timestamp\"] = value.index\n    return value\n",
+          "default": ""
+        }
+      ],
+      "ports": [
+        {
+          "id": "n-cf-add-timestamp::value",
+          "name": "value",
+          "direction": "in",
+          "data_type": "any",
+          "cardinality": "one",
+          "label": null
+        },
+        {
+          "id": "n-cf-add-timestamp::result",
+          "name": "result",
+          "direction": "out",
+          "data_type": "any",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-cf-split": {
+      "id": "n-cf-split",
+      "type": "recommend.temporal_split",
+      "label": "Temporal Split",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "user_col",
+          "type_token": "str",
+          "value": "sepal length (cm)",
+          "default": null
+        },
+        {
+          "name": "item_col",
+          "type_token": "str",
+          "value": "sepal width (cm)",
+          "default": null
+        },
+        {
+          "name": "value_col",
+          "type_token": "str",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "timestamp_col",
+          "type_token": "str",
+          "value": "timestamp",
+          "default": null
+        },
+        {
+          "name": "test_ratio",
+          "type_token": "float",
+          "value": 0.2,
+          "default": 0.2
+        },
+        {
+          "name": "implicit",
+          "type_token": "bool",
+          "value": true,
+          "default": true
+        }
+      ],
+      "ports": [
+        {
+          "id": "n-cf-split::frame",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        },
+        {
+          "id": "n-cf-split::train",
+          "name": "train",
+          "direction": "out",
+          "data_type": "InteractionMatrix",
+          "cardinality": "one",
+          "label": null
+        },
+        {
+          "id": "n-cf-split::test",
+          "name": "test",
+          "direction": "out",
+          "data_type": "InteractionMatrix",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-cf-fit-knn": {
+      "id": "n-cf-fit-knn",
+      "type": "recommend.fit",
+      "label": "Fit User-KNN CF",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "algorithm",
+          "type_token": "str",
+          "value": "user_knn_cf",
+          "default": null
+        },
+        {
+          "name": "params",
+          "type_token": "dict[str, any]",
+          "value": {
+            "k": 2
+          },
+          "default": {}
+        }
+      ],
+      "ports": [
+        {
+          "id": "n-cf-fit-knn::interactions",
+          "name": "interactions",
+          "direction": "in",
+          "data_type": "InteractionMatrix",
+          "cardinality": "one",
+          "label": "Interactions"
+        },
+        {
+          "id": "n-cf-fit-knn::item_features",
+          "name": "item_features",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Item Features"
+        },
+        {
+          "id": "n-cf-fit-knn::recommender",
+          "name": "recommender",
+          "direction": "out",
+          "data_type": "Recommender",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-cf-fit-svd": {
+      "id": "n-cf-fit-svd",
+      "type": "recommend.fit",
+      "label": "Fit SVD CF",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "algorithm",
+          "type_token": "str",
+          "value": "svd_cf",
+          "default": null
+        },
+        {
+          "name": "params",
+          "type_token": "dict[str, any]",
+          "value": {
+            "n_components": 2,
+            "seed": 0
+          },
+          "default": {}
+        }
+      ],
+      "ports": [
+        {
+          "id": "n-cf-fit-svd::interactions",
+          "name": "interactions",
+          "direction": "in",
+          "data_type": "InteractionMatrix",
+          "cardinality": "one",
+          "label": "Interactions"
+        },
+        {
+          "id": "n-cf-fit-svd::item_features",
+          "name": "item_features",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Item Features"
+        },
+        {
+          "id": "n-cf-fit-svd::recommender",
+          "name": "recommender",
+          "direction": "out",
+          "data_type": "Recommender",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-cf-eval-knn": {
+      "id": "n-cf-eval-knn",
+      "type": "recommend.evaluate",
+      "label": "Evaluate User-KNN CF",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "k",
+          "type_token": "int",
+          "value": 5,
+          "default": 10
+        },
+        {
+          "name": "metrics",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "n-cf-eval-knn::recommender",
+          "name": "recommender",
+          "direction": "in",
+          "data_type": "Recommender",
+          "cardinality": "one",
+          "label": null
+        },
+        {
+          "id": "n-cf-eval-knn::test_interactions",
+          "name": "test_interactions",
+          "direction": "in",
+          "data_type": "InteractionMatrix",
+          "cardinality": "one",
+          "label": null
+        },
+        {
+          "id": "n-cf-eval-knn::result",
+          "name": "result",
+          "direction": "out",
+          "data_type": "EvalResult",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-cf-eval-svd": {
+      "id": "n-cf-eval-svd",
+      "type": "recommend.evaluate",
+      "label": "Evaluate SVD CF",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "k",
+          "type_token": "int",
+          "value": 5,
+          "default": 10
+        },
+        {
+          "name": "metrics",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "n-cf-eval-svd::recommender",
+          "name": "recommender",
+          "direction": "in",
+          "data_type": "Recommender",
+          "cardinality": "one",
+          "label": null
+        },
+        {
+          "id": "n-cf-eval-svd::test_interactions",
+          "name": "test_interactions",
+          "direction": "in",
+          "data_type": "InteractionMatrix",
+          "cardinality": "one",
+          "label": null
+        },
+        {
+          "id": "n-cf-eval-svd::result",
+          "name": "result",
+          "direction": "out",
+          "data_type": "EvalResult",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-cf-recommend-list": {
+      "id": "n-cf-recommend-list",
+      "type": "recommend.recommend",
+      "label": "Recommendation List",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "user_ids",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "n",
+          "type_token": "int",
+          "value": 5,
+          "default": 10
+        },
+        {
+          "name": "exclude_known",
+          "type_token": "bool",
+          "value": true,
+          "default": true
+        }
+      ],
+      "ports": [
+        {
+          "id": "n-cf-recommend-list::recommender",
+          "name": "recommender",
+          "direction": "in",
+          "data_type": "Recommender",
+          "cardinality": "one",
+          "label": null
+        },
+        {
+          "id": "n-cf-recommend-list::result",
+          "name": "result",
+          "direction": "out",
+          "data_type": "RecommendationResult",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-cf-pr-curve": {
+      "id": "n-cf-pr-curve",
+      "type": "viz.plot_precision_recall_curve",
+      "label": "Precision-Recall Curve",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "k_max",
+          "type_token": "int",
+          "value": 5,
+          "default": 50
+        }
+      ],
+      "ports": [
+        {
+          "id": "n-cf-pr-curve::recommender",
+          "name": "recommender",
+          "direction": "in",
+          "data_type": "Recommender",
+          "cardinality": "one",
+          "label": null
+        },
+        {
+          "id": "n-cf-pr-curve::test_interactions",
+          "name": "test_interactions",
+          "direction": "in",
+          "data_type": "InteractionMatrix",
+          "cardinality": "one",
+          "label": null
+        },
+        {
+          "id": "n-cf-pr-curve::plot",
+          "name": "plot",
+          "direction": "out",
+          "data_type": "PlotSpec",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    }
+  },
+  "edges": {
+    "e-cf-0": {
+      "id": "e-cf-0",
+      "source": {
+        "node_id": "n-cf-load",
+        "port_id": "n-cf-load::frame"
+      },
+      "target": {
+        "node_id": "n-cf-add-timestamp",
+        "port_id": "n-cf-add-timestamp::value"
+      },
+      "type_compatible": null
+    },
+    "e-cf-1": {
+      "id": "e-cf-1",
+      "source": {
+        "node_id": "n-cf-add-timestamp",
+        "port_id": "n-cf-add-timestamp::result"
+      },
+      "target": {
+        "node_id": "n-cf-split",
+        "port_id": "n-cf-split::frame"
+      },
+      "type_compatible": null
+    },
+    "e-cf-2": {
+      "id": "e-cf-2",
+      "source": {
+        "node_id": "n-cf-split",
+        "port_id": "n-cf-split::train"
+      },
+      "target": {
+        "node_id": "n-cf-fit-knn",
+        "port_id": "n-cf-fit-knn::interactions"
+      },
+      "type_compatible": null
+    },
+    "e-cf-3": {
+      "id": "e-cf-3",
+      "source": {
+        "node_id": "n-cf-split",
+        "port_id": "n-cf-split::train"
+      },
+      "target": {
+        "node_id": "n-cf-fit-svd",
+        "port_id": "n-cf-fit-svd::interactions"
+      },
+      "type_compatible": null
+    },
+    "e-cf-4": {
+      "id": "e-cf-4",
+      "source": {
+        "node_id": "n-cf-split",
+        "port_id": "n-cf-split::test"
+      },
+      "target": {
+        "node_id": "n-cf-eval-knn",
+        "port_id": "n-cf-eval-knn::test_interactions"
+      },
+      "type_compatible": null
+    },
+    "e-cf-5": {
+      "id": "e-cf-5",
+      "source": {
+        "node_id": "n-cf-fit-knn",
+        "port_id": "n-cf-fit-knn::recommender"
+      },
+      "target": {
+        "node_id": "n-cf-eval-knn",
+        "port_id": "n-cf-eval-knn::recommender"
+      },
+      "type_compatible": null
+    },
+    "e-cf-6": {
+      "id": "e-cf-6",
+      "source": {
+        "node_id": "n-cf-split",
+        "port_id": "n-cf-split::test"
+      },
+      "target": {
+        "node_id": "n-cf-eval-svd",
+        "port_id": "n-cf-eval-svd::test_interactions"
+      },
+      "type_compatible": null
+    },
+    "e-cf-7": {
+      "id": "e-cf-7",
+      "source": {
+        "node_id": "n-cf-fit-svd",
+        "port_id": "n-cf-fit-svd::recommender"
+      },
+      "target": {
+        "node_id": "n-cf-eval-svd",
+        "port_id": "n-cf-eval-svd::recommender"
+      },
+      "type_compatible": null
+    },
+    "e-cf-8": {
+      "id": "e-cf-8",
+      "source": {
+        "node_id": "n-cf-fit-knn",
+        "port_id": "n-cf-fit-knn::recommender"
+      },
+      "target": {
+        "node_id": "n-cf-recommend-list",
+        "port_id": "n-cf-recommend-list::recommender"
+      },
+      "type_compatible": null
+    },
+    "e-cf-9": {
+      "id": "e-cf-9",
+      "source": {
+        "node_id": "n-cf-fit-svd",
+        "port_id": "n-cf-fit-svd::recommender"
+      },
+      "target": {
+        "node_id": "n-cf-pr-curve",
+        "port_id": "n-cf-pr-curve::recommender"
+      },
+      "type_compatible": null
+    },
+    "e-cf-10": {
+      "id": "e-cf-10",
+      "source": {
+        "node_id": "n-cf-split",
+        "port_id": "n-cf-split::test"
+      },
+      "target": {
+        "node_id": "n-cf-pr-curve",
+        "port_id": "n-cf-pr-curve::test_interactions"
+      },
+      "type_compatible": null
+    }
+  }
+}

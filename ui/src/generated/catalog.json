@@ -5934,6 +5934,115 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "description": "Evaluate multiple fitted recommenders and rank them by NDCG@k.",
+      "family": "recommend",
+      "label": "Compare",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": 10,
+          "help": "Cutoff for the ranking metrics.",
+          "hints": null,
+          "label": "k",
+          "name": "k",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "many",
+          "data_type": "Recommender",
+          "direction": "in",
+          "help": "Two or more already-fitted recommenders to compare.",
+          "label": "Recommenders",
+          "name": "recommenders",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "InteractionMatrix",
+          "direction": "in",
+          "help": "Held-out interactions all recommenders are scored against.",
+          "label": null,
+          "name": "test_interactions",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Tidy comparison table, one row per recommender, sorted by NDCG@k descending.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "recommend.compare",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
+      "description": "Score a fitted recommender against held-out interactions.",
+      "family": "recommend",
+      "label": "Evaluate",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": 10,
+          "help": "Cutoff for the ranking metrics.",
+          "hints": null,
+          "label": "k",
+          "name": "k",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Subset of {precision_at_k, recall_at_k, ndcg_at_k, map_at_k, hit_rate, coverage, diversity, novelty} to compute; unset means all eight.",
+          "hints": null,
+          "label": "Metrics",
+          "name": "metrics",
+          "required": false,
+          "type_token": "list[str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Recommender",
+          "direction": "in",
+          "help": "The fitted recommender to evaluate.",
+          "label": null,
+          "name": "recommender",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "InteractionMatrix",
+          "direction": "in",
+          "help": "Held-out interactions to score recommendations against.",
+          "label": null,
+          "name": "test_interactions",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "EvalResult",
+          "direction": "out",
+          "help": "Per-user metrics + system-level aggregate metrics.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "recommend.evaluate",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
       "description": "Fit a curated, allow-listed recommender algorithm.",
       "family": "recommend",
       "label": "Fit Recommender",
@@ -6555,6 +6664,101 @@
         }
       ],
       "type": "recommend.similar_items",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
+      "description": "Split events into train/test InteractionMatrix pairs by per-user recency.",
+      "family": "recommend",
+      "label": "Temporal Split",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column identifying the user.",
+          "hints": null,
+          "label": "User column",
+          "name": "user_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column identifying the item.",
+          "hints": null,
+          "label": "Item column",
+          "name": "item_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column with interaction value; unset means implicit (every row counts as 1).",
+          "hints": null,
+          "label": "Value column",
+          "name": "value_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column used to order each user's interactions by recency.",
+          "hints": null,
+          "label": "Timestamp column",
+          "name": "timestamp_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": 0.2,
+          "help": "Fraction of each user's most recent interactions held out for test.",
+          "hints": null,
+          "label": "Test ratio",
+          "name": "test_ratio",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": true,
+          "help": "Whether values represent implicit feedback rather than explicit ratings.",
+          "hints": null,
+          "label": "Implicit feedback",
+          "name": "implicit",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The tidy events/ratings DataFrame to split.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "InteractionMatrix",
+          "direction": "out",
+          "help": "Each user's earlier interactions.",
+          "label": null,
+          "name": "train",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "InteractionMatrix",
+          "direction": "out",
+          "help": "Each user's held-out, most recent interactions.",
+          "label": null,
+          "name": "test",
+          "required": true
+        }
+      ],
+      "type": "recommend.temporal_split",
       "version": 1
     },
     {
@@ -9590,6 +9794,188 @@
         }
       ],
       "type": "viz.plot_correlation_heatmap",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Visualization",
+      "description": "Render coverage vs. accuracy scatter to surface the accuracy/diversity trade-off.",
+      "family": "viz",
+      "label": "Plot Coverage vs. Accuracy",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "mean_ndcg_at_k",
+          "help": "Which comparison-frame column to plot on the y-axis as the accuracy metric.",
+          "hints": null,
+          "label": "Accuracy metric",
+          "name": "accuracy_metric",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The tidy comparison DataFrame from ef.recommend.compare().",
+          "label": null,
+          "name": "comparison",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered coverage-vs-accuracy scatter as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "viz.plot_coverage_vs_accuracy",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Visualization",
+      "description": "Render a grouped bar chart comparing multiple recommenders across metrics.",
+      "family": "viz",
+      "label": "Plot Metric Comparison",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Subset of metric columns to plot; unset means every standard metric column present in the comparison frame.",
+          "hints": null,
+          "label": "Metrics",
+          "name": "metrics",
+          "required": false,
+          "type_token": "list[str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The tidy comparison DataFrame from ef.recommend.compare().",
+          "label": null,
+          "name": "comparison",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered grouped bar chart as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "viz.plot_metric_comparison",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Visualization",
+      "description": "Render recommendation frequency vs. item popularity rank (log scale).",
+      "family": "viz",
+      "label": "Plot Popularity Distribution",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": 10,
+          "help": "Number of recommendations generated per user to tally item frequency.",
+          "hints": null,
+          "label": "Recommendations per user",
+          "name": "n",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Recommender",
+          "direction": "in",
+          "help": "The fitted recommender to analyze.",
+          "label": null,
+          "name": "recommender",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "InteractionMatrix",
+          "direction": "in",
+          "help": "Interactions used to rank item popularity.",
+          "label": null,
+          "name": "interactions",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered popularity-distribution histogram as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "viz.plot_popularity_distribution",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Visualization",
+      "description": "Render the precision@k/recall@k trade-off curve for a fitted recommender.",
+      "family": "viz",
+      "label": "Plot Precision-Recall Curve",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": 50,
+          "help": "Sweep k from 1 to this value.",
+          "hints": null,
+          "label": "Max k",
+          "name": "k_max",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Recommender",
+          "direction": "in",
+          "help": "The fitted recommender to sweep.",
+          "label": null,
+          "name": "recommender",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "InteractionMatrix",
+          "direction": "in",
+          "help": "Held-out interactions to score against.",
+          "label": null,
+          "name": "test_interactions",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered precision-recall trade-off curve as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "viz.plot_precision_recall_curve",
       "version": 1
     },
     {

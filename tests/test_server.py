@@ -586,6 +586,86 @@ def test_http_compile_and_execute(client: TestClient) -> None:
     assert body["results"]["n-load"]["frame"]["kind"] == "table"
 
 
+def _recommend_graph() -> dict:
+    """load_sample(iris) -> prepare_interactions -> recommend.fit -> recommend.recommend --
+    a real Recommender-bearing edge (fit -> recommend) terminating in a RecommendationResult
+    (Epic 15, Story 15)."""
+    from emergentflow.nodes.examples import (
+        LoadSample,
+        PrepareInteractions,
+        Recommend,
+        RecommendFit,
+    )
+
+    def _out(node, name):
+        return next(p for p in node.ports if p.direction == Direction.OUT and p.name == name)
+
+    def _in(node, name):
+        return next(p for p in node.ports if p.direction == Direction.IN and p.name == name)
+
+    def _edge(src, src_port, dst, dst_port) -> Edge:
+        return Edge(
+            source=PortRef(node_id=src.id, port_id=_out(src, src_port).id),
+            target=PortRef(node_id=dst.id, port_id=_in(dst, dst_port).id),
+        )
+
+    load = LoadSample().instantiate(name="iris", label="Load Sample")
+    # A second source feeding RecommendFit's optional `item_features` IN port: the server's
+    # dangling-input guard (emergentflow/server/service.py) requires every IN port to have an
+    # upstream edge regardless of the port's `required` flag, unlike the compiler/executor's
+    # guard which only enforces required ports -- so this port must be wired even though it is
+    # optional per the node's PortSpec. The "popularity" algorithm ignores item_features
+    # entirely (see `_fit_popularity` in emergentflow/recommend/catalog.py), so any DataFrame
+    # here is safe -- a different sample name ("wine") than the primary load avoids a
+    # same-params on-disk cache collision, which would otherwise report this node's status as
+    # "cached" rather than "ok".
+    item_features_load = LoadSample().instantiate(name="wine", label="Load Item Features")
+    prepare = PrepareInteractions().instantiate(
+        label="Prepare Interactions",
+        user_col="sepal length (cm)",
+        item_col="sepal width (cm)",
+    )
+    fit = RecommendFit().instantiate(label="Fit Recommender", algorithm="popularity", params={})
+    recommend = Recommend().instantiate(label="Recommend", n=5)
+
+    edges = [
+        _edge(load, "frame", prepare, "frame"),
+        _edge(prepare, "interactions", fit, "interactions"),
+        _edge(item_features_load, "frame", fit, "item_features"),
+        _edge(fit, "recommender", recommend, "recommender"),
+    ]
+    graph = Graph(
+        paradigm=Paradigm.FUNCTIONAL,
+        name="server-test-recommend",
+        nodes={n.id: n for n in (load, item_features_load, prepare, fit, recommend)},
+        edges={e.id: e for e in edges},
+    )
+    return json.loads(serialize_graph(graph))
+
+
+def test_http_compile_and_execute_recommend_graph(client: TestClient) -> None:
+    """Round-trip a Recommender-bearing edge (fit -> recommend) through /compile and /execute,
+    terminating in a RecommendationResult (Epic 15, Story 15)."""
+    resp = client.post("/compile", json=_recommend_graph())
+    assert resp.status_code == 200
+    code = resp.json()["code"]
+    assert "ef.recommend.fit(" in code
+    assert "ef.recommend.recommend(" in code
+
+    resp = client.post("/execute", json=_recommend_graph())
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["payload_version"] == 2
+    assert all(status["status"] == "ok" for status in body["statuses"].values())
+    recommend_node_id = next(
+        node_id for node_id, result in body["results"].items() if "result" in result
+    )
+    result_payload = body["results"][recommend_node_id]["result"]
+    assert result_payload["kind"] == "record"
+    assert result_payload["type"] == "RecommendationResult"
+    assert result_payload["fields"]["recommendations"]["kind"] == "table"
+
+
 def test_http_execute_node(client: TestClient) -> None:
     resp = client.post("/execute_node", json={"graph": _load_csv_graph(), "run_node": "n-load"})
     assert resp.status_code == 200
