@@ -8,6 +8,12 @@ from typing import Any
 import pandas as pd
 import pytest
 
+from emergentflow.codegen.compiler import compile_to_code
+from emergentflow.codegen.executor import execute
+from emergentflow.ir import Direction, Edge, Graph, Node, PortRef
+from emergentflow.nodes.contract import CodeFragment, NodeDefinition
+from emergentflow.nodes.registry import register
+from emergentflow.nodes.spec import PortSpec
 from emergentflow.recommend import fit, hybrid_switching, hybrid_weighted, recommend
 from emergentflow.recommend.errors import InvalidRecommenderParamsError
 from emergentflow.recommend.interactions import InteractionMatrix
@@ -313,3 +319,95 @@ def test_hybrid_switching_execute_vs_codegen_equivalence() -> None:
     pd.testing.assert_frame_equal(
         exec_result["result"].recommendations, scope["result"].recommendations
     )
+
+
+# ---------------------------------------------------------------------------
+# Full-graph equivalence: the Cardinality.MANY port through the WHOLE pipeline
+# ---------------------------------------------------------------------------
+#
+# Every other equivalence test in this module hand-builds a CodegenContext with
+# an already-resolved list-literal string (e.g. "[fit_a, fit_b]"), which only
+# proves HybridWeighted.codegen()/execute() agree given that binding -- it never
+# exercises build_wiring_map/build_name_map/build_codegen_context resolving a
+# REAL Cardinality.MANY fan-in from actual graph edges, nor compiler.py's
+# whole-module assembly around it. This test builds one real Graph (a source
+# node fanning OUT to two recommend.fit nodes, whose recommender outputs fan IN
+# to one recommend.hybrid_weighted node's MANY port) and drives it through
+# execute(graph) and compile_to_code(graph) end to end.
+
+
+@register
+class _HybridInteractionsSource(NodeDefinition):
+    """Test-only fixture: 0 in, 1 out (InteractionMatrix).
+
+    Feeds two ``recommend.fit`` nodes (fan-out) whose ``recommender`` outputs, in
+    turn, fan IN to one ``recommend.hybrid_weighted`` node's ``Cardinality.MANY``
+    port -- see the module-level comment above for why this exists alongside the
+    other, narrower equivalence tests.
+    """
+
+    type = "test.hybrid_interactions_source"
+    family = "test"
+    label = "InteractionsSource"
+    ports = [PortSpec(name="interactions", direction=Direction.OUT, data_type="InteractionMatrix")]
+
+    def codegen(self, node: Node, ctx: Any) -> CodeFragment:
+        return CodeFragment(body=f"{ctx.out_var('interactions')} = _TEST_INTERACTIONS_FIXTURE")
+
+    def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
+        return {"interactions": _make_small_interactions()}
+
+
+def _port_id(node: Node, name: str) -> str:
+    return next(p.id for p in node.ports if p.name == name)
+
+
+def test_hybrid_weighted_full_graph_execute_vs_codegen_equivalence() -> None:
+    """ADR 0002 end to end, through the real compiler/executor pipeline (not a
+    hand-built CodegenContext): a source node fans OUT to two recommend.fit
+    nodes, whose outputs fan IN to one recommend.hybrid_weighted node's
+    Cardinality.MANY port."""
+    from emergentflow.nodes.examples.recommend_fit import RecommendFit
+    from emergentflow.nodes.examples.recommend_hybrid_weighted import HybridWeighted
+
+    source = _HybridInteractionsSource().instantiate()
+    fit_a = RecommendFit().instantiate(algorithm="popularity", params={"score_type": "count"})
+    fit_b = RecommendFit().instantiate(algorithm="co_occurrence", params={"metric": "lift"})
+    hybrid = HybridWeighted().instantiate(
+        weights=[2.0, 1.0], n=5, blend_strategy="weighted_sum", user_ids=[1], exclude_known=False
+    )
+
+    edges = [
+        Edge(
+            source=PortRef(node_id=source.id, port_id=_port_id(source, "interactions")),
+            target=PortRef(node_id=fit_a.id, port_id=_port_id(fit_a, "interactions")),
+        ),
+        Edge(
+            source=PortRef(node_id=source.id, port_id=_port_id(source, "interactions")),
+            target=PortRef(node_id=fit_b.id, port_id=_port_id(fit_b, "interactions")),
+        ),
+        Edge(
+            source=PortRef(node_id=fit_a.id, port_id=_port_id(fit_a, "recommender")),
+            target=PortRef(node_id=hybrid.id, port_id=_port_id(hybrid, "recommenders")),
+        ),
+        Edge(
+            source=PortRef(node_id=fit_b.id, port_id=_port_id(fit_b, "recommender")),
+            target=PortRef(node_id=hybrid.id, port_id=_port_id(hybrid, "recommenders")),
+        ),
+    ]
+    graph = Graph(
+        nodes={n.id: n for n in [source, fit_a, fit_b, hybrid]},
+        edges={e.id: e for e in edges},
+    )
+
+    exec_results = execute(graph)
+    exec_result = exec_results[hybrid.id]["result"]
+
+    source_code = compile_to_code(graph)
+    namespace: dict[str, Any] = {"_TEST_INTERACTIONS_FIXTURE": _make_small_interactions()}
+    exec(compile(source_code, "<compiled_hybrid_weighted_graph>", "exec"), namespace)
+    codegen_results = namespace["main"]()
+    assert len(codegen_results) == 1
+    codegen_result = next(iter(codegen_results.values()))
+
+    pd.testing.assert_frame_equal(exec_result.recommendations, codegen_result.recommendations)

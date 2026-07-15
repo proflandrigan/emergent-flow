@@ -1107,7 +1107,6 @@ def _fit_user_knn_cf(
         },
         model={
             "item_ids": interactions.item_ids,
-            "user_ids": interactions.user_ids,
             "similarity": sim_topk,
             "matrix": matrix,
             "user_index": interactions.user_index,
