@@ -61,3 +61,28 @@ class RecommendationResult:
     """
 
     recommendations: pd.DataFrame
+
+
+@dataclass
+class EvalResult:
+    """Inspectable evaluation of a fitted recommender against held-out interactions.
+
+    Attributes
+    ----------
+    algorithm: the evaluated recommender's algorithm key (``recommender.algorithm``).
+    k: the cutoff used for the ranking metrics.
+    per_user: tidy DataFrame with columns ``user_id``, ``precision_at_k``, ``recall_at_k``,
+        ``ndcg_at_k``, ``hit``, ``average_precision`` -- only the columns for metrics that were
+        actually requested are present (plus ``user_id``), so a caller who requested a subset via
+        ``metrics=`` gets a narrower frame.
+    aggregate: JSON-native dict of system-wide metrics -- ``mean_precision_at_k``,
+        ``mean_recall_at_k``, ``mean_ndcg_at_k``, ``map_at_k``, ``hit_rate`` (mean of ``per_user``
+        columns, only for requested metrics), plus keys a later story appends (coverage,
+        diversity, novelty) -- this dataclass's shape must not need to change for that, since
+        ``aggregate`` is an open dict.
+    """
+
+    algorithm: str
+    k: int
+    per_user: pd.DataFrame
+    aggregate: dict[str, Any]

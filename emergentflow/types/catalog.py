@@ -191,3 +191,14 @@ register_type(
         ),
     )
 )
+register_type(
+    TypeDef(
+        token="EvalResult",
+        description=(
+            "The evaluation of a fitted recommender against held-out interactions, produced by "
+            "ef.recommend.evaluate (Epic 15): a tidy per-user precision/recall/ndcg/hit/AP frame "
+            "plus a system-level aggregate dict (mean ranking metrics, coverage, diversity, "
+            "novelty)."
+        ),
+    )
+)

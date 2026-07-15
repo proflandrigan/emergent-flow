@@ -132,3 +132,46 @@ jobs:
           PGDATABASE: postgres
           PGUSER: postgres
           PGPASSWORD: postgres
+
+  recommend-extra:
+    name: recommend equivalence ([recommend] extra)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install "3.12"
+
+      - name: Install dependencies (locked, with recommend extra)
+        run: uv sync --locked --python "3.12" --extra recommend
+
+      - name: "ADR-0002 equivalence gate ([recommend] extra: implicit-backed ALS/BPR)"
+        run: uv run pytest -m equivalence -q
+
+  torch-recommend:
+    name: recommend equivalence (torch-backed deep models)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install "3.12"
+
+      - name: Install dependencies (locked)
+        run: uv sync --locked --python "3.12"
+
+      - name: Install torch (ad hoc, not a pyproject.toml dependency)
+        run: uv pip install torch
+
+      - name: "ADR-0002 equivalence gate (torch-backed: NCF, two-tower)"
+        run: uv run pytest -m equivalence -q

@@ -302,3 +302,83 @@ The manual milestone — a live Claude Code session with the persona file drivin
 against a real `emergentflow serve` process, ghost diff visible on the canvas — is the
 human-observable proof-of-concept companion to these CI tests (not itself CI-checked; see
 `epics/epic-14-agent-collaboration.md` Story 12's unchecked manual-milestone line).
+
+## Recommender Systems Today (Epic 15) — the `ef.recommend` surface
+
+Epic 15 built `ef.recommend` as a **parallel but structurally analogous** seam to `ef.ml`/
+`ef.stats` (recommenders consume sparse user-item interaction matrices and emit ranked item
+lists, not feature-target DataFrames — see `docs/adr/0021-recommender-systems-architecture.md`):
+four fixed archetypes (baseline, content-based, collaborative, deep), one shared
+`FittedRecommender`/`InteractionMatrix`/`RecommendationResult` representation trio, and one
+`ef.recommend.fit`/`recommend`/`evaluate`/`compare` wrapper seam every node routes through. Two
+pipelines under `examples/recommender_acceptance_demo/` are the acceptance criteria and
+demonstrate both halves of the recommender surface end to end: content-based filtering compared
+against a popularity baseline, and memory-based vs. model-based collaborative filtering evaluated
+on a temporally held-out test set.
+
+### Content-based: popularity baseline vs. TF-IDF, compared side by side
+
+```
+load_sample(iris) ─→ prepare_interactions ─┬─→ recommend.fit(popularity) ──────┐
+                                            └─→ recommend.fit(tfidf_similarity)─┤
+                    custom_code (dedup + synthesize item text) ─→ (item_features)┘
+                                                                                  │
+                          [popularity, tfidf]-recommenders (Cardinality.MANY) ───┴─→ recommend.compare ─→ viz.plot_metric_comparison
+```
+
+`load_sample`'s bundled datasets (iris/wine/diabetes) are all-numeric with no free-text column,
+so a `custom_code` node sits between `load_sample` and the TF-IDF fitter's `item_features` port:
+it deduplicates iris rows by the item column (`groupby(...).mean()` — mirroring how the Story 13
+golden-code test solves the same "raw iris has duplicate values in every column" problem for
+`tfidf_similarity`'s `item_id_col` uniqueness requirement) and synthesizes a short "description"
+text column from the averaged `target` class value, giving TF-IDF real per-item text to
+vectorize. Both fitted recommenders' `Recommender` outputs fan into `recommend.compare`'s
+`recommenders` port — the first committed acceptance-demo graph in this repo to serialize a
+`Cardinality.MANY` edge set — which evaluates both against the same interactions and returns a
+tidy comparison `DataFrame` (one row per recommender, `mean_ndcg_at_k`/`coverage`/`diversity`/
+... columns), rendered by `viz.plot_metric_comparison` as a grouped bar chart, one color per
+metric.
+
+### Collaborative filtering: user-KNN vs. SVD, evaluated on a temporal holdout
+
+```
+load_sample(iris) ─→ custom_code (synthesize timestamp) ─→ recommend.temporal_split
+                                                                 ├─(train)─→ recommend.fit(user_knn_cf) ─┬─(recommender)─→ recommend.evaluate ←─(test)─┤
+                                                                 │                                        └─────────────────→ recommend.recommend
+                                                                 ├─(train)─→ recommend.fit(svd_cf) ────────(recommender)──→ recommend.evaluate ←─(test)─┤
+                                                                 └─(test)───────────────────────────────────────────────→ viz.plot_precision_recall_curve
+```
+
+`recommend.temporal_split` (a new two-OUT-port node, `train`/`test`, mirroring
+`ml.train_test_split`'s existing tuple-unpack pattern) needs a recency column to order each
+user's interactions by, which — like the content-based demo's text column — the bundled iris
+dataset doesn't have; a `custom_code` node synthesizes one from the row index. The memory-based
+(`user_knn_cf`) and model-based (`svd_cf`) fitted recommenders are each scored against the same
+held-out `test` interactions via `recommend.evaluate`, demonstrating both collaborative-filtering
+sub-families side by side; one recommender's fitted `Recommender` also feeds a plain
+`recommend.recommend` node (a real recommendation list) and the other feeds
+`viz.plot_precision_recall_curve`, which sweeps k=1..5 and renders the precision@k/recall@k
+trade-off as a `PlotSpec`.
+
+### Where they live
+
+- **`examples/recommender_acceptance_demo/content_based_pipeline.json`** /
+  **`examples/recommender_acceptance_demo/collaborative_pipeline.json`** — the IR graphs in
+  canonical form, generated and validated by `tests/test_recommend_acceptance_demo.py`.
+- Both graphs load in the canvas palette (via `ef.export_catalog()`'s generated `recommend.*`/
+  `viz.*` entries), compile through `/compile` to downloadable Python, and execute via `/execute`
+  with per-node status — the same data-driven catalog path the Epic 8/12/13 demos above document,
+  now exercising a `Recommender`-bearing edge (fit → recommend/evaluate) and a
+  `RecommendationResult`-terminal edge, with zero per-node UI code
+  (`tests/test_server.py::test_http_compile_and_execute_recommend_graph` proves the same round
+  trip against a smaller fit → recommend graph directly over HTTP).
+
+### How they're verified
+
+`tests/test_recommend_acceptance_demo.py` proves, for each pipeline: the committed JSON matches
+what the builder function produces (a drift guard), the graph's node/edge counts and node types
+are as expected, and an `@pytest.mark.equivalence` test (reusing
+`tests/test_codegen_equivalence.py`'s `assert_equivalent` harness) that `execute(graph)` and
+running the code `compile_to_code(graph)` emits produce equivalent results end to end — the same
+discipline as the Epic 8/12 demos above, now covering the recommend family's `Cardinality.MANY`
+fan-in and two-OUT-port split node for the first time in a committed acceptance-demo graph.

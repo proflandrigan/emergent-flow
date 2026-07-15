@@ -501,7 +501,7 @@ NL->graph agent (the recommender surface it can target widens).
 > The metrics surface an analyst uses to compare recommenders. All backed by pandas/numpy — no
 > new deps. This is the recommender analog to Epic 8's `ef.ml.evaluate`.
 
-- [ ] `ef.recommend.evaluate(recommender, test_interactions, *, k, metrics) -> EvalResult` —
+- [x] `ef.recommend.evaluate(recommender, test_interactions, *, k, metrics) -> EvalResult` —
   scores a fitted recommender's recommendations against held-out interactions. Returns a tidy
   `EvalResult` dataclass containing:
   - **Per-user metrics frame:** user_id, precision_at_k, recall_at_k, ndcg_at_k, hit (binary),
@@ -510,18 +510,18 @@ NL->graph agent (the recommender surface it can target widens).
     coverage (fraction of items ever recommended), diversity (intra-list distance), novelty
     (mean inverse popularity of recommended items).
   - `k` is configurable (default 10). `metrics` allows selecting a subset.
-- [ ] **Coverage and diversity** are system-level metrics (not per-user): coverage measures catalog
+- [x] **Coverage and diversity** are system-level metrics (not per-user): coverage measures catalog
   breadth (what fraction of all items appear in any user's top-k), diversity measures how
   different each user's recommendations are from each other (1 - mean pairwise cosine similarity
   of recommended item sets). Novelty rewards recommending long-tail items. These are the metrics
   that distinguish a trivially-high-precision "recommend the same 10 popular items to everyone"
   from a useful recommender.
-- [ ] `ef.recommend.compare(test_interactions, *, recommenders, k) -> DataFrame` — the recommender
+- [x] `ef.recommend.compare(test_interactions, *, recommenders, k) -> DataFrame` — the recommender
   analog to `ef.ml.compare_models`: evaluates multiple fitted recommenders on the same test set
   and returns a tidy comparison DataFrame (one row per recommender, columns for each metric),
   sorted by NDCG@k descending. The baseline-to-beat framing: a popularity recommender is always
   included as an automatic baseline row if not already in the list.
-- [ ] Golden tests on the metric computations against known-correct hand-computed fixtures (small
+- [x] Golden tests on the metric computations against known-correct hand-computed fixtures (small
   enough to verify by inspection). Confirm every metric is deterministic.
 
 ## Story 13 — Equivalence & golden testing at scale
@@ -530,18 +530,18 @@ NL->graph agent (the recommender surface it can target widens).
 > with a **parametrized harness over the matrix**, keyed on the inspectable recommendation DataFrame
 > — not one bespoke test per algorithm. Mirror Epic 8 Story 9 / Epic 12 Story 10.
 
-- [ ] A `pytest.mark.parametrize` matrix that, per algorithm, builds a minimal graph
+- [x] A `pytest.mark.parametrize` matrix that, per algorithm, builds a minimal graph
   (`prepare_interactions -> fit -> recommend`) and asserts `execute(ir)` artifacts ~= running
   `compile_to_code(ir)` on a fixed interaction fixture — keyed on the tidy recommendation
   DataFrame (user_id, item_id, rank, score) so opaque model internals aren't compared. Compute
   the matrix dynamically from the registry (it grows as the allow-list widens — the Epic 8
   `keys_for_archetype()` pattern).
-- [ ] Fixed seeds + fixed interaction datasets for determinism; mark every equivalence test
+- [x] Fixed seeds + fixed interaction datasets for determinism; mark every equivalence test
   `@pytest.mark.equivalence` and gate it in `.github/workflows/ci.yml` alongside the existing
   equivalence gate. `[recommend]`-extra equivalence runs under a separate CI job with
   `pytest.importorskip("implicit")`. `torch`-backed equivalence runs under the existing
   `torch`-available job.
-- [ ] Golden tests on **generated code** for a representative algorithm per archetype and family
+- [x] Golden tests on **generated code** for a representative algorithm per archetype and family
   (readable, ruff-clean, importable) — not one golden per entry.
 
 ## Story 14 — Recommender-aware visualization nodes
@@ -550,16 +550,16 @@ NL->graph agent (the recommender surface it can target widens).
 > recommendation lists, not just raw DataFrames. This is where the recommend + viz halves meet,
 > mirroring Epic 12 Story 9.
 
-- [ ] **Precision-recall@k curve** from an `EvalResult` across multiple k values (sweep k=1..50
+- [x] **Precision-recall@k curve** from an `EvalResult` across multiple k values (sweep k=1..50
   and plot the trade-off). Emits `PlotSpec` (plotly, JSON-native, Epic 12 contract).
-- [ ] **Metric comparison bar chart** from `ef.recommend.compare` output — one grouped bar per
+- [x] **Metric comparison bar chart** from `ef.recommend.compare` output — one grouped bar per
   recommender, one color per metric. Emits `PlotSpec`.
-- [ ] **Coverage vs. accuracy scatter** — plots each recommender's coverage against its NDCG@k,
+- [x] **Coverage vs. accuracy scatter** — plots each recommender's coverage against its NDCG@k,
   surfacing the accuracy/diversity trade-off. Emits `PlotSpec`.
-- [ ] **Item popularity distribution** — long-tail histogram of recommendation frequency vs. item
+- [x] **Item popularity distribution** — long-tail histogram of recommendation frequency vs. item
   popularity rank (log scale), showing whether a recommender is biased toward popular items.
   Emits `PlotSpec`.
-- [ ] Golden + equivalence via the Story 13 harness on fixtures that produce fitted recommenders
+- [x] Golden + equivalence via the Story 13 harness on fixtures that produce fitted recommenders
   first (so the plot node's input is a real `EvalResult`/DataFrame, not a stub).
 
 ## Story 15 — Wire into the canvas + acceptance demos
@@ -567,23 +567,23 @@ NL->graph agent (the recommender surface it can target widens).
 > The payoff: the generated catalog drives the palette and config panels with zero per-node UI,
 > and real recommender workflows run end-to-end. Mirror Epic 8 Story 10 / Epic 12 Story 12.
 
-- [ ] The canvas palette (repo Epic 5) renders every generated recommender entry and the
+- [x] The canvas palette (repo Epic 5) renders every generated recommender entry and the
   evaluation/preparation nodes by `family`/`category` grouping; config panels render the
   structured spec (`user_col`/`item_col`/`value_col`/`algorithm`/`n`/`k`/`similarity`) from
   catalog data with **zero per-node UI code** (reuse/extend the Epic 8 Story 10 curated-per-field
   config renderer). Confirm `Recommender`- and `InteractionMatrix`-bearing edges validate on the
   canvas (Epic 3 rules).
-- [ ] Round-trip canvas -> IR -> `/compile` -> downloadable `.py` and `/execute` with per-node
+- [x] Round-trip canvas -> IR -> `/compile` -> downloadable `.py` and `/execute` with per-node
   status, including a `Recommender`-bearing edge (fit -> recommend) and a
   `RecommendationResult`-terminal edge.
-- [ ] **Acceptance demo (content-based):** `load_sample -> prepare_interactions -> popularity
+- [x] **Acceptance demo (content-based):** `load_sample -> prepare_interactions -> popularity
   baseline -> TF-IDF content-based -> evaluate both -> comparison bar chart` builds on the canvas,
   compiles, and executes to a metrics comparison table + a rendered bar chart.
-- [ ] **Acceptance demo (collaborative filtering):** `load_sample -> prepare_interactions ->
+- [x] **Acceptance demo (collaborative filtering):** `load_sample -> prepare_interactions ->
   temporal_split -> user-KNN CF -> SVD CF -> evaluate both on test set -> recommendation list +
   precision-recall curve` builds on the canvas, compiles, and executes to recommendation
   DataFrames + evaluation metrics + a rendered plot.
-- [ ] Document both under `docs/acceptance-demo.md` as the "recommender workflows the app can do
+- [x] Document both under `docs/acceptance-demo.md` as the "recommender workflows the app can do
   today" reference, and add an example graph pair under
   `examples/recommender_acceptance_demo/` (the Epic 8
   `examples/sklearn_acceptance_demo/` precedent).
