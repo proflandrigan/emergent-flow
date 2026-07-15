@@ -181,3 +181,13 @@ register_type(
         ),
     )
 )
+register_type(
+    TypeDef(
+        token="RecommendationResult",
+        description=(
+            "The terminal recommendation payload produced by "
+            "ef.recommend.recommend/similar_items (Epic 15): a tidy "
+            "user_id/item_id/rank/score DataFrame."
+        ),
+    )
+)

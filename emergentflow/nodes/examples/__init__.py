@@ -73,6 +73,10 @@ from .pipeline import Pipeline
 from .predict import Predict
 from .prepare_interactions import PrepareInteractions
 from .query_builder import QueryBuilder
+from .recommend_by_embedding import RecommendByEmbedding
+from .recommend_fit import RecommendFit
+from .recommend_recommend import Recommend
+from .recommend_similar_items import SimilarItems
 from .report import GenerateHtmlSummary
 from .scale_features import ScaleFeatures
 from .seasonal_decompose import SeasonalDecompose
@@ -160,10 +164,14 @@ __all__ = [
     "Predict",
     "PrepareInteractions",
     "QueryBuilder",
+    "Recommend",
+    "RecommendByEmbedding",
+    "RecommendFit",
     "ScaleFeatures",
     "SeasonalDecompose",
     "SelectColumns",
     "SelectFeatures",
+    "SimilarItems",
     "SqlQuery",
     "Summarize",
     "TrainClassifier",

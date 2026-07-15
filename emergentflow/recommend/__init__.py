@@ -299,3 +299,6 @@ def random_split(
         cold_start_mode="include",
     )
     return train, test
+
+
+from emergentflow.recommend import catalog  # noqa: E402, F401
