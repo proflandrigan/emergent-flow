@@ -37,7 +37,7 @@ from emergentflow.codegen.errors import CodegenError, UnboundInputError
 from emergentflow.codegen.traversal import topological_sort
 from emergentflow.codegen.validation import enforce_validation_gate, required_in_port_names
 from emergentflow.codegen.wiring import build_wiring_map
-from emergentflow.ir import Direction, Graph, Node, Paradigm
+from emergentflow.ir import Cardinality, Direction, Graph, Node, Paradigm
 from emergentflow.nodes import get as get_node_definition
 from emergentflow.nodes import registry as default_node_registry
 
@@ -155,11 +155,20 @@ def execute(
             if port.direction != Direction.IN:
                 continue
             sources = wiring_map.upstream(node.id, port.id)
+            if port.cardinality == Cardinality.MANY:
+                values: list[Any] = []
+                for src in sources:
+                    src_node = graph.nodes[src.node_id]
+                    src_port_name = next(p.name for p in src_node.ports if p.id == src.port_id)
+                    values.append(results[src.node_id][src_port_name])
+                inputs[port.name] = values
+                continue
             if len(sources) > 1:
                 raise ValueError(
                     f"IN port {port.name!r} on node {node.id!r} has {len(sources)} "
-                    "sources; multi-source fan-in is not yet supported by codegen "
-                    "context."
+                    "sources but Cardinality.ONE; only one source is allowed. This "
+                    "should be unreachable -- build_wiring_map raises CardinalityError "
+                    "for this case first."
                 )
             if not sources:
                 # The dangling-input guard above only rejects unconnected

@@ -31,7 +31,7 @@ from emergentflow.codegen.validation import enforce_validation_gate
 from emergentflow.codegen.wiring import WiringMap, build_wiring_map
 from emergentflow.eval import label as eval_label
 from emergentflow.eval.export import build_eval_set_rows, build_finetune_rows, rows_to_jsonl_bytes
-from emergentflow.ir import Direction, Graph, Node, Paradigm
+from emergentflow.ir import Cardinality, Direction, Graph, Node, Paradigm
 from emergentflow.ir.schema import ir_json_schema
 from emergentflow.ir.serialize import deserialize_graph
 from emergentflow.llm.gateway import GatewayClient
@@ -437,11 +437,28 @@ def _execute_functional_stream(
             if port.direction != Direction.IN:
                 continue
             sources = wiring_map.upstream(node.id, port.id)
+            if port.cardinality == Cardinality.MANY:
+                values: list[Any] = []
+                any_upstream_skipped = False
+                for src in sources:
+                    if node_status[src.node_id] not in (_STATUS_OK, _STATUS_CACHED):
+                        any_upstream_skipped = True
+                        break
+                    src_node = graph.nodes[src.node_id]
+                    src_port_name = next(p.name for p in src_node.ports if p.id == src.port_id)
+                    values.append(node_results[src.node_id][src_port_name])
+                    upstream_hashes.append(node_hashes[src.node_id])
+                if any_upstream_skipped:
+                    skipped = True
+                    break
+                inputs[port.name] = values
+                continue
             if len(sources) > 1:
                 raise ValueError(
                     f"IN port {port.name!r} on node {node.id!r} has {len(sources)} "
-                    "sources; multi-source fan-in is not yet supported by codegen "
-                    "context."
+                    "sources but Cardinality.ONE; only one source is allowed. This "
+                    "should be unreachable -- build_wiring_map raises CardinalityError "
+                    "for this case first."
                 )
             src = sources[0]
             if node_status[src.node_id] not in (_STATUS_OK, _STATUS_CACHED):

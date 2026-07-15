@@ -332,7 +332,7 @@ NL->graph agent (the recommender surface it can target widens).
 > computation over the interaction matrix. All backed by scipy sparse operations + sklearn
 > pairwise distances — no new deps.
 
-- [ ] **Registry entries** for the collaborative archetype (memory-based sub-family):
+- [x] **Registry entries** for the collaborative archetype (memory-based sub-family):
   - **User-based KNN CF:** for each user, find the K most similar users (cosine / Pearson over
     their interaction vectors), then recommend items those similar users liked that the target user
     hasn't seen. Params: `k` (neighbors), `similarity` (cosine / pearson / jaccard), `n`
@@ -340,15 +340,23 @@ NL->graph agent (the recommender surface it can target widens).
   - **Item-based KNN CF:** for each item pair, compute similarity over their user-interaction
     vectors; for a target user, score unseen items by weighted similarity to items they've
     interacted with. Params: `k`, `similarity`, `n`, `min_common_users`.
-- [ ] Both memory-based CF algorithms operate directly on the `InteractionMatrix` sparse matrix.
+- [x] Both memory-based CF algorithms operate directly on the `InteractionMatrix` sparse matrix.
   The similarity computation uses `sklearn.metrics.pairwise.cosine_similarity` (sparse-aware) for
-  cosine, scipy's sparse correlation for Pearson, and set-intersection-over-union for Jaccard.
-  For large matrices (>100k users/items), document the memory/time trade-off and recommend the
-  model-based path (Story 8) instead.
-- [ ] The `FittedRecommender.model` for memory-based CF stores the precomputed similarity matrix
+  cosine, an adjusted/mean-centered cosine similarity for Pearson, and set-intersection-over-union
+  for Jaccard. The user/item-user and user-user/item-item similarity matrices are computed densely
+  (`n x n`) after thresholding to top-K, so the memory/time trade-off for large matrices
+  (>100k users/items) is documented in `_similarity_matrix`/`_top_k_sparse`'s docstrings
+  (`emergentflow/recommend/catalog.py`) — the model-based path (Story 8) is recommended instead
+  at that scale.
+- [x] The `FittedRecommender.model` for memory-based CF stores the precomputed similarity matrix
   (sparse, thresholded to top-K per row to bound memory). `fit_stats` includes similarity-matrix
   density and the effective neighborhood size distribution.
 - [ ] Golden + equivalence via the Story 13 harness on a small, deterministic interaction fixture.
+  **Partially done:** golden `ast.parse` + execute-vs-codegen equivalence exists for both
+  `user_knn_cf` and `item_knn_cf` (`tests/test_recommend_collaborative_catalog.py`), plus
+  hand-verified expected recommendation order/scores, `min_common_items`/`min_common_users`
+  filtering, exclude_known, determinism, and cold-start tests. Not done: the actual Story 13
+  parametrized cross-registry harness, which hasn't landed yet.
 
 ## Story 8 — Model-based collaborative filtering (SVD, NMF, ALS, BPR)
 
@@ -356,30 +364,38 @@ NL->graph agent (the recommender surface it can target widens).
 > factor matrices. The base install covers sklearn-backed SVD/NMF (explicit ratings); the
 > `[recommend]` extra adds optimized implicit-feedback models via `implicit`.
 
-- [ ] **Base-install registry entries** (sklearn, no new deps):
+- [x] **Base-install registry entries** (sklearn, no new deps):
   - **TruncatedSVD:** sklearn `TruncatedSVD` over the interaction matrix — learns latent factors
     for items. Reconstruct approximate ratings as `U @ Sigma @ Vt`, rank unseen items by
     predicted rating. Params: `n_components`, `n`, `seed`.
   - **NMF:** sklearn `NMF` over the (non-negative) interaction matrix — learns non-negative latent
     factors. Params: `n_components`, `n`, `seed`, `max_iter`.
-- [ ] **`[recommend]`-extra registry entries** (`implicit`, MIT):
+- [x] **`[recommend]`-extra registry entries** (`implicit`, MIT):
   - **ALS (Alternating Least Squares):** `implicit.als.AlternatingLeastSquares` — the standard
     implicit-feedback matrix factorization. Params: `factors`, `regularization`, `iterations`,
     `n`, `seed`. Deterministic given `seed`.
   - **BPR (Bayesian Personalized Ranking):** `implicit.bpr.BayesianPersonalizedRanking` — learns
     a ranking over items from pairwise implicit feedback. Params: `factors`, `learning_rate`,
     `regularization`, `iterations`, `n`, `seed`.
-- [ ] The `FittedRecommender.model` for model-based CF stores the learned user-factor and item-
+- [x] The `FittedRecommender.model` for model-based CF stores the learned user-factor and item-
   factor matrices (numpy arrays, inspectable by shape; the live `implicit` model object degrades
   on the result-payload contract). `fit_stats` includes explained variance (for SVD),
-  reconstruction error, and convergence info.
-- [ ] **Optional-dependency discipline** (mirroring Epic 12 Story 7): base install absent-import
+  reconstruction error + iteration count (for NMF), and factor/iteration counts (for ALS/BPR).
+- [x] **Optional-dependency discipline** (mirroring Epic 12 Story 7): base install absent-import
   -> typed `MissingOptionalDependencyError("emergentflow[recommend]")`; equivalence/golden tests
-  use `pytest.importorskip("implicit")` so the default CI lane skips them; a **separate CI job**
-  (or opt-in marker) installs `[recommend]` and runs the implicit-feedback equivalence matrix
-  with fixed seeds.
+  use `pytest.importorskip("implicit")` so the default CI lane skips them. A dedicated separate CI
+  job that installs `[recommend]` and runs the implicit-feedback equivalence matrix is not yet
+  wired into `.github/workflows/ci.yml` — Story 13's parametrized harness (below) is the natural
+  place to hang that job once it lands.
 - [ ] Golden + equivalence via the Story 13 harness. SVD/NMF are deterministic given a fixed seed.
   ALS/BPR determinism requires `implicit`'s `random_state` param — verify and document.
+  **Partially done:** golden `ast.parse` + execute-vs-codegen equivalence exists for all four
+  algorithms (`tests/test_recommend_collaborative_catalog.py` for `svd_cf`/`nmf_cf`,
+  `tests/test_recommend_implicit_catalog.py` for `als`/`bpr`, the latter `importorskip`-gated).
+  SVD/NMF determinism holds exactly given `seed`. ALS is deterministic given `random_state`; BPR
+  additionally required `num_threads=1` (multi-threaded SGD updates raced on shared factor rows
+  and broke item-ranking reproducibility even with a fixed `random_state`) — documented inline in
+  `_fit_bpr`. Not done: the actual Story 13 parametrized cross-registry harness.
 
 ## Story 9 — Hybrid recommenders (content + collaborative)
 
@@ -387,20 +403,28 @@ NL->graph agent (the recommender surface it can target widens).
 > algorithm family — it wires existing recommenders together via score blending / stacking, so it
 > inherits their ADR-0002 equivalence by construction.
 
-- [ ] **Weighted hybrid:** given two or more `FittedRecommender` outputs (from any archetype), blend
+- [x] **Weighted hybrid:** given two or more `FittedRecommender` outputs (from any archetype), blend
   their per-item scores with configurable weights and re-rank. Params: `weights` (list of floats,
   one per input recommender), `n`, `blend_strategy` (weighted_sum / rank_fusion / cascade).
   This is the simplest and most common hybrid approach.
-- [ ] **Switching hybrid:** select which recommender to use per user based on a condition (e.g.,
+- [x] **Switching hybrid:** select which recommender to use per user based on a condition (e.g.,
   cold-start users — fewer than K interactions — get the content-based recommender; warm users get
   collaborative). Params: `cold_start_threshold`, `n`. Addresses the cold-start problem directly.
-- [ ] Both hybrid nodes take **multiple** `Recommender` inputs (or `RecommendationResult` frames)
-  and emit a single `RecommendationResult`. The port shape is `Recommender[] + params ->
-  RecommendationResult`; if this multi-input port is the first of its kind in the type system,
-  document the extension in `docs/type-system-spec.md`.
+- [x] Both hybrid nodes take **multiple** `Recommender` inputs and emit a single
+  `RecommendationResult`. The port shape is `Recommender[] + params -> RecommendationResult`.
+  This is the first `Cardinality.MANY` IN port among the reference nodes — the underlying fan-in
+  support was added to `emergentflow/codegen/context.py` (codegen: binds to a Python list-literal
+  expression string), `executor.py` (execute: collects a real Python list), and
+  `emergentflow/server/service.py` (the SSE/whole-graph server executor), and the extension is
+  documented in `docs/type-system-spec.md`.
 - [ ] Golden + equivalence via the Story 13 harness, verifying that the blended output is
   deterministic and that the same blend weights produce identical results via `execute` and
-  `compile_to_code`.
+  `compile_to_code`. **Partially done:** golden `ast.parse` + execute-vs-codegen equivalence
+  exists for both `hybrid_weighted` and `hybrid_switching` (`tests/test_recommend_hybrid.py`),
+  using a hand-built `CodegenContext` to exercise the `Cardinality.MANY` binding directly, plus
+  an independently-computed oracle test for `weighted_sum`, a cascade-priority test, a
+  cold-start-routing test, and determinism tests for both. Not done: the actual Story 13
+  parametrized cross-registry harness.
 
 ---
 

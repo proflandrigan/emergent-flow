@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 from emergentflow.codegen.naming import NameMap
 from emergentflow.codegen.wiring import WiringMap
-from emergentflow.ir.common import Direction
+from emergentflow.ir.common import Cardinality, Direction
 from emergentflow.ir.node import Node
 
 
@@ -86,9 +86,13 @@ def build_codegen_context(node: Node, name_map: NameMap, wiring_map: WiringMap) 
         splicing the ``None`` literal into the emitted call is the correct,
         equivalence-preserving binding (mirrors ``execute``'s ``inputs[name] =
         None`` for the same case), not a placeholder for a missing wire;
-      * more than one source (fan-in, Cardinality.MANY) -> raise ValueError
-        naming the port. None of the reference nodes use MANY inputs;
-        supporting multi-source fan-in is deferred.
+      * a MANY-cardinality port (fan-in) -> binds to a Python list-literal
+        expression string over all upstream sources' variable names, e.g.
+        "[a, b, c]", in the same deterministic (node_id, port_id) order
+        `WiringMap.upstream` already returns -- so a node's codegen can splice
+        it directly into an emitted call as a list argument. Zero sources
+        binds to "[]" (distinct from a dangling Cardinality.ONE optional
+        port, which binds to the "None" literal).
     """
     in_vars: dict[str, str] = {}
     out_vars: dict[str, str] = {}
@@ -98,7 +102,10 @@ def build_codegen_context(node: Node, name_map: NameMap, wiring_map: WiringMap) 
             out_vars[port.name] = name_map.var_for(node.id, port.id)
         elif port.direction == Direction.IN:
             sources = wiring_map.upstream(node.id, port.id)
-            if len(sources) == 0:
+            if port.cardinality == Cardinality.MANY:
+                var_names = [name_map.var_for(s.node_id, s.port_id) for s in sources]
+                in_vars[port.name] = "[" + ", ".join(var_names) + "]"
+            elif len(sources) == 0:
                 in_vars[port.name] = "None"
             elif len(sources) == 1:
                 source = sources[0]
@@ -106,8 +113,9 @@ def build_codegen_context(node: Node, name_map: NameMap, wiring_map: WiringMap) 
             else:
                 raise ValueError(
                     f"IN port {port.name!r} on node {node.id!r} has {len(sources)} "
-                    "sources; multi-source fan-in is not yet supported by codegen "
-                    "context."
+                    "sources but Cardinality.ONE; only one source is allowed. This "
+                    "should be unreachable -- build_wiring_map raises CardinalityError "
+                    "for this case first."
                 )
 
     return CodegenContext(in_vars=in_vars, out_vars=out_vars)

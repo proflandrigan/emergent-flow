@@ -342,8 +342,9 @@ def test_multi_output_threads_each_out_port_by_name() -> None:
     assert results["dbl_lo"] == {"out": 2}
 
 
-def test_multi_source_fan_in_is_error() -> None:
-    """A MANY IN port fed by 2 sources raises ValueError (parity with codegen)."""
+def test_multi_source_fan_in_collects_a_list_in_deterministic_order() -> None:
+    """A MANY IN port fed by 2 sources receives a list of both upstream values, in
+    the same deterministic (node_id, port_id) order build_wiring_map defines."""
     src_a = Node(
         id="src_a",
         type=_ExecSource.type,
@@ -355,6 +356,15 @@ def test_multi_source_fan_in_is_error() -> None:
         type=_ExecSource.type,
         label=_ExecSource.label,
         ports=[Port(id="src_b-out", name="out", direction=Direction.OUT, data_type="int")],
+    )
+    dbl = Node(
+        id="dbl",
+        type=_ExecDouble.type,
+        label=_ExecDouble.label,
+        ports=[
+            Port(id="dbl-in", name="in_", direction=Direction.IN, data_type="int"),
+            Port(id="dbl-out", name="out", direction=Direction.OUT, data_type="int"),
+        ],
     )
     fan = Node(
         id="fan",
@@ -373,15 +383,23 @@ def test_multi_source_fan_in_is_error() -> None:
     )
     edges = [
         Edge(
+            source=PortRef(node_id="src_b", port_id="src_b-out"),
+            target=PortRef(node_id="dbl", port_id="dbl-in"),
+        ),
+        Edge(
             source=PortRef(node_id="src_a", port_id="src_a-out"),
             target=PortRef(node_id="fan", port_id="fan-in"),
         ),
         Edge(
-            source=PortRef(node_id="src_b", port_id="src_b-out"),
+            source=PortRef(node_id="dbl", port_id="dbl-out"),
             target=PortRef(node_id="fan", port_id="fan-in"),
         ),
     ]
-    graph = _graph([src_a, src_b, fan], edges)
+    graph = _graph([src_a, src_b, dbl, fan], edges)
 
-    with pytest.raises(ValueError, match="multi-source fan-in"):
-        execute(graph)
+    results = execute(graph)
+
+    # fan-in's two sources are node "dbl" (src_b doubled: 1 * 2 = 2) and node
+    # "src_a" (value 1). build_wiring_map orders sources by (node_id, port_id);
+    # "dbl" < "src_a" lexicographically, so dbl's value (2) comes first.
+    assert results["fan"]["out"] == [2, 1]

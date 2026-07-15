@@ -75,6 +75,8 @@ from .prepare_interactions import PrepareInteractions
 from .query_builder import QueryBuilder
 from .recommend_by_embedding import RecommendByEmbedding
 from .recommend_fit import RecommendFit
+from .recommend_hybrid_switching import HybridSwitching
+from .recommend_hybrid_weighted import HybridWeighted
 from .recommend_recommend import Recommend
 from .recommend_similar_items import SimilarItems
 from .report import GenerateHtmlSummary
@@ -148,6 +150,8 @@ __all__ = [
     "GenerateHtmlSummary",
     "GridSearch",
     "GroupByAggregate",
+    "HybridSwitching",
+    "HybridWeighted",
     "ImputeMissing",
     "LlmCall",
     "LlmPrompt",
