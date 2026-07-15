@@ -34,6 +34,7 @@ from emergentflow.recommend.registry import RecommenderSpec, get_recommender_spe
 
 __all__ = [
     "fit",
+    "fit_two_tower",
     "hybrid_switching",
     "hybrid_weighted",
     "prepare_interactions",
@@ -112,6 +113,34 @@ def fit(
     if spec.requires_extra is not None:
         _require_extra(spec.requires_extra)
     return spec.fitter(interactions, item_features, resolved_params)
+
+
+@public_op(name="ef.recommend.fit_two_tower")
+def fit_two_tower(
+    interactions: InteractionMatrix,
+    *,
+    item_features: pd.DataFrame | None = None,
+    user_features: pd.DataFrame | None = None,
+    params: dict[str, Any] | None = None,
+) -> FittedRecommender:
+    """Fit the two-tower deep recommender (Epic 15, Story 11) -- a dedicated seam alongside
+    ``fit()`` because two-tower is the only algorithm that consumes BOTH item-feature and
+    user-feature side inputs; the shared ``Fitter`` callable type (Story 2) used by every other
+    algorithm only carries one optional DataFrame (``item_features``), so two-tower keeps its
+    own seam here rather than widening that type for every existing fitter. Mirrors ``fit()``'s
+    algorithm-key lookup / param validation / optional-extra gating exactly, then calls
+    ``catalog._fit_two_tower_impl`` directly with the extra ``user_features`` argument. Because
+    both the compiled code (via the dedicated ``RecommendFitTwoTower`` node) and ``execute``
+    reach this only through this function, ADR-0002 equivalence holds by construction. Never
+    mutates ``interactions``, ``item_features``, or ``user_features``.
+    """
+    from emergentflow.recommend.catalog import _fit_two_tower_impl  # noqa: PLC0415
+
+    spec = get_recommender_spec("two_tower")
+    resolved_params = _validate_params(spec, params or {})
+    if spec.requires_extra is not None:
+        _require_extra(spec.requires_extra)
+    return _fit_two_tower_impl(interactions, item_features, user_features, resolved_params)
 
 
 @public_op(name="ef.recommend.recommend")
