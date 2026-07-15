@@ -23,6 +23,7 @@
     "PlotSpec",
     "Predictions",
     "PromptSpec",
+    "RecommendationResult",
     "Recommender",
     "Schema",
     "StatsModel",

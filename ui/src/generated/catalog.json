@@ -5934,6 +5934,83 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "description": "Fit a curated, allow-listed recommender algorithm.",
+      "family": "recommend",
+      "label": "Fit Recommender",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which curated recommender algorithm to fit.",
+          "hints": {
+            "choices": [
+              "co_occurrence",
+              "embedding_similarity",
+              "feature_knn",
+              "popularity",
+              "popularity_segmented",
+              "random",
+              "tfidf_similarity"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Algorithm",
+          "name": "algorithm",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": {},
+          "help": "Keyword arguments for the chosen algorithm.",
+          "hints": null,
+          "label": "Algorithm params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "InteractionMatrix",
+          "direction": "in",
+          "help": "The prepared user-item interaction matrix.",
+          "label": "Interactions",
+          "name": "interactions",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Optional item features for content-based algorithms.",
+          "label": "Item Features",
+          "name": "item_features",
+          "required": false
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Recommender",
+          "direction": "out",
+          "help": "The fitted recommender model.",
+          "label": null,
+          "name": "recommender",
+          "required": true
+        }
+      ],
+      "type": "recommend.fit",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
       "description": "Validate and deduplicate raw user-item interaction data into a sparse InteractionMatrix.",
       "family": "recommend",
       "label": "Prepare Interactions",
@@ -6112,6 +6189,196 @@
         }
       ],
       "type": "recommend.prepare_interactions",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
+      "description": "Generate top-N recommendations from a fitted recommender.",
+      "family": "recommend",
+      "label": "Recommend",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Users to recommend for; empty/unset means every user the recommender was fit on.",
+          "hints": null,
+          "label": "User IDs",
+          "name": "user_ids",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": 10,
+          "help": "Number of recommendations to generate per user.",
+          "hints": null,
+          "label": "Recommendations per user",
+          "name": "n",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": true,
+          "help": "Drop items already present in the user's training interactions.",
+          "hints": null,
+          "label": "Exclude known items",
+          "name": "exclude_known",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Recommender",
+          "direction": "in",
+          "help": "The fitted recommender model.",
+          "label": null,
+          "name": "recommender",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "RecommendationResult",
+          "direction": "out",
+          "help": "Top-N recommendations per user.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "recommend.recommend",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
+      "description": "Content-based filtering via dense embedding similarity \u2014 fits a NearestNeighbors index on a pre-computed embedding column.",
+      "family": "recommend",
+      "label": "Recommend by Embedding Similarity",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "item_id",
+          "help": "Column identifying the item in item_features.",
+          "hints": null,
+          "label": "Item ID column",
+          "name": "item_id_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column containing a pre-computed embedding (list of floats) per item.",
+          "hints": null,
+          "label": "Embedding column",
+          "name": "embedding_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "cosine",
+          "help": "Distance metric for NearestNeighbors.",
+          "hints": {
+            "choices": [
+              "cosine",
+              "euclidean"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Similarity metric",
+          "name": "metric",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "InteractionMatrix",
+          "direction": "in",
+          "help": "The prepared user-item interaction matrix.",
+          "label": "Interactions",
+          "name": "interactions",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "DataFrame with a pre-computed embedding column (list of floats) per item.",
+          "label": "Item Features",
+          "name": "item_features",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Recommender",
+          "direction": "out",
+          "help": "The fitted embedding-similarity recommender.",
+          "label": null,
+          "name": "recommender",
+          "required": true
+        }
+      ],
+      "type": "recommend.recommend_by_embedding",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
+      "description": "Find the N most similar items to each given item.",
+      "family": "recommend",
+      "label": "Similar Items",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Items to find similar items for.",
+          "hints": null,
+          "label": "Item IDs",
+          "name": "item_ids",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": 10,
+          "help": "Number of similar items to return per query item.",
+          "hints": null,
+          "label": "Similar items per item",
+          "name": "n",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Recommender",
+          "direction": "in",
+          "help": "The fitted recommender model.",
+          "label": null,
+          "name": "recommender",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "RecommendationResult",
+          "direction": "out",
+          "help": "Similar items per query item.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "recommend.similar_items",
       "version": 1
     },
     {
