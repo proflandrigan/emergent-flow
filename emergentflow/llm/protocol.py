@@ -119,6 +119,75 @@ class LLMResponse:
     finish_reason: str
 
 
+@dataclasses.dataclass(frozen=True)
+class EmbeddingUsage:
+    """Token counts for one embedding call."""
+
+    input_tokens: int
+
+
+@dataclasses.dataclass(frozen=True)
+class EmbeddingRequest:
+    """A pure, JSON-native description of one embedding call.
+
+    Attributes
+    ----------
+    provider: gateway provider key, e.g. ``"openai"``.
+    model: provider model id, e.g. ``"text-embedding-3-small"``.
+    texts: the input strings to embed.
+    api_key_env: name of the environment variable holding the provider API
+        key (never the key itself — ADR 0017 secrets rule). ``None`` lets the
+        client fall back to a provider-conventional env-var name.
+    llm_connection: name of a registered LLM credential profile. ``None``
+        means no profile reference.
+    """
+
+    provider: str
+    model: str
+    texts: tuple[str, ...]
+    api_key_env: str | None = None
+    llm_connection: str | None = None
+
+    def content_hash(self) -> str:
+        """Return a stable sha256 hex digest identifying this request's content.
+
+        Used by `ReplayClient` to key recorded fixtures. Built from a
+        JSON-native, sorted-keys serialization of every field so the hash is
+        stable across process runs and Python versions.
+        """
+        payload = {
+            "provider": self.provider,
+            "model": self.model,
+            "texts": list(self.texts),
+        }
+        blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+@dataclasses.dataclass(frozen=True)
+class EmbeddingResponse:
+    """The inspectable result of one embedding call.
+
+    JSON-native so it satisfies `emergentflow.api.is_inspectable`.
+
+    Attributes
+    ----------
+    embeddings: list of embedding vectors, one per input text.
+    model: the model id that actually served the request.
+    dimensions: the dimensionality of each embedding vector.
+    usage: input token count.
+    cost_usd: computed cost for this call.
+    latency_ms: wall-clock latency reported by the client.
+    """
+
+    embeddings: list[list[float]]
+    model: str
+    dimensions: int
+    usage: EmbeddingUsage
+    cost_usd: float
+    latency_ms: float
+
+
 class FixtureMissError(LookupError):
     """Raised by `ReplayClient` when a request's content hash has no recorded fixture.
 

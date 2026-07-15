@@ -23,6 +23,7 @@ _LAZY_FAMILIES = frozenset(
     {
         "data",
         "clean",
+        "embed",
         "stats",
         "ml",
         "reports",
@@ -64,6 +65,7 @@ if TYPE_CHECKING:  # let type-checkers resolve ef.data, ef.codegen, ... statical
         clean,
         codegen,
         data,
+        embed,
         eval,
         explain,
         llm,
@@ -91,6 +93,7 @@ __all__ = [
     "is_inspectable",
     "public_op",
     "data",
+    "embed",
     "clean",
     "stats",
     "timeseries",

@@ -130,6 +130,14 @@ recommend = [
 explain = [
     "shap>=0.44,<1",
 ]
+# `pip install emergentflow[embed]` enables the optional local text-embedding backend
+# (sentence-transformers, Apache-2.0). Kept optional so a bare SDK install stays light
+# (ADR 0007); the API embedding path (via GatewayClient/LiteLLM) needs only the `[llm]`
+# extra. A local-backend embed node in a base install raises a typed
+# MissingOptionalDependencyError, never an opaque ImportError.
+embed = [
+    "sentence-transformers>=3,<4",
+]
 # `pip install emergentflow[bigquery]` enables the BigQuery warehouse adapter (Epic 13).
 # google-cloud-bigquery is Apache-2.0 (compatible; not GPL). Kept optional so a bare SDK
 # install stays credential-free and light (ADR 0007 / ADR 0018); a BigQuery node in a base
@@ -161,7 +169,7 @@ mcp = [
 # modeling, and the MCP tool wrapper. Convenient for local development or
 # exploration; production installs should cherry-pick only the extras they need.
 all = [
-    "emergentflow[server,llm,bayes,explain,bigquery,redshift,postgres,mcp]",
+    "emergentflow[server,llm,bayes,embed,explain,bigquery,redshift,postgres,mcp]",
 ]
 
 [project.urls]
@@ -280,5 +288,9 @@ module = [
     # stubs and is imported lazily inside `emergentflow/recommend/catalog.py`'s ALS/BPR
     # fitters, absent from the bare `uv sync --locked` CI env (like torch/litellm/pymc).
     "implicit.*",
+    # The optional `emergentflow[embed]` extra: sentence-transformers is imported lazily
+    # inside `emergentflow/embed/__init__.py`, absent from the bare `uv sync --locked`
+    # CI env (like torch/litellm/pymc).
+    "sentence_transformers.*",
 ]
 ignore_missing_imports = true

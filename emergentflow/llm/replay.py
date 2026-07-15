@@ -17,7 +17,15 @@ import json
 import os
 from pathlib import Path
 
-from emergentflow.llm.protocol import FixtureMissError, LLMRequest, LLMResponse, Usage
+from emergentflow.llm.protocol import (
+    EmbeddingRequest,
+    EmbeddingResponse,
+    EmbeddingUsage,
+    FixtureMissError,
+    LLMRequest,
+    LLMResponse,
+    Usage,
+)
 
 
 def _fixture_path(fixtures_dir: Path, content_hash: str) -> Path:
@@ -47,6 +55,24 @@ def _response_from_dict(payload: dict) -> LLMResponse:
     )
 
 
+def _embedding_response_to_dict(response: EmbeddingResponse) -> dict:
+    """Serialize an `EmbeddingResponse` to a JSON-native dict."""
+    return dataclasses.asdict(response)
+
+
+def _embedding_response_from_dict(payload: dict) -> EmbeddingResponse:
+    """Reconstruct an `EmbeddingResponse` from the dict `_embedding_response_to_dict` writes."""
+    usage_payload = payload["usage"]
+    return EmbeddingResponse(
+        embeddings=payload["embeddings"],
+        model=payload["model"],
+        dimensions=payload["dimensions"],
+        usage=EmbeddingUsage(input_tokens=usage_payload["input_tokens"]),
+        cost_usd=payload["cost_usd"],
+        latency_ms=payload["latency_ms"],
+    )
+
+
 def write_fixture(
     fixtures_dir: str | os.PathLike[str], request: LLMRequest, response: LLMResponse
 ) -> Path:
@@ -63,6 +89,23 @@ def write_fixture(
     dir_path.mkdir(parents=True, exist_ok=True)
     path = _fixture_path(dir_path, request.content_hash())
     path.write_text(json.dumps(_response_to_dict(response), indent=2, sort_keys=True) + "\n")
+    return path
+
+
+def write_embedding_fixture(
+    fixtures_dir: str | os.PathLike[str], request: EmbeddingRequest, response: EmbeddingResponse
+) -> Path:
+    """Write *response* as a content-addressed fixture for *request*.
+
+    Creates *fixtures_dir* if it does not already exist. The fixture file is
+    named ``<request.content_hash()>.json``. Returns the path written.
+    """
+    dir_path = Path(fixtures_dir)
+    dir_path.mkdir(parents=True, exist_ok=True)
+    path = _fixture_path(dir_path, request.content_hash())
+    path.write_text(
+        json.dumps(_embedding_response_to_dict(response), indent=2, sort_keys=True) + "\n"
+    )
     return path
 
 
@@ -106,3 +149,23 @@ class ReplayClient:
             )
         payload = json.loads(path.read_text())
         return _response_from_dict(payload)
+
+    def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
+        """Replay the embedding fixture recorded for *request*.
+
+        Raises
+        ------
+        FixtureMissError
+            If no fixture file exists for ``request.content_hash()``.
+        """
+        content_hash = request.content_hash()
+        path = _fixture_path(self.fixtures_dir, content_hash)
+        if not path.exists():
+            raise FixtureMissError(
+                f"No recorded embedding fixture for request hash {content_hash!r} "
+                f"(looked in {self.fixtures_dir}). To record one:\n"
+                f"    from emergentflow.llm.replay import write_embedding_fixture\n"
+                f"    write_embedding_fixture({str(self.fixtures_dir)!r}, request, response)"
+            )
+        payload = json.loads(path.read_text())
+        return _embedding_response_from_dict(payload)
