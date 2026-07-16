@@ -434,6 +434,27 @@ function EstimatorParamsField({
               }}
             />
           );
+        } else if (kwarg.type === "list") {
+          // Comma-separated text, same convention as the top-level "list" widget
+          // (widgets.ts's isListType/parseValue/formatValue) -- without this branch a list
+          // default like [32, 16, 8] falls into the plain-text branch below, which stringifies
+          // the array for display and then writes the raw unparsed string back on every edit
+          // instead of an array, corrupting params like mlp_layers/feature_cols/ngram_range.
+          const arr = Array.isArray(value) ? value : [];
+          kwargWidget = (
+            <Input
+              type="text"
+              data-testid={testId}
+              value={arr.join(", ")}
+              onChange={(e) => {
+                const parsed = e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter((s) => s.length > 0);
+                writeCurated(kwarg.name, parsed);
+              }}
+            />
+          );
         } else {
           kwargWidget = (
             <Input
@@ -444,9 +465,16 @@ function EstimatorParamsField({
             />
           );
         }
+        // Only CatalogRecommenderParam carries `required` (sklearn's CatalogEstimatorParam has
+        // no such concept -- every constructor kwarg has a default); guard with `in` so this
+        // stays a no-op for the estimator-sourced kwargs of the pre-existing curated nodes.
+        const kwargRequired = "required" in kwarg && kwarg.required;
         return (
           <div key={kwarg.name} style={{ marginBottom: "0.5rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem" }}>{kwarg.name}</label>
+            <label style={{ display: "block", fontSize: "0.85rem" }}>
+              {kwarg.name}
+              {kwargRequired ? " *" : ""}
+            </label>
             {kwargWidget}
             {kwarg.help ? (
               <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
