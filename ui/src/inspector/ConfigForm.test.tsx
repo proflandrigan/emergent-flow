@@ -256,3 +256,63 @@ test("llm_connection param renders a select, not a text input", () => {
   const el = screen.getByTestId("param-llm_connection");
   expect(el.tagName).toBe("SELECT");
 });
+
+test("recommend.fit renders curated per-param widgets from catalog.recommenders once an algorithm is selected", () => {
+  const id = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("recommend.fit"), { x: 0, y: 0 });
+  useGraphStore.getState().setParam(id, "algorithm", "popularity");
+  const node = useGraphStore.getState().nodes[id];
+  render(<ConfigForm node={node} />);
+
+  // The algorithm choice param resolves via catalog.recommenders (source "recommenders"),
+  // not catalog.estimators.
+  const recommender = catalog.recommenders.find((r) => r.key === "popularity");
+  expect(recommender).toBeDefined();
+  for (const kwarg of recommender!.params) {
+    expect(screen.getByTestId(`estimator-param-${kwarg.name}`)).toBeInTheDocument();
+  }
+
+  // score_type carries curated choices -> renders a select, not a raw JSON blob.
+  const scoreType = screen.getByTestId("estimator-param-score_type") as HTMLSelectElement;
+  expect(scoreType.tagName).toBe("SELECT");
+  const options = Array.from(scoreType.querySelectorAll("option")).map((o) => o.value);
+  expect(options).toEqual(["", "count", "mean_rating", "weighted"]);
+
+  // The advanced-JSON overflow field is present (dict param is still named "params").
+  expect(screen.getByTestId("estimator-params-advanced-params")).toBeInTheDocument();
+});
+
+test("editing a curated recommender kwarg writes into the recommend.fit params dict", () => {
+  const id = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("recommend.fit"), { x: 0, y: 0 });
+  useGraphStore.getState().setParam(id, "algorithm", "popularity");
+  const node = useGraphStore.getState().nodes[id];
+  render(<ConfigForm node={node} />);
+
+  const scoreType = screen.getByTestId("estimator-param-score_type") as HTMLSelectElement;
+  fireEvent.change(scoreType, { target: { value: "weighted" } });
+
+  const updated = useGraphStore
+    .getState()
+    .nodes[id].params.find((p) => p.name === "params");
+  expect((updated?.value as Record<string, unknown>).score_type).toBe("weighted");
+});
+
+test("transform.scale_features renders curated estimator widgets (feature-transform node wired into the curated path)", () => {
+  const id = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("transform.scale_features"), { x: 0, y: 0 });
+  useGraphStore.getState().setParam(id, "estimator", "StandardScaler");
+  const node = useGraphStore.getState().nodes[id];
+  render(<ConfigForm node={node} />);
+
+  const estimator = catalog.estimators.find((e) => e.key === "StandardScaler");
+  expect(estimator).toBeDefined();
+  for (const kwarg of estimator!.params) {
+    expect(screen.getByTestId(`estimator-param-${kwarg.name}`)).toBeInTheDocument();
+  }
+  // No raw JSON blob for the dict param -- it's the curated field instead.
+  expect(screen.getByTestId("estimator-params-advanced-params")).toBeInTheDocument();
+});

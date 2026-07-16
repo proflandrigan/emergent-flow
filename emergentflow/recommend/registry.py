@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "RecommenderFamily",
+    "RecommenderParamSpec",
     "RecommenderSpec",
     "register_recommender",
     "get_recommender_spec",
@@ -64,6 +65,24 @@ SimilarItemsFn = Callable[["FittedRecommender", "list[Any]", int], "Recommendati
 
 
 @dataclass(frozen=True)
+class RecommenderParamSpec:
+    """Curated UI/validation metadata for one recommender algorithm param.
+
+    Additive to the ``required_params``/``optional_params`` name tuples (which stay the
+    authoritative allow-list ``ef.recommend.fit`` validates against): this carries the
+    type/default/help/choices the Epic 4 config UI renders. ``required`` mirrors whether the
+    param name appears in ``RecommenderSpec.required_params``.
+    """
+
+    name: str
+    type: str  # "int" | "float" | "str" | "bool" | "list" | "any"
+    default: Any = None
+    help: str = ""
+    choices: tuple[str, ...] | None = None
+    required: bool = False
+
+
+@dataclass(frozen=True)
 class RecommenderSpec:
     """One curated allow-list entry mapping an algorithm key to how to fit/recommend/similar it.
 
@@ -79,6 +98,10 @@ class RecommenderSpec:
     required_params: structured-param keys that MUST be present (validated by the ``ef.recommend
         .fit`` wrapper).
     optional_params: additional structured-param keys this algorithm accepts.
+    param_metadata: curated per-param type/default/help/choices metadata (one entry per name in
+        ``required_params + optional_params``), additive to those name tuples -- see
+        :class:`RecommenderParamSpec`. Left ``()`` for entries registered before this metadata
+        existed.
     requires_extra: pip extra target (e.g. ``"emergentflow[recommend]"``) needed to run this
         algorithm, or ``None`` for base-install algorithms. ``ef.recommend.fit`` raises
         ``MissingOptionalDependencyError`` when it is set but the extra is absent.
@@ -96,6 +119,7 @@ class RecommenderSpec:
     similar_items_fn: SimilarItemsFn | None = None
     required_params: tuple[str, ...] = ()
     optional_params: tuple[str, ...] = ()
+    param_metadata: tuple[RecommenderParamSpec, ...] = ()
     requires_extra: str | None = None
     handles_cold_start_users: bool = False
     handles_cold_start_items: bool = False

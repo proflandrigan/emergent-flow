@@ -1,5 +1,5 @@
 {
-  "catalog_version": 4,
+  "catalog_version": 5,
   "charts": [
     {
       "category": "Visualization",
@@ -10207,6 +10207,796 @@
       ],
       "type": "viz.plot_residuals",
       "version": 1
+    }
+  ],
+  "recommenders": [
+    {
+      "category": "Collaborative",
+      "description": "Implicit-feedback matrix factorization via implicit.als.AlternatingLeastSquares -- requires the emergentflow[recommend] extra. Deterministic given seed.",
+      "family": "collaborative",
+      "key": "als",
+      "label": "Als",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": 64,
+          "help": "Number of latent factors.",
+          "name": "factors",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 0.01,
+          "help": "L2 regularization strength.",
+          "name": "regularization",
+          "required": false,
+          "type": "float"
+        },
+        {
+          "choices": null,
+          "default": 15,
+          "help": "Number of ALS optimization iterations.",
+          "name": "iterations",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 0,
+          "help": "Random seed for reproducible fitting.",
+          "name": "seed",
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "requires_extra": "emergentflow[recommend]"
+    },
+    {
+      "category": "Collaborative",
+      "description": "Implicit-feedback Bayesian Personalized Ranking via implicit.bpr.BayesianPersonalizedRanking -- requires the emergentflow[recommend] extra. Deterministic given seed.",
+      "family": "collaborative",
+      "key": "bpr",
+      "label": "Bpr",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": 64,
+          "help": "Number of latent factors.",
+          "name": "factors",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 0.01,
+          "help": "SGD learning rate.",
+          "name": "learning_rate",
+          "required": false,
+          "type": "float"
+        },
+        {
+          "choices": null,
+          "default": 0.01,
+          "help": "L2 regularization strength.",
+          "name": "regularization",
+          "required": false,
+          "type": "float"
+        },
+        {
+          "choices": null,
+          "default": 100,
+          "help": "Number of BPR SGD iterations.",
+          "name": "iterations",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 0,
+          "help": "Random seed for reproducible fitting.",
+          "name": "seed",
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "requires_extra": "emergentflow[recommend]"
+    },
+    {
+      "category": "Baseline",
+      "description": "Co-occurrence / association-rules baseline \u2014 item-item lift, confidence, or support from the binary interaction matrix.",
+      "family": "baseline",
+      "key": "co_occurrence",
+      "label": "Co Occurrence",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": [
+            "lift",
+            "confidence",
+            "support"
+          ],
+          "default": "lift",
+          "help": "Item-item association metric used to rank co-occurring items.",
+          "name": "metric",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": 0.0,
+          "help": "Minimum support threshold below which a pair's score is zeroed out.",
+          "name": "min_support",
+          "required": false,
+          "type": "float"
+        }
+      ],
+      "requires_extra": null
+    },
+    {
+      "category": "Content",
+      "description": "Content-based filtering via dense embedding similarity (sklearn NearestNeighbors, cosine/euclidean) \u2014 user profile is the centroid of their known items' embeddings; embeddings are supplied pre-computed (e.g. via ef.llm.embed) or user-supplied.",
+      "family": "content",
+      "key": "embedding_similarity",
+      "label": "Embedding Similarity",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": null,
+          "help": "Column in item_features identifying each item.",
+          "name": "item_id_col",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Column in item_features holding each item's dense embedding vector.",
+          "name": "embedding_col",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": [
+            "cosine",
+            "euclidean"
+          ],
+          "default": "cosine",
+          "help": "Distance metric used by NearestNeighbors.",
+          "name": "metric",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "requires_extra": null
+    },
+    {
+      "category": "Content",
+      "description": "Content-based KNN via NearestNeighbors over numeric feature columns \u2014 builds a user profile from the centroid of their known items' feature vectors.",
+      "family": "content",
+      "key": "feature_knn",
+      "label": "Feature Knn",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": null,
+          "help": "Column in item_features identifying each item.",
+          "name": "item_id_col",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Numeric columns in item_features to build the KNN feature vectors from.",
+          "name": "feature_cols",
+          "required": true,
+          "type": "list"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": [
+            "cosine",
+            "euclidean",
+            "manhattan"
+          ],
+          "default": "cosine",
+          "help": "Distance metric used by NearestNeighbors.",
+          "name": "metric",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "choices": [
+            "brute",
+            "auto",
+            "ball_tree",
+            "kd_tree"
+          ],
+          "default": "brute",
+          "help": "NearestNeighbors search algorithm.",
+          "name": "algorithm",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "requires_extra": null
+    },
+    {
+      "category": "Collaborative",
+      "description": "Item-based KNN collaborative filtering -- for each item a user has interacted with, finds the K most similar items (cosine/pearson/jaccard) and scores unseen items by weighted similarity.",
+      "family": "collaborative",
+      "key": "item_knn_cf",
+      "label": "Item Knn Cf",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": 5,
+          "help": "Number of nearest neighbor items to use.",
+          "name": "k",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": [
+            "cosine",
+            "pearson",
+            "jaccard"
+          ],
+          "default": "cosine",
+          "help": "Item-item similarity measure.",
+          "name": "similarity",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 1,
+          "help": "Minimum shared interacting users required for a neighbor to count.",
+          "name": "min_common_users",
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "requires_extra": null
+    },
+    {
+      "category": "Deep",
+      "description": "Neural Collaborative Filtering (GMF + MLP, He et al. 2017) -- requires the optional torch dependency. Deterministic given seed.",
+      "family": "deep",
+      "key": "ncf",
+      "label": "Ncf",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": 8,
+          "help": "Dimensionality of the user/item GMF and MLP embeddings.",
+          "name": "embedding_dim",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": [
+            32,
+            16,
+            8
+          ],
+          "help": "Hidden layer sizes of the MLP tower.",
+          "name": "mlp_layers",
+          "required": false,
+          "type": "list"
+        },
+        {
+          "choices": null,
+          "default": 20,
+          "help": "Number of training epochs.",
+          "name": "epochs",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 256,
+          "help": "Mini-batch size for training.",
+          "name": "batch_size",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 0.01,
+          "help": "Adam optimizer learning rate.",
+          "name": "learning_rate",
+          "required": false,
+          "type": "float"
+        },
+        {
+          "choices": null,
+          "default": 4,
+          "help": "Number of negative examples sampled per positive interaction.",
+          "name": "negative_samples",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 0,
+          "help": "Random seed for reproducible training.",
+          "name": "seed",
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "requires_extra": "torch"
+    },
+    {
+      "category": "Collaborative",
+      "description": "Matrix-factorization CF via sklearn NMF -- learns non-negative latent user/item factors and ranks unseen items by predicted rating (dot product of factors).",
+      "family": "collaborative",
+      "key": "nmf_cf",
+      "label": "Nmf Cf",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": 10,
+          "help": "Number of latent factors (NMF components) to learn.",
+          "name": "n_components",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 0,
+          "help": "Random seed for the NMF solver.",
+          "name": "seed",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 200,
+          "help": "Maximum number of NMF solver iterations.",
+          "name": "max_iter",
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "requires_extra": null
+    },
+    {
+      "category": "Baseline",
+      "description": "Global popularity baseline \u2014 same top-N ranking for every user (score_type: count / mean_rating / weighted).",
+      "family": "baseline",
+      "key": "popularity",
+      "label": "Popularity",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": [
+            "count",
+            "mean_rating",
+            "weighted"
+          ],
+          "default": "count",
+          "help": "How to score item popularity from the interaction matrix.",
+          "name": "score_type",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "requires_extra": null
+    },
+    {
+      "category": "Baseline",
+      "description": "Per-segment popularity baseline \u2014 popularity computed separately within each user segment (supplied via params[user_segments]).",
+      "family": "baseline",
+      "key": "popularity_segmented",
+      "label": "Popularity Segmented",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": null,
+          "help": "Descriptive label for the segmentation column being used.",
+          "name": "segment_col",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": [
+            "count",
+            "mean_rating",
+            "weighted"
+          ],
+          "default": "count",
+          "help": "How to score item popularity within each segment.",
+          "name": "score_type",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Mapping of user id to segment value used to group users.",
+          "name": "user_segments",
+          "required": false,
+          "type": "any"
+        }
+      ],
+      "requires_extra": null
+    },
+    {
+      "category": "Baseline",
+      "description": "Random recommendation baseline \u2014 draws N random items per user, deterministic given seed.",
+      "family": "baseline",
+      "key": "random",
+      "label": "Random",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 0,
+          "help": "Random seed for reproducible random draws.",
+          "name": "seed",
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "requires_extra": null
+    },
+    {
+      "category": "Collaborative",
+      "description": "Matrix-factorization CF via sklearn TruncatedSVD -- learns latent user/item factors and ranks unseen items by predicted rating (dot product of factors).",
+      "family": "collaborative",
+      "key": "svd_cf",
+      "label": "Svd Cf",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": 10,
+          "help": "Number of latent factors (SVD components) to learn.",
+          "name": "n_components",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 0,
+          "help": "Random seed for the SVD solver.",
+          "name": "seed",
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "requires_extra": null
+    },
+    {
+      "category": "Content",
+      "description": "Content-based filtering via TF-IDF cosine similarity \u2014 builds a user profile from the centroid of their known items' TF-IDF vectors.",
+      "family": "content",
+      "key": "tfidf_similarity",
+      "label": "Tfidf Similarity",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": null,
+          "help": "Column in item_features identifying each item.",
+          "name": "item_id_col",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Column in item_features holding the text to vectorize.",
+          "name": "text_col",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Maximum vocabulary size for the TF-IDF vectorizer (None = unlimited).",
+          "name": "max_features",
+          "required": false,
+          "type": "any"
+        },
+        {
+          "choices": null,
+          "default": [
+            1,
+            1
+          ],
+          "help": "Lower/upper bound (inclusive) of n-gram sizes to extract.",
+          "name": "ngram_range",
+          "required": false,
+          "type": "list"
+        }
+      ],
+      "requires_extra": null
+    },
+    {
+      "category": "Deep",
+      "description": "Two-tower retrieval model (separate user/item encoder towers, dot-product scoring) -- requires the optional torch dependency. Optionally consumes item-side features via the generic node; full item+user side features via ef.recommend.fit_two_tower(). Deterministic given seed.",
+      "family": "deep",
+      "key": "two_tower",
+      "label": "Two Tower",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": 16,
+          "help": "Output embedding dimensionality of the user tower.",
+          "name": "user_embedding_dim",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 16,
+          "help": "Output embedding dimensionality of the item tower (must equal user_embedding_dim).",
+          "name": "item_embedding_dim",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": [
+            32
+          ],
+          "help": "Hidden layer sizes of the user encoder tower.",
+          "name": "user_tower_layers",
+          "required": false,
+          "type": "list"
+        },
+        {
+          "choices": null,
+          "default": [
+            32
+          ],
+          "help": "Hidden layer sizes of the item encoder tower.",
+          "name": "item_tower_layers",
+          "required": false,
+          "type": "list"
+        },
+        {
+          "choices": [
+            "bce",
+            "softmax_cross_entropy",
+            "bpr_loss"
+          ],
+          "default": "bce",
+          "help": "Training loss used to contrast positive vs. sampled negative pairs.",
+          "name": "loss",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": 4,
+          "help": "Number of negative items sampled per positive interaction.",
+          "name": "negative_sampling_ratio",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 10,
+          "help": "Number of training epochs.",
+          "name": "epochs",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 64,
+          "help": "Mini-batch size for training.",
+          "name": "batch_size",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 0.01,
+          "help": "Adam optimizer learning rate.",
+          "name": "learning_rate",
+          "required": false,
+          "type": "float"
+        },
+        {
+          "choices": null,
+          "default": 0,
+          "help": "Random seed for reproducible training.",
+          "name": "seed",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": "item_id",
+          "help": "Column in item_features identifying each item.",
+          "name": "item_id_col",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": "user_id",
+          "help": "Column in user_features identifying each user.",
+          "name": "user_id_col",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "requires_extra": "torch"
+    },
+    {
+      "category": "Collaborative",
+      "description": "User-based KNN collaborative filtering -- finds the K most similar users (cosine/pearson/jaccard) and recommends items they liked that the target user hasn't seen.",
+      "family": "collaborative",
+      "key": "user_knn_cf",
+      "label": "User Knn Cf",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": 5,
+          "help": "Number of nearest neighbor users to use.",
+          "name": "k",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": [
+            "cosine",
+            "pearson",
+            "jaccard"
+          ],
+          "default": "cosine",
+          "help": "User-user similarity measure.",
+          "name": "similarity",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Number of recommendations per user.",
+          "name": "n",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 1,
+          "help": "Minimum shared interacted items required for a neighbor to count.",
+          "name": "min_common_items",
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "requires_extra": null
     }
   ]
 }

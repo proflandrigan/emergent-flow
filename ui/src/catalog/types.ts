@@ -81,9 +81,30 @@ export interface CatalogChart {
   options: string[];
 }
 
+export interface CatalogRecommenderParam {
+  name: string;
+  type: "bool" | "int" | "float" | "str" | "list" | "any";
+  default?: unknown;
+  help?: string;
+  choices?: string[] | null;
+  required?: boolean;
+}
+
+export interface CatalogRecommender {
+  key: string;
+  node_type: string;
+  family: string;
+  label: string;
+  category: string;
+  description: string;
+  requires_extra?: string | null;
+  params: CatalogRecommenderParam[];
+}
+
 export interface Catalog {
   catalog_version: number;
   nodes: CatalogNode[];
   estimators: CatalogEstimator[];
   charts: CatalogChart[];
+  recommenders: CatalogRecommender[];
 }

@@ -30,7 +30,11 @@ from sklearn.neighbors import NearestNeighbors
 from emergentflow.recommend.errors import InvalidRecommenderParamsError
 from emergentflow.recommend.interactions import InteractionMatrix
 from emergentflow.recommend.models import FittedRecommender, RecommendationResult
-from emergentflow.recommend.registry import RecommenderSpec, register_recommender
+from emergentflow.recommend.registry import (
+    RecommenderParamSpec,
+    RecommenderSpec,
+    register_recommender,
+)
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -209,6 +213,17 @@ register_recommender(
         similar_items_fn=None,
         required_params=(),
         optional_params=("n", "seed"),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
+            RecommenderParamSpec(
+                name="seed",
+                type="int",
+                default=0,
+                help="Random seed for reproducible random draws.",
+            ),
+        ),
         handles_cold_start_users=True,
         handles_cold_start_items=True,
         description="Random recommendation baseline — draws N random items per user, "
@@ -299,6 +314,18 @@ register_recommender(
         similar_items_fn=None,
         required_params=(),
         optional_params=("n", "score_type"),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
+            RecommenderParamSpec(
+                name="score_type",
+                type="str",
+                default="count",
+                help="How to score item popularity from the interaction matrix.",
+                choices=("count", "mean_rating", "weighted"),
+            ),
+        ),
         handles_cold_start_users=True,
         handles_cold_start_items=False,
         description="Global popularity baseline — same top-N ranking for every user "
@@ -423,6 +450,31 @@ register_recommender(
         similar_items_fn=None,
         required_params=("segment_col",),
         optional_params=("n", "score_type", "user_segments"),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="segment_col",
+                type="str",
+                default=None,
+                help="Descriptive label for the segmentation column being used.",
+                required=True,
+            ),
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
+            RecommenderParamSpec(
+                name="score_type",
+                type="str",
+                default="count",
+                help="How to score item popularity within each segment.",
+                choices=("count", "mean_rating", "weighted"),
+            ),
+            RecommenderParamSpec(
+                name="user_segments",
+                type="any",
+                default=None,
+                help="Mapping of user id to segment value used to group users.",
+            ),
+        ),
         handles_cold_start_users=True,
         handles_cold_start_items=False,
         description="Per-segment popularity baseline — popularity computed separately "
@@ -602,6 +654,24 @@ register_recommender(
         similar_items_fn=_similar_co_occurrence,
         required_params=(),
         optional_params=("n", "metric", "min_support"),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
+            RecommenderParamSpec(
+                name="metric",
+                type="str",
+                default="lift",
+                help="Item-item association metric used to rank co-occurring items.",
+                choices=("lift", "confidence", "support"),
+            ),
+            RecommenderParamSpec(
+                name="min_support",
+                type="float",
+                default=0.0,
+                help="Minimum support threshold below which a pair's score is zeroed out.",
+            ),
+        ),
         handles_cold_start_users=False,
         handles_cold_start_items=False,
         description="Co-occurrence / association-rules baseline — item-item lift, "
@@ -720,6 +790,37 @@ register_recommender(
         similar_items_fn=None,
         required_params=("item_id_col", "text_col"),
         optional_params=("n", "max_features", "ngram_range"),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="item_id_col",
+                type="str",
+                default=None,
+                help="Column in item_features identifying each item.",
+                required=True,
+            ),
+            RecommenderParamSpec(
+                name="text_col",
+                type="str",
+                default=None,
+                help="Column in item_features holding the text to vectorize.",
+                required=True,
+            ),
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
+            RecommenderParamSpec(
+                name="max_features",
+                type="any",
+                default=None,
+                help="Maximum vocabulary size for the TF-IDF vectorizer (None = unlimited).",
+            ),
+            RecommenderParamSpec(
+                name="ngram_range",
+                type="list",
+                default=(1, 1),
+                help="Lower/upper bound (inclusive) of n-gram sizes to extract.",
+            ),
+        ),
         handles_cold_start_users=False,
         handles_cold_start_items=True,
         description="Content-based filtering via TF-IDF cosine similarity — "
@@ -849,6 +950,39 @@ register_recommender(
         similar_items_fn=None,
         required_params=("item_id_col", "feature_cols"),
         optional_params=("n", "metric", "algorithm"),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="item_id_col",
+                type="str",
+                default=None,
+                help="Column in item_features identifying each item.",
+                required=True,
+            ),
+            RecommenderParamSpec(
+                name="feature_cols",
+                type="list",
+                default=None,
+                help="Numeric columns in item_features to build the KNN feature vectors from.",
+                required=True,
+            ),
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
+            RecommenderParamSpec(
+                name="metric",
+                type="str",
+                default="cosine",
+                help="Distance metric used by NearestNeighbors.",
+                choices=("cosine", "euclidean", "manhattan"),
+            ),
+            RecommenderParamSpec(
+                name="algorithm",
+                type="str",
+                default="brute",
+                help="NearestNeighbors search algorithm.",
+                choices=("brute", "auto", "ball_tree", "kd_tree"),
+            ),
+        ),
         handles_cold_start_users=False,
         handles_cold_start_items=True,
         description="Content-based KNN via NearestNeighbors over numeric "
@@ -988,6 +1122,32 @@ register_recommender(
         similar_items_fn=None,
         required_params=("item_id_col", "embedding_col"),
         optional_params=("n", "metric"),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="item_id_col",
+                type="str",
+                default=None,
+                help="Column in item_features identifying each item.",
+                required=True,
+            ),
+            RecommenderParamSpec(
+                name="embedding_col",
+                type="str",
+                default=None,
+                help="Column in item_features holding each item's dense embedding vector.",
+                required=True,
+            ),
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
+            RecommenderParamSpec(
+                name="metric",
+                type="str",
+                default="cosine",
+                help="Distance metric used by NearestNeighbors.",
+                choices=("cosine", "euclidean"),
+            ),
+        ),
         handles_cold_start_users=False,
         handles_cold_start_items=True,
         description="Content-based filtering via dense embedding similarity "
@@ -1176,6 +1336,27 @@ register_recommender(
         similar_items_fn=None,
         required_params=(),
         optional_params=("k", "similarity", "n", "min_common_items"),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="k", type="int", default=5, help="Number of nearest neighbor users to use."
+            ),
+            RecommenderParamSpec(
+                name="similarity",
+                type="str",
+                default="cosine",
+                help="User-user similarity measure.",
+                choices=("cosine", "pearson", "jaccard"),
+            ),
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
+            RecommenderParamSpec(
+                name="min_common_items",
+                type="int",
+                default=1,
+                help="Minimum shared interacted items required for a neighbor to count.",
+            ),
+        ),
         handles_cold_start_users=False,
         handles_cold_start_items=False,
         description="User-based KNN collaborative filtering -- finds the K most "
@@ -1292,6 +1473,27 @@ register_recommender(
         similar_items_fn=None,
         required_params=(),
         optional_params=("k", "similarity", "n", "min_common_users"),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="k", type="int", default=5, help="Number of nearest neighbor items to use."
+            ),
+            RecommenderParamSpec(
+                name="similarity",
+                type="str",
+                default="cosine",
+                help="Item-item similarity measure.",
+                choices=("cosine", "pearson", "jaccard"),
+            ),
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
+            RecommenderParamSpec(
+                name="min_common_users",
+                type="int",
+                default=1,
+                help="Minimum shared interacting users required for a neighbor to count.",
+            ),
+        ),
         handles_cold_start_users=False,
         handles_cold_start_items=False,
         description="Item-based KNN collaborative filtering -- for each item a "
@@ -1403,6 +1605,20 @@ register_recommender(
         similar_items_fn=None,
         required_params=(),
         optional_params=("n_components", "n", "seed"),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="n_components",
+                type="int",
+                default=10,
+                help="Number of latent factors (SVD components) to learn.",
+            ),
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
+            RecommenderParamSpec(
+                name="seed", type="int", default=0, help="Random seed for the SVD solver."
+            ),
+        ),
         handles_cold_start_users=False,
         handles_cold_start_items=False,
         description="Matrix-factorization CF via sklearn TruncatedSVD -- learns "
@@ -1465,6 +1681,26 @@ register_recommender(
         similar_items_fn=None,
         required_params=(),
         optional_params=("n_components", "n", "seed", "max_iter"),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="n_components",
+                type="int",
+                default=10,
+                help="Number of latent factors (NMF components) to learn.",
+            ),
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
+            RecommenderParamSpec(
+                name="seed", type="int", default=0, help="Random seed for the NMF solver."
+            ),
+            RecommenderParamSpec(
+                name="max_iter",
+                type="int",
+                default=200,
+                help="Maximum number of NMF solver iterations.",
+            ),
+        ),
         handles_cold_start_users=False,
         handles_cold_start_items=False,
         description="Matrix-factorization CF via sklearn NMF -- learns "
@@ -1593,6 +1829,29 @@ register_recommender(
         similar_items_fn=None,
         required_params=(),
         optional_params=("factors", "regularization", "iterations", "n", "seed"),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="factors", type="int", default=64, help="Number of latent factors."
+            ),
+            RecommenderParamSpec(
+                name="regularization",
+                type="float",
+                default=0.01,
+                help="L2 regularization strength.",
+            ),
+            RecommenderParamSpec(
+                name="iterations",
+                type="int",
+                default=15,
+                help="Number of ALS optimization iterations.",
+            ),
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
+            RecommenderParamSpec(
+                name="seed", type="int", default=0, help="Random seed for reproducible fitting."
+            ),
+        ),
         requires_extra="emergentflow[recommend]",
         handles_cold_start_users=False,
         handles_cold_start_items=False,
@@ -1669,6 +1928,35 @@ register_recommender(
         similar_items_fn=None,
         required_params=(),
         optional_params=("factors", "learning_rate", "regularization", "iterations", "n", "seed"),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="factors", type="int", default=64, help="Number of latent factors."
+            ),
+            RecommenderParamSpec(
+                name="learning_rate",
+                type="float",
+                default=0.01,
+                help="SGD learning rate.",
+            ),
+            RecommenderParamSpec(
+                name="regularization",
+                type="float",
+                default=0.01,
+                help="L2 regularization strength.",
+            ),
+            RecommenderParamSpec(
+                name="iterations",
+                type="int",
+                default=100,
+                help="Number of BPR SGD iterations.",
+            ),
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
+            RecommenderParamSpec(
+                name="seed", type="int", default=0, help="Random seed for reproducible fitting."
+            ),
+        ),
         requires_extra="emergentflow[recommend]",
         handles_cold_start_users=False,
         handles_cold_start_items=False,
@@ -1894,6 +2182,44 @@ register_recommender(
             "negative_samples",
             "n",
             "seed",
+        ),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="embedding_dim",
+                type="int",
+                default=8,
+                help="Dimensionality of the user/item GMF and MLP embeddings.",
+            ),
+            RecommenderParamSpec(
+                name="mlp_layers",
+                type="list",
+                default=[32, 16, 8],
+                help="Hidden layer sizes of the MLP tower.",
+            ),
+            RecommenderParamSpec(
+                name="epochs", type="int", default=20, help="Number of training epochs."
+            ),
+            RecommenderParamSpec(
+                name="batch_size", type="int", default=256, help="Mini-batch size for training."
+            ),
+            RecommenderParamSpec(
+                name="learning_rate",
+                type="float",
+                default=0.01,
+                help="Adam optimizer learning rate.",
+            ),
+            RecommenderParamSpec(
+                name="negative_samples",
+                type="int",
+                default=4,
+                help="Number of negative examples sampled per positive interaction.",
+            ),
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
+            RecommenderParamSpec(
+                name="seed", type="int", default=0, help="Random seed for reproducible training."
+            ),
         ),
         requires_extra="torch",
         handles_cold_start_users=False,
@@ -2258,6 +2584,76 @@ register_recommender(
             "item_id_col",
             "user_id_col",
             "n",
+        ),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="user_embedding_dim",
+                type="int",
+                default=16,
+                help="Output embedding dimensionality of the user tower.",
+            ),
+            RecommenderParamSpec(
+                name="item_embedding_dim",
+                type="int",
+                default=16,
+                help="Output embedding dimensionality of the item tower "
+                "(must equal user_embedding_dim).",
+            ),
+            RecommenderParamSpec(
+                name="user_tower_layers",
+                type="list",
+                default=[32],
+                help="Hidden layer sizes of the user encoder tower.",
+            ),
+            RecommenderParamSpec(
+                name="item_tower_layers",
+                type="list",
+                default=[32],
+                help="Hidden layer sizes of the item encoder tower.",
+            ),
+            RecommenderParamSpec(
+                name="loss",
+                type="str",
+                default="bce",
+                help="Training loss used to contrast positive vs. sampled negative pairs.",
+                choices=("bce", "softmax_cross_entropy", "bpr_loss"),
+            ),
+            RecommenderParamSpec(
+                name="negative_sampling_ratio",
+                type="int",
+                default=4,
+                help="Number of negative items sampled per positive interaction.",
+            ),
+            RecommenderParamSpec(
+                name="epochs", type="int", default=10, help="Number of training epochs."
+            ),
+            RecommenderParamSpec(
+                name="batch_size", type="int", default=64, help="Mini-batch size for training."
+            ),
+            RecommenderParamSpec(
+                name="learning_rate",
+                type="float",
+                default=0.01,
+                help="Adam optimizer learning rate.",
+            ),
+            RecommenderParamSpec(
+                name="seed", type="int", default=0, help="Random seed for reproducible training."
+            ),
+            RecommenderParamSpec(
+                name="item_id_col",
+                type="str",
+                default="item_id",
+                help="Column in item_features identifying each item.",
+            ),
+            RecommenderParamSpec(
+                name="user_id_col",
+                type="str",
+                default="user_id",
+                help="Column in user_features identifying each user.",
+            ),
+            RecommenderParamSpec(
+                name="n", type="int", default=None, help="Number of recommendations per user."
+            ),
         ),
         requires_extra="torch",
         handles_cold_start_users=False,
