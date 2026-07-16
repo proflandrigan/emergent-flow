@@ -3319,6 +3319,174 @@
     },
     {
       "advisor_persona": null,
+      "category": "Embeddings",
+      "description": "Embed a text column in a DataFrame using an API provider (OpenAI, Anthropic, Gemini, etc.) or a local sentence-transformers model.",
+      "family": "embed",
+      "label": "Embed Text",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Name of the column containing text to embed.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Text column",
+          "name": "column",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "api",
+          "help": "'api' for provider-hosted models, 'local' for sentence-transformers.",
+          "hints": {
+            "choices": [
+              "api",
+              "local"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Backend",
+          "name": "backend",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "openai",
+          "help": "Gateway provider key (API backend only), e.g. 'openai'.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Provider",
+          "name": "provider",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "text-embedding-3-small",
+          "help": "Model id (API backend), e.g. 'text-embedding-3-small'.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Model",
+          "name": "model",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "all-MiniLM-L6-v2",
+          "help": "Sentence-transformers model name (local backend only).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Local model",
+          "name": "local_model",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "embedding",
+          "help": "Name of the column to add containing embeddings.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Output column",
+          "name": "output_column",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Name of a registered LLM credential profile (API backend only). Leave blank for provider default.",
+          "hints": {
+            "choices": null,
+            "connection_kind": "llm",
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "connection"
+          },
+          "label": "LLM connection",
+          "name": "llm_connection",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Input DataFrame containing the text column to embed.",
+          "label": "Data",
+          "name": "data",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input DataFrame augmented with an embedding column.",
+          "label": "Embedded Data",
+          "name": "data",
+          "required": true
+        }
+      ],
+      "type": "embed.text",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "LLM",
       "description": "Merge a labels table onto an eval-run compare table, keyed by (row_id, variant).",
       "family": "eval",
