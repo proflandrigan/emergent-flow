@@ -31,6 +31,7 @@ from .discretize import Discretize
 from .distribution_summary import DistributionSummary
 from .drop_missing import DropMissing
 from .eda_profile import EdaProfile
+from .embed_text import EmbedText
 from .encode_categorical import EncodeCategorical
 from .eval_label import EvalLabel
 from .eval_run import EvalRun
@@ -130,6 +131,7 @@ __all__ = [
     "DistributionSummary",
     "DropMissing",
     "EdaProfile",
+    "EmbedText",
     "EncodeCategorical",
     "EvalLabel",
     "EvalRun",

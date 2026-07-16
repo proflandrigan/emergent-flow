@@ -4,7 +4,10 @@ emergentflow.llm.budget
 `BudgetClient` -- an `LLMClient` decorator enforcing a running-total USD
 ceiling (Epic 9 Story 4). Wraps any `LLMClient` (a `ReplayClient`, a
 `GatewayClient`, or another decorator); the guard lives entirely at this
-client edge, never inside a node -- nodes stay unaware of budgeting.
+client edge, never inside a node -- nodes stay unaware of budgeting. It
+guards both completion calls (`complete()`) and embedding calls (`embed()`)
+against the same running total, since a node graph may mix `llm.call` and
+`embed.text` nodes behind one injected client.
 
 Cost per call is computed independently via `emergentflow.llm.pricing`
 (the same source of truth `emergentflow.llm.call()` uses), not read from the
@@ -15,8 +18,14 @@ elsewhere; `BudgetClient` cannot rely on it.
 
 from __future__ import annotations
 
-from emergentflow.llm.pricing import compute_cost
-from emergentflow.llm.protocol import LLMClient, LLMRequest, LLMResponse
+from emergentflow.llm.pricing import compute_cost, compute_embedding_cost
+from emergentflow.llm.protocol import (
+    EmbeddingRequest,
+    EmbeddingResponse,
+    LLMClient,
+    LLMRequest,
+    LLMResponse,
+)
 
 
 class BudgetExceededError(RuntimeError):
@@ -66,4 +75,27 @@ class BudgetClient:
             )
         response = self._client.complete(request)
         self.spent_usd += compute_cost(response.model, response.usage)
+        return response
+
+    def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
+        """Delegate to the wrapped client's `embed()`, guarded by the running budget.
+
+        Mirrors `complete()`: refuses the call before it reaches the wrapped
+        client if the budget is already exhausted, then tracks the call's
+        cost -- computed via `emergentflow.llm.pricing.compute_embedding_cost`,
+        independent of whatever `cost_usd` the wrapped client returned --
+        against the same running total `complete()` uses.
+
+        Raises
+        ------
+        BudgetExceededError
+            If `spent_usd` has already reached or exceeded `budget_usd`.
+        """
+        if self.spent_usd >= self.budget_usd:
+            raise BudgetExceededError(
+                f"Budget of ${self.budget_usd:.4f} already reached (spent "
+                f"${self.spent_usd:.4f}); refusing further calls."
+            )
+        response = self._client.embed(request)
+        self.spent_usd += compute_embedding_cost(response.model, response.usage)
         return response

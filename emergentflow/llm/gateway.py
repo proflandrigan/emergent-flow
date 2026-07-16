@@ -23,7 +23,14 @@ import os
 import time
 
 from emergentflow.llm.env import MissingAPIKeyError, resolve_effective_api_key_env_name
-from emergentflow.llm.protocol import LLMRequest, LLMResponse, Usage
+from emergentflow.llm.protocol import (
+    EmbeddingRequest,
+    EmbeddingResponse,
+    EmbeddingUsage,
+    LLMRequest,
+    LLMResponse,
+    Usage,
+)
 
 
 class GatewayResponseError(RuntimeError):
@@ -132,4 +139,57 @@ class GatewayClient:
             cost_usd=0.0,
             latency_ms=latency_ms,
             finish_reason=finish_reason,
+        )
+
+    def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
+        """Send *request* to the provider's embedding endpoint via LiteLLM.
+
+        Raises
+        ------
+        ModuleNotFoundError
+            Re-raised with an install hint if ``litellm`` is not installed.
+        MissingAPIKeyError
+            If the resolved env var is unset.
+        """
+        try:
+            import litellm
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "emergentflow.llm.gateway.GatewayClient needs the `llm` extra "
+                f"(missing dependency: {exc.name}).\n"
+                "Install it with:  pip install 'emergentflow[llm]'"
+            ) from exc
+
+        env_name = resolve_effective_api_key_env_name(
+            request.provider, request.api_key_env, request.llm_connection
+        )
+        api_key = os.environ.get(env_name)
+        if not api_key:
+            raise MissingAPIKeyError(
+                f"Environment variable {env_name!r} is not set. "
+                f"Export it before running a graph with an embedding node, e.g.:\n"
+                f"    export {env_name}=<your api key>"
+            )
+
+        start = time.perf_counter()
+        response = litellm.embedding(
+            model=f"{request.provider}/{request.model}",
+            input=list(request.texts),
+            api_key=api_key,
+        )
+        latency_ms = (time.perf_counter() - start) * 1000.0
+
+        response_usage = getattr(response, "usage", None)
+        input_tokens = response_usage.prompt_tokens if response_usage else 0
+
+        vectors: list[list[float]] = [item["embedding"] for item in response.data]
+        dimensions = len(vectors[0]) if vectors else 0
+
+        return EmbeddingResponse(
+            embeddings=vectors,
+            model=request.model,
+            dimensions=dimensions,
+            usage=EmbeddingUsage(input_tokens=input_tokens),
+            cost_usd=0.0,
+            latency_ms=latency_ms,
         )
