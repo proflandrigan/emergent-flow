@@ -13,7 +13,7 @@ usable `LLMResponse` -- just without a cost figure.
 
 from __future__ import annotations
 
-from emergentflow.llm.protocol import Usage
+from emergentflow.llm.protocol import EmbeddingUsage, Usage
 
 #: model id -> (USD per 1000 input tokens, USD per 1000 output tokens).
 #: Update here as providers change pricing; not part of the ADR-0002
@@ -25,6 +25,15 @@ PRICE_TABLE_PER_1K_TOKENS: dict[str, tuple[float, float]] = {
     "gpt-4o": (2.50, 10.00),
     "gpt-4o-mini": (0.15, 0.60),
     "gemini-2.5-flash": (0.075, 0.30),
+}
+
+#: model id -> USD per 1000 input tokens for embedding calls (no output tokens).
+#: Update here as providers change pricing; not part of the ADR-0002
+#: equivalence-critical path (see module docstring).
+EMBEDDING_PRICE_TABLE_PER_1K_TOKENS: dict[str, float] = {
+    "text-embedding-3-small": 0.00002,
+    "text-embedding-3-large": 0.00013,
+    "text-embedding-ada-002": 0.00010,
 }
 
 
@@ -42,3 +51,16 @@ def compute_cost(model: str, usage: Usage) -> float:
     return (usage.input_tokens / 1000.0) * input_per_1k + (
         usage.output_tokens / 1000.0
     ) * output_per_1k
+
+
+def compute_embedding_cost(model: str, usage: EmbeddingUsage) -> float:
+    """Return the USD cost of one embedding call, given *model* and *usage*.
+
+    Pure function of its two arguments. Returns ``0.0`` for a *model* not
+    present in :data:`EMBEDDING_PRICE_TABLE_PER_1K_TOKENS` (an unpriced/unlisted
+    model still produces a usable `EmbeddingResponse`; see module docstring).
+    """
+    input_per_1k = EMBEDDING_PRICE_TABLE_PER_1K_TOKENS.get(model)
+    if input_per_1k is None:
+        return 0.0
+    return (usage.input_tokens / 1000.0) * input_per_1k

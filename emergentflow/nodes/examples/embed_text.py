@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from emergentflow.ir.common import Direction
 from emergentflow.ir.node import Node
+from emergentflow.llm.protocol import LLMClient
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
@@ -160,7 +161,7 @@ class EmbedText(NodeDefinition):
         )
 
     def execute(
-        self, node: Node, inputs: dict[str, Any], *, client: Any | None = None
+        self, node: Node, inputs: dict[str, Any], *, client: LLMClient | None = None
     ) -> dict[str, Any]:
         from emergentflow.embed import text as embed_text
 

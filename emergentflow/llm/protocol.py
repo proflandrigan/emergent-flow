@@ -8,8 +8,8 @@ pure SDK core and any real or replayed LLM provider call.
 call — building it from node inputs is pure. `LLMResponse` is the inspectable
 result carried on every `ef.llm.call` node's OUT port (satisfies
 `emergentflow.api.is_inspectable`; a live provider SDK object is never
-returned). `LLMClient` is a `Protocol` with one method, `complete`, so any
-object with that method (a `ReplayClient`, a `GatewayClient`, a test double)
+returned). `LLMClient` is a `Protocol` with two methods, `complete` and `embed`, so any
+object with those methods (a `ReplayClient`, a `GatewayClient`, a test double)
 satisfies it without inheritance.
 """
 
@@ -201,12 +201,18 @@ class FixtureMissError(LookupError):
 class LLMClient(Protocol):
     """The injected-client seam every LLM-call node depends on (ADR 0017).
 
-    Any object exposing a `complete(request: LLMRequest) -> LLMResponse`
-    method satisfies this protocol structurally (no inheritance required) --
-    `ReplayClient` and `GatewayClient` are the two implementations that ship
-    with this package.
+    Any object exposing `complete(request: LLMRequest) -> LLMResponse` and
+    `embed(request: EmbeddingRequest) -> EmbeddingResponse` methods satisfies
+    this protocol structurally (no inheritance required) -- `ReplayClient` and
+    `GatewayClient` are the two implementations that ship with this package.
+    Any decorator wrapping an `LLMClient` (e.g. `BudgetClient`) must implement
+    both methods to remain a drop-in replacement for the client it wraps.
     """
 
     def complete(self, request: LLMRequest) -> LLMResponse:
         """Run one completion call and return an inspectable `LLMResponse`."""
+        ...
+
+    def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
+        """Run one embedding call and return an inspectable `EmbeddingResponse`."""
         ...

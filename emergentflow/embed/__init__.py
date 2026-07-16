@@ -6,14 +6,17 @@ column in a DataFrame, dispatching to either an API provider (via the injected
 ``LLMClient`` seam, ADR 0017) or a local sentence-transformers model.
 
 The API path builds an ``EmbeddingRequest`` and delegates the single effectful step to
-``client.embed(request)``; cost is computed centrally here, not in the client backend.
+``client.embed(request)``. Unlike ``ef.llm.call()``, this function returns a bare
+augmented DataFrame with no per-call metadata (cost, latency, token usage) attached --
+consistent with other feature-transform nodes (e.g. ``ef.timeseries.ewma``) -- so cost
+is never computed here. Spend governance for the API path happens at the client edge,
+by wrapping the injected client in ``emergentflow.llm.budget.BudgetClient``, which
+tracks embedding cost the same way it tracks completion cost.
 The local path lazy-imports ``sentence-transformers`` (optional ``emergentflow[embed]``
-extra) and runs the model in-process — no client injection needed.
+extra) and runs the model in-process — no client injection, and so no cost, needed.
 """
 
 from __future__ import annotations
-
-from typing import Any
 
 import pandas as pd
 
@@ -23,7 +26,7 @@ from emergentflow.embed.errors import (
     MissingClientError,
     MissingOptionalDependencyError,
 )
-from emergentflow.llm.protocol import EmbeddingRequest, EmbeddingResponse
+from emergentflow.llm.protocol import EmbeddingRequest, EmbeddingResponse, LLMClient
 
 __all__ = [
     "EmbedError",
@@ -38,7 +41,7 @@ def _embed_api(
     *,
     provider: str,
     model: str,
-    client: Any,
+    client: LLMClient,
     api_key_env: str | None,
     llm_connection: str | None,
 ) -> EmbeddingResponse:
@@ -78,7 +81,7 @@ def text(
     *,
     provider: str | None = None,
     model: str | None = None,
-    client: Any | None = None,
+    client: LLMClient | None = None,
     local_model: str | None = None,
     output_column: str = "embedding",
     api_key_env: str | None = None,
