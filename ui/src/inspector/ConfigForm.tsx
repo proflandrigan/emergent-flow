@@ -441,6 +441,15 @@ function EstimatorParamsField({
           // the array for display and then writes the raw unparsed string back on every edit
           // instead of an array, corrupting params like mlp_layers/feature_cols/ngram_range.
           const arr = Array.isArray(value) ? value : [];
+          // CatalogRecommenderParam has no item-type token (unlike ParamSpec's "list[int]"/
+          // "list[float]"), so infer numeric-ness from whichever of the current value or the
+          // kwarg's own default is non-empty -- catches mlp_layers/*_tower_layers/ngram_range
+          // (numeric defaults) while leaving string lists like feature_cols alone. Without this,
+          // every edit writes string items (e.g. "32" instead of 32), which crashes numeric
+          // consumers like torch layer sizes or TfidfVectorizer's ngram_range tuple.
+          const defaultArr = Array.isArray(kwarg.default) ? kwarg.default : [];
+          const sampleArr = arr.length > 0 ? arr : defaultArr;
+          const isNumericList = sampleArr.length > 0 && sampleArr.every((v) => typeof v === "number");
           kwargWidget = (
             <Input
               type="text"
@@ -450,7 +459,14 @@ function EstimatorParamsField({
                 const parsed = e.target.value
                   .split(",")
                   .map((s) => s.trim())
-                  .filter((s) => s.length > 0);
+                  .filter((s) => s.length > 0)
+                  .map((s) => {
+                    if (!isNumericList) {
+                      return s;
+                    }
+                    const n = Number(s);
+                    return Number.isNaN(n) ? s : n;
+                  });
                 writeCurated(kwarg.name, parsed);
               }}
             />

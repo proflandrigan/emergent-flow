@@ -24,6 +24,19 @@ export function isListOfDictType(typeToken: string): boolean {
   return typeToken.startsWith("list[dict") || typeToken.startsWith("list[dict[");
 }
 
+// Extract the item type from a "list[int]"/"list[float]" token, or null for a bare "list"/
+// "list[str]"/anything else. Used so the "list" widget can coerce numeric items instead of
+// always producing strings (a plain "list" token stays string items, matching prior behavior).
+export function listItemType(typeToken: string): "int" | "float" | null {
+  if (typeToken === "list[int]") {
+    return "int";
+  }
+  if (typeToken === "list[float]") {
+    return "float";
+  }
+  return null;
+}
+
 // Choose the widget. Precedence: explicit widget hint -> sql/connection/column; then
 // choices -> "select"; then by type_token:
 //   "bool" -> "checkbox"; "int"|"float" -> "number"; dict types (incl. list-of-dict) -> "json";
@@ -94,10 +107,21 @@ export function parseValue(param: CatalogParam, raw: string): unknown {
     return Number.isNaN(n) ? null : n;
   }
   if (kind === "list") {
-    return raw
+    const items = raw
       .split(",")
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
+    const itemType = listItemType(param.type_token);
+    if (itemType === null) {
+      return items;
+    }
+    return items.map((s) => {
+      const n = Number(s);
+      if (Number.isNaN(n)) {
+        return s;
+      }
+      return itemType === "int" ? Math.round(n) : n;
+    });
   }
   if (kind === "json") {
     try {

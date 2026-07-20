@@ -40,8 +40,10 @@ uv run pytest -k declarative                            # by keyword
 install torch into the venv ad hoc (`uv pip install torch`) — do not add it to
 `pyproject.toml`. The same lazy-import pattern applies to other optional extras used only in
 specific tests: `litellm` (`[llm]`), `fastmcp` (`[mcp]`, though it's in the dev dependency
-group so it's present in CI), the Bayesian stack `pymc`/`bambi`/`arviz` (`[bayes]`), and
-`shap` (`[explain]`).
+group so it's present in CI), the Bayesian stack `pymc`/`bambi`/`arviz` (`[bayes]`),
+`shap` (`[explain]`), `sentence-transformers` (`[embed]`), and `implicit` (`[recommend]`,
+gating the ALS/BPR matrix-factorization recommenders — the family's deep models, NCF and
+two-tower, instead reuse the same optional `torch` dependency as the declarative seam).
 
 ### UI (`ui/`)
 
@@ -223,6 +225,38 @@ overwriting existing columns the way `ml.fit_transform` does. Errors are typed
 `ts_ewma`, `ts_lag_features`, `ts_rolling_aggregate`, `ts_difference`,
 `ts_time_weighted_aggregate`).
 
+### Recommender systems (`emergentflow/recommend/`, ADR 0021)
+
+`ef.recommend` is a **parallel seam to `ml`/`stats`, not an extension of the sklearn estimator
+adapter** — recommenders consume sparse user-item `InteractionMatrix` objects and produce ranked
+item lists, not feature-target DataFrames and point predictions (ADR 0021 explains why forcing
+them through `fit_estimator` would be a leaky abstraction). Every algorithm's `codegen`/`execute`
+routes through three wrapper functions — `fit`, `recommend`, `similar_items` (plus
+`hybrid_weighted`/`hybrid_switching`, `compare`, `evaluate`) — so ADR-0002 equivalence holds by
+construction. The registered catalog spans baselines (random, popularity, co-occurrence),
+content-based filtering (TF-IDF, feature KNN, embedding similarity), collaborative filtering
+(user/item KNN, SVD, NMF on hard deps; ALS/BPR behind the optional `[recommend]` extra via
+`implicit`), and deep recommenders (NCF, two-tower) behind the same optional `torch` dependency
+used by the declarative seam. Evaluation uses ranking/system metrics with no classification
+analog — precision@k, recall@k, NDCG@k, MAP@k, hit rate, coverage, diversity
+(`emergentflow/recommend/metrics.py`) — plus temporal/random interaction-matrix splitting
+(`interactions.py`) so leakage-free evaluation is a first-class op, not an afterthought. A gated
+algorithm invoked without its extra raises a typed `MissingOptionalDependencyError`, never an
+opaque `ImportError`. Reference nodes live alongside the other families in
+`emergentflow/nodes/examples/` (`recommend_fit`, `recommend_recommend`, `recommend_similar_items`,
+`recommend_hybrid_weighted`, `recommend_hybrid_switching`, `recommend_fit_two_tower`,
+`recommend_compare`, `recommend_evaluate`, `recommend_temporal_split`).
+
+### Text embeddings (`emergentflow/embed/`)
+
+`ef.embed.text()` embeds a text column of a DataFrame, dispatching to one of two backends:
+an API provider (`provider` + `model`, routed through the injected `LLMClient` seam, ADR 0017 —
+the same client wrapped by `emergentflow.llm.budget.BudgetClient` for spend tracking) or a local
+`sentence-transformers` model (`local_model`, lazy-imported behind the optional `[embed]` extra).
+Unlike `ef.llm.call`, it returns a bare augmented DataFrame with no per-call cost/latency
+metadata — consistent with other feature-transform nodes. The reference node is `embed_text`
+in `emergentflow/nodes/examples/`.
+
 ### Local server (`emergentflow/server/`)
 
 A FastAPI/Uvicorn app (optional `[server]` extra; `emergentflow serve` / `emergentflow lab`)
@@ -250,6 +284,18 @@ dependencies, `emergentflow/collab/` is never eagerly imported, CI never calls a
 existing route contracts stay byte-identical whether or not any session is ever opened. An
 optional MCP tool wrapper over the same routes lives in `emergentflow/collab/mcp.py` (`[mcp]`
 extra, FastMCP).
+
+A registry of built-in **personas** (`emergentflow/collab/personas.py`, definitions in
+`persona_defs.py`: `data_modeller`, `data_scientist`, `researcher`, `ml_engineer`) scopes an
+agent's system prompt to a node-family focus; each persona's full markdown identity lives in
+`agents/*.md` (e.g. `agents/data-scientist.md`), read by the chat runner at activation time —
+`persona_defs.py` only carries a short prompt fragment plus `source_path`. A human activates or
+switches a persona mid-chat with a slash command (e.g. `/data-scientist`), detected by
+`chat_runner._detect_persona_command` and recorded on `ChatState.active_persona`
+(`ui/src/session/usePersonas.ts` surfaces this in the chat UI). Separately,
+`emergentflow/collab/consult.py` implements a **Mode-B one-shot consult**: composes a persona's
+system prompt plus a graph slice into a single LLM call and parses the response into a
+`set_params`-only `GraphMutation`, without opening a full chat session.
 
 ### Connection profiles (`emergentflow/connections/`)
 

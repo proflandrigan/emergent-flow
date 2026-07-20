@@ -181,8 +181,8 @@ def _recommend_random(
         user_ids = list(user_index.keys())
 
     rows: list[dict[str, Any]] = []
+    rng = np.random.default_rng(seed)
     for uid in user_ids:
-        rng = np.random.default_rng(seed)
         n_items = len(item_ids)
         candidates = list(range(n_items))
         if exclude_known and uid in user_index:
