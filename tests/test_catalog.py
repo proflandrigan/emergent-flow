@@ -91,7 +91,7 @@ def ref_registry() -> NodeRegistry:
 
 
 def test_catalog_version_constant():
-    assert CATALOG_VERSION == 4
+    assert CATALOG_VERSION == 5
 
 
 def test_top_level_keys(ref_registry: NodeRegistry):
@@ -100,6 +100,7 @@ def test_top_level_keys(ref_registry: NodeRegistry):
         "nodes",
         "estimators",
         "charts",
+        "recommenders",
         "connectors",
     }
 

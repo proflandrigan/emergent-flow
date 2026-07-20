@@ -3,14 +3,15 @@
 // form per node type. The store param value is the source of truth; this component never keeps
 // a local copy.
 //
-// One exception: nodes that fit/transform/cluster via a curated sklearn estimator (identified
-// by having both an `estimator` choice param and a `params` dict param -- Epic 8's fit /
-// fit_transform / cluster_detect / cross_validate archetypes) render their `params` dict as one
-// widget per curated kwarg (sourced from `catalog.estimators`, keyed on the node's current
-// `estimator` value) plus an "Advanced params (JSON)" overflow field for anything not curated,
+// One exception: node types listed in `CURATED_PARAM_NODES` below (Epic 8's fit / fit_transform /
+// cluster_detect / cross_validate archetypes, the transform.* feature-transform nodes, and
+// recommend.fit) pair a "pick an algorithm/estimator" choice param with a kwargs dict param whose
+// shape is described by a catalog entry (`catalog.estimators` or `catalog.recommenders`). Those
+// nodes render their dict param as one widget per curated kwarg (keyed on the node's current
+// choice-param value) plus an "Advanced params (JSON)" overflow field for anything not curated,
 // instead of a single raw JSON blob -- Epic 8 Story 10's curated/advanced split.
 
-import type { CatalogEstimator, CatalogParam } from "../catalog/types";
+import type { CatalogEstimator, CatalogParam, CatalogRecommender } from "../catalog/types";
 import { useCatalog } from "../catalog/useCatalog";
 import { useConnectionProfiles, useLlmConnectionProfiles } from "../catalog/useConnectionProfiles";
 import { useGraphStore } from "../store/graphStore";
@@ -28,19 +29,40 @@ import { CodeEditor } from "./CodeEditor";
 import { ColumnSelect, ColumnMultiSelect } from "./ColumnSelect";
 import { QueryBuilderPreview } from "./QueryBuilderPreview";
 
-// Node types whose `params` dict param holds curated sklearn estimator constructor kwargs
-// (Epic 8 archetypes). Restricted to an explicit list rather than inferred generically, since
-// ml.grid_search's `param_grid` and ml.pipeline's `steps` are dict/list params with a different
-// shape (per-param candidate lists / a list of step specs) that a flat curated-kwarg form does
-// not fit.
-const ESTIMATOR_PARAMS_NODE_TYPES = new Set([
-  "ml.fit_estimator",
-  "ml.fit_transform",
-  "ml.cluster_detect",
-  "ml.cross_validate",
-]);
-const ESTIMATOR_PARAMS_PARAM_NAME = "params";
-const ESTIMATOR_CHOICE_PARAM_NAME = "estimator";
+// Node types whose `params` dict param holds curated constructor kwargs for a choice param
+// (Epic 8 archetypes + recommend.fit). Restricted to an explicit config map rather than inferred
+// generically, since ml.grid_search's `param_grid` and ml.pipeline's `steps` are dict/list params
+// with a different shape (per-param candidate lists / a list of step specs) that a flat
+// curated-kwarg form does not fit.
+type CuratedSource = "estimators" | "recommenders";
+interface CuratedParamConfig {
+  choiceParam: string; // the "pick an algorithm/estimator" select param name
+  dictParam: string; // the kwargs dict param name
+  source: CuratedSource;
+}
+const CURATED_PARAM_NODES: Record<string, CuratedParamConfig> = {
+  "ml.fit_estimator": { choiceParam: "estimator", dictParam: "params", source: "estimators" },
+  "ml.fit_transform": { choiceParam: "estimator", dictParam: "params", source: "estimators" },
+  "ml.cluster_detect": { choiceParam: "estimator", dictParam: "params", source: "estimators" },
+  "ml.cross_validate": { choiceParam: "estimator", dictParam: "params", source: "estimators" },
+  "transform.scale_features": {
+    choiceParam: "estimator",
+    dictParam: "params",
+    source: "estimators",
+  },
+  "transform.encode_categorical": {
+    choiceParam: "estimator",
+    dictParam: "params",
+    source: "estimators",
+  },
+  "transform.discretize": { choiceParam: "estimator", dictParam: "params", source: "estimators" },
+  "transform.generate_features": {
+    choiceParam: "estimator",
+    dictParam: "params",
+    source: "estimators",
+  },
+  "recommend.fit": { choiceParam: "algorithm", dictParam: "params", source: "recommenders" },
+};
 
 function resolveCatalogParam(
   meta: CatalogParam | undefined,
@@ -315,19 +337,21 @@ interface EstimatorParamsFieldProps {
   node: NodeModel;
   param: ParamModel;
   meta: CatalogParam | undefined;
-  estimator: CatalogEstimator;
+  estimator: CatalogEstimator | CatalogRecommender;
+  dictParam: string;
 }
 
-// Renders `node`'s `params` dict as one widget per curated kwarg for the currently-selected
-// estimator, plus an "Advanced params (JSON)" overflow textarea for anything not curated.
-// Always writes the FULL merged dict back via setParam so neither side clobbers the other.
-// Deliberately stateless (no local React state) -- every widget derives its displayed value
-// directly from the store on every render, same invariant as ParamRow above.
+// Renders `node`'s dict param as one widget per curated kwarg for the currently-selected
+// estimator/algorithm, plus an "Advanced params (JSON)" overflow textarea for anything not
+// curated. Always writes the FULL merged dict back via setParam so neither side clobbers the
+// other. Deliberately stateless (no local React state) -- every widget derives its displayed
+// value directly from the store on every render, same invariant as ParamRow above.
 function EstimatorParamsField({
   node,
   param,
   meta,
   estimator,
+  dictParam,
 }: EstimatorParamsFieldProps): JSX.Element {
   const setParam = useGraphStore((s) => s.setParam);
   const currentValue =
@@ -338,7 +362,7 @@ function EstimatorParamsField({
   const { curated, overflow } = splitCuratedParams(currentValue, curatedNames);
 
   function writeCurated(name: string, value: unknown) {
-    setParam(node.id, ESTIMATOR_PARAMS_PARAM_NAME, {
+    setParam(node.id, dictParam, {
       ...curated,
       [name]: value,
       ...overflow,
@@ -348,7 +372,7 @@ function EstimatorParamsField({
   function writeOverflow(raw: string) {
     try {
       const parsed = JSON.parse(raw) as Record<string, unknown>;
-      setParam(node.id, ESTIMATOR_PARAMS_PARAM_NAME, { ...curated, ...parsed });
+      setParam(node.id, dictParam, { ...curated, ...parsed });
     } catch {
       // Invalid JSON: don't commit yet. The textarea's value is derived from the store (below),
       // so an invalid in-progress edit simply doesn't take effect until it parses.
@@ -410,6 +434,27 @@ function EstimatorParamsField({
               }}
             />
           );
+        } else if (kwarg.type === "list") {
+          // Comma-separated text, same convention as the top-level "list" widget
+          // (widgets.ts's isListType/parseValue/formatValue) -- without this branch a list
+          // default like [32, 16, 8] falls into the plain-text branch below, which stringifies
+          // the array for display and then writes the raw unparsed string back on every edit
+          // instead of an array, corrupting params like mlp_layers/feature_cols/ngram_range.
+          const arr = Array.isArray(value) ? value : [];
+          kwargWidget = (
+            <Input
+              type="text"
+              data-testid={testId}
+              value={arr.join(", ")}
+              onChange={(e) => {
+                const parsed = e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter((s) => s.length > 0);
+                writeCurated(kwarg.name, parsed);
+              }}
+            />
+          );
         } else {
           kwargWidget = (
             <Input
@@ -420,9 +465,16 @@ function EstimatorParamsField({
             />
           );
         }
+        // Only CatalogRecommenderParam carries `required` (sklearn's CatalogEstimatorParam has
+        // no such concept -- every constructor kwarg has a default); guard with `in` so this
+        // stays a no-op for the estimator-sourced kwargs of the pre-existing curated nodes.
+        const kwargRequired = "required" in kwarg && kwarg.required;
         return (
           <div key={kwarg.name} style={{ marginBottom: "0.5rem" }}>
-            <label style={{ display: "block", fontSize: "0.85rem" }}>{kwarg.name}</label>
+            <label style={{ display: "block", fontSize: "0.85rem" }}>
+              {kwarg.name}
+              {kwargRequired ? " *" : ""}
+            </label>
             {kwargWidget}
             {kwarg.help ? (
               <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
@@ -451,12 +503,22 @@ function EstimatorParamsField({
   );
 }
 
-// Renders the `estimator` choice param for a curated-estimator node type. Identical to
-// ParamRow's "select" branch, except changing the estimator also resets the sibling `params`
-// dict to {} -- otherwise a kwarg valid only for the PREVIOUS estimator lingers as unrecognized
-// "overflow" in EstimatorParamsField and gets resubmitted verbatim on the next curated edit,
-// which the backend rejects with InvalidEstimatorParamsError for the newly-selected estimator.
-function EstimatorChoiceRow({ node, param, meta }: ParamRowProps): JSX.Element {
+interface EstimatorChoiceRowProps extends ParamRowProps {
+  dictParam: string;
+}
+
+// Renders the "pick an algorithm/estimator" choice param for a curated-param node type.
+// Identical to ParamRow's "select" branch, except changing the choice also resets the sibling
+// dict param to {} -- otherwise a kwarg valid only for the PREVIOUS choice lingers as
+// unrecognized "overflow" in EstimatorParamsField and gets resubmitted verbatim on the next
+// curated edit, which the backend rejects with InvalidEstimatorParamsError for the
+// newly-selected choice.
+function EstimatorChoiceRow({
+  node,
+  param,
+  meta,
+  dictParam,
+}: EstimatorChoiceRowProps): JSX.Element {
   const setParam = useGraphStore((s) => s.setParam);
   const catalogParam = resolveCatalogParam(meta, param);
   const choices = catalogParam.hints?.choices ?? [];
@@ -477,7 +539,7 @@ function EstimatorChoiceRow({ node, param, meta }: ParamRowProps): JSX.Element {
         onChange={(e) => {
           const next = parseValue(catalogParam, e.target.value);
           if (next !== param.value) {
-            setParam(node.id, ESTIMATOR_PARAMS_PARAM_NAME, {});
+            setParam(node.id, dictParam, {});
           }
           setParam(node.id, param.name, next);
         }}
@@ -515,35 +577,45 @@ export function ConfigForm({ node }: { node: NodeModel }): JSX.Element {
     );
   }
 
-  const estimatorValue = node.params.find(
-    (p) => p.name === ESTIMATOR_CHOICE_PARAM_NAME,
-  )?.value;
-  const catalogEstimator =
-    ESTIMATOR_PARAMS_NODE_TYPES.has(node.type) && typeof estimatorValue === "string"
-      ? catalog.estimators.find((e) => e.key === estimatorValue)
+  const curated = CURATED_PARAM_NODES[node.type];
+  const choiceValue = curated
+    ? node.params.find((p) => p.name === curated.choiceParam)?.value
+    : undefined;
+  const curatedEntries = curated
+    ? curated.source === "recommenders"
+      ? catalog.recommenders
+      : catalog.estimators
+    : undefined;
+  const curatedEntry =
+    curatedEntries && typeof choiceValue === "string"
+      ? curatedEntries.find((e) => e.key === choiceValue)
       : undefined;
 
   return (
     <div data-testid="config-form">
       {node.params.map((param) => {
         const meta = spec?.params.find((p) => p.name === param.name);
-        if (catalogEstimator && param.name === ESTIMATOR_PARAMS_PARAM_NAME) {
+        if (curated && curatedEntry && param.name === curated.dictParam) {
           return (
             <EstimatorParamsField
               key={param.name}
               node={node}
               param={param}
               meta={meta}
-              estimator={catalogEstimator}
+              estimator={curatedEntry}
+              dictParam={curated.dictParam}
             />
           );
         }
-        if (
-          ESTIMATOR_PARAMS_NODE_TYPES.has(node.type) &&
-          param.name === ESTIMATOR_CHOICE_PARAM_NAME
-        ) {
+        if (curated && param.name === curated.choiceParam) {
           return (
-            <EstimatorChoiceRow key={param.name} node={node} param={param} meta={meta} />
+            <EstimatorChoiceRow
+              key={param.name}
+              node={node}
+              param={param}
+              meta={meta}
+              dictParam={curated.dictParam}
+            />
           );
         }
         return <ParamRow key={param.name} node={node} param={param} meta={meta} />;
