@@ -710,10 +710,30 @@ class SessionStore:
                 raise UnknownSessionError(f"no session with id {session_id!r}.")
             session.collab.chat.backend_thread_id = thread_id
 
+    def set_chat_persona(self, session_id: str, persona_slug: str | None) -> None:
+        """Set or clear the active persona on the session's chat state, and publish a
+        ``persona_changed`` event.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            session.collab.chat.active_persona = persona_slug
+            self._publish(
+                session_id,
+                {"type": "persona_changed", "session_id": session_id, "persona": persona_slug},
+            )
+
     def end_chat(self, session_id: str) -> GraphSession:
-        """Clear the session's active chat backend and thread id so a new backend can be
-        started. Turn history is kept. Callers should interrupt any RUNNING turn (see
-        interrupt_chat_turn) before calling this -- end_chat does not itself check for one.
+        """Clear the session's active chat backend, thread id, and active persona so a new
+        backend can be started. Turn history is kept. Callers should interrupt any RUNNING
+        turn (see interrupt_chat_turn) before calling this -- end_chat does not itself check
+        for one.
 
         Raises
         ------
@@ -726,6 +746,7 @@ class SessionStore:
                 raise UnknownSessionError(f"no session with id {session_id!r}.")
             session.collab.chat.backend = None
             session.collab.chat.backend_thread_id = None
+            session.collab.chat.active_persona = None
             self._publish(session_id, {"type": "chat_ended", "session_id": session_id})
             return session
 

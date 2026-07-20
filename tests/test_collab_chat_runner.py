@@ -195,6 +195,139 @@ class TestStartChatTurn:
         assert echoed_prompt == "second message"
 
 
+class TestDetectPersonaCommand:
+    def test_recognizes_data_scientist(self) -> None:
+        assert chat_runner._detect_persona_command("/data-scientist") == "data-scientist.md"
+
+    def test_recognizes_researcher(self) -> None:
+        assert chat_runner._detect_persona_command("/researcher") == "researcher.md"
+
+    def test_recognizes_ml_engineer(self) -> None:
+        assert chat_runner._detect_persona_command("/ml-engineer") == "ml-engineer.md"
+
+    def test_case_insensitive(self) -> None:
+        result = chat_runner._detect_persona_command("/Data-Scientist review this")
+        assert result == "data-scientist.md"
+
+    def test_ignores_trailing_text(self) -> None:
+        result = chat_runner._detect_persona_command("/researcher build me a pipeline")
+        assert result == "researcher.md"
+
+    def test_returns_none_for_unknown(self) -> None:
+        assert chat_runner._detect_persona_command("/unknown-command") is None
+
+    def test_returns_none_for_empty(self) -> None:
+        assert chat_runner._detect_persona_command("") is None
+
+    def test_returns_none_for_plain_message(self) -> None:
+        assert chat_runner._detect_persona_command("just a normal message") is None
+
+
+class TestPersonaSlashCommands:
+    def test_first_turn_with_persona_injects_persona_block(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store = SessionStore()
+        monkeypatch.setattr(chat_runner, "get_default_store", lambda: store)
+        session = store.create()
+
+        turn = chat_runner.start_chat_turn(
+            session.id,
+            "fake-chat-echo",
+            "/data-scientist review my pipeline",
+            base_url="http://127.0.0.1:8765",
+        )
+        status = _wait_for_status(store, session.id, turn.id)
+        assert status == ChatTurnStatus.COMPLETED
+        echoed = store.get(session.id).collab.chat.turns[0].agent_message
+        assert echoed is not None
+        assert "Your persona" in echoed
+        assert "Data Scientist" in echoed or "data scientist" in echoed.lower()
+        assert "Emergent Flow Collaborator" in echoed
+
+    def test_persona_sets_active_persona_on_chat_state(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store = SessionStore()
+        monkeypatch.setattr(chat_runner, "get_default_store", lambda: store)
+        session = store.create()
+
+        turn = chat_runner.start_chat_turn(
+            session.id,
+            "fake-chat-echo",
+            "/data-scientist hello",
+            base_url="http://127.0.0.1:8765",
+        )
+        _wait_for_status(store, session.id, turn.id)
+        assert store.get(session.id).collab.chat.active_persona == "data_scientist"
+
+    def test_resume_with_persona_switch_injects_switch_block(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store = SessionStore()
+        monkeypatch.setattr(chat_runner, "get_default_store", lambda: store)
+        session = store.create()
+
+        first = chat_runner.start_chat_turn(
+            session.id, "fake-chat-echo", "first message", base_url="http://127.0.0.1:8765"
+        )
+        _wait_for_status(store, session.id, first.id)
+        store.set_chat_thread_id(session.id, "resume-abc")
+
+        second = chat_runner.start_chat_turn(
+            session.id,
+            "fake-chat-echo",
+            "/ml-engineer check the serving path",
+            base_url="http://127.0.0.1:8765",
+        )
+        _wait_for_status(store, session.id, second.id)
+        echoed = store.get(session.id).collab.chat.turns[1].agent_message
+        assert echoed is not None
+        assert "Persona switch" in echoed
+        assert store.get(session.id).collab.chat.active_persona == "ml_engineer"
+
+    def test_resume_without_persona_sends_raw_message(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store = SessionStore()
+        monkeypatch.setattr(chat_runner, "get_default_store", lambda: store)
+        session = store.create()
+
+        first = chat_runner.start_chat_turn(
+            session.id, "fake-chat-echo", "/researcher hello", base_url="http://127.0.0.1:8765"
+        )
+        _wait_for_status(store, session.id, first.id)
+        store.set_chat_thread_id(session.id, "resume-abc")
+
+        second = chat_runner.start_chat_turn(
+            session.id,
+            "fake-chat-echo",
+            "continue our conversation",
+            base_url="http://127.0.0.1:8765",
+        )
+        _wait_for_status(store, session.id, second.id)
+        echoed = store.get(session.id).collab.chat.turns[1].agent_message
+        assert echoed == "continue our conversation"
+        assert store.get(session.id).collab.chat.active_persona == "researcher"
+
+    def test_end_chat_clears_active_persona(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        store = SessionStore()
+        monkeypatch.setattr(chat_runner, "get_default_store", lambda: store)
+        session = store.create()
+
+        turn = chat_runner.start_chat_turn(
+            session.id,
+            "fake-chat-echo",
+            "/data-scientist hello",
+            base_url="http://127.0.0.1:8765",
+        )
+        _wait_for_status(store, session.id, turn.id)
+        assert store.get(session.id).collab.chat.active_persona == "data_scientist"
+
+        store.end_chat(session.id)
+        assert store.get(session.id).collab.chat.active_persona is None
+
+
 class TestStopChatTurn:
     def test_stop_interrupts_a_running_turn(self, monkeypatch: pytest.MonkeyPatch) -> None:
         store = SessionStore()

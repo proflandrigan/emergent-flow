@@ -83,6 +83,7 @@ export interface ChatState {
   backend: string | null;
   backend_thread_id: string | null;
   turns: ChatTurn[];
+  active_persona: string | null;
 }
 
 export interface GraphSession {

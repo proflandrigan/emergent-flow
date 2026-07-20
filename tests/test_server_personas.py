@@ -32,3 +32,18 @@ def test_get_personas_returns_empty_list_when_nothing_registered(client: TestCli
     r = client.get("/personas")
     assert r.status_code == 200, r.text
     assert r.json() == {"personas": []}
+
+
+def test_get_personas_returns_all_builtins(client: TestClient) -> None:
+    from emergentflow.collab.persona_defs import register_builtin_personas
+
+    register_builtin_personas()
+    r = client.get("/personas")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    slugs = [p["slug"] for p in body["personas"]]
+    assert slugs == ["data_modeller", "data_scientist", "ml_engineer", "researcher"]
+    for p in body["personas"]:
+        assert "label" in p
+        assert "description" in p
+        assert "node_families" in p

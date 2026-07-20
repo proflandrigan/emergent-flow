@@ -78,6 +78,10 @@ class ChatState(BaseModel):
     active chat at a time" (product decision) is enforced at the SessionStore level (a later
     task), not on this model itself -- the model stays a plain data container, same division of
     labor as ReviewThread/Gate.
+
+    ``active_persona`` records which persona slug (e.g. ``"data_scientist"``) is currently
+    active in the chat, set when the human types a persona slash command (e.g.
+    ``/data-scientist``) as a chat message. None means no persona is active -- plain chat.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -85,3 +89,4 @@ class ChatState(BaseModel):
     backend: str | None = None
     backend_thread_id: str | None = None
     turns: list[ChatTurn] = Field(default_factory=list)
+    active_persona: str | None = None

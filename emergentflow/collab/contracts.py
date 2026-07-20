@@ -42,6 +42,7 @@ class SessionEvent(BaseModel):
         "chat_turn_failed",
         "chat_turn_interrupted",
         "chat_ended",
+        "persona_changed",
     ]
     session_id: str
     proposal_id: str | None = None
@@ -51,6 +52,7 @@ class SessionEvent(BaseModel):
     gate_id: str | None = None
     decision_id: str | None = None
     turn_id: str | None = None
+    persona: str | None = None
 
 
 def mutation_json_schema() -> dict[str, Any]:

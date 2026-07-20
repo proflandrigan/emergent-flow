@@ -39,7 +39,7 @@ afterEach(() => {
     proposals: {},
     reviews: {},
     gates: {},
-    chat: { backend: null, backend_thread_id: null, turns: [] },
+    chat: { backend: null, backend_thread_id: null, active_persona: null, turns: [] },
     status: "idle",
     error: null,
     rebaseNeeded: false,

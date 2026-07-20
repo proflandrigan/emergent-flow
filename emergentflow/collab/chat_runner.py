@@ -48,6 +48,23 @@ from emergentflow.collab.session import SessionStore, get_default_store
 _PROTOCOL_DOC_PATH = (
     pathlib.Path(__file__).resolve().parents[2] / "agents" / "emergent-flow-collaborator.md"
 )
+_AGENTS_DIR = pathlib.Path(__file__).resolve().parents[2] / "agents"
+
+# Slash commands recognized as chat messages, mapped to their persona markdown filename under
+# agents/ -- the single source of truth for which commands are recognized. Slash-command slugs
+# use hyphens (as typed by the human); persona slugs (ChatState.active_persona) use underscores,
+# matching emergentflow.collab.persona_defs -- _FILENAME_TO_SLUG/_SLUG_TO_FILENAME below bridge
+# the two.
+_PERSONA_SLASH_COMMANDS: dict[str, str] = {
+    "/data-scientist": "data-scientist.md",
+    "/researcher": "researcher.md",
+    "/ml-engineer": "ml-engineer.md",
+}
+_FILENAME_TO_SLUG: dict[str, str] = {
+    filename: command.lstrip("/").replace("-", "_")
+    for command, filename in _PERSONA_SLASH_COMMANDS.items()
+}
+_SLUG_TO_FILENAME: dict[str, str] = {slug: filename for filename, slug in _FILENAME_TO_SLUG.items()}
 
 _RUNNING_PROCESSES: dict[str, subprocess.Popen[str]] = {}
 # Registered synchronously in start_chat_turn, BEFORE the background thread is even started --
@@ -66,11 +83,53 @@ class UnknownBackendError(Exception):
     name."""
 
 
+def _detect_persona_command(message: str) -> str | None:
+    """Return the persona markdown filename if *message* starts with a known persona slash
+    command (``_PERSONA_SLASH_COMMANDS``), else None.
+
+    Only the first word is checked case-insensitively, so ``/data-scientist build me a
+    pipeline`` still matches.
+    """
+    stripped = message.strip()
+    if not stripped:
+        return None
+    first_word = stripped.split()[0].lower()
+    return _PERSONA_SLASH_COMMANDS.get(first_word)
+
+
+def _read_persona_markdown(filename: str) -> str:
+    """Read an agent persona markdown file (e.g. ``"data-scientist.md"``) from agents/."""
+    return (_AGENTS_DIR / filename).read_text(encoding="utf-8")
+
+
+def _persona_filename_for_slug(slug: str) -> str | None:
+    """Return the persona markdown filename for an already-active persona *slug*, or None if
+    *slug* isn't one of the recognized personas."""
+    return _SLUG_TO_FILENAME.get(slug)
+
+
 def _build_first_turn_prompt(
-    *, session_id: str, base_url: str, auth_token: str | None, user_message: str
+    *,
+    session_id: str,
+    base_url: str,
+    auth_token: str | None,
+    user_message: str,
+    persona_filename: str | None = None,
 ) -> str:
     protocol = _PROTOCOL_DOC_PATH.read_text(encoding="utf-8")
     auth_line = f"- Auth header: `Authorization: Bearer {auth_token}`\n" if auth_token else ""
+
+    persona_block = ""
+    if persona_filename is not None:
+        persona_md = _read_persona_markdown(persona_filename)
+        persona_block = (
+            "\n\n---\n\n"
+            "## Your persona\n\n"
+            "You have been activated with a specific persona. Adopt the following identity "
+            "and follow its behavioral rules for the duration of this chat session:\n\n"
+            f"{persona_md}\n\n"
+        )
+
     return (
         f"{protocol}\n\n"
         "---\n\n"
@@ -80,6 +139,7 @@ def _build_first_turn_prompt(
         f"- Base URL: {base_url}\n"
         f"- Session id: {session_id}\n"
         f"{auth_line}"
+        f"{persona_block}"
         "Reply conversationally in plain text. When you take an action (propose a mutation, "
         "run validate, etc.), do it via curl as described above, then tell the human what you "
         "did and why in your reply. Keep replies concise.\n\n"
@@ -195,14 +255,44 @@ def start_chat_turn(
 
     session = store.get(session_id)
     resume_id = session.collab.chat.backend_thread_id
+
+    # A persona slash command (e.g. "/data-scientist") in the user's message activates (or
+    # switches) the session's persona -- store it on ChatState so the UI can show it and later
+    # turns keep injecting/continuing it.
+    persona_filename = _detect_persona_command(user_message)
+    if persona_filename is not None:
+        store.set_chat_persona(session_id, _FILENAME_TO_SLUG[persona_filename])
+        session = store.get(session_id)  # re-read so active_persona reflects the update below
+    active_persona_slug = session.collab.chat.active_persona
+
     if resume_id is None:
+        # First turn: build the full protocol+session prompt, with the persona markdown (if
+        # any is active yet) folded in as an extra context block.
         prompt = _build_first_turn_prompt(
             session_id=session_id,
             base_url=base_url,
             auth_token=auth_token,
             user_message=user_message,
+            persona_filename=(
+                _persona_filename_for_slug(active_persona_slug) if active_persona_slug else None
+            ),
+        )
+    elif persona_filename is not None:
+        # A resumed turn that just switched (or newly activated) persona: inject the persona
+        # markdown into this turn's prompt so the already-running CLI conversation picks it up.
+        persona_md = _read_persona_markdown(persona_filename)
+        prompt = (
+            "## Persona switch\n\n"
+            "The human has activated a new persona. From now on, adopt the following identity "
+            "and follow its behavioral rules:\n\n"
+            f"{persona_md}\n\n"
+            "---\n\n"
+            "The human says:\n\n"
+            f"{user_message}"
         )
     else:
+        # A resumed turn continuing an already-active persona (or no persona at all) -- the CLI
+        # already has whatever persona context it needs from a previous turn's prompt.
         prompt = user_message
 
     # Registered here, synchronously, BEFORE the background thread starts -- so a stop_chat_turn

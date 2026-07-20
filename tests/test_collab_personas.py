@@ -156,7 +156,7 @@ class TestJsonRoundTrip:
 
 
 class TestRegisterBuiltinPersonas:
-    def test_registers_both_personas(self) -> None:
+    def test_registers_all_personas(self) -> None:
         from emergentflow.collab.persona_defs import register_builtin_personas
 
         register_builtin_personas()
@@ -175,4 +175,39 @@ class TestRegisterBuiltinPersonas:
 
         register_builtin_personas()
         register_builtin_personas()  # must not raise
-        assert len(list_personas()) == 2
+        assert len(list_personas()) == 4
+
+    def test_registers_data_scientist(self) -> None:
+        from emergentflow.collab.persona_defs import register_builtin_personas
+
+        register_builtin_personas()
+        ds = get_persona("data_scientist")
+        assert ds.label == "Data Scientist"
+        assert ds.node_families == ["data", "stats", "ml"]
+        assert ds.source_path == "agents/data-scientist.md"
+
+    def test_registers_ml_engineer(self) -> None:
+        from emergentflow.collab.persona_defs import register_builtin_personas
+
+        register_builtin_personas()
+        me = get_persona("ml_engineer")
+        assert me.label == "ML Engineer"
+        assert me.node_families == ["ml", "recommend"]
+        assert me.source_path == "agents/ml-engineer.md"
+
+    def test_researcher_description_updated(self) -> None:
+        from emergentflow.collab.persona_defs import register_builtin_personas
+
+        register_builtin_personas()
+        rs = get_persona("researcher")
+        assert rs.description == (
+            "Reviews stats nodes for methodology soundness — assumptions, power, multiple "
+            "comparisons, distribution assessment."
+        )
+
+    def test_list_personas_returns_all_four(self) -> None:
+        from emergentflow.collab.persona_defs import register_builtin_personas
+
+        register_builtin_personas()
+        slugs = [p.slug for p in list_personas()]
+        assert slugs == ["data_modeller", "data_scientist", "ml_engineer", "researcher"]

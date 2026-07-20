@@ -38,6 +38,18 @@
       "default": null,
       "title": "Gate Id"
     },
+    "persona": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Persona"
+    },
     "proposal_id": {
       "anyOf": [
         {
@@ -95,7 +107,8 @@
         "chat_turn_completed",
         "chat_turn_failed",
         "chat_turn_interrupted",
-        "chat_ended"
+        "chat_ended",
+        "persona_changed"
       ],
       "title": "Type",
       "type": "string"
