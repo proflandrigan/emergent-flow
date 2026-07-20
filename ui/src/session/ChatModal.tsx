@@ -27,6 +27,7 @@ import { OverlayModal } from "../ui/OverlayModal";
 
 import { getAvailableAgents, type ChatTurn } from "./sessionClient";
 import { useSessionStore } from "./sessionStore";
+import { usePersonas } from "./usePersonas";
 
 export interface ChatModalProps {
   onClose: () => void;
@@ -318,6 +319,7 @@ function ActiveChat({ backend }: { backend: string }): JSX.Element {
   const startChat = useSessionStore((s) => s.startChat);
   const stopChat = useSessionStore((s) => s.stopChat);
   const endChat = useSessionStore((s) => s.endChat);
+  const personas = usePersonas();
   const [ending, setEnding] = useState(false);
   const [draftMessage, setDraftMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -326,6 +328,11 @@ function ActiveChat({ backend }: { backend: string }): JSX.Element {
 
   const latestTurn = chat.turns[chat.turns.length - 1];
   const turnRunning = latestTurn?.status === "running";
+
+  const activePersonaLabel = chat.active_persona
+    ? (personas.find((p) => p.slug === chat.active_persona)?.label ??
+      chat.active_persona)
+    : null;
 
   const handleEnd = (): void => {
     setEnding(true);
@@ -358,6 +365,7 @@ function ActiveChat({ backend }: { backend: string }): JSX.Element {
     <div data-testid="chat-active-view">
       <div style={{ fontWeight: 600, marginBottom: "var(--space-2)" }}>
         Chatting with {backend}
+        {activePersonaLabel ? ` as ${activePersonaLabel}` : ""}
       </div>
       <div
         data-testid="chat-message-list"
@@ -465,6 +473,8 @@ export function ChatModal({ onClose }: ChatModalProps): JSX.Element {
   const createAndJoin = useSessionStore((s) => s.createAndJoin);
   const backend = useSessionStore((s) => s.chat.backend);
   const turns = useSessionStore((s) => s.chat.turns);
+  const activePersonaSlug = useSessionStore((s) => s.chat.active_persona);
+  const personas = usePersonas();
   const latestTurn = turns[turns.length - 1];
   // Guards against React StrictMode's synchronous double-invoke of this effect on mount,
   // which would otherwise fire createAndJoin() twice and orphan the first session -- the flag
@@ -505,12 +515,17 @@ export function ChatModal({ onClose }: ChatModalProps): JSX.Element {
   }, [chatWidth]);
 
   if (viewMode === "collapsed") {
+    const personaLabel = activePersonaSlug
+      ? (personas.find((p) => p.slug === activePersonaSlug)?.label ?? null)
+      : null;
     const label =
       backend === null
         ? "Chat"
         : latestTurn?.status === "running"
-          ? `${backend} is working\u2026`
-          : `${backend} chat`;
+          ? `${personaLabel ?? backend} is working\u2026`
+          : personaLabel
+            ? `${personaLabel} chat`
+            : `${backend} chat`;
     return <ChatPill label={label} onExpand={() => setViewMode("docked")} />;
   }
 

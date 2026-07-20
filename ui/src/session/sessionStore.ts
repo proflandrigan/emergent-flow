@@ -195,6 +195,7 @@ const idleChatState: ChatState = {
   backend: null,
   backend_thread_id: null,
   turns: [],
+  active_persona: null,
 };
 
 const idleConnectionState: ConnectionState = {
@@ -444,8 +445,8 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
       const turn = await startChatRequest(state.sessionId, { backend, message });
       set((s) => ({
         chat: {
+          ...s.chat,
           backend: s.chat.backend ?? backend,
-          backend_thread_id: s.chat.backend_thread_id,
           turns: [...s.chat.turns, turn],
         },
       }));

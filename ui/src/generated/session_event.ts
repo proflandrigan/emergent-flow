@@ -3,6 +3,7 @@
 export type CommentId = string | null;
 export type DecisionId = string | null;
 export type GateId = string | null;
+export type Persona = string | null;
 export type ProposalId = string | null;
 export type ReviewId = string | null;
 export type SessionId = string;
@@ -23,7 +24,8 @@ export type Type =
   | "chat_turn_completed"
   | "chat_turn_failed"
   | "chat_turn_interrupted"
-  | "chat_ended";
+  | "chat_ended"
+  | "persona_changed";
 export type Version = number | null;
 
 /**
@@ -33,6 +35,7 @@ export interface SessionEvent {
   comment_id?: CommentId;
   decision_id?: DecisionId;
   gate_id?: GateId;
+  persona?: Persona;
   proposal_id?: ProposalId;
   review_id?: ReviewId;
   session_id: SessionId;

@@ -5,6 +5,9 @@ import { useGraphStore } from "../store/graphStore";
 import * as sessionClient from "./sessionClient";
 import { ChatModal } from "./ChatModal";
 import { useSessionStore } from "./sessionStore";
+import { usePersonas } from "./usePersonas";
+
+vi.mock("./usePersonas");
 
 vi.mock("./sessionClient", () => ({
   createSession: vi.fn(),
@@ -42,6 +45,7 @@ function fakeSession(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(usePersonas).mockReturnValue([]);
   useGraphStore.getState().reset();
   useSessionStore.setState({
     sessionId: null,
@@ -49,7 +53,12 @@ beforeEach(() => {
     proposals: {},
     reviews: {},
     gates: {},
-    chat: { backend: null, backend_thread_id: null, turns: [] },
+    chat: {
+      backend: null,
+      backend_thread_id: null,
+      active_persona: null,
+      turns: [],
+    },
     status: "idle",
     error: null,
     rebaseNeeded: false,
@@ -138,6 +147,7 @@ test("shows the active view once a chat backend is set", () => {
     chat: {
       backend: "claude",
       backend_thread_id: null,
+      active_persona: null,
       turns: [
         {
           id: "turn-1",
@@ -158,6 +168,54 @@ test("shows the active view once a chat backend is set", () => {
   expect(screen.getByTestId("chat-end-button")).not.toBeDisabled();
 });
 
+test("shows the active persona label in the chat header when one is set", () => {
+  vi.mocked(usePersonas).mockReturnValue([
+    {
+      slug: "data_scientist",
+      label: "Data Scientist",
+      description: "Helps with data science",
+      node_families: ["ml"],
+    },
+  ]);
+  useSessionStore.setState({
+    sessionId: "abc",
+    version: 0,
+    status: "connected",
+    chat: {
+      backend: "claude",
+      backend_thread_id: null,
+      active_persona: "data_scientist",
+      turns: [],
+    },
+  });
+
+  render(<ChatModal onClose={vi.fn()} />);
+
+  expect(screen.getByTestId("chat-active-view")).toHaveTextContent(
+    "Chatting with claude as Data Scientist",
+  );
+});
+
+test("falls back to the raw persona slug when personas have not loaded yet", () => {
+  useSessionStore.setState({
+    sessionId: "abc",
+    version: 0,
+    status: "connected",
+    chat: {
+      backend: "claude",
+      backend_thread_id: null,
+      active_persona: "data_scientist",
+      turns: [],
+    },
+  });
+
+  render(<ChatModal onClose={vi.fn()} />);
+
+  expect(screen.getByTestId("chat-active-view")).toHaveTextContent(
+    "Chatting with claude as data_scientist",
+  );
+});
+
 test("End chat button is disabled while the latest turn is running", () => {
   useSessionStore.setState({
     sessionId: "abc",
@@ -166,6 +224,7 @@ test("End chat button is disabled while the latest turn is running", () => {
     chat: {
       backend: "claude",
       backend_thread_id: null,
+      active_persona: null,
       turns: [
         {
           id: "turn-1",
@@ -193,6 +252,7 @@ test("End chat calls the store's endChat action", async () => {
     chat: {
       backend: "claude",
       backend_thread_id: null,
+      active_persona: null,
       turns: [
         {
           id: "turn-1",
@@ -212,7 +272,12 @@ test("End chat calls the store's endChat action", async () => {
       collab: {
         reviews: {},
         gates: {},
-        chat: { backend: null, backend_thread_id: null, turns: [] },
+        chat: {
+          backend: null,
+          backend_thread_id: null,
+          active_persona: null,
+          turns: [],
+        },
       },
     }),
   );
@@ -233,6 +298,7 @@ test("renders each turn's user message, narration, and agent reply", () => {
     chat: {
       backend: "claude",
       backend_thread_id: null,
+      active_persona: null,
       turns: [
         {
           id: "turn-1",
@@ -266,6 +332,7 @@ test("Send posts a new message with the existing backend", async () => {
     chat: {
       backend: "claude",
       backend_thread_id: null,
+      active_persona: null,
       turns: [
         {
           id: "turn-1",
@@ -311,6 +378,7 @@ test("shows a Stop button instead of Send while the latest turn is running, and 
     chat: {
       backend: "claude",
       backend_thread_id: null,
+      active_persona: null,
       turns: [
         {
           id: "turn-1",
@@ -350,7 +418,12 @@ test("Collapse button switches to the pill view, which expands back on click", (
     sessionId: "abc",
     version: 0,
     status: "connected",
-    chat: { backend: "claude", backend_thread_id: null, turns: [] },
+    chat: {
+      backend: "claude",
+      backend_thread_id: null,
+      active_persona: null,
+      turns: [],
+    },
   });
 
   render(<ChatModal onClose={vi.fn()} />);
@@ -366,6 +439,35 @@ test("Collapse button switches to the pill view, which expands back on click", (
   expect(screen.getByTestId("chat-active-view")).toBeInTheDocument();
 });
 
+test("the collapsed pill shows the persona name when one is active", () => {
+  vi.mocked(usePersonas).mockReturnValue([
+    {
+      slug: "data_scientist",
+      label: "Data Scientist",
+      description: "Helps with data science",
+      node_families: ["ml"],
+    },
+  ]);
+  useSessionStore.setState({
+    sessionId: "abc",
+    version: 0,
+    status: "connected",
+    chat: {
+      backend: "claude",
+      backend_thread_id: null,
+      active_persona: "data_scientist",
+      turns: [],
+    },
+  });
+
+  render(<ChatModal onClose={vi.fn()} />);
+  fireEvent.click(screen.getByTestId("chat-dock-minimize"));
+
+  expect(screen.getByTestId("chat-modal-pill")).toHaveTextContent(
+    "Data Scientist chat",
+  );
+});
+
 test("the pill shows a working indicator while a turn is running", () => {
   useSessionStore.setState({
     sessionId: "abc",
@@ -374,6 +476,7 @@ test("the pill shows a working indicator while a turn is running", () => {
     chat: {
       backend: "claude",
       backend_thread_id: null,
+      active_persona: null,
       turns: [
         {
           id: "turn-1",
@@ -404,6 +507,7 @@ test("the dock's close button calls onClose", () => {
     chat: {
       backend: "claude",
       backend_thread_id: null,
+      active_persona: null,
       turns: [
         {
           id: "turn-1",
@@ -433,6 +537,7 @@ test("a failed turn's activity log auto-expands", () => {
     chat: {
       backend: "claude",
       backend_thread_id: null,
+      active_persona: null,
       turns: [
         {
           id: "turn-1",
@@ -464,6 +569,7 @@ test("a completed turn's activity log stays collapsed by default", () => {
     chat: {
       backend: "claude",
       backend_thread_id: null,
+      active_persona: null,
       turns: [
         {
           id: "turn-1",

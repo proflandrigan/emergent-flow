@@ -311,7 +311,16 @@ describe("subscribeToSessionEvents", () => {
         JSON.stringify(
           fakeSession({
             version: 0,
-            collab: { reviews: {}, gates: {}, chat: { backend: "claude", backend_thread_id: null, turns: [turn] } },
+            collab: {
+              reviews: {},
+              gates: {},
+              chat: {
+                backend: "claude",
+                backend_thread_id: null,
+                active_persona: null,
+                turns: [turn],
+              },
+            },
           }),
         ),
         { status: 200 },

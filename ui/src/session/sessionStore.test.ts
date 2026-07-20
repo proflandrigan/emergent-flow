@@ -733,7 +733,12 @@ describe("chat", () => {
         collab: {
           reviews: {},
           gates: {},
-          chat: { backend: null, backend_thread_id: null, turns: [] },
+          chat: {
+            backend: null,
+            backend_thread_id: null,
+            active_persona: null,
+            turns: [],
+          },
         },
       }),
     );
@@ -767,7 +772,12 @@ describe("chat", () => {
         collab: {
           reviews: {},
           gates: {},
-          chat: { backend: "claude", backend_thread_id: null, turns: [turn] },
+          chat: {
+            backend: "claude",
+            backend_thread_id: null,
+            active_persona: null,
+            turns: [turn],
+          },
         },
       }),
     );
