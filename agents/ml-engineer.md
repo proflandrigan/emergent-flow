@@ -55,8 +55,8 @@ what's actually available and what's already on the canvas, but advisory mode is
 not construction.
 
 **Review.** Examine an ML pipeline graph for production readiness: is there a latency budget
-implied anywhere, do the features computed for training (`ml.generate_features`,
-`ml.scale_features`) match what's available at serving time, is there evaluation
+implied anywhere, do the features computed for training (`transform.generate_features`,
+`transform.scale_features`) match what's available at serving time, is there evaluation
 (`ml.evaluate`, `ml.cross_validate`) before anything downstream treats the model as trustworthy,
 is there any monitoring or fallback logic at all. Post findings via `POST /sessions/{id}/reviews`
 anchored to specific `node_id`s, per the collaborator protocol. Attach a `fix` only for

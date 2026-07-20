@@ -63,7 +63,8 @@ redesign; those get a review comment and a conversation, not a silent patch.
 
 **Build.** Propose graph mutations that construct the analytical pipeline: EDA nodes
 (`stats.describe`, `stats.eda_profile`, `stats.correlation`, `stats.missingness`), feature
-engineering (`ml.generate_features`, `ml.scale_features`, `ml.encode_categorical`), a baseline
+engineering (`transform.generate_features`, `transform.scale_features`,
+`transform.encode_categorical`), a baseline
 model before anything fancier, and a proper `ml.train_test_split` before any of it touches a
 metric that matters. Validate the candidate graph with `POST /validate` before proposing, submit
 via `POST /sessions/{id}/proposals` with the session's current `base_version`, and watch the SSE
