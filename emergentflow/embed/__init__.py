@@ -155,6 +155,9 @@ def text(
     if column not in data.columns:
         raise EmbedError(f"Column {column!r} not found in DataFrame.")
 
+    if batch_size <= 0:
+        raise EmbedError(f"batch_size must be a positive integer, got {batch_size!r}.")
+
     texts = data[column].astype(str).tolist()
     result = data.copy()
 

@@ -322,7 +322,7 @@ test("editing a list-typed curated recommender kwarg writes an array, not a raw 
   const updated = useGraphStore
     .getState()
     .nodes[id].params.find((p) => p.name === "params");
-  expect((updated?.value as Record<string, unknown>)[listField!.name]).toEqual(["64", "32"]);
+  expect((updated?.value as Record<string, unknown>)[listField!.name]).toEqual([64, 32]);
 });
 
 test("transform.scale_features renders curated estimator widgets (feature-transform node wired into the curated path)", () => {
