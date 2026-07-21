@@ -144,6 +144,7 @@ embed = [
 # install raises a typed MissingOptionalDependencyError, never an opaque ImportError.
 bigquery = [
     "google-cloud-bigquery>=3,<4",
+    "db-dtypes>=1,<2",
 ]
 # `pip install emergentflow[redshift]` enables the Redshift warehouse adapter (Epic 13).
 # redshift-connector is Apache-2.0 (compatible; not GPL). Kept optional (ADR 0007 / ADR 0018).
