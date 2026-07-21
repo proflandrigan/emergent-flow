@@ -44,6 +44,7 @@ export function toRFNode(
     selected,
     data: {
       label: node.label ?? node.type,
+      nodeType: node.type,
       family: family ?? null,
       ports: node.ports.map((port) => ({
         id: port.id,

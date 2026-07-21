@@ -30,7 +30,9 @@ import { EfEdge } from "./edges/EfEdge";
 import { EfNode } from "./nodes/EfNode";
 import { NoteNode } from "./nodes/NoteNode";
 import { NodeContextMenu } from "./NodeContextMenu";
+import { NodeInfoPanel } from "./NodeInfoPanel";
 import { NoteAnchorOverlay } from "./NoteAnchorOverlay";
+import { OverlayModal } from "../ui/OverlayModal";
 import { toRFEdge, toRFNode } from "./toReactFlow";
 
 const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode };
@@ -146,6 +148,11 @@ export function Canvas(): JSX.Element {
     x: number;
     y: number;
   } | null>(null);
+  const [infoNodeId, setInfoNodeId] = useState<string | null>(null);
+
+  const infoCatalogNode = infoNodeId
+    ? catalog.nodes.find((n) => n.type === nodes[infoNodeId]?.type)
+    : undefined;
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
@@ -215,8 +222,14 @@ export function Canvas(): JSX.Element {
           onRunToHere={() => {
             void runGraph({ runTo: contextMenu.nodeId });
           }}
+          onNodeInfo={() => setInfoNodeId(contextMenu.nodeId)}
           onClose={closeContextMenu}
         />
+      )}
+      {infoCatalogNode && (
+        <OverlayModal width={420} onClose={() => setInfoNodeId(null)}>
+          <NodeInfoPanel node={infoCatalogNode} />
+        </OverlayModal>
       )}
     </div>
   );
