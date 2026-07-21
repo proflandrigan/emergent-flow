@@ -14,7 +14,6 @@ import { useState, type CSSProperties } from "react";
 import { Save } from "lucide-react";
 
 import "./EfNode.css";
-import { useCatalog } from "../../catalog/useCatalog";
 import { PayloadView } from "../../inspector/PayloadView";
 import type { NodeStatus, Payload } from "../../store/execution";
 import { Tooltip } from "../../ui/Tooltip";
@@ -26,7 +25,7 @@ import { familyMeta } from "../../theme/family";
 // fields (the index's `unknown` value type accepts anything).
 export interface EfNodeData extends Record<string, unknown> {
   label: string;
-  nodeType?: string;
+  description?: string | null;
   family?: string | null;
   ports: {
     id: string;
@@ -102,11 +101,7 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
   const detailed = useStore((s) => isDetailed(s.transform[2]));
 
   const meta = familyMeta(data.family ?? "");
-  const catalog = useCatalog();
-  const catalogNode = data.nodeType
-    ? catalog.nodes.find((n) => n.type === data.nodeType)
-    : undefined;
-  const description = catalogNode?.description;
+  const description = data.description;
   const FamIcon = meta.Icon;
 
   const inPorts = data.ports.filter((port) => port.direction === "in");

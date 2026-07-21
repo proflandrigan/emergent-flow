@@ -66,6 +66,11 @@ export function Canvas(): JSX.Element {
     [catalog],
   );
 
+  const descriptionByType = useMemo(
+    () => Object.fromEntries(catalog.nodes.map((n) => [n.type, n.description ?? null])),
+    [catalog],
+  );
+
   const reasons = useMemo(() => {
     const m: Record<string, string> = {};
     for (const d of diagnostics) {
@@ -79,9 +84,16 @@ export function Canvas(): JSX.Element {
   const rfNodes = useMemo(
     () =>
       Object.values(nodes).map((n) =>
-        toRFNode(n, !!selNodes[n.id], statuses[n.id]?.status, results[n.id], familyByType[n.type] ?? null),
+        toRFNode(
+          n,
+          !!selNodes[n.id],
+          statuses[n.id]?.status,
+          results[n.id],
+          familyByType[n.type] ?? null,
+          descriptionByType[n.type] ?? null,
+        ),
       ),
-    [nodes, selNodes, statuses, results, familyByType],
+    [nodes, selNodes, statuses, results, familyByType, descriptionByType],
   );
   const rfEdges = useMemo(
     () =>

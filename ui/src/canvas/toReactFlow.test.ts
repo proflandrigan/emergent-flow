@@ -60,7 +60,7 @@ function noteModel(overrides?: Partial<NodeModel>): NodeModel {
 
 describe("toRFNode (notes.markdown)", () => {
   test("produces a noteNode with content / color / anchorId from params", () => {
-    const rf = toRFNode(noteModel(), false, null, null, null) as ReturnType<typeof toRFNode>;
+    const rf = toRFNode(noteModel(), false, null, null, null, null) as ReturnType<typeof toRFNode>;
 
     expect(rf.type).toBe("noteNode");
     if (rf.type === "noteNode") {
@@ -73,7 +73,7 @@ describe("toRFNode (notes.markdown)", () => {
   test("missing color param falls back to yellow", () => {
     const rf = toRFNode(
       noteModel({ params: [{ name: "content", typeToken: "str", value: "hi" }] }),
-      false, null, null, null,
+      false, null, null, null, null,
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "noteNode") {
@@ -87,7 +87,7 @@ describe("toRFNode (notes.markdown)", () => {
         { name: "content", typeToken: "str", value: "hi" },
         { name: "color", typeToken: "str", value: 42 },
       ] }),
-      false, null, null, null,
+      false, null, null, null, null,
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "noteNode") {
@@ -101,7 +101,7 @@ describe("toRFNode (notes.markdown)", () => {
         { name: "content", typeToken: "str", value: "hi" },
         { name: "color", typeToken: "str", value: "blue" },
       ] }),
-      false, null, null, null,
+      false, null, null, null, null,
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "noteNode") {
@@ -116,7 +116,7 @@ describe("toRFNode (notes.markdown)", () => {
         { name: "color", typeToken: "str", value: "blue" },
         { name: "anchor_id", typeToken: "str | null", value: null },
       ] }),
-      false, null, null, null,
+      false, null, null, null, null,
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "noteNode") {
@@ -125,7 +125,7 @@ describe("toRFNode (notes.markdown)", () => {
   });
 
   test("noteNode passes id / position / selected through", () => {
-    const rf = toRFNode(noteModel(), true, null, null, null) as ReturnType<typeof toRFNode>;
+    const rf = toRFNode(noteModel(), true, null, null, null, null) as ReturnType<typeof toRFNode>;
 
     expect(rf.id).toBe("n1");
     expect(rf.position).toEqual({ x: 100, y: 200 });

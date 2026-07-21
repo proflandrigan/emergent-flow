@@ -164,10 +164,10 @@ describe("EfNode", () => {
     expect(screen.getByTestId("ef-node")).toHaveClass("ef-node--running");
   });
 
-  test("renders tooltip with catalog description when nodeType is provided", () => {
+  test("renders tooltip with catalog description when description is provided", () => {
     const data: EfNodeData = {
       label: "Cast Types",
-      nodeType: "clean.cast_types",
+      description: "Cast selected columns to new data types.",
       ports: [],
       status: null,
       results: null,
@@ -189,7 +189,7 @@ describe("EfNode", () => {
     ).not.toBeInTheDocument();
   });
 
-  test("does not render tooltip when nodeType is omitted", () => {
+  test("does not render tooltip when description is omitted", () => {
     const data: EfNodeData = {
       label: "Load CSV",
       ports: [],
