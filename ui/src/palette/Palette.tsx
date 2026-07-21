@@ -219,7 +219,7 @@ export function Palette(): JSX.Element {
                         <button
                           key={node.type}
                           type="button"
-                          title={node.type}
+                          title={node.description ?? node.type}
                           aria-label={`${node.label} (${node.type})`}
                           onMouseEnter={() => setHoveredType(node.type)}
                           onMouseLeave={() =>

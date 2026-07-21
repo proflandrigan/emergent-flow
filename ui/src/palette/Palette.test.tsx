@@ -62,10 +62,10 @@ test("collapse state persists to localStorage", () => {
   );
 });
 
-test("node row has a title attribute equal to its type", () => {
+test("node row has a title attribute carrying the catalog description", () => {
   render(<Palette />);
   const btn = screen.getByText(/Load CSV/).closest("button")!;
-  expect(btn.getAttribute("title")).toBe("data.load_csv");
+  expect(btn.getAttribute("title")).toBe("Load a CSV file into a pandas DataFrame.");
 });
 
 test("node row has an accessible name carrying both label and type", () => {
