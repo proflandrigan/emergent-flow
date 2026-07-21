@@ -589,3 +589,238 @@ test("a completed turn's activity log stays collapsed by default", () => {
   const activity = screen.getByTestId("chat-turn-activity");
   expect(activity).not.toHaveTextContent("proposing mutation");
 });
+
+test("BackendPicker: Enter submits the draft message and starts the chat", async () => {
+  vi.mocked(sessionClient.createSession).mockResolvedValue(
+    fakeSession({ id: "abc" }),
+  );
+  vi.mocked(sessionClient.startChat).mockResolvedValue({
+    id: "turn-1",
+    backend: "claude",
+    user_message: "hello",
+    narration: [],
+    agent_message: null,
+    status: "running",
+    error: null,
+  });
+
+  render(<ChatModal onClose={vi.fn()} />);
+
+  await waitFor(() => {
+    expect(screen.getByTestId("chat-backend-select")).toBeInTheDocument();
+  });
+  fireEvent.change(screen.getByTestId("chat-draft-message"), {
+    target: { value: "hello" },
+  });
+  fireEvent.keyDown(screen.getByTestId("chat-draft-message"), {
+    key: "Enter",
+  });
+
+  await waitFor(() => {
+    expect(sessionClient.startChat).toHaveBeenCalledWith("abc", {
+      backend: "claude",
+      message: "hello",
+    });
+  });
+});
+
+test("BackendPicker: Shift+Enter inserts a newline and does not start the chat", async () => {
+  vi.mocked(sessionClient.createSession).mockResolvedValue(
+    fakeSession({ id: "abc" }),
+  );
+
+  render(<ChatModal onClose={vi.fn()} />);
+
+  await waitFor(() => {
+    expect(screen.getByTestId("chat-backend-select")).toBeInTheDocument();
+  });
+  fireEvent.change(screen.getByTestId("chat-draft-message"), {
+    target: { value: "hello" },
+  });
+  fireEvent.keyDown(screen.getByTestId("chat-draft-message"), {
+    key: "Enter",
+    shiftKey: true,
+  });
+
+  expect(sessionClient.startChat).not.toHaveBeenCalled();
+});
+
+test("BackendPicker: typing / opens the persona palette and selecting an option inserts the slash command", async () => {
+  vi.mocked(usePersonas).mockReturnValue([
+    {
+      slug: "data_scientist",
+      label: "Data Scientist",
+      description: "Helps with data science",
+      node_families: ["ml"],
+    },
+  ]);
+  vi.mocked(sessionClient.createSession).mockResolvedValue(
+    fakeSession({ id: "abc" }),
+  );
+
+  render(<ChatModal onClose={vi.fn()} />);
+
+  await waitFor(() => {
+    expect(screen.getByTestId("chat-backend-select")).toBeInTheDocument();
+  });
+  fireEvent.change(screen.getByTestId("chat-draft-message"), {
+    target: { value: "/" },
+  });
+
+  expect(
+    screen.getByTestId("chat-draft-message-palette"),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByTestId("chat-draft-message-palette-option-data_scientist"),
+  ).toBeInTheDocument();
+  fireEvent.click(
+    screen.getByTestId("chat-draft-message-palette-option-data_scientist"),
+  );
+
+  expect(screen.getByTestId("chat-draft-message")).toHaveValue(
+    "/data-scientist ",
+  );
+});
+
+test("ActiveChat: Enter sends a new message", async () => {
+  useSessionStore.setState({
+    sessionId: "abc",
+    version: 0,
+    status: "connected",
+    chat: {
+      backend: "claude",
+      backend_thread_id: null,
+      active_persona: null,
+      turns: [
+        {
+          id: "turn-1",
+          backend: "claude",
+          user_message: "hello",
+          narration: [],
+          agent_message: "hi",
+          status: "completed",
+          error: null,
+        },
+      ],
+    },
+  });
+  vi.mocked(sessionClient.startChat).mockResolvedValue({
+    id: "turn-2",
+    backend: "claude",
+    user_message: "again",
+    narration: [],
+    agent_message: null,
+    status: "running",
+    error: null,
+  });
+
+  render(<ChatModal onClose={vi.fn()} />);
+
+  fireEvent.change(screen.getByTestId("chat-message-input"), {
+    target: { value: "again" },
+  });
+  fireEvent.keyDown(screen.getByTestId("chat-message-input"), {
+    key: "Enter",
+  });
+
+  await waitFor(() => {
+    expect(sessionClient.startChat).toHaveBeenCalledWith("abc", {
+      backend: "claude",
+      message: "again",
+    });
+  });
+});
+
+test("ActiveChat: Shift+Enter does not send", async () => {
+  useSessionStore.setState({
+    sessionId: "abc",
+    version: 0,
+    status: "connected",
+    chat: {
+      backend: "claude",
+      backend_thread_id: null,
+      active_persona: null,
+      turns: [
+        {
+          id: "turn-1",
+          backend: "claude",
+          user_message: "hello",
+          narration: [],
+          agent_message: "hi",
+          status: "completed",
+          error: null,
+        },
+      ],
+    },
+  });
+  vi.mocked(sessionClient.startChat).mockResolvedValue({
+    id: "turn-2",
+    backend: "claude",
+    user_message: "again",
+    narration: [],
+    agent_message: null,
+    status: "running",
+    error: null,
+  });
+
+  render(<ChatModal onClose={vi.fn()} />);
+
+  fireEvent.change(screen.getByTestId("chat-message-input"), {
+    target: { value: "again" },
+  });
+  fireEvent.keyDown(screen.getByTestId("chat-message-input"), {
+    key: "Enter",
+    shiftKey: true,
+  });
+
+  expect(sessionClient.startChat).not.toHaveBeenCalled();
+});
+
+test("ActiveChat: typing / opens the persona palette and selecting an option inserts the slash command", async () => {
+  vi.mocked(usePersonas).mockReturnValue([
+    {
+      slug: "researcher",
+      label: "Researcher",
+      description: "Helps with research",
+      node_families: ["stats"],
+    },
+  ]);
+  useSessionStore.setState({
+    sessionId: "abc",
+    version: 0,
+    status: "connected",
+    chat: {
+      backend: "claude",
+      backend_thread_id: null,
+      active_persona: null,
+      turns: [
+        {
+          id: "turn-1",
+          backend: "claude",
+          user_message: "hello",
+          narration: [],
+          agent_message: "hi",
+          status: "completed",
+          error: null,
+        },
+      ],
+    },
+  });
+
+  render(<ChatModal onClose={vi.fn()} />);
+
+  fireEvent.change(screen.getByTestId("chat-message-input"), {
+    target: { value: "/" },
+  });
+
+  expect(
+    screen.getByTestId("chat-message-input-palette-option-researcher"),
+  ).toBeInTheDocument();
+  fireEvent.click(
+    screen.getByTestId("chat-message-input-palette-option-researcher"),
+  );
+
+  expect(screen.getByTestId("chat-message-input")).toHaveValue(
+    "/researcher ",
+  );
+});

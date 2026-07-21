@@ -28,6 +28,7 @@ import { OverlayModal } from "../ui/OverlayModal";
 import { getAvailableAgents, type ChatTurn } from "./sessionClient";
 import { useSessionStore } from "./sessionStore";
 import { usePersonas } from "./usePersonas";
+import { ChatComposer } from "./ChatComposer";
 
 export interface ChatModalProps {
   onClose: () => void;
@@ -67,6 +68,7 @@ function ChatPill({
 
 function BackendPicker(): JSX.Element {
   const startChat = useSessionStore((s) => s.startChat);
+  const personas = usePersonas();
   const [agents, setAgents] = useState<string[] | null>(null);
   const [agentsError, setAgentsError] = useState<string | null>(null);
   const [selectedBackend, setSelectedBackend] = useState("");
@@ -141,14 +143,17 @@ function BackendPicker(): JSX.Element {
               </option>
             ))}
           </Select>
-          <textarea
-            data-testid="chat-draft-message"
-            value={draftMessage}
-            onChange={(e) => setDraftMessage(e.target.value)}
-            placeholder="What do you want the agent to do?"
-            rows={3}
-            style={{ width: "100%", marginBottom: "var(--space-2)" }}
-          />
+          <div style={{ marginBottom: "var(--space-2)" }}>
+            <ChatComposer
+              data-testid="chat-draft-message"
+              value={draftMessage}
+              onChange={setDraftMessage}
+              onSubmit={handleStart}
+              personas={personas}
+              placeholder="What do you want the agent to do?"
+              rows={3}
+            />
+          </div>
           <Button
             variant="primary"
             data-testid="chat-start-button"
@@ -399,14 +404,15 @@ function ActiveChat({ backend }: { backend: string }): JSX.Element {
           flexShrink: 0,
         }}
       >
-        <textarea
+        <ChatComposer
           data-testid="chat-message-input"
           value={draftMessage}
-          onChange={(e) => setDraftMessage(e.target.value)}
+          onChange={setDraftMessage}
+          onSubmit={handleSend}
+          personas={personas}
           placeholder="Send a message"
           rows={2}
           disabled={turnRunning || sending}
-          style={{ flex: 1 }}
         />
         {turnRunning ? (
           <Button
