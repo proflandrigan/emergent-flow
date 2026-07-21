@@ -253,38 +253,36 @@ function ChatTurnActivity({ turn }: { turn: ChatTurn }): JSX.Element | null {
 
 function ChatTurnView({ turn }: { turn: ChatTurn }): JSX.Element {
   return (
-    <div data-testid="chat-turn" style={{ marginBottom: "var(--space-3)" }}>
+    <div
+      data-testid="chat-turn"
+      style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}
+    >
       <div
+        data-testid="chat-turn-user-message"
         style={{
-          marginBottom: "var(--space-2)",
-          display: "flex",
-          justifyContent: "flex-end",
+          alignSelf: "flex-end",
+          background: "color-mix(in srgb, var(--text-primary) 6%, transparent)",
+          border: "1px solid var(--glass-border)",
+          borderRadius: "var(--radius-md) var(--radius-md) 0 var(--radius-md)",
+          padding: "var(--space-2) var(--space-3)",
+          maxWidth: "85%",
+          fontSize: "var(--text-sm)",
+          color: "var(--text-primary)",
+          whiteSpace: "pre-wrap",
         }}
       >
-        <div
-          data-testid="chat-turn-user-message"
-          style={{
-            background: "rgba(59, 130, 246, 0.15)",
-            border: "1px solid rgba(59, 130, 246, 0.25)",
-            borderRadius: "var(--radius-md) var(--radius-md) 0 var(--radius-md)",
-            padding: "var(--space-2) var(--space-3)",
-            maxWidth: "85%",
-            fontSize: "var(--text-sm)",
-            color: "var(--text-primary)",
-          }}
-        >
-          {turn.user_message}
-        </div>
+        {turn.user_message}
       </div>
       <ChatTurnActivity turn={turn} />
       {turn.status === "completed" && turn.agent_message !== null ? (
         <div
           data-testid="chat-turn-agent-message"
           style={{
-            background: "rgba(255, 255, 255, 0.08)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            borderRadius: "0 var(--radius-md) var(--radius-md) var(--radius-md)",
-            padding: "var(--space-2) var(--space-3)",
+            alignSelf: "flex-start",
+            background: "var(--glass-bg)",
+            border: "1px solid var(--glass-border)",
+            borderRadius: "var(--radius-md)",
+            padding: "var(--space-3)",
             maxWidth: "85%",
             fontSize: "var(--text-sm)",
             color: "var(--text-primary)",
@@ -362,17 +360,29 @@ function ActiveChat({ backend }: { backend: string }): JSX.Element {
   };
 
   return (
-    <div data-testid="chat-active-view">
-      <div style={{ fontWeight: 600, marginBottom: "var(--space-2)" }}>
+    <div
+      data-testid="chat-active-view"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        minHeight: 0,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: "var(--space-2)", flexShrink: 0 }}>
         Chatting with {backend}
         {activePersonaLabel ? ` as ${activePersonaLabel}` : ""}
       </div>
       <div
         data-testid="chat-message-list"
         style={{
-          maxHeight: 320,
+          flex: 1,
+          minHeight: 0,
           overflowY: "auto",
           marginBottom: "var(--space-2)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-4)",
         }}
       >
         {chat.turns.length === 0 ? (
@@ -386,6 +396,7 @@ function ActiveChat({ backend }: { backend: string }): JSX.Element {
           display: "flex",
           gap: "var(--space-2)",
           marginBottom: "var(--space-2)",
+          flexShrink: 0,
         }}
       >
         <textarea
@@ -443,7 +454,15 @@ function ActiveChat({ backend }: { backend: string }): JSX.Element {
 function ChatModalContent(): JSX.Element {
   const backend = useSessionStore((s) => s.chat.backend);
   return (
-    <div data-testid="chat-modal-content">
+    <div
+      data-testid="chat-modal-content"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        flex: 1,
+        minHeight: 0,
+      }}
+    >
       {backend === null ? <BackendPicker /> : <ActiveChat backend={backend} />}
     </div>
   );
@@ -554,7 +573,9 @@ export function ChatModal({ onClose }: ChatModalProps): JSX.Element {
           style={{
             display: "flex",
             flexDirection: "column",
+            flex: 1,
             minHeight: 0,
+            height: "70vh",
           }}
         >
           <div
