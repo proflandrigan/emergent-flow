@@ -236,5 +236,6 @@ df = ef.data.query(
 
 This requires both a connection profile configured in
 `~/.config/emergentflow/connections.toml` and a warehouse client injected at execution time
-(`ef.execute(graph, client=...)` or the compiled module's `main(client=...)`) — see the
-connection docs for setup.
+(`ef.execute(graph, client=...)` or the compiled module's `main(client=...)`) — see
+[ADR 0018](../adr/0018-data-source-connector-seam.md) for the connection-profile seam, and the
+[Canvas UI Guide](canvas-ui-guide.md)'s connection manager section for configuring one visually.

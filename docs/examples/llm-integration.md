@@ -176,7 +176,7 @@ return a `DatasetExportManifest` (`path`, `row_count`, `byte_size`) describing w
 
 ## 7. Client Injection in Graphs
 
-An `llm.call` (or any `requires_client = True`) node needs its client injected at run time,
+An `llm_call` (or any `requires_client = True`) node needs its client injected at run time,
 either into `execute()` or into the compiled module's `main()`:
 
 ```python
@@ -214,8 +214,8 @@ If no fixture exists for a request's content hash, `ReplayClient.complete` raise
 
 ## 9. In the Canvas
 
-> **In the Canvas:** Add an `llm.prompt` node to render a template, then connect its output to
-> an `llm.call` node. Configure the provider, model, and connection in the Config tab. For
+> **In the Canvas:** Add an `llm_prompt` node to render a template, then connect its output to
+> an `llm_call` node. Configure the provider, model, and connection in the Config tab. For
 > structured output, set `response_format` to `"json"` and provide a schema. The Prompt Lab
 > (accessible from the toolbar) lets you run eval comparisons across multiple models
 > interactively. See [Canvas UI Guide](canvas-ui-guide.md).

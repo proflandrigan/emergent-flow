@@ -104,13 +104,15 @@ result = ef.script.run_code(code, df)
 print(result.shape)  # more columns than the original
 ```
 
+## 6. In the Canvas
+
 > **In the Canvas:** Add a `custom_code` node and write your `def transform(value):` function
 > in the Config tab's code editor. The node receives the upstream DataFrame (or any value) as
 > `value` and passes its return value downstream. The generated Python module inlines your
 > transform function with AST-based variable renaming. See
 > [Canvas UI Guide](canvas-ui-guide.md).
 
-## Security Note
+## 7. Security Note
 
 Custom code runs with full interpreter privileges — the same trust level as the local
 Emergent Flow server. Never run custom code from untrusted sources.

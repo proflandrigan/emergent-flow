@@ -74,6 +74,8 @@ similarities = cosine_similarity(embeddings)
 print(similarities)
 ```
 
+## 6. In the Canvas
+
 > **In the Canvas:** Add an `embed_text` node and connect a DataFrame source. Configure the
 > embedding backend (local model name or API provider/model) in the Config tab. The output
 > DataFrame flows to downstream nodes with the embedding column appended. See

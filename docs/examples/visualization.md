@@ -165,8 +165,11 @@ model, since a confusion matrix is undefined for those tasks.
 ```python
 fitted = ef.stats.fit_model(
     df,
-    model="linear_regression",
-    spec={"formula": "Q('sepal length (cm)') ~ Q('petal length (cm)')"},
+    model="OLS",
+    spec={
+        "target": "sepal length (cm)",
+        "fixed_effects": ["petal length (cm)"],
+    },
 )
 plot = ef.viz.plot_coefficients(fitted)
 plot = ef.viz.plot_residuals(fitted)

@@ -163,7 +163,7 @@ header's overflow menu (**Start chat** / **Open chat**):
 - Completely optional — the canvas works without agents, and no session is opened unless you
   start one
 
-See [agent-integration.md](../agent-integration.md) for the full agent-facing protocol.
+See the [Agent Integration guide](../agent-integration.md) for the full agent-facing protocol.
 
 ## 9. Developing the UI
 

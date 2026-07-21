@@ -286,7 +286,7 @@ generation timestamp, so it is not byte-reproducible between calls even for iden
 ## 7. Visualizing EDA Results
 
 ```python
-# Correlation heatmap (see Visualization guide)
+# Correlation heatmap (see the Visualization guide)
 corr = ef.stats.correlation(df)
 plot = ef.viz.plot_correlation_heatmap(corr)
 
@@ -295,8 +295,8 @@ co_miss = ef.stats.co_missingness(df_messy)
 plot = ef.viz.plot_missingness_heatmap(co_miss)
 ```
 
-See the Visualization guide for the full `ef.viz` catalog and how to render a returned
-`PlotSpec`.
+See the [Visualization](visualization.md) guide for the full `ef.viz` catalog and how to render
+a returned `PlotSpec`.
 
 ## 8. In the Canvas
 
