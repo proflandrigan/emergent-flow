@@ -111,6 +111,17 @@ class TestApplyMutationAdds:
         result = apply_mutation(graph, m)
         assert result.nodes[node.id].position == Position(x=5.0, y=5.0)
 
+    def test_cascaded_default_position_does_not_collide_with_explicit_sibling(self) -> None:
+        """A default-positioned add must not land on a position an explicitly-positioned
+        add in the *same* mutation already claims (regression: the cascade used to only
+        check against the pre-existing graph, not other nodes in this batch)."""
+        graph = Graph()
+        explicit_node = _load_csv_node().model_copy(update={"position": Position(x=60.0, y=60.0)})
+        default_node = _load_csv_node()
+        m = GraphMutation(base_version=1, add_nodes=[explicit_node, default_node])
+        result = apply_mutation(graph, m)
+        assert result.nodes[explicit_node.id].position != result.nodes[default_node.id].position
+
     def test_add_edge_colliding_with_existing_id_raises(self) -> None:
         source, target, edge = _wired_pair()
         edge = edge.model_copy(update={"id": "dup-edge"})

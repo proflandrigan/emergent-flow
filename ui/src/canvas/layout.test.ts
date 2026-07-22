@@ -53,6 +53,20 @@ describe("separateOverlappingNodes", () => {
     const result = separateOverlappingNodes(nodes);
     expect(result.a.position).toEqual({ x: 0, y: 0 });
   });
+
+  test("a cascaded node never lands on an unrelated node elsewhere in the graph", () => {
+    // a/b collide at (0,0); the first cascade step for b would be (48,48),
+    // which c already occupies -- b must be pushed past that too.
+    const nodes: Record<string, NodeModel> = {
+      a: node("a", 0, 0),
+      b: node("b", 0, 0),
+      c: node("c", 48, 48),
+    };
+    const result = separateOverlappingNodes(nodes);
+    expect(result.b.position).not.toEqual(result.a.position);
+    expect(result.b.position).not.toEqual(result.c.position);
+    expect(result.c.position).toEqual({ x: 48, y: 48 });
+  });
 });
 
 function makeEdge(

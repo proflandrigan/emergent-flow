@@ -250,6 +250,23 @@ describe("pasteNodes", () => {
     expect(Object.keys(useGraphStore.getState().nodes)).toHaveLength(3);
   });
 
+  test("pasting the same clipboard twice in a row does not stack the two new nodes on each other", () => {
+    // Regression: pasteNodes always offsets from the *original* clipboard model, so two
+    // successive Ctrl+V calls (clipboard unchanged between them, as Canvas.tsx does it)
+    // used to land both new nodes on the exact same coordinates.
+    const originalId = useGraphStore
+      .getState()
+      .addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const original = useGraphStore.getState().nodes[originalId];
+
+    const [id1] = useGraphStore.getState().pasteNodes([original]);
+    const [id2] = useGraphStore.getState().pasteNodes([original]);
+
+    const pos1 = useGraphStore.getState().nodes[id1].position;
+    const pos2 = useGraphStore.getState().nodes[id2].position;
+    expect(pos1).not.toEqual(pos2);
+  });
+
   test("pasting an empty array returns [] and does not change nodes or push a history entry", () => {
     useGraphStore
       .getState()

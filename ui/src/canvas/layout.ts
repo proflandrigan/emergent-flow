@@ -8,24 +8,36 @@ import type { EdgeModel, NodeModel } from "../store/model";
 
 const CASCADE_STEP = 48;
 
+function posKey(position: { x: number; y: number }): string {
+  return `${Math.round(position.x)}:${Math.round(position.y)}`;
+}
+
 // Groups nodes by their rounded (x, y) so near-identical floats (e.g. two
 // nodes both left at the IR's `Position()` default) are treated as one
 // collision group, then nudges every node in a group after the first by a
 // fixed cascade offset. Nodes that don't collide with anything are returned
 // unchanged (same object reference), so callers that diff for re-render
 // don't see spurious churn.
+//
+// The cascade offset for a group member is checked against every occupied
+// spot in the graph (pre-existing nodes AND spots already claimed by earlier
+// cascaded members), not just the other members of its own group -- otherwise
+// a node cascaded out of one collision could land exactly on an unrelated
+// node (or another group's cascaded node) elsewhere on the canvas.
 export function separateOverlappingNodes(
   nodes: Record<string, NodeModel>,
 ): Record<string, NodeModel> {
   const groups = new Map<string, string[]>();
+  const taken = new Set<string>();
   for (const node of Object.values(nodes)) {
-    const key = `${Math.round(node.position.x)}:${Math.round(node.position.y)}`;
+    const key = posKey(node.position);
     const group = groups.get(key);
     if (group) {
       group.push(node.id);
     } else {
       groups.set(key, [node.id]);
     }
+    taken.add(key);
   }
 
   const result: Record<string, NodeModel> = { ...nodes };
@@ -38,13 +50,20 @@ export function separateOverlappingNodes(
         return; // first node in the group keeps its original spot
       }
       const existing = nodes[id];
-      result[id] = {
-        ...existing,
-        position: {
-          x: existing.position.x + CASCADE_STEP * index,
-          y: existing.position.y + CASCADE_STEP * index,
-        },
+      let step = index;
+      let position = {
+        x: existing.position.x + CASCADE_STEP * step,
+        y: existing.position.y + CASCADE_STEP * step,
       };
+      while (taken.has(posKey(position))) {
+        step += 1;
+        position = {
+          x: existing.position.x + CASCADE_STEP * step,
+          y: existing.position.y + CASCADE_STEP * step,
+        };
+      }
+      taken.add(posKey(position));
+      result[id] = { ...existing, position };
     });
   }
   return result;

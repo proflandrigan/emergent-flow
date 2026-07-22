@@ -250,7 +250,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       for (const node of cloned) {
         nodes[node.id] = node;
       }
-      return { nodes };
+      // Repeated Ctrl+V of the same clipboard clones from the same original
+      // position every time, so back-to-back pastes land exactly on top of
+      // each other -- de-overlap against the whole graph (not just this
+      // paste's own clones) the same way loadIR does.
+      return { nodes: separateOverlappingNodes(nodes) };
     });
     return cloned.map((n) => n.id);
   },

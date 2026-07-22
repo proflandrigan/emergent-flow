@@ -67,18 +67,33 @@ class GraphMutation(IRModel):
 _CASCADE_STEP = 60.0
 
 
-def _next_cascade_position(existing_positions: list[Position], index: int) -> Position:
+def _next_cascade_position(
+    existing_positions: list[Position], index: int, taken: set[tuple[float, float]]
+) -> tuple[Position, int]:
     """A position offset past the bounding box of *existing_positions*, stepped by *index*.
 
     Used as a safety net for GraphMutation.add_nodes left at the default
     Position() sentinel — keeps agent-proposed batches from stacking at the
     origin. The canvas is free to re-lay-out further; this only guarantees
     non-overlap.
+
+    *taken* is the set of (x, y) points already claimed -- by pre-existing
+    graph nodes or by earlier nodes in this same ``add_nodes`` batch, whether
+    those landed on an explicit position or a previously cascaded one. The
+    diagonal offset alone only avoids the pre-existing graph's bounding box;
+    without also checking *taken*, a cascaded point can land exactly on an
+    explicitly-positioned node added earlier in the same batch. Returns the
+    chosen position and the index consumed (so the caller can resume
+    cascading from the next index).
     """
     base_x = max((p.x for p in existing_positions), default=0.0)
     base_y = max((p.y for p in existing_positions), default=0.0)
-    offset = _CASCADE_STEP * (index + 1)
-    return Position(x=base_x + offset, y=base_y + offset)
+    while True:
+        offset = _CASCADE_STEP * (index + 1)
+        position = Position(x=base_x + offset, y=base_y + offset)
+        if (position.x, position.y) not in taken:
+            return position, index
+        index += 1
 
 
 def apply_mutation(graph: Graph, m: GraphMutation) -> Graph:
@@ -119,14 +134,17 @@ def apply_mutation(graph: Graph, m: GraphMutation) -> Graph:
     existing_positions = [n.position for n in graph.nodes.values()]
     _default_position = Position()
     cascade_index = 0
+    taken_positions = {(p.x, p.y) for p in existing_positions}
     for node in m.add_nodes:
         if node.id in new_nodes:
             raise MutationError(f"add_nodes: node id {node.id!r} already exists in the graph.")
         if node.position == _default_position:
-            node = node.model_copy(
-                update={"position": _next_cascade_position(existing_positions, cascade_index)}
+            position, cascade_index = _next_cascade_position(
+                existing_positions, cascade_index, taken_positions
             )
+            node = node.model_copy(update={"position": position})
             cascade_index += 1
+        taken_positions.add((node.position.x, node.position.y))
         new_nodes[node.id] = node
 
     for edge in m.add_edges:
