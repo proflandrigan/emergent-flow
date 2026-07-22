@@ -284,7 +284,7 @@ function ChatTurnView({ turn }: { turn: ChatTurn }): JSX.Element {
           data-testid="chat-turn-agent-message"
           style={{
             alignSelf: "flex-start",
-            background: "var(--glass-bg)",
+            background: "var(--surface-2)",
             border: "1px solid var(--glass-border)",
             borderRadius: "var(--radius-md)",
             padding: "var(--space-3)",

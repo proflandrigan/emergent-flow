@@ -164,5 +164,9 @@ temp/
 # Bundled UI build artifact (vite build ui/ -> emergentflow/_static/, ADR 0013)
 /emergentflow/_static/
 
+# Build artifact (build_backend.py's _copy_agents() copies repo-root agents/*.md here so the
+# wheel ships them as package data, chat_runner resolves it there)
+/emergentflow/agents/
+
 # On-disk DAG execution cache (emergentflow serve, Epic 7 Story 6)
 /.ef-cache/

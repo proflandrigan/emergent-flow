@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 import type { Persona } from "./usePersonas";
+import "./ChatComposer.css";
 
 export interface ChatComposerProps {
   value: string;
@@ -87,7 +88,7 @@ export function ChatComposer(props: ChatComposerProps): JSX.Element {
   };
 
   return (
-    <div style={{ position: "relative", flex: 1 }}>
+    <div className="ef-chat-composer">
       <textarea
         ref={textareaRef}
         data-testid={props["data-testid"]}
@@ -100,7 +101,7 @@ export function ChatComposer(props: ChatComposerProps): JSX.Element {
         placeholder={props.placeholder}
         rows={props.rows}
         disabled={props.disabled}
-        style={{ flex: 1 }}
+        className="ef-chat-composer__textarea"
       />
       {paletteOpen ? (
         <div
@@ -112,7 +113,7 @@ export function ChatComposer(props: ChatComposerProps): JSX.Element {
             marginBottom: "var(--space-1)",
             zIndex: 20,
             minWidth: 160,
-            background: "var(--glass-bg)",
+            background: "var(--surface-2)",
             border: "1px solid var(--glass-border)",
             borderRadius: "var(--radius-md)",
             boxShadow: "var(--shadow-2)",

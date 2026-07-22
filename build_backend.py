@@ -29,6 +29,8 @@ from setuptools.build_meta import (  # noqa: F401 - re-export PEP 517 hooks for 
 
 _ROOT = Path(__file__).resolve().parent
 _UI_DIR = _ROOT / "ui"
+_AGENTS_SRC = _ROOT / "agents"
+_AGENTS_DEST = _ROOT / "emergentflow" / "agents"
 
 
 def _build_ui() -> None:
@@ -50,7 +52,22 @@ def _build_ui() -> None:
         print(f"emergentflow build: ui/ build skipped ({exc}); server uses the demo page.")
 
 
+def _copy_agents() -> None:
+    """Best-effort: copy repo-root agents/*.md into emergentflow/agents/ so the wheel ships the
+    chat protocol doc + persona markdown as package data (chat_runner resolves it there).
+    Never raises out of the build."""
+    if not _AGENTS_SRC.is_dir():
+        return
+    try:
+        _AGENTS_DEST.mkdir(parents=True, exist_ok=True)
+        for md in _AGENTS_SRC.glob("*.md"):
+            shutil.copy2(md, _AGENTS_DEST / md.name)
+    except OSError as exc:
+        print(f"emergentflow build: agents/ copy skipped ({exc}).")
+
+
 def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
-    """Compile ui/ (best-effort), then delegate to setuptools' wheel build."""
+    """Copy agents docs + compile ui/ (both best-effort), then delegate to setuptools."""
+    _copy_agents()
     _build_ui()
     return _orig.build_wheel(wheel_directory, config_settings, metadata_directory)
