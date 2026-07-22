@@ -13,9 +13,10 @@ The spawned CLI drives the session over its OWN shell/curl access to the already
 protocol document plus the session's id/base URL/auth into the FIRST turn's prompt as a context
 block, then sends just the human's new message on every later turn (relying on the CLI's own
 --resume/--session continuation to remember the rest, per each AgentAdapter's build_command).
-Reading agents/emergent-flow-collaborator.md from disk assumes a repo checkout / editable
-install where agents/ is present; packaging that file into a wheel-only install is out of scope
-here.
+agents/emergent-flow-collaborator.md is resolved package-dir-first (emergentflow/agents/, what a
+wheel install ships via package-data) with a repo-root agents/ fallback for a source checkout /
+editable install (see _resolve_agents_dir); if neither copy can be read, a minimal embedded
+protocol string is used instead so a missing doc never 422s the chat.
 
 Text events accumulate across a turn and are only published as the turn's final agent_message
 once the process exits -- narration (tool-call) events publish live, one per line, as they
@@ -45,10 +46,53 @@ from emergentflow.collab.agents import AgentAdapter, get_adapter, list_available
 from emergentflow.collab.chat import ChatTurn, ChatTurnAlreadyResolvedError
 from emergentflow.collab.session import SessionStore, get_default_store
 
-_PROTOCOL_DOC_PATH = (
-    pathlib.Path(__file__).resolve().parents[2] / "agents" / "emergent-flow-collaborator.md"
+
+def _resolve_agents_dir() -> pathlib.Path:
+    """Locate the agents/ docs directory (chat protocol doc + persona markdown).
+
+    Tries, in order:
+    1. the copy shipped INSIDE the package -- ``emergentflow/agents/``
+       (``parents[1]/agents``), what a plain ``pip install emergentflow`` (wheel) gets;
+    2. the repo-root ``agents/`` of an editable install / source checkout
+       (``parents[2]/agents``).
+
+    The first that exists wins; if neither does, the packaged path is returned anyway so
+    callers fall back gracefully on a per-file basis (see ``_read_protocol_doc``).
+    """
+    here = pathlib.Path(__file__).resolve()
+    packaged = here.parents[1] / "agents"  # emergentflow/agents/
+    checkout = here.parents[2] / "agents"  # <repo-root>/agents/
+    for candidate in (packaged, checkout):
+        if candidate.is_dir():
+            return candidate
+    return packaged
+
+
+_AGENTS_DIR = _resolve_agents_dir()
+_PROTOCOL_DOC_PATH = _AGENTS_DIR / "emergent-flow-collaborator.md"
+
+_FALLBACK_PROTOCOL = (
+    "# Emergent Flow collaborator\n\n"
+    "You are a coding agent collaborating with a human on an Emergent Flow graph session over "
+    "the already-running local HTTP API. Use your Bash tool with `curl` to read and mutate the "
+    "session. Key endpoints (relative to the Base URL given below):\n\n"
+    "- `GET /sessions/{id}` -- read the current session (graph + collab state).\n"
+    "- `PUT /sessions/{id}/graph` -- replace the graph (send `expected_version`).\n"
+    "- `POST /sessions/{id}/proposals` -- propose a graph mutation for the human to accept.\n"
+    "- `GET /schema`, `GET /catalog`, `GET /mutation-schema` -- discover node/mutation shapes.\n\n"
+    "Reply conversationally in plain text; when you take an action, do it via curl as described "
+    "above, then tell the human what you did and why in your reply. Keep replies concise."
 )
-_AGENTS_DIR = pathlib.Path(__file__).resolve().parents[2] / "agents"
+
+
+def _read_protocol_doc() -> str:
+    """Return the chat protocol doc text, falling back to ``_FALLBACK_PROTOCOL`` if the packaged
+    file is missing/unreadable (never raises -- a missing doc must not 422 the chat)."""
+    try:
+        return _PROTOCOL_DOC_PATH.read_text(encoding="utf-8")
+    except OSError:
+        return _FALLBACK_PROTOCOL
+
 
 # Slash commands recognized as chat messages, mapped to their persona markdown filename under
 # agents/ -- the single source of truth for which commands are recognized. Slash-command slugs
@@ -98,8 +142,13 @@ def _detect_persona_command(message: str) -> str | None:
 
 
 def _read_persona_markdown(filename: str) -> str:
-    """Read an agent persona markdown file (e.g. ``"data-scientist.md"``) from agents/."""
-    return (_AGENTS_DIR / filename).read_text(encoding="utf-8")
+    """Read an agent persona markdown file (e.g. ``"data-scientist.md"``) from the resolved
+    agents dir. Returns "" if the file is missing/unreadable so an opt-in persona command
+    never crashes a chat turn."""
+    try:
+        return (_AGENTS_DIR / filename).read_text(encoding="utf-8")
+    except OSError:
+        return ""
 
 
 def _persona_filename_for_slug(slug: str) -> str | None:
@@ -116,7 +165,7 @@ def _build_first_turn_prompt(
     user_message: str,
     persona_filename: str | None = None,
 ) -> str:
-    protocol = _PROTOCOL_DOC_PATH.read_text(encoding="utf-8")
+    protocol = _read_protocol_doc()
     auth_line = f"- Auth header: `Authorization: Bearer {auth_token}`\n" if auth_token else ""
 
     persona_block = ""

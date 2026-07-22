@@ -211,7 +211,7 @@ include = ["emergentflow*"]
 # the wheel as package data. Absent in a source build (no Node) -> nothing is bundled and
 # the server serves its demo page. Two globs cover top-level and nested asset files.
 [tool.setuptools.package-data]
-emergentflow = ["_static/*", "_static/**/*"]
+emergentflow = ["_static/*", "_static/**/*", "agents/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
