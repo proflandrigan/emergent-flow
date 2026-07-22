@@ -3488,6 +3488,95 @@
     {
       "advisor_persona": null,
       "category": "LLM",
+      "description": "LLM-as-judge: grade an eval-run compare table's output column against a rubric.",
+      "family": "eval",
+      "label": "Eval Judge",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "",
+          "help": "Free-text grading criteria the judge model scores each row's output against.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "markdown"
+          },
+          "label": "Rubric",
+          "name": "rubric",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "anthropic",
+          "help": "Gateway provider key for the judge model, e.g. 'anthropic'.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Judge provider",
+          "name": "judge_provider",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "claude-sonnet-5",
+          "help": "Provider model id used as the judge, e.g. 'claude-sonnet-5'.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Judge model",
+          "name": "judge_model",
+          "required": true,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The eval-run compare table (ef.eval.run's output) to judge.",
+          "label": null,
+          "name": "results",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "results, with judge_score and judge_rationale columns added.",
+          "label": null,
+          "name": "judged",
+          "required": true
+        }
+      ],
+      "type": "eval.judge",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "LLM",
       "description": "Merge a labels table onto an eval-run compare table, keyed by (row_id, variant).",
       "family": "eval",
       "label": "Eval Label",
@@ -3612,6 +3701,66 @@
         }
       ],
       "type": "eval.run",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "LLM",
+      "description": "Grade an eval-run compare table with deterministic scorers and summarize per variant.",
+      "family": "eval",
+      "label": "Eval Score",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": [],
+          "help": "Scorer specs, e.g. [{'name': 'exact', 'kind': 'exact_match', 'reference_column': 'expected'}].",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Scorers",
+          "name": "scorers",
+          "required": true,
+          "type_token": "list[dict]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The eval-run compare table (ef.eval.run's output) to score.",
+          "label": null,
+          "name": "results",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "results, with one score_<name> column added per scorer.",
+          "label": null,
+          "name": "scored",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "One row per variant: n, plus mean_<name> for every score_<name> column.",
+          "label": null,
+          "name": "metrics",
+          "required": true
+        }
+      ],
+      "type": "eval.score",
       "version": 1
     },
     {
@@ -4022,7 +4171,7 @@
     {
       "advisor_persona": null,
       "category": "LLM",
-      "description": "Run one completion call against a provider through the unified gateway.",
+      "description": "Run one completion call against a provider through the unified gateway. Use for a single completion call once you already have rendered messages.",
       "family": "llm",
       "label": "LLM Call",
       "paradigm": "functional",
@@ -4200,7 +4349,7 @@
     {
       "advisor_persona": null,
       "category": "LLM",
-      "description": "Render a system + user prompt template with {{variable}} substitution.",
+      "description": "Render a system + user prompt template with {{variable}} substitution. Use when you need a reusable rendered prompt to feed llm.call.",
       "family": "llm",
       "label": "LLM Prompt",
       "paradigm": "functional",
@@ -4217,7 +4366,7 @@
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "markdown"
           },
           "label": "System template",
           "name": "system",
@@ -4236,7 +4385,7 @@
             "min_length": null,
             "pattern": null,
             "step": null,
-            "widget": "text"
+            "widget": "markdown"
           },
           "label": "User template",
           "name": "user",
@@ -4275,6 +4424,24 @@
         },
         {
           "cardinality": "one",
+          "data_type": "str",
+          "direction": "in",
+          "help": "Optional: a wired string overriding the literal 'system' param (e.g. from llm.prompt_from_file).",
+          "label": null,
+          "name": "system_template",
+          "required": false
+        },
+        {
+          "cardinality": "one",
+          "data_type": "str",
+          "direction": "in",
+          "help": "Optional: a wired string overriding the literal 'user' param (e.g. from llm.prompt_from_file).",
+          "label": null,
+          "name": "user_template",
+          "required": false
+        },
+        {
+          "cardinality": "one",
           "data_type": "PromptSpec",
           "direction": "out",
           "help": "The rendered {system, user, messages} prompt, ready for ef.llm.call.",
@@ -4284,6 +4451,48 @@
         }
       ],
       "type": "llm.prompt",
+      "version": 2
+    },
+    {
+      "advisor_persona": null,
+      "category": "LLM",
+      "description": "Read a prompt template's text from a file on disk.",
+      "family": "llm",
+      "label": "Prompt From File",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Filesystem path to the prompt template file (e.g. prompts/summarize.md).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "file"
+          },
+          "label": "Template path",
+          "name": "path",
+          "required": true,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "str",
+          "direction": "out",
+          "help": "The file's raw text content.",
+          "label": null,
+          "name": "text",
+          "required": true
+        }
+      ],
+      "type": "llm.prompt_from_file",
       "version": 1
     },
     {

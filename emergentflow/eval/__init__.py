@@ -13,14 +13,20 @@ files.
 from __future__ import annotations
 
 from emergentflow.eval.export import DatasetExportManifest, export_eval_set, export_finetune
+from emergentflow.eval.judge import judge
 from emergentflow.eval.label import LabelColumnError, label
 from emergentflow.eval.run import run
+from emergentflow.eval.score import ScorerError, score, summarize_scores
 
 __all__ = [
     "DatasetExportManifest",
     "LabelColumnError",
+    "ScorerError",
     "export_eval_set",
     "export_finetune",
+    "judge",
     "label",
     "run",
+    "score",
+    "summarize_scores",
 ]

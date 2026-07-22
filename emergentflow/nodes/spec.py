@@ -117,7 +117,9 @@ class ValidationHints(IRModel):
         Regular expression a string value must fully match.
     widget:
         UI widget hint, e.g. ``"text"``, ``"number"``, ``"select"``,
-        ``"slider"``, ``"checkbox"``, ``"file"``.  Advisory only.
+        ``"slider"``, ``"checkbox"``, ``"file"``, ``"markdown"``,
+        ``"code"``, ``"sql"``, ``"column"``, ``"connection"``.  Advisory
+        only.
     connection_kind:
         When `widget == "connection"`, which connection-profile kind this param's dropdown
         should be filtered to — `"warehouse"` or `"llm"`. `None` (the default) means

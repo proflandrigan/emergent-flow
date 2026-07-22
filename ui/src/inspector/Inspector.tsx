@@ -18,8 +18,9 @@ import { Segmented } from "../ui/Segmented";
 import { CodePanel } from "./CodePanel";
 import { ConfigForm } from "./ConfigForm";
 import { PayloadView } from "./PayloadView";
+import { StepsPanel } from "./StepsPanel";
 
-type InspectorTab = "config" | "code" | "results";
+type InspectorTab = "config" | "code" | "results" | "steps";
 
 function formatAgo(ms: number): string {
   const secs = Math.max(0, Math.round((Date.now() - ms) / 1000));
@@ -32,6 +33,7 @@ function formatAgo(ms: number): string {
 export function Inspector(): JSX.Element {
   const [tab, setTab] = useState<InspectorTab>("config");
   const [expanded, setExpanded] = useState(false);
+  const [highlightVarName, setHighlightVarName] = useState<string | null>(null);
   const selNodes = useSelectionStore((s) => s.nodes);
   const nodes = useGraphStore((s) => s.nodes);
   const nodeId = selectedNodeId({ nodes: selNodes });
@@ -98,6 +100,7 @@ export function Inspector(): JSX.Element {
             testId: "inspector-tab-config",
           },
           { value: "code", label: "Code", testId: "inspector-tab-code" },
+          { value: "steps", label: "Steps", testId: "inspector-tab-steps" },
           {
             value: "results",
             label: "Results",
@@ -124,7 +127,17 @@ export function Inspector(): JSX.Element {
         </p>
       );
     }
-    if (tab === "code") return <CodePanel />;
+    if (tab === "code") return <CodePanel highlightVarName={highlightVarName} />;
+    if (tab === "steps") {
+      return (
+        <StepsPanel
+          onViewInCode={(varName) => {
+            setHighlightVarName(varName);
+            setTab("code");
+          }}
+        />
+      );
+    }
     return renderResults();
   }
 

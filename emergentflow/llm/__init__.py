@@ -23,6 +23,7 @@ delegates to: pure ``{{var}}`` template rendering (see
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
 from typing import Any
 
 from emergentflow.api import public_op
@@ -36,6 +37,7 @@ __all__ = [
     "MissingClientError",
     "StructuredOutputValidationError",
     "prompt",
+    "prompt_from_file",
     "PromptSpec",
     "PromptVariableError",
     "summarize_run",
@@ -140,6 +142,31 @@ def prompt(system: str, user: str, variables: dict[str, object]) -> PromptSpec:
         See `render_prompt`.
     """
     return render_prompt(system, user, variables)
+
+
+@public_op(name="ef.llm.prompt_from_file")
+def prompt_from_file(filepath: str) -> str:
+    """Read a prompt template's raw text from *filepath* (the ``ef.llm.prompt_from_file`` node
+    wrapper).
+
+    Thin wrapper over a plain file read. Deliberately kept separate from
+    `prompt()`/`render_prompt` so those stay pure and cacheable -- reading a
+    file whose content can change independently of any node param is the one
+    impure step, isolated here exactly the way `data.load_csv` isolates its
+    own file read.
+
+    Raises
+    ------
+    ValueError
+        If *filepath* is empty or not a string.
+    FileNotFoundError
+        If *filepath* does not exist.
+    """
+    if not filepath or not isinstance(filepath, str):
+        raise ValueError(f"filepath must be a non-empty string, got {filepath!r}")
+    if not Path(filepath).exists():
+        raise FileNotFoundError(f"Prompt template file not found: {filepath!r}")
+    return Path(filepath).read_text(encoding="utf-8")
 
 
 _TYPE_MAP: dict[str, type | tuple[type, ...]] = {

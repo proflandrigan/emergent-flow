@@ -33,8 +33,10 @@ from .drop_missing import DropMissing
 from .eda_profile import EdaProfile
 from .embed_text import EmbedText
 from .encode_categorical import EncodeCategorical
+from .eval_judge import EvalJudge
 from .eval_label import EvalLabel
 from .eval_run import EvalRun
+from .eval_score import EvalScore
 from .evaluate import Evaluate
 from .explain_error_table import ExplainErrorTable
 from .explain_plot_calibration import ExplainPlotCalibration
@@ -61,6 +63,7 @@ from .group_by_aggregate import GroupByAggregate
 from .impute import ImputeMissing
 from .llm_call import LlmCall
 from .llm_prompt import LlmPrompt
+from .llm_prompt_from_file import LlmPromptFromFile
 from .load_csv import LoadCsv
 from .load_json import LoadJson
 from .load_parquet import LoadParquet
@@ -133,8 +136,10 @@ __all__ = [
     "EdaProfile",
     "EmbedText",
     "EncodeCategorical",
+    "EvalJudge",
     "EvalLabel",
     "EvalRun",
+    "EvalScore",
     "Evaluate",
     "ExplainErrorTable",
     "ExplainPlotCalibration",
@@ -164,6 +169,7 @@ __all__ = [
     "ImputeMissing",
     "LlmCall",
     "LlmPrompt",
+    "LlmPromptFromFile",
     "LoadCsv",
     "LoadJson",
     "LoadParquet",

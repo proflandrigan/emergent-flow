@@ -2,7 +2,7 @@
 emergentflow.nodes.examples.llm_prompt
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Reference node: ``llm.prompt`` — the "write prompts" half of the Prompt Lab
-loop (Epic 9 Story 3). 1 required IN port, 1 OUT port.
+loop (Epic 9 Story 3). 1 required IN port + 2 optional IN ports, 1 OUT port.
 
 Both ``execute`` and ``codegen`` route through the same
 ``emergentflow.llm.prompt`` wrapper via the ``ef.llm.prompt`` alias, so the
@@ -41,11 +41,14 @@ class LlmPrompt(NodeDefinition):
     """Render a system/user prompt template against a variable binding."""
 
     type = "llm.prompt"
-    version = 1
+    version = 2
     family = "llm"
     label = "LLM Prompt"
     category = "LLM"
-    description = "Render a system + user prompt template with {{variable}} substitution."
+    description = (
+        "Render a system + user prompt template with {{variable}} substitution. "
+        "Use when you need a reusable rendered prompt to feed llm.call."
+    )
 
     ports = [
         PortSpec(
@@ -53,6 +56,22 @@ class LlmPrompt(NodeDefinition):
             direction=Direction.IN,
             data_type="VariableBinding",
             help="One row of variable-name -> value bindings used to render the templates.",
+        ),
+        PortSpec(
+            name="system_template",
+            direction=Direction.IN,
+            data_type="str",
+            required=False,
+            help="Optional: a wired string overriding the literal 'system' param "
+            "(e.g. from llm.prompt_from_file).",
+        ),
+        PortSpec(
+            name="user_template",
+            direction=Direction.IN,
+            data_type="str",
+            required=False,
+            help="Optional: a wired string overriding the literal 'user' param "
+            "(e.g. from llm.prompt_from_file).",
         ),
         PortSpec(
             name="prompt",
@@ -69,7 +88,7 @@ class LlmPrompt(NodeDefinition):
             required=True,
             label="System template",
             help="System-message template, e.g. 'You are a {{persona}} assistant.'",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="markdown"),
         ),
         ParamSpec(
             name="user",
@@ -78,7 +97,7 @@ class LlmPrompt(NodeDefinition):
             required=True,
             label="User template",
             help="User-message template, e.g. 'Answer this: {{question}}'",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="markdown"),
         ),
         ParamSpec(
             name="variables",
@@ -98,12 +117,16 @@ class LlmPrompt(NodeDefinition):
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         system, user = self._args(node)
+        system_wired = ctx.in_var("system_template")
+        user_wired = ctx.in_var("user_template")
+        system_expr = f"({system_wired} if {system_wired} is not None else {system!r})"
+        user_expr = f"({user_wired} if {user_wired} is not None else {user!r})"
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('prompt')} = ef.llm.prompt(\n"
-                f"    {system!r},\n"
-                f"    {user!r},\n"
+                f"    {system_expr},\n"
+                f"    {user_expr},\n"
                 f"    {ctx.in_var('variables')},\n"
                 f")"
             ),
@@ -111,5 +134,11 @@ class LlmPrompt(NodeDefinition):
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
         system, user = self._args(node)
+        system_override = inputs.get("system_template")
+        user_override = inputs.get("user_template")
+        if system_override is not None:
+            system = system_override
+        if user_override is not None:
+            user = user_override
         prompt_spec = llm_prompt(system, user, inputs["variables"])
         return {"prompt": prompt_spec}

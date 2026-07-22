@@ -190,3 +190,32 @@ test("calling runGraph while a run is already in flight is a no-op", async () =>
 
   expect(fetchSpy).toHaveBeenCalledTimes(1);
 });
+
+test("runGraph with runTo as an array sends run_to as an array in the POST body", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    sseResponse([{ type: "run_complete", total_ms: 0 }]),
+  );
+
+  await runGraph({ runTo: ["n1", "n2"] });
+
+  const callArgs = (vi.mocked(fetch).mock.calls as [[string, RequestInit]])[0];
+  const parsedBody = JSON.parse(callArgs[1].body as string);
+  expect(parsedBody).toEqual({
+    graph: expect.anything(),
+    run_to: ["n1", "n2"],
+  });
+});
+
+test("runGraph with an empty array runTo sends the bare graph without run_to", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    sseResponse([{ type: "run_complete", total_ms: 0 }]),
+  );
+
+  await runGraph({ runTo: [] });
+
+  const callArgs = (vi.mocked(fetch).mock.calls as [[string, RequestInit]])[0];
+  const parsedBody = JSON.parse(callArgs[1].body as string);
+  expect(parsedBody).toHaveProperty("nodes");
+  expect(parsedBody).toHaveProperty("edges");
+  expect(parsedBody).not.toHaveProperty("run_to");
+});

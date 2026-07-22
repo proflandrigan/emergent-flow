@@ -7,6 +7,38 @@ fixture replay in tests). This guide walks through templating, calling, structur
 connection profiles, eval runs (the Prompt Lab), labeling/export, and how client injection
 flows through both `execute()` and compiled code.
 
+## Choosing the Right LLM Node
+
+A quick reference for which node to reach for:
+
+| Question | Node |
+|---|---|
+| I need one prompt rendered against variables, as a reusable step in a larger flow | `llm.prompt` |
+| I need to make a single completion call (given messages I already have) | `llm.call` |
+| I want to compare one prompt across N inputs and/or M model variants side by side | `eval.run` |
+| I have an `eval.run` compare table and want to attach human judgments to it | `eval.label` |
+
+**The `llm.prompt` → `llm.call` chain** is the general-purpose path: `llm.prompt`
+renders a `{{var}}` template into a `PromptSpec` (pure, no client needed);
+wire its `prompt` OUT port into `llm.call`'s `messages` IN port to actually
+make the call. See [§1](#1-prompt-templates) and [§2](#2-making-llm-calls)
+below, and the canvas example at the end of this section.
+
+**`eval.run` is not "`llm.prompt` + `llm.call` in a loop" that you build
+yourself** — it's a self-contained node that renders and calls internally,
+one prompt template x N dataset rows x M model variants, in a single step.
+Reach for `eval.run` when you're comparing options (which model, which
+temperature, which prompt wording) rather than running one fixed call in a
+pipeline. See [§5](#5-eval-runs-prompt-lab).
+
+> **In the Canvas:** to chain `llm.prompt` into `llm.call`, drag an edge
+> from the `llm.prompt` node's `prompt` output port to the `llm.call`
+> node's `messages` input port — `PromptSpec.messages` is exactly the
+> shape `llm.call` expects, so no adapter node is needed. Configure
+> `llm.call`'s `provider`/`model`/connection in its Config tab. Use
+> `eval.run` instead of this pair when you want a compare grid across
+> multiple inputs or models rather than a single call.
+
 ## 1. Prompt Templates
 
 `ef.llm.prompt` renders a system/user template pair against a variable-binding dict into a
@@ -173,6 +205,56 @@ manifest = ef.eval.export_finetune(labeled, path="finetune.jsonl")
 
 Both exporters silently drop rows with no label (an eval/fine-tune set is *judged* data) and
 return a `DatasetExportManifest` (`path`, `row_count`, `byte_size`) describing what was written.
+
+### Deterministic Scoring (`ef.eval.score`)
+
+For automatic, rule-based grading instead of (or alongside) human labels,
+`ef.eval.score` applies a list of scorer specs to an `ef.eval.run` compare
+table, appending one `score_<name>` column per scorer:
+
+```python
+scored = ef.eval.score(
+    results,
+    scorers=[
+        {"name": "exact", "kind": "exact_match", "reference_column": "expected"},
+        {"name": "mentions_positive", "kind": "contains", "substring": "positive"},
+    ],
+)
+metrics = ef.eval.summarize_scores(scored)
+print(metrics)  # columns: variant, n, mean_exact, mean_mentions_positive
+```
+
+Supported scorer `kind`s: `exact_match`, `contains`, `regex`,
+`numeric_distance`, `json_schema` — see `emergentflow.eval.score.score`'s
+docstring for each kind's parameters. `ef.eval.summarize_scores` rolls the
+scored table up to one row per variant (`provider:model`), computing the
+mean of every `score_*` column — the metric a Prompt Lab compare view uses
+to rank variants.
+
+### LLM-as-Judge Scoring (`ef.eval.judge`)
+
+When a rule can't capture what "good" means, `ef.eval.judge` asks an LLM to
+grade each row against a free-text rubric, requesting structured
+`{"score": float, "rationale": str}` output:
+
+```python
+judged = ef.eval.judge(
+    results,
+    rubric="Score 1.0 if the answer directly and correctly addresses the question, 0.0 otherwise.",
+    judge_provider="anthropic",
+    judge_model="claude-sonnet-5",
+    client=client,
+)
+print(judged[["output", "judge_score", "judge_rationale"]])
+```
+
+Like `ef.eval.run`, `ef.eval.judge` requires an injected `client` (ADR 0017)
+and makes one LLM call per row -- it is not cacheable. The judge model may
+differ from the variant(s) being judged (e.g. judge every row with a single
+strong model regardless of which variant produced it). Combine with
+`ef.eval.summarize_scores` by renaming `judge_score` to a `score_<name>`
+column first if you want it rolled into the same variant-level metrics
+table as deterministic scores.
 
 ## 7. Client Injection in Graphs
 

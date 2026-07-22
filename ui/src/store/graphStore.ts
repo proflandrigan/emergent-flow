@@ -8,6 +8,7 @@ import { create } from "zustand";
 import type { CatalogNode } from "../catalog/types";
 import type { Graph } from "../generated/ir";
 import { useExecutionStore } from "./executionStore";
+import { layeredLayout, separateOverlappingNodes } from "../canvas/layout";
 import { newId } from "./ids";
 import { fromIR, toIR } from "./ir";
 import { useValidationStore } from "./validationStore";
@@ -42,6 +43,10 @@ function emptyGraph(): CanvasModel {
 // object already) and must never carry a live reference into past/future (hence structuredClone).
 const HISTORY_LIMIT = 100;
 
+// Fixed offset so pasted nodes are visibly distinct from their originals
+// rather than landing exactly on top of them.
+const PASTE_OFFSET = 40;
+
 // Exported so callers outside this store (e.g. ProposalPanel's "edit into own" flow) can build
 // a CanvasModel-shaped snapshot of the live store without re-listing its fields themselves.
 export function snapshot(s: CanvasModel): CanvasModel {
@@ -70,10 +75,12 @@ export interface GraphStore extends CanvasModel {
     source: { node_id: string; port_id: string },
     target: { node_id: string; port_id: string },
   ) => string | null;
+  pasteNodes: (models: NodeModel[]) => string[];
   removeEdge: (edgeId: string) => void;
   toIR: () => Graph;
   loadIR: (graph: Graph) => void;
   loadModel: (model: CanvasModel) => void;
+  tidyLayout: () => void;
   reset: () => void;
   pushHistory: (txn: string) => void;
   undo: () => void;
@@ -224,6 +231,34 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     return edgeId;
   },
 
+  pasteNodes(models) {
+    if (models.length === 0) {
+      return [];
+    }
+    get().pushHistory("pasteNodes");
+    const cloned: NodeModel[] = models.map((original) => ({
+      ...structuredClone(original),
+      id: newId("node"),
+      ports: original.ports.map((port) => ({ ...port, id: newId("port") })),
+      position: {
+        x: original.position.x + PASTE_OFFSET,
+        y: original.position.y + PASTE_OFFSET,
+      },
+    }));
+    set((state) => {
+      const nodes = { ...state.nodes };
+      for (const node of cloned) {
+        nodes[node.id] = node;
+      }
+      // Repeated Ctrl+V of the same clipboard clones from the same original
+      // position every time, so back-to-back pastes land exactly on top of
+      // each other -- de-overlap against the whole graph (not just this
+      // paste's own clones) the same way loadIR does.
+      return { nodes: separateOverlappingNodes(nodes) };
+    });
+    return cloned.map((n) => n.id);
+  },
+
   removeEdge(edgeId) {
     if (!get().edges[edgeId]) {
       return; // already gone (e.g. removeNode cleaned it up) -- don't push a no-op entry
@@ -249,7 +284,8 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
 
   loadIR(graph) {
     get().pushHistory("loadIR");
-    set(fromIR(graph));
+    const model = fromIR(graph);
+    set({ ...model, nodes: separateOverlappingNodes(model.nodes) });
     clearDerivedStores();
   },
 
@@ -263,6 +299,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       edges: model.edges,
     });
     clearDerivedStores();
+  },
+
+  tidyLayout() {
+    get().pushHistory("tidyLayout");
+    set((state) => ({ nodes: layeredLayout(state.nodes, state.edges) }));
   },
 
   reset() {

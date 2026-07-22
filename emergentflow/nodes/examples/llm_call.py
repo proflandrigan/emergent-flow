@@ -43,7 +43,10 @@ class LlmCall(NodeDefinition):
     family = "llm"
     label = "LLM Call"
     category = "LLM"
-    description = "Run one completion call against a provider through the unified gateway."
+    description = (
+        "Run one completion call against a provider through the unified gateway. "
+        "Use for a single completion call once you already have rendered messages."
+    )
     requires_client = True
     cacheable = False  # non-deterministic network call; never cache-serve a stale result.
 

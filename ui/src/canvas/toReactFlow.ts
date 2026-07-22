@@ -18,6 +18,7 @@ export function toRFNode(
   status: NodeStatus | null | undefined,
   results: Record<string, Payload> | null | undefined,
   family: string | null | undefined,
+  description: string | null | undefined,
 ): RFNode<EfNodeData> | RFNode<NoteNodeData> {
   if (node.type === NOTE_NODE_TYPE) {
     const paramValue = (name: string): unknown =>
@@ -45,6 +46,7 @@ export function toRFNode(
     data: {
       label: node.label ?? node.type,
       family: family ?? null,
+      description: description ?? null,
       ports: node.ports.map((port) => ({
         id: port.id,
         name: port.name,

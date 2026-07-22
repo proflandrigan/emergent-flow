@@ -163,4 +163,43 @@ describe("EfNode", () => {
 
     expect(screen.getByTestId("ef-node")).toHaveClass("ef-node--running");
   });
+
+  test("renders tooltip with catalog description when description is provided", () => {
+    const data: EfNodeData = {
+      label: "Cast Types",
+      description: "Cast selected columns to new data types.",
+      ports: [],
+      status: null,
+      results: null,
+    };
+
+    const { container } = renderEfNode(data);
+
+    const wrapper = container.querySelector(".ef-tooltip");
+    expect(wrapper).toBeInTheDocument();
+
+    fireEvent.mouseEnter(wrapper!);
+    expect(
+      screen.getByText("Cast selected columns to new data types."),
+    ).toBeInTheDocument();
+
+    fireEvent.mouseLeave(wrapper!);
+    expect(
+      screen.queryByText("Cast selected columns to new data types."),
+    ).not.toBeInTheDocument();
+  });
+
+  test("does not render tooltip when description is omitted", () => {
+    const data: EfNodeData = {
+      label: "Load CSV",
+      ports: [],
+      status: null,
+      results: null,
+    };
+
+    const { container } = renderEfNode(data);
+
+    expect(container.querySelector(".ef-tooltip")).not.toBeInTheDocument();
+    expect(screen.getByText("Load CSV")).toBeInTheDocument();
+  });
 });

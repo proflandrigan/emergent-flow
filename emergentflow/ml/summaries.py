@@ -107,7 +107,10 @@ def summarize_outlier(estimator: Any) -> dict[str, Any]:
         )
     offset = getattr(estimator, "offset_", None)
     if offset is not None:
-        summary["offset"] = float(offset)
+        # OneClassSVM.offset_ is a shape-(1,) ndarray (IsolationForest/EllipticEnvelope's is a
+        # plain float) -- float() on a size-1-but-ndim>0 array is deprecated (NumPy 1.25) and
+        # will raise in a future NumPy; .item() extracts the scalar for either shape.
+        summary["offset"] = float(np.asarray(offset).item())
     return summary
 
 

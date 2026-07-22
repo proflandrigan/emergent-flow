@@ -16,6 +16,7 @@ import { Save } from "lucide-react";
 import "./EfNode.css";
 import { PayloadView } from "../../inspector/PayloadView";
 import type { NodeStatus, Payload } from "../../store/execution";
+import { Tooltip } from "../../ui/Tooltip";
 import { isDetailed } from "./lod";
 import { familyMeta } from "../../theme/family";
 
@@ -24,6 +25,7 @@ import { familyMeta } from "../../theme/family";
 // fields (the index's `unknown` value type accepts anything).
 export interface EfNodeData extends Record<string, unknown> {
   label: string;
+  description?: string | null;
   family?: string | null;
   ports: {
     id: string;
@@ -99,6 +101,7 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
   const detailed = useStore((s) => isDetailed(s.transform[2]));
 
   const meta = familyMeta(data.family ?? "");
+  const description = data.description;
   const FamIcon = meta.Icon;
 
   const inPorts = data.ports.filter((port) => port.direction === "in");
@@ -106,6 +109,24 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
 
   const resultEntries = data.results ? Object.entries(data.results) : [];
   const hasResults = resultEntries.length > 0;
+
+  const headerStyle: CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--space-2)",
+    marginLeft: "calc(-1 * var(--space-2))",
+    marginRight: "calc(-1 * var(--space-2))",
+    marginTop: "calc(-1 * var(--space-2))",
+    marginBottom: "var(--space-2)",
+    padding: "var(--space-2) var(--space-3)",
+    borderTopLeftRadius: "var(--radius-md)",
+    borderTopRightRadius: "var(--radius-md)",
+    background: meta.soft,
+    borderLeft: `3px solid ${meta.color}`,
+    fontWeight: 600,
+    color: "var(--text-primary)",
+    fontSize: "var(--text-sm)",
+  };
 
   const boxStyle: CSSProperties = {
     ...boxStyleBase,
@@ -130,28 +151,19 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
       data-testid="ef-node"
       className={data.status === "running" ? "ef-node--running" : undefined}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--space-2)",
-          marginLeft: "calc(-1 * var(--space-2))",
-          marginRight: "calc(-1 * var(--space-2))",
-          marginTop: "calc(-1 * var(--space-2))",
-          marginBottom: "var(--space-2)",
-          padding: "var(--space-2) var(--space-3)",
-          borderTopLeftRadius: "var(--radius-md)",
-          borderTopRightRadius: "var(--radius-md)",
-          background: meta.soft,
-          borderLeft: `3px solid ${meta.color}`,
-          fontWeight: 600,
-          color: "var(--text-primary)",
-          fontSize: "var(--text-sm)",
-        }}
-      >
-        <FamIcon size={14} style={{ color: meta.color, flexShrink: 0 }} />
-        <span>{data.label}</span>
-      </div>
+      {description ? (
+        <Tooltip label={description}>
+          <div style={headerStyle}>
+            <FamIcon size={14} style={{ color: meta.color, flexShrink: 0 }} />
+            <span>{data.label}</span>
+          </div>
+        </Tooltip>
+      ) : (
+        <div style={headerStyle}>
+          <FamIcon size={14} style={{ color: meta.color, flexShrink: 0 }} />
+          <span>{data.label}</span>
+        </div>
+      )}
       <div>
         {inPorts.map((port) => (
           <div key={port.id} style={{ ...portRowStyle, textAlign: "left" }}>

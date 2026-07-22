@@ -106,6 +106,7 @@ from emergentflow.server.service import (
     get_personas,
     get_schema,
     get_session_event_schema,
+    inspect_graph,
     label_eval,
     list_connections,
     list_knowledge,
@@ -184,6 +185,7 @@ _POST_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "/eval/label": label_eval,
     "/execute": execute_graph,
     "/execute_node": execute_node,
+    "/inspect": inspect_graph,
     "/knowledge": save_knowledge,
     "/validate": validate_graph,
 }

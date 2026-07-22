@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, expect, test } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, expect, test, vi } from "vitest";
 
 import type { CatalogNode } from "../catalog/types";
 import { useExecutionStore } from "../store/executionStore";
@@ -121,6 +121,60 @@ test("Expand button is visible even without results", () => {
 
   render(<Inspector />);
   expect(screen.getByTestId("inspector-expand-btn")).toBeInTheDocument();
+});
+
+test("Steps tab shows the empty state when no nodes exist", () => {
+  render(<Inspector />);
+  fireEvent.click(screen.getByTestId("inspector-tab-steps"));
+  expect(screen.getByTestId("steps-empty")).toBeInTheDocument();
+});
+
+test("clicking view-in-code in Steps tab switches to the Code tab", async () => {
+  const id = useGraphStore.getState().addNodeFromSpec(fakeSpec, { x: 0, y: 0 });
+
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+    if (url === "/inspect") {
+      return new Response(
+        JSON.stringify({
+          payload_version: 2,
+          steps: [
+            {
+              step: 0,
+              node_id: id,
+              node_label: "L",
+              status: "ok",
+              inputs: [],
+              outputs: [
+                {
+                  var_name: "result_var",
+                  port_name: "out",
+                  payload: { kind: "scalar", value: 42 },
+                },
+              ],
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    return new Response(JSON.stringify({ code: "x = 1" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  });
+
+  render(<Inspector />);
+  fireEvent.click(screen.getByTestId("inspector-tab-steps"));
+
+  await waitFor(() =>
+    expect(screen.getByTestId("steps-list")).toBeInTheDocument(),
+  );
+
+  fireEvent.click(screen.getByTestId("steps-view-in-code"));
+
+  await waitFor(() =>
+    expect(screen.getByTestId("code-output")).toBeInTheDocument(),
+  );
 });
 
 test("Clicking the X button in expanded modal closes it", () => {
