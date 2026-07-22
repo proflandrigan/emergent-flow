@@ -41,6 +41,10 @@ export function IRToolbar(): JSX.Element {
     fileInputRef.current?.click();
   }
 
+  function handleTidyLayout() {
+    useGraphStore.getState().tidyLayout();
+  }
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     // Reset now so re-selecting the same file still fires `change`.
@@ -83,6 +87,13 @@ export function IRToolbar(): JSX.Element {
           onClick={handleImportClick}
         >
           Import
+        </Button>
+        <Button
+          variant="ghost"
+          data-testid="tidy-layout"
+          onClick={handleTidyLayout}
+        >
+          Tidy layout
         </Button>
         <input
           ref={fileInputRef}

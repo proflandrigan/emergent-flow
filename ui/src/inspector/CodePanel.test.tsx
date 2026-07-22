@@ -67,3 +67,41 @@ test("shows the empty state and never calls fetch for an empty graph", () => {
   expect(screen.getByTestId("code-empty")).toBeInTheDocument();
   expect(f).not.toHaveBeenCalled();
 });
+
+test("highlights the line matching highlightVarName", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify({ code: "x = 1\ny = x + 1" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+
+  addNode();
+  render(<CodePanel debounceMs={0} highlightVarName="y" />);
+
+  await waitFor(() =>
+    expect(screen.getByTestId("code-output")).toHaveTextContent("y = x + 1"),
+  );
+
+  const highlighted = screen.getByTestId("code-highlighted-line");
+  expect(highlighted).toBeInTheDocument();
+  expect(highlighted).toHaveTextContent("y = x + 1");
+});
+
+test("does not highlight any line when highlightVarName is null", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(JSON.stringify({ code: "x = 1\ny = x + 1" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+
+  addNode();
+  render(<CodePanel debounceMs={0} highlightVarName={null} />);
+
+  await waitFor(() =>
+    expect(screen.getByTestId("code-output")).toHaveTextContent("x = 1"),
+  );
+
+  expect(screen.queryByTestId("code-highlighted-line")).not.toBeInTheDocument();
+});

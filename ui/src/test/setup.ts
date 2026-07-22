@@ -8,3 +8,7 @@ class ResizeObserver {
 globalThis.ResizeObserver =
   globalThis.ResizeObserver ??
   (ResizeObserver as unknown as typeof globalThis.ResizeObserver);
+
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}

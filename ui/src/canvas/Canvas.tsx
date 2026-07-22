@@ -20,6 +20,7 @@ import {
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import { useCatalog } from "../catalog/useCatalog";
+import type { NodeModel } from "../store/model";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
@@ -32,6 +33,7 @@ import { NoteNode } from "./nodes/NoteNode";
 import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeInfoPanel } from "./NodeInfoPanel";
 import { NoteAnchorOverlay } from "./NoteAnchorOverlay";
+import { SelectionToolbar } from "./SelectionToolbar";
 import { OverlayModal } from "../ui/OverlayModal";
 import { toRFEdge, toRFNode } from "./toReactFlow";
 
@@ -49,11 +51,13 @@ export function Canvas(): JSX.Element {
   const removeNode = useGraphStore((s) => s.removeNode);
   const removeEdge = useGraphStore((s) => s.removeEdge);
   const connect = useGraphStore((s) => s.connect);
+  const pasteNodes = useGraphStore((s) => s.pasteNodes);
 
   const selNodes = useSelectionStore((s) => s.nodes);
   const selEdges = useSelectionStore((s) => s.edges);
   const setNodeSelected = useSelectionStore((s) => s.setNodeSelected);
   const setEdgeSelected = useSelectionStore((s) => s.setEdgeSelected);
+  const clearSelection = useSelectionStore((s) => s.clear);
 
   const edgeCompatibility = useValidationStore((s) => s.edgeCompatibility);
   const diagnostics = useValidationStore((s) => s.diagnostics);
@@ -101,6 +105,11 @@ export function Canvas(): JSX.Element {
         toRFEdge(e, !!selEdges[e.id], edgeCompatibility[e.id], reasons[e.id]),
       ),
     [edges, selEdges, edgeCompatibility, reasons],
+  );
+
+  const selectedNodeIds = useMemo(
+    () => Object.keys(selNodes).filter((id) => selNodes[id]),
+    [selNodes],
   );
 
   const onNodesChange = useCallback(
@@ -161,6 +170,7 @@ export function Canvas(): JSX.Element {
     y: number;
   } | null>(null);
   const [infoNodeId, setInfoNodeId] = useState<string | null>(null);
+  const [clipboard, setClipboard] = useState<NodeModel[] | null>(null);
 
   const infoCatalogNode = infoNodeId
     ? catalog.nodes.find((n) => n.type === nodes[infoNodeId]?.type)
@@ -185,6 +195,55 @@ export function Canvas(): JSX.Element {
       document.removeEventListener("click", closeContextMenu);
     };
   }, [contextMenu, closeContextMenu]);
+
+  useEffect(() => {
+    function isEditableTarget(target: EventTarget | null): boolean {
+      if (!(target instanceof HTMLElement)) {
+        return false;
+      }
+      return (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      );
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (isEditableTarget(e.target)) {
+        return;
+      }
+      const isModifier = e.metaKey || e.ctrlKey;
+      if (!isModifier) {
+        return;
+      }
+      const key = e.key.toLowerCase();
+      if (key === "c") {
+        const selectedIds = Object.keys(selNodes).filter((id) => selNodes[id]);
+        if (selectedIds.length === 0) {
+          return;
+        }
+        const models = selectedIds
+          .map((id) => nodes[id])
+          .filter((n): n is NodeModel => Boolean(n));
+        if (models.length === 0) {
+          return;
+        }
+        setClipboard(models);
+      } else if (key === "v") {
+        if (!clipboard || clipboard.length === 0) {
+          return;
+        }
+        const newIds = pasteNodes(clipboard);
+        clearSelection();
+        for (const id of newIds) {
+          setNodeSelected(id, true);
+        }
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [clipboard, nodes, selNodes, pasteNodes, clearSelection, setNodeSelected]);
 
   return (
     <div style={{ width: "100%", height: "100%" }}>
@@ -227,6 +286,14 @@ export function Canvas(): JSX.Element {
           }
         />
       </ReactFlow>
+      {selectedNodeIds.length > 1 && (
+        <SelectionToolbar
+          count={selectedNodeIds.length}
+          onRunSelected={() => {
+            void runGraph({ runTo: selectedNodeIds });
+          }}
+        />
+      )}
       {contextMenu && (
         <NodeContextMenu
           x={contextMenu.x}

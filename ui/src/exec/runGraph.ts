@@ -10,8 +10,9 @@ import { useGraphStore } from "../store/graphStore";
 import { readSSEEvents } from "./sse";
 
 export interface RunGraphOptions {
-  /** If set, only this node's ancestor-closed subgraph runs ("run to here"). */
-  runTo?: string;
+  /** If set, only the ancestor-closed subgraph of this node (or these nodes) runs
+   *  ("run to here" for a single id, "run selected" for an array). */
+  runTo?: string | string[];
   /** Called with a human-readable message whenever the run fails (in addition to
    *  `executionStore.error` always being set). Callers that render their own error
    *  banner (e.g. `ExecutionToolbar`) pass this; callers that don't need a local
@@ -29,7 +30,9 @@ export async function runGraph(options: RunGraphOptions = {}): Promise<void> {
 
   const { runTo, onError } = options;
   const graph = useGraphStore.getState().toIR();
-  const body = runTo ? { graph, run_to: runTo } : graph;
+  const hasRunTo =
+    typeof runTo === "string" || (Array.isArray(runTo) && runTo.length > 0);
+  const body = hasRunTo ? { graph, run_to: runTo } : graph;
 
   function fail(message: string) {
     useExecutionStore.getState().setError(message);

@@ -18,7 +18,7 @@ import hashlib
 import json
 import time
 from collections.abc import Generator, Iterator
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 import pandas as pd
@@ -26,6 +26,7 @@ import pandas as pd
 from emergentflow import __version__, compile_to_code, execute, export_catalog, validate
 from emergentflow.clients import ClientKind, Clients
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
+from emergentflow.codegen.inspect import build_step_traces
 from emergentflow.codegen.traversal import topological_sort
 from emergentflow.codegen.validation import enforce_validation_gate
 from emergentflow.codegen.wiring import WiringMap, build_wiring_map
@@ -652,6 +653,29 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
         "payload_version": PAYLOAD_CONTRACT_VERSION,
         "results": _results_to_payloads(results),
         "statuses": statuses,
+    }
+
+
+def inspect_graph(payload: dict[str, Any]) -> dict[str, Any]:
+    """IR graph (as a dict) -> ``{"payload_version", "steps"}`` (issue #95: variable inspector).
+
+    Runs *graph* once via ``emergentflow.codegen.inspect.build_step_traces``,
+    injecting the same server-side client bundle ``_execute_node`` builds for
+    any node declaring a client capability (a real ``GatewayClient`` for the
+    LLM seam, the shared ``AdapterWarehouseClient`` for the warehouse seam --
+    both cheap to construct unconditionally; see ``_get_warehouse_client``'s
+    docstring). FUNCTIONAL graphs only: a DECLARATIVE graph raises whatever
+    ``build_step_traces``/``execute()`` already raises for that shape,
+    surfacing as the server's usual 422 (this route does not support
+    ``run_to`` -- it always traces the whole graph).
+    """
+    graph = _to_graph(payload)
+    validate_api_keys_present(graph)
+    clients = Clients(llm=GatewayClient(), warehouse=_get_warehouse_client())
+    traces = build_step_traces(graph, clients=clients)
+    return {
+        "payload_version": PAYLOAD_CONTRACT_VERSION,
+        "steps": [asdict(trace) for trace in traces],
     }
 
 

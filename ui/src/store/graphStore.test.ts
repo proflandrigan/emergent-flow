@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from "vitest";
 
 import type { CatalogNode } from "../catalog/types";
+import type { Graph } from "../generated/ir";
 import catalog from "../generated/catalog.json";
 import { useGraphStore } from "./graphStore";
 
@@ -160,5 +161,105 @@ describe("toIR", () => {
     for (const [id, edge] of Object.entries(graph.edges ?? {})) {
       expect(edge.id).toBe(id);
     }
+  });
+});
+
+describe("loadIR", () => {
+  test("two nodes at the same IR position get distinct canvas positions", () => {
+    const graph: Graph = {
+      paradigm: "functional",
+      nodes: {
+        a: {
+          id: "a",
+          type: "data.load_csv",
+          paradigm: "functional",
+          params: [],
+          ports: [{ name: "out", direction: "out" }],
+          position: { x: 0, y: 0 },
+        },
+        b: {
+          id: "b",
+          type: "data.load_csv",
+          paradigm: "functional",
+          params: [],
+          ports: [{ name: "out", direction: "out" }],
+          position: { x: 0, y: 0 },
+        },
+      },
+      edges: {},
+    };
+
+    useGraphStore.getState().loadIR(graph);
+
+    const { nodes } = useGraphStore.getState();
+    expect(nodes.a.position).not.toEqual(nodes.b.position);
+  });
+});
+
+describe("pasteNodes", () => {
+  test("pasting one node produces a new node with different id, same type/params (deep-equal), offset position, and fresh port ids", () => {
+    const originalId = useGraphStore
+      .getState()
+      .addNodeFromSpec(loadCsv, { x: 100, y: 200 });
+    const original = useGraphStore.getState().nodes[originalId];
+
+    const [pastedId] = useGraphStore.getState().pasteNodes([original]);
+    const pasted = useGraphStore.getState().nodes[pastedId];
+
+    expect(pasted.id).not.toBe(original.id);
+    expect(pasted.type).toBe(original.type);
+    expect(pasted.params).toEqual(original.params);
+    expect(pasted.params).not.toBe(original.params);
+    expect(pasted.position.x).toBe(original.position.x + 40);
+    expect(pasted.position.y).toBe(original.position.y + 40);
+
+    for (const port of pasted.ports) {
+      expect(port.id).toBeTruthy();
+      const origPort = original.ports.find((p) => p.name === port.name);
+      expect(origPort).toBeDefined();
+      expect(port.id).not.toBe(origPort!.id);
+    }
+  });
+
+  test("mutating pasted node's params does not affect original", () => {
+    const originalId = useGraphStore
+      .getState()
+      .addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const original = useGraphStore.getState().nodes[originalId];
+
+    const [pastedId] = useGraphStore.getState().pasteNodes([original]);
+
+    useGraphStore.getState().setParam(originalId, original.params[0].name, "mutated");
+
+    const reloadedPasted = useGraphStore.getState().nodes[pastedId];
+    expect(reloadedPasted.params[0].value).not.toBe("mutated");
+  });
+
+  test("pasting the same node twice produces two distinct new ids each time", () => {
+    const originalId = useGraphStore
+      .getState()
+      .addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const original = useGraphStore.getState().nodes[originalId];
+
+    const [id1] = useGraphStore.getState().pasteNodes([original]);
+    const [id2] = useGraphStore.getState().pasteNodes([original]);
+
+    expect(id1).not.toBe(id2);
+    expect(id1).not.toBe(originalId);
+    expect(id2).not.toBe(originalId);
+    expect(Object.keys(useGraphStore.getState().nodes)).toHaveLength(3);
+  });
+
+  test("pasting an empty array returns [] and does not change nodes or push a history entry", () => {
+    useGraphStore
+      .getState()
+      .addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const beforeUndo = useGraphStore.getState().canUndo();
+
+    const result = useGraphStore.getState().pasteNodes([]);
+
+    expect(result).toEqual([]);
+    expect(Object.keys(useGraphStore.getState().nodes)).toHaveLength(1);
+    expect(useGraphStore.getState().canUndo()).toBe(beforeUndo);
   });
 });

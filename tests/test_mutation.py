@@ -25,7 +25,7 @@ from emergentflow.ir.mutation import (
     apply_mutation,
     propose_diagnostics,
 )
-from emergentflow.ir.node import Node
+from emergentflow.ir.node import Node, Position
 from emergentflow.nodes.examples.cast_types import CastTypes
 from emergentflow.nodes.examples.load_csv import LoadCsv
 
@@ -88,6 +88,28 @@ class TestApplyMutationAdds:
         m = GraphMutation(base_version=1, add_nodes=[a, b])
         with pytest.raises(MutationError):
             apply_mutation(graph, m)
+
+    def test_add_node_at_default_position_gets_cascaded(self) -> None:
+        graph = Graph()
+        node = _load_csv_node()
+        m = GraphMutation(base_version=1, add_nodes=[node])
+        result = apply_mutation(graph, m)
+        assert result.nodes[node.id].position != Position(x=0.0, y=0.0)
+
+    def test_add_multiple_nodes_at_default_position_do_not_collide(self) -> None:
+        graph = Graph()
+        node_a = _load_csv_node()
+        node_b = _load_csv_node()
+        m = GraphMutation(base_version=1, add_nodes=[node_a, node_b])
+        result = apply_mutation(graph, m)
+        assert result.nodes[node_a.id].position != result.nodes[node_b.id].position
+
+    def test_add_node_with_explicit_position_is_preserved(self) -> None:
+        graph = Graph()
+        node = _load_csv_node().model_copy(update={"position": Position(x=5.0, y=5.0)})
+        m = GraphMutation(base_version=1, add_nodes=[node])
+        result = apply_mutation(graph, m)
+        assert result.nodes[node.id].position == Position(x=5.0, y=5.0)
 
     def test_add_edge_colliding_with_existing_id_raises(self) -> None:
         source, target, edge = _wired_pair()

@@ -2,7 +2,7 @@
 // `/compile` endpoint and renders the returned Python read-only with highlight.js syntax
 // highlighting. One-way only (ADR 0001) -- this panel never parses code back into the graph.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import hljs from "highlight.js/lib/core";
 import python from "highlight.js/lib/languages/python";
 import "highlight.js/styles/atom-one-dark.css";
@@ -11,16 +11,34 @@ import { useGraphStore } from "../store/graphStore";
 
 hljs.registerLanguage("python", python);
 
-interface CodePanelProps {
-  debounceMs?: number;
+function findAssignmentLineIndex(code: string, varName: string | null | undefined): number {
+  if (!varName) {
+    return -1;
+  }
+  const pattern = new RegExp(`^\\s*${varName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*=`);
+  const lines = code.split("\n");
+  return lines.findIndex((line) => pattern.test(line));
 }
 
-export function CodePanel({ debounceMs = 400 }: CodePanelProps): JSX.Element {
+interface CodePanelProps {
+  debounceMs?: number;
+  highlightVarName?: string | null;
+}
+
+export function CodePanel({
+  debounceMs = 400,
+  highlightVarName = null,
+}: CodePanelProps): JSX.Element {
   const nodes = useGraphStore((s) => s.nodes);
   const edges = useGraphStore((s) => s.edges);
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const highlightedLineRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    highlightedLineRef.current?.scrollIntoView({ block: "center" });
+  }, [highlightVarName, code]);
 
   useEffect(() => {
     const graph = useGraphStore.getState().toIR();
@@ -116,12 +134,25 @@ export function CodePanel({ debounceMs = 400 }: CodePanelProps): JSX.Element {
             borderRadius: "var(--radius-sm)",
           }}
         >
-          <code
-            className="hljs language-python"
-            dangerouslySetInnerHTML={{
-              __html: hljs.highlight(code ?? "", { language: "python" }).value,
-            }}
-          />
+          <code className="hljs language-python">
+            {(() => {
+              const highlighted = hljs.highlight(code ?? "", { language: "python" }).value;
+              const highlightIndex = findAssignmentLineIndex(code ?? "", highlightVarName);
+              return highlighted.split("\n").map((lineHtml, i) => (
+                <div
+                  key={i}
+                  ref={i === highlightIndex ? highlightedLineRef : undefined}
+                  data-testid={i === highlightIndex ? "code-highlighted-line" : undefined}
+                  style={
+                    i === highlightIndex
+                      ? { background: "var(--accent-soft)" }
+                      : undefined
+                  }
+                  dangerouslySetInnerHTML={{ __html: lineHtml || " " }}
+                />
+              ));
+            })()}
+          </code>
         </pre>
       )}
     </div>

@@ -22,7 +22,7 @@ from emergentflow.codegen.validation import validate as run_validate
 from emergentflow.ir.common import IRModel
 from emergentflow.ir.edge import Edge
 from emergentflow.ir.graph import Graph
-from emergentflow.ir.node import Node
+from emergentflow.ir.node import Node, Position
 from emergentflow.ir.params import Param, ParamValue
 from emergentflow.nodes import registry as default_node_registry
 
@@ -64,6 +64,23 @@ class GraphMutation(IRModel):
     author: str = "human"
 
 
+_CASCADE_STEP = 60.0
+
+
+def _next_cascade_position(existing_positions: list[Position], index: int) -> Position:
+    """A position offset past the bounding box of *existing_positions*, stepped by *index*.
+
+    Used as a safety net for GraphMutation.add_nodes left at the default
+    Position() sentinel — keeps agent-proposed batches from stacking at the
+    origin. The canvas is free to re-lay-out further; this only guarantees
+    non-overlap.
+    """
+    base_x = max((p.x for p in existing_positions), default=0.0)
+    base_y = max((p.y for p in existing_positions), default=0.0)
+    offset = _CASCADE_STEP * (index + 1)
+    return Position(x=base_x + offset, y=base_y + offset)
+
+
 def apply_mutation(graph: Graph, m: GraphMutation) -> Graph:
     """Apply *m* to (a copy of) *graph* and return a new Graph.
 
@@ -99,9 +116,17 @@ def apply_mutation(graph: Graph, m: GraphMutation) -> Graph:
     # ------------------------------------------------------------------
     # 2. Adds
     # ------------------------------------------------------------------
+    existing_positions = [n.position for n in graph.nodes.values()]
+    _default_position = Position()
+    cascade_index = 0
     for node in m.add_nodes:
         if node.id in new_nodes:
             raise MutationError(f"add_nodes: node id {node.id!r} already exists in the graph.")
+        if node.position == _default_position:
+            node = node.model_copy(
+                update={"position": _next_cascade_position(existing_positions, cascade_index)}
+            )
+            cascade_index += 1
         new_nodes[node.id] = node
 
     for edge in m.add_edges:
