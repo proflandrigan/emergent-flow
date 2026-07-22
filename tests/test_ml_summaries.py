@@ -6,6 +6,8 @@ Covers the 6 builder functions in ``emergentflow.ml.summaries`` directly and the
 
 from __future__ import annotations
 
+import warnings
+
 import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
@@ -13,6 +15,7 @@ from sklearn.ensemble import IsolationForest
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import OneClassSVM
 
 from emergentflow.api import is_inspectable
 from emergentflow.ml import fit_estimator, summarize
@@ -179,6 +182,26 @@ def test_summarize_outlier() -> None:
 def test_summarize_outlier_missing_attrs() -> None:
     result = summarize_outlier(object())
     assert result == {}
+
+
+def test_summarize_outlier_array_valued_offset_no_deprecation_warning() -> None:
+    """OneClassSVM.offset_ is a shape-(1,) ndarray, unlike IsolationForest's plain float.
+
+    Regression test for a confirmed bug hunt finding (2026-07-21): float() on that
+    ndim>0 array raised ``DeprecationWarning: Conversion of an array with ndim > 0 to
+    a scalar is deprecated`` (NumPy 1.25), which upgrades to a hard TypeError in a
+    future NumPy -- would silently break `ef.ml.summarize` for every OneClassSVM node.
+    """
+    df = _make_unsupervised_df()
+    X = df[["x1", "x2"]]
+    est = OneClassSVM().fit(X)
+    assert est.offset_.ndim == 1  # sanity: this is the array-shaped case, not a plain float
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        result = summarize_outlier(est)
+
+    assert isinstance(result["offset"], float)
 
 
 def test_summarize_preprocessing() -> None:
