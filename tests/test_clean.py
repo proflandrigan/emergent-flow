@@ -279,6 +279,13 @@ class TestExplodeLists:
         result = explode_lists(df, columns=["items"], drop_empty=False)
         assert len(result) == 2
 
+    def test_drop_empty_true_preserves_none_element_in_nonempty_list(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "items": [["a", None], ["c"]]})
+        result = explode_lists(df, columns=["items"], drop_empty=True)
+        assert len(result) == 3
+        assert list(result["u"]) == [1, 1, 2]
+        assert result["items"].tolist()[1] is None
+
     def test_does_not_mutate_input(self) -> None:
         df = pd.DataFrame({"u": [1, 2], "items": [["a", "b"], ["c"]]})
         original = df.copy()

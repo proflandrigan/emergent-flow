@@ -196,6 +196,15 @@ def filter_rows(
     return df[mask].copy()
 
 
+def _is_empty_list_cell(value: Any) -> bool:
+    """True for a cell that will explode to a placeholder NaN row: an empty list-like, or a
+    scalar missing value (None/NaN). A real ``None``/NaN *element inside* a non-empty list is
+    not an empty cell and must not be treated as one."""
+    if isinstance(value, (list, tuple, set)):
+        return len(value) == 0
+    return bool(pd.isna(value))
+
+
 @public_op(name="ef.clean.explode_lists")
 def explode_lists(
     df: pd.DataFrame,
@@ -210,17 +219,20 @@ def explode_lists(
     its own row; multiple ``columns`` are exploded **together** (index-aligned / zipped, not
     cross-joined), which requires the lists in a given row to be the same length — pandas raises
     ``ValueError`` otherwise. Empty lists / missing values explode to a single NaN row; when
-    ``drop_empty`` is True (default) those all-NaN exploded rows are dropped. ``ignore_index``
-    renumbers the result 0..n-1. Never mutates the input.
+    ``drop_empty`` is True (default) those placeholder rows are dropped **before** exploding, so
+    a genuine ``None``/NaN *element* inside an otherwise non-empty list is preserved as its own
+    row rather than being mistaken for an empty-list placeholder. ``ignore_index`` renumbers the
+    result 0..n-1. Never mutates the input.
     """
     if not columns:
         raise ValueError("columns must be a non-empty list of column names.")
     unknown = [c for c in columns if c not in df.columns]
     if unknown:
         raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
-    result = df.explode(columns if len(columns) > 1 else columns[0], ignore_index=False)
     if drop_empty:
-        result = result.dropna(subset=columns, how="all")
+        is_empty = df[columns].apply(lambda col: col.map(_is_empty_list_cell))
+        df = df[~is_empty.all(axis=1)]
+    result = df.explode(columns if len(columns) > 1 else columns[0], ignore_index=False)
     result = result.reset_index(drop=True) if ignore_index else result.copy()
     return result
 
