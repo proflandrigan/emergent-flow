@@ -270,6 +270,8 @@ def encode_lists(
     ``sep`` is given, string cells are first split on it (e.g. ``"rock|jazz"`` with ``sep="|"``);
     otherwise cells are expected to already hold Python lists. ``drop`` removes the original
     ``column`` from the output. Row order and index are preserved. Never mutates the input.
+    Raises ``ValueError`` if a generated indicator column name collides with an existing
+    column in the output (after ``drop``) instead of silently producing duplicate labels.
     """
     if column not in df.columns:
         raise ValueError(f"unknown column {column!r}; expected one of {list(df.columns)!r}.")
@@ -284,11 +286,18 @@ def encode_lists(
             f"(e.g. str and int); encode_lists requires every label to be of a "
             f"consistently comparable type."
         ) from exc
+    indicator_columns = [f"{resolved_prefix}_{cls}" for cls in binarizer.classes_]
+    base = df.drop(columns=[column]) if drop else df.copy()
+    collisions = [c for c in indicator_columns if c in base.columns]
+    if collisions:
+        raise ValueError(
+            f"generated indicator column(s) {collisions!r} collide with existing column(s) "
+            f"in the input frame; choose a different prefix."
+        )
     indicator = pd.DataFrame(
         encoded,
-        columns=[f"{resolved_prefix}_{cls}" for cls in binarizer.classes_],
+        columns=indicator_columns,
         index=df.index,
         dtype=int,
     )
-    base = df.drop(columns=[column]) if drop else df.copy()
     return pd.concat([base, indicator], axis=1)

@@ -356,3 +356,13 @@ class TestEncodeLists:
         df = pd.DataFrame({"u": [1, 2], "g": [[1, "a"], ["b"]]})
         with pytest.raises(ValueError, match="mutually unsortable"):
             encode_lists(df, column="g")
+
+    def test_generated_column_colliding_with_existing_column_raises(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "g_rock": [10, 20], "g": [["rock"], ["jazz"]]})
+        with pytest.raises(ValueError, match="collide"):
+            encode_lists(df, column="g")
+
+    def test_generated_column_colliding_with_kept_original_column_raises(self) -> None:
+        df = pd.DataFrame({"g_rock": [10, 20], "g": [["rock"], ["jazz"]]})
+        with pytest.raises(ValueError, match="collide"):
+            encode_lists(df, column="g", drop=False)

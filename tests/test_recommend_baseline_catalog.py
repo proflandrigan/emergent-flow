@@ -285,6 +285,29 @@ def test_popularity_segmented_cold_start_fallback():
     assert result.recommendations["item_id"].tolist() == ["A", "C", "B"]
 
 
+def test_popularity_segmented_absent_user_not_confused_with_explicit_none_segment():
+    """A user absent from user_segments falls back to global ranking even when some OTHER
+    user was explicitly assigned segment None -- `.get(uid)` defaulting to None must not be
+    confused with a real `None` segment value already present in user_to_segment."""
+    im = _make_small_interactions()
+    spec = _reg.get_recommender_spec("popularity_segmented")
+
+    fitted = spec.fitter(
+        im,
+        None,
+        {
+            "segment_col": "region",
+            # user 1 explicitly has NO segment (None); user 2 is in "west".
+            # users 3 and 4 are entirely absent from the map.
+            "user_segments": {1: None, 2: "west"},
+        },
+    )
+    # user 1's solo scores (A=5, B=1, C=0) differ from the global ranking (A=9, C=6, B=3),
+    # so this distinguishes "fell back to global" from "leaked into the None segment".
+    result = spec.recommend_fn(fitted, [4], 3, exclude_known=False)
+    assert result.recommendations["item_id"].tolist() == ["A", "C", "B"]
+
+
 def test_popularity_segmented_no_segments_degrades_to_global():
     """Without user_segments, popularity_segmented behaves like global popularity."""
     im = _make_small_interactions()
