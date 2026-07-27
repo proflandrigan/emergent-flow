@@ -83,6 +83,7 @@ from .recommend_by_embedding import RecommendByEmbedding
 from .recommend_compare import RecommendCompare
 from .recommend_evaluate import RecommendEvaluate
 from .recommend_fit import RecommendFit
+from .recommend_fit_two_tower import RecommendFitTwoTower
 from .recommend_hybrid_switching import HybridSwitching
 from .recommend_hybrid_weighted import HybridWeighted
 from .recommend_recommend import Recommend
@@ -192,6 +193,7 @@ __all__ = [
     "RecommendCompare",
     "RecommendEvaluate",
     "RecommendFit",
+    "RecommendFitTwoTower",
     "RecommendTemporalSplit",
     "ScaleFeatures",
     "SeasonalDecompose",

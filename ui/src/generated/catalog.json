@@ -6682,6 +6682,65 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "description": "Fit a two-tower retrieval model. Optionally consumes an item-features frame (one row per item, keyed by an 'item_id' column plus numeric columns) and a user-features frame (one row per user, keyed by 'user_id' plus numeric columns).",
+      "family": "recommend",
+      "label": "Fit Two-Tower Recommender",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": {},
+          "help": "Keyword arguments for the two-tower model (e.g. epochs, user_embedding_dim, item_embedding_dim, loss). Use item_id_col / user_id_col to point at non-default id columns in the feature frames.",
+          "hints": null,
+          "label": "Algorithm params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "InteractionMatrix",
+          "direction": "in",
+          "help": "The prepared user-item interaction matrix.",
+          "label": "Interactions",
+          "name": "interactions",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Optional item-side features for the item tower: one row per item, an 'item_id' column matching the interactions, plus numeric feature columns (e.g. multi-hot columns from clean.encode_lists). Non-numeric columns are ignored.",
+          "label": "Item Features",
+          "name": "item_features",
+          "required": false
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Optional user-side features for the user tower: one row per user, a 'user_id' column matching the interactions, plus numeric feature columns. Non-numeric columns are ignored.",
+          "label": "User Features",
+          "name": "user_features",
+          "required": false
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Recommender",
+          "direction": "out",
+          "help": "The fitted two-tower recommender model.",
+          "label": null,
+          "name": "recommender",
+          "required": true
+        }
+      ],
+      "type": "recommend.fit_two_tower",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
       "description": "Route cold-start users to one recommender and warm users to another, based on known-interaction count.",
       "family": "recommend",
       "label": "Hybrid (Switching)",
