@@ -264,7 +264,14 @@ def encode_lists(
     resolved_prefix = prefix if prefix is not None else column
     labels = [_coerce_labels(v, sep) for v in df[column]]
     binarizer = MultiLabelBinarizer()
-    encoded = binarizer.fit_transform(labels)
+    try:
+        encoded = binarizer.fit_transform(labels)
+    except TypeError as exc:
+        raise ValueError(
+            f"column {column!r} has labels of mixed, mutually unsortable types "
+            f"(e.g. str and int); encode_lists requires every label to be of a "
+            f"consistently comparable type."
+        ) from exc
     indicator = pd.DataFrame(
         encoded,
         columns=[f"{resolved_prefix}_{cls}" for cls in binarizer.classes_],

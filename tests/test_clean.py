@@ -344,3 +344,8 @@ class TestEncodeLists:
         df = pd.DataFrame({"u": [1, 2], "g": [["rock", "jazz"], ["pop"]]})
         with pytest.raises(ValueError):
             encode_lists(df, column="nope")
+
+    def test_mixed_unsortable_label_types_raises_value_error(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "g": [[1, "a"], ["b"]]})
+        with pytest.raises(ValueError, match="mutually unsortable"):
+            encode_lists(df, column="g")
