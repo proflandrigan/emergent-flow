@@ -11,7 +11,15 @@ import pandas as pd
 import pytest
 
 from emergentflow.api import PUBLIC_OPS
-from emergentflow.clean import cast_types, drop_missing, filter_rows, impute_missing, select_columns
+from emergentflow.clean import (
+    cast_types,
+    drop_missing,
+    encode_lists,
+    explode_lists,
+    filter_rows,
+    impute_missing,
+    select_columns,
+)
 
 
 def test_impute_mean_fills_nan() -> None:
@@ -243,3 +251,96 @@ def test_drop_missing_subset_with_column_axis_raises() -> None:
     df = pd.DataFrame({"a": [1.0, None, 3.0], "b": [1.0, 2.0, None]})
     with pytest.raises(ValueError, match="subset is only supported when axis='rows'"):
         drop_missing(df, axis="columns", subset=["a"])
+
+
+class TestExplodeLists:
+    def test_single_column_explode(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "items": [["a", "b"], ["c"]]})
+        result = explode_lists(df, columns=["items"])
+        assert len(result) == 3
+        assert list(result["items"]) == ["a", "b", "c"]
+        assert list(result["u"]) == [1, 1, 2]
+
+    def test_aligned_multi_column_explode(self) -> None:
+        df = pd.DataFrame({"u": [1], "items": [["a", "b"]], "ts": [[10, 20]]})
+        result = explode_lists(df, columns=["items", "ts"])
+        assert len(result) == 2
+        assert list(result["items"]) == ["a", "b"]
+        assert list(result["ts"]) == [10, 20]
+
+    def test_drop_empty_true_drops_empty_list_row(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "items": [["a"], []]})
+        result = explode_lists(df, columns=["items"], drop_empty=True)
+        assert len(result) == 1
+        assert list(result["u"]) == [1]
+
+    def test_drop_empty_false_keeps_nan_row(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "items": [["a"], []]})
+        result = explode_lists(df, columns=["items"], drop_empty=False)
+        assert len(result) == 2
+
+    def test_does_not_mutate_input(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "items": [["a", "b"], ["c"]]})
+        original = df.copy()
+        explode_lists(df, columns=["items"])
+        pd.testing.assert_frame_equal(df, original)
+
+    def test_unknown_column_raises(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "items": [["a", "b"], ["c"]]})
+        with pytest.raises(ValueError):
+            explode_lists(df, columns=["nope"])
+
+    def test_empty_columns_raises(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "items": [["a", "b"], ["c"]]})
+        with pytest.raises(ValueError):
+            explode_lists(df, columns=[])
+
+
+class TestEncodeLists:
+    def test_basic_multi_hot(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "g": [["rock", "jazz"], ["pop"]]})
+        result = encode_lists(df, column="g")
+        assert list(result.columns) == ["u", "g_jazz", "g_pop", "g_rock"]
+        assert result.loc[0, ["g_jazz", "g_pop", "g_rock"]].tolist() == [1, 0, 1]
+        assert result.loc[1, ["g_jazz", "g_pop", "g_rock"]].tolist() == [0, 1, 0]
+        assert "g" not in result.columns
+
+    def test_prefix_override(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "g": [["rock", "jazz"], ["pop"]]})
+        result = encode_lists(df, column="g", prefix="genre")
+        assert list(result.columns) == ["u", "genre_jazz", "genre_pop", "genre_rock"]
+
+    def test_drop_false_keeps_original_column(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "g": [["rock", "jazz"], ["pop"]]})
+        result = encode_lists(df, column="g", drop=False)
+        assert "g" in result.columns
+        assert list(result["g"]) == [["rock", "jazz"], ["pop"]]
+
+    def test_empty_cell_yields_all_zeros(self) -> None:
+        df = pd.DataFrame({"u": [1], "g": [[]]})
+        result = encode_lists(df, column="g")
+        assert len(result) == 1
+        assert list(result.columns) == ["u"]
+
+    def test_none_cell_mixed_with_list_yields_all_zeros_row(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "g": [["rock"], None]})
+        result = encode_lists(df, column="g")
+        assert result.loc[0, "g_rock"] == 1
+        assert result.loc[1, "g_rock"] == 0
+
+    def test_sep_splitting(self) -> None:
+        df = pd.DataFrame({"u": [1], "g": ["rock|jazz"]})
+        result = encode_lists(df, column="g", sep="|")
+        assert result.loc[0, "g_jazz"] == 1
+        assert result.loc[0, "g_rock"] == 1
+
+    def test_does_not_mutate_input(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "g": [["rock", "jazz"], ["pop"]]})
+        original = df.copy()
+        encode_lists(df, column="g")
+        pd.testing.assert_frame_equal(df, original)
+
+    def test_unknown_column_raises(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "g": [["rock", "jazz"], ["pop"]]})
+        with pytest.raises(ValueError):
+            encode_lists(df, column="nope")

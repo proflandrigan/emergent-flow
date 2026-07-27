@@ -2346,6 +2346,183 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "description": "Multi-hot encode a list-valued column into wide 0/1 indicator columns (one per distinct label).",
+      "family": "clean",
+      "label": "Encode Lists",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "The list-valued column to multi-hot encode.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Column",
+          "name": "column",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Prefix for the generated indicator columns (defaults to the column name).",
+          "hints": null,
+          "label": "Prefix",
+          "name": "prefix",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": true,
+          "help": "Drop the original list column from the output.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Drop original",
+          "name": "drop",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": null,
+          "help": "If set, split string cells on this separator instead of expecting lists.",
+          "hints": null,
+          "label": "Separator",
+          "name": "sep",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing a list-valued column to encode.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The DataFrame with wide indicator columns appended.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.encode_lists",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
+      "description": "Explode one or more index-aligned list columns into long rows (like pandas explode).",
+      "family": "clean",
+      "label": "Explode Lists",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "List column(s) to explode. Multiple columns are exploded together (aligned).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": true,
+          "help": "Drop rows produced from empty lists / missing values.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Drop empty",
+          "name": "drop_empty",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": true,
+          "help": "Renumber the result index 0..n-1.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Reset index",
+          "name": "ignore_index",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing list-valued column(s) to explode.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The long-form DataFrame with list elements expanded to one row each.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.explode_lists",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
       "description": "Keep rows matching a column/operator/value predicate.",
       "family": "clean",
       "label": "Filter Rows",

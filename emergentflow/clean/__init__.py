@@ -18,6 +18,7 @@ from typing import Any
 
 import pandas as pd
 from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import MultiLabelBinarizer
 
 from emergentflow.api import public_op
 
@@ -40,6 +41,8 @@ __all__ = [
     "select_columns",
     "cast_types",
     "filter_rows",
+    "explode_lists",
+    "encode_lists",
     "STRATEGIES",
     "OPERATORS",
 ]
@@ -191,3 +194,82 @@ def filter_rows(
     else:
         raise ValueError(f"unknown operator {operator!r}; expected one of {list(OPERATORS)!r}.")
     return df[mask].copy()
+
+
+@public_op(name="ef.clean.explode_lists")
+def explode_lists(
+    df: pd.DataFrame,
+    *,
+    columns: list[str],
+    drop_empty: bool = True,
+    ignore_index: bool = True,
+) -> pd.DataFrame:
+    """Explode one or more list-valued columns into long rows, returning a NEW DataFrame.
+
+    Thin wrapper over ``pandas.DataFrame.explode``. A single column turns each list element into
+    its own row; multiple ``columns`` are exploded **together** (index-aligned / zipped, not
+    cross-joined), which requires the lists in a given row to be the same length — pandas raises
+    ``ValueError`` otherwise. Empty lists / missing values explode to a single NaN row; when
+    ``drop_empty`` is True (default) those all-NaN exploded rows are dropped. ``ignore_index``
+    renumbers the result 0..n-1. Never mutates the input.
+    """
+    if not columns:
+        raise ValueError("columns must be a non-empty list of column names.")
+    unknown = [c for c in columns if c not in df.columns]
+    if unknown:
+        raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+    result = df.explode(columns if len(columns) > 1 else columns[0], ignore_index=False)
+    if drop_empty:
+        result = result.dropna(subset=columns, how="all")
+    result = result.reset_index(drop=True) if ignore_index else result.copy()
+    return result
+
+
+def _coerce_labels(value: Any, sep: str | None) -> list[Any]:
+    """Normalise one cell into a list of labels for multi-hot encoding.
+
+    Lists/tuples/sets pass through; a missing value (None/NaN) becomes the empty set; a string is
+    split on ``sep`` when ``sep`` is given, else treated as a single label; any other scalar is a
+    single label.
+    """
+    if isinstance(value, (list, tuple, set)):
+        return list(value)
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return []
+    if sep is not None and isinstance(value, str):
+        return [part for part in value.split(sep) if part != ""]
+    return [value]
+
+
+@public_op(name="ef.clean.encode_lists")
+def encode_lists(
+    df: pd.DataFrame,
+    *,
+    column: str,
+    prefix: str | None = None,
+    drop: bool = True,
+    sep: str | None = None,
+) -> pd.DataFrame:
+    """Multi-hot encode a list-valued column into wide 0/1 indicator columns; returns a NEW frame.
+
+    Thin wrapper over ``sklearn.preprocessing.MultiLabelBinarizer``. Each distinct label across
+    ``column`` becomes an integer indicator column named ``f"{prefix}_{label}"`` (``prefix``
+    defaults to ``column``), in sorted label order. Missing/empty cells encode as all-zeros. When
+    ``sep`` is given, string cells are first split on it (e.g. ``"rock|jazz"`` with ``sep="|"``);
+    otherwise cells are expected to already hold Python lists. ``drop`` removes the original
+    ``column`` from the output. Row order and index are preserved. Never mutates the input.
+    """
+    if column not in df.columns:
+        raise ValueError(f"unknown column {column!r}; expected one of {list(df.columns)!r}.")
+    resolved_prefix = prefix if prefix is not None else column
+    labels = [_coerce_labels(v, sep) for v in df[column]]
+    binarizer = MultiLabelBinarizer()
+    encoded = binarizer.fit_transform(labels)
+    indicator = pd.DataFrame(
+        encoded,
+        columns=[f"{resolved_prefix}_{cls}" for cls in binarizer.classes_],
+        index=df.index,
+        dtype=int,
+    )
+    base = df.drop(columns=[column]) if drop else df.copy()
+    return pd.concat([base, indicator], axis=1)

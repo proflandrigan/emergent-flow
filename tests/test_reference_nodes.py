@@ -24,7 +24,9 @@ from emergentflow.nodes.examples import (
     Correlation,
     Describe,
     DropMissing,
+    EncodeLists,
     Evaluate,
+    ExplodeLists,
     FilterRows,
     FitEstimator,
     GenerateHtmlSummary,
@@ -199,6 +201,60 @@ class TestSelectColumns:
         defn = SelectColumns()
         df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0], "c": [7.0, 8.0, 9.0]})
         node = defn.instantiate(columns=["a", "c"])
+        executed = defn.execute(node, inputs={"frame": df.copy()})
+        scope = {"frame": df.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
+# clean.explode_lists
+# ---------------------------------------------------------------------------
+
+
+class TestExplodeLists:
+    def test_codegen_body_golden(self):
+        defn = ExplodeLists()
+        node = defn.instantiate(columns=["items"])
+        frag = defn.preview(node)
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == (
+            "frame = ef.clean.explode_lists(frame, columns=['items'], "
+            "drop_empty=True, ignore_index=True)"
+        )
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = ExplodeLists()
+        df = pd.DataFrame({"u": [1, 2], "items": [["a", "b"], ["c"]]})
+        node = defn.instantiate(columns=["items"])
+        executed = defn.execute(node, inputs={"frame": df.copy()})
+        scope = {"frame": df.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
+# clean.encode_lists
+# ---------------------------------------------------------------------------
+
+
+class TestEncodeLists:
+    def test_codegen_body_golden(self):
+        defn = EncodeLists()
+        node = defn.instantiate(column="genres")
+        frag = defn.preview(node)
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == (
+            "frame = ef.clean.encode_lists(frame, column='genres', prefix=None, "
+            "drop=True, sep=None)"
+        )
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = EncodeLists()
+        df = pd.DataFrame({"u": [1, 2], "genres": [["rock", "jazz"], ["pop"]]})
+        node = defn.instantiate(column="genres")
         executed = defn.execute(node, inputs={"frame": df.copy()})
         scope = {"frame": df.copy()}
         _run_codegen(defn, node, scope)

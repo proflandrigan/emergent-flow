@@ -33,6 +33,7 @@ from .drop_missing import DropMissing
 from .eda_profile import EdaProfile
 from .embed_text import EmbedText
 from .encode_categorical import EncodeCategorical
+from .encode_lists import EncodeLists
 from .eval_judge import EvalJudge
 from .eval_label import EvalLabel
 from .eval_run import EvalRun
@@ -47,6 +48,7 @@ from .explain_plot_shap_beeswarm import ExplainPlotShapBeeswarm
 from .explain_plot_shap_importance import ExplainPlotShapImportance
 from .explain_plot_shap_waterfall import ExplainPlotShapWaterfall
 from .explain_shap_values import ExplainShapValues
+from .explode_lists import ExplodeLists
 from .filter_rows import FilterRows
 from .fit_bayesian_model import FitBayesianModel
 from .fit_estimator import FitEstimator
@@ -136,6 +138,7 @@ __all__ = [
     "EdaProfile",
     "EmbedText",
     "EncodeCategorical",
+    "EncodeLists",
     "EvalJudge",
     "EvalLabel",
     "EvalRun",
@@ -150,6 +153,7 @@ __all__ = [
     "ExplainPlotShapImportance",
     "ExplainPlotShapWaterfall",
     "ExplainShapValues",
+    "ExplodeLists",
     "FilterRows",
     "FitBayesianModel",
     "FitEstimator",

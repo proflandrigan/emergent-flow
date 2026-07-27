@@ -134,6 +134,9 @@ The acceptance demo (`examples/acceptance_demo/demo.py`) is the canonical worked
 `python examples/acceptance_demo/demo.py` runs an 8-node pipeline end to end and writes an
 HTML report.
 
+> **Shaping data for recommenders:** see [Recommender data prep](./recommender-data-prep.md) for a
+> packed-lists → two-tower walkthrough.
+
 ## 5. Developing the UI directly (optional)
 
 Only needed if you're editing `ui/` source rather than just using the app:
