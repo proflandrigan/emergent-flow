@@ -762,7 +762,11 @@ class TestLoadParquet:
         node = defn.instantiate(path=parquet_file)
         frag = defn.preview(node)
         assert frag.imports == ["import emergentflow as ef"]
-        assert frag.body == f"frame = ef.data.load_parquet({parquet_file!r}, columns=None)"
+        assert frag.body == (
+            f"frame = ef.data.load_parquet("
+            f"{parquet_file!r}, columns=None, source_file=False, connection=None, "
+            f"expect_columns=None, expect_dtypes=None)"
+        )
 
     def test_codegen_matches_execute(self, parquet_file):
         """ADR 0002: execute == result of running the emitted code."""
@@ -804,7 +808,9 @@ class TestLoadJson:
         frag = defn.preview(node)
         assert frag.imports == ["import emergentflow as ef"]
         assert frag.body == (
-            f"frame = ef.data.load_json({json_file!r}, orient='records', lines=False)"
+            f"frame = ef.data.load_json("
+            f"{json_file!r}, orient='records', lines=False, source_file=False, "
+            f"connection=None, expect_columns=None, expect_dtypes=None)"
         )
 
     def test_codegen_matches_execute(self, json_file):

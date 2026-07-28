@@ -3152,6 +3152,341 @@
     {
       "advisor_persona": "data_modeller",
       "category": "Ingest",
+      "description": "Fetch JSON records from an HTTP/REST endpoint into a tidy DataFrame.",
+      "family": "data",
+      "label": "HTTP Fetch",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "The URL to fetch.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "URL",
+          "name": "url",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "GET",
+          "help": "HTTP method for the request.",
+          "hints": {
+            "choices": [
+              "GET",
+              "POST"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Method",
+          "name": "method",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional HTTP headers as a dict of key-value pairs.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Headers",
+          "name": "headers",
+          "required": false,
+          "type_token": "dict"
+        },
+        {
+          "default": null,
+          "help": "Optional query-string parameters as a dict of key-value pairs.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Query params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict"
+        },
+        {
+          "default": null,
+          "help": "Optional request body string (e.g. JSON or form-encoded).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "textarea"
+          },
+          "label": "Body",
+          "name": "body",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "A connection-profile name (never a credential). Resolved to live credentials by the HttpClient at fetch time.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Connection",
+          "name": "connection",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Request timeout in seconds.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Timeout (s)",
+          "name": "timeout_s",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Dot-separated path into the JSON response to select records (e.g. \"data.items\"). No wildcards or array indexing are supported.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "JSON path",
+          "name": "json_path",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": true,
+          "help": "When True, normalize nested JSON objects into flat columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Flatten",
+          "name": "flatten",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": "none",
+          "help": "Pagination strategy: none, cursor, offset, or page.",
+          "hints": {
+            "choices": [
+              "none",
+              "cursor",
+              "offset",
+              "page"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Pagination",
+          "name": "pagination",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "cursor",
+          "help": "Query-parameter name for the cursor value when pagination is 'cursor'.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Cursor param",
+          "name": "cursor_param",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Dot-separated path to the next-cursor value in the response body, required when pagination is 'cursor'.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Cursor path",
+          "name": "cursor_path",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "page",
+          "help": "Query-parameter name for the page number when pagination is 'page'.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Page param",
+          "name": "page_param",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "offset",
+          "help": "Query-parameter name for the offset value when pagination is 'offset'.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Offset param",
+          "name": "offset_param",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Number of records per page; required when pagination is 'offset' or 'page'.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Page size",
+          "name": "page_size",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": 10,
+          "help": "Maximum number of pages to fetch before stopping.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Max pages",
+          "name": "max_pages",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The fetched records as a tidy pandas DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.http_fetch",
+      "version": 1
+    },
+    {
+      "advisor_persona": "data_modeller",
+      "category": "Ingest",
       "description": "Load a CSV file into a pandas DataFrame.",
       "family": "data",
       "label": "Load CSV",
@@ -3159,7 +3494,7 @@
       "params": [
         {
           "default": null,
-          "help": "Filesystem path to the .csv file to load.",
+          "help": "Filesystem path to the .csv file to load. Accepts a glob pattern (e.g. `data/*.csv`) to row-concatenate every match in sorted order, or an object-store URI (`s3://`, `gs://`, `az://`) which requires the `[cloud]` extra.",
           "hints": {
             "choices": null,
             "connection_kind": null,
@@ -3194,6 +3529,82 @@
           "name": "encoding",
           "required": false,
           "type_token": "str"
+        },
+        {
+          "default": false,
+          "help": "Add a 'source_file' column naming the file each row came from. Useful when loading a glob pattern across many files.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Add source file column",
+          "name": "source_file",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": null,
+          "help": "Name of a connection profile supplying object-store credentials for a remote URI. A profile NAME only -- never a credential, which is resolved from the profile's env-var names at load time. Ignored for local paths.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Connection profile",
+          "name": "connection",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional list of column names that must be present after loading. A missing column fails the load with a typed SchemaContractError naming every mismatch at once, rather than surfacing as a KeyError further downstream.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected columns",
+          "name": "expect_columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional map of column name to expected pandas dtype string (e.g. {'id': 'int64', 'name': 'object'}). Checked after loading; a mismatch fails the load with a typed SchemaContractError.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected dtypes",
+          "name": "expect_dtypes",
+          "required": false,
+          "type_token": "dict"
         }
       ],
       "ports": [
@@ -3208,6 +3619,337 @@
         }
       ],
       "type": "data.load_csv",
+      "version": 4
+    },
+    {
+      "advisor_persona": "data_modeller",
+      "category": "Ingest",
+      "description": "Load a sheet from an Excel workbook into a pandas DataFrame.",
+      "family": "data",
+      "label": "Load Excel",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Filesystem path to the .xlsx file to load. Accepts a glob pattern (e.g. `data/*.xlsx`) to row-concatenate every match in sorted order, or an object-store URI (`s3://`, `gs://`, `az://`) which requires the `[cloud]` extra.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "file"
+          },
+          "label": "Excel path",
+          "name": "path",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "0",
+          "help": "A sheet name, or a zero-based index like ``0``. A string of all digits is automatically converted to an integer index.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Sheet name or index",
+          "name": "sheet",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 0,
+          "help": "Zero-based row index to use as the column header.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Header row",
+          "name": "header_row",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "An Excel range string (e.g. ``\"A:D\"``) or a comma-separated list of column names. Passed through to pandas.read_excel.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Columns to load",
+          "name": "usecols",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": false,
+          "help": "Add a 'source_file' column naming the file each row came from. Useful when loading a glob pattern across many files.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Add source file column",
+          "name": "source_file",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": null,
+          "help": "Name of a connection profile supplying object-store credentials for a remote URI. A profile NAME only -- never a credential, which is resolved from the profile's env-var names at load time. Ignored for local paths.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Connection profile",
+          "name": "connection",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional list of column names that must be present after loading. A missing column fails the load with a typed SchemaContractError naming every mismatch at once, rather than surfacing as a KeyError further downstream.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected columns",
+          "name": "expect_columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional map of column name to expected pandas dtype string (e.g. {'id': 'int64', 'name': 'object'}). Checked after loading; a mismatch fails the load with a typed SchemaContractError.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected dtypes",
+          "name": "expect_dtypes",
+          "required": false,
+          "type_token": "dict"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The loaded data as a pandas DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.load_excel",
+      "version": 2
+    },
+    {
+      "advisor_persona": "data_modeller",
+      "category": "Ingest",
+      "description": "Load a Google Sheets tab into a pandas DataFrame over the HTTP client seam.",
+      "family": "data",
+      "label": "Load Google Sheet",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "The id from the sheet's URL.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Spreadsheet ID",
+          "name": "spreadsheet_id",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Tab name within the spreadsheet (omit for the first/default tab).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Sheet name",
+          "name": "sheet",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 0,
+          "help": "Zero-based row index to use as column header.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Header row",
+          "name": "header_row",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "A connection-profile name (never a credential). Resolved to live credentials by the HttpClient at fetch time.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Connection",
+          "name": "connection",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Request timeout in seconds.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Timeout (s)",
+          "name": "timeout_s",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Optional list of column names that must be present after loading. A missing column fails the load with a typed SchemaContractError naming every mismatch at once, rather than surfacing as a KeyError further downstream.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected columns",
+          "name": "expect_columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional map of column name to expected pandas dtype string (e.g. {'id': 'int64', 'name': 'object'}). Checked after loading; a mismatch fails the load with a typed SchemaContractError.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected dtypes",
+          "name": "expect_dtypes",
+          "required": false,
+          "type_token": "dict"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The loaded sheet data as a pandas DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.load_google_sheet",
       "version": 2
     },
     {
@@ -3220,7 +3962,7 @@
       "params": [
         {
           "default": null,
-          "help": "Filesystem path to the .json file to load.",
+          "help": "Filesystem path to the .json file to load. Accepts a glob pattern (e.g. `data/*.json`) to row-concatenate every match in sorted order, or an object-store URI (`s3://`, `gs://`, `az://`) which requires the `[cloud]` extra.",
           "hints": {
             "choices": null,
             "connection_kind": null,
@@ -3254,6 +3996,82 @@
           "name": "lines",
           "required": false,
           "type_token": "bool"
+        },
+        {
+          "default": false,
+          "help": "Add a 'source_file' column naming the file each row came from. Useful when loading a glob pattern across many files.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Add source file column",
+          "name": "source_file",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": null,
+          "help": "Name of a connection profile supplying object-store credentials for a remote URI. A profile NAME only -- never a credential, which is resolved from the profile's env-var names at load time. Ignored for local paths.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Connection profile",
+          "name": "connection",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional list of column names that must be present after loading. A missing column fails the load with a typed SchemaContractError naming every mismatch at once, rather than surfacing as a KeyError further downstream.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected columns",
+          "name": "expect_columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional map of column name to expected pandas dtype string (e.g. {'id': 'int64', 'name': 'object'}). Checked after loading; a mismatch fails the load with a typed SchemaContractError.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected dtypes",
+          "name": "expect_dtypes",
+          "required": false,
+          "type_token": "dict"
         }
       ],
       "ports": [
@@ -3268,7 +4086,7 @@
         }
       ],
       "type": "data.load_json",
-      "version": 2
+      "version": 4
     },
     {
       "advisor_persona": null,
@@ -3280,7 +4098,7 @@
       "params": [
         {
           "default": null,
-          "help": "Filesystem path to the .parquet file to load.",
+          "help": "Filesystem path to the .parquet file to load. Accepts a glob pattern (e.g. `data/*.parquet`) to row-concatenate every match in sorted order, or an object-store URI (`s3://`, `gs://`, `az://`) which requires the `[cloud]` extra.",
           "hints": {
             "choices": null,
             "connection_kind": null,
@@ -3305,6 +4123,82 @@
           "name": "columns",
           "required": false,
           "type_token": "list[str]"
+        },
+        {
+          "default": false,
+          "help": "Add a 'source_file' column naming the file each row came from. Useful when loading a glob pattern across many files.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Add source file column",
+          "name": "source_file",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": null,
+          "help": "Name of a connection profile supplying object-store credentials for a remote URI. A profile NAME only -- never a credential, which is resolved from the profile's env-var names at load time. Ignored for local paths.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Connection profile",
+          "name": "connection",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional list of column names that must be present after loading. A missing column fails the load with a typed SchemaContractError naming every mismatch at once, rather than surfacing as a KeyError further downstream.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected columns",
+          "name": "expect_columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional map of column name to expected pandas dtype string (e.g. {'id': 'int64', 'name': 'object'}). Checked after loading; a mismatch fails the load with a typed SchemaContractError.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected dtypes",
+          "name": "expect_dtypes",
+          "required": false,
+          "type_token": "dict"
         }
       ],
       "ports": [
@@ -3319,24 +4213,27 @@
         }
       ],
       "type": "data.load_parquet",
-      "version": 1
+      "version": 4
     },
     {
       "advisor_persona": null,
       "category": "Ingest",
-      "description": "Load a small bundled sample dataset (zero filesystem setup).",
+      "description": "Load a small bundled sample dataset (zero filesystem setup): the sklearn classification/regression toy sets (iris, wine, diabetes), a daily web-traffic time series, a product-review text corpus, and a retail transactions table.",
       "family": "data",
       "label": "Load Sample",
       "paradigm": "functional",
       "params": [
         {
           "default": "iris",
-          "help": "Which bundled sample dataset to load.",
+          "help": "Which bundled sample dataset to load: iris/wine/diabetes (sklearn), web_traffic (timeseries), reviews (text/LLM), or transactions (product analytics).",
           "hints": {
             "choices": [
               "iris",
               "wine",
-              "diabetes"
+              "diabetes",
+              "web_traffic",
+              "reviews",
+              "transactions"
             ],
             "connection_kind": null,
             "max": null,
@@ -3365,7 +4262,7 @@
         }
       ],
       "type": "data.load_sample",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,

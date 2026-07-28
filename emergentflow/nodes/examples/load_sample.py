@@ -3,9 +3,11 @@ emergentflow.nodes.examples.load_sample
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Reference node: ``data.load_sample`` — a *source* node (0 inputs, 1 output).
 
-Real, bundled, scikit-learn-backed sample dataset loader (Epic 6, Story 3). ``execute`` calls
-``emergentflow.data.load_sample`` directly and the code emitted by ``codegen`` calls the
-same wrapper via the ``ef.`` alias, so the two paths are equivalent by construction (ADR 0002).
+Real, bundled, scikit-learn-backed sample dataset loader (Epic 6, Story 3), plus three
+generated synthetic datasets for the timeseries, text/LLM, and product-analytics node
+families (Epic 16, Story 4). ``execute`` calls ``emergentflow.data.load_sample`` directly
+and the code emitted by ``codegen`` calls the same wrapper via the ``ef.`` alias, so the
+two paths are equivalent by construction (ADR 0002).
 """
 
 from __future__ import annotations
@@ -29,11 +31,15 @@ class LoadSample(NodeDefinition):
     """Load a small bundled sample dataset (zero filesystem setup)."""
 
     type = "data.load_sample"
-    version = 1
+    version = 2
     family = "data"
     label = "Load Sample"
     category = "Ingest"
-    description = "Load a small bundled sample dataset (zero filesystem setup)."
+    description = (
+        "Load a small bundled sample dataset (zero filesystem setup): the sklearn "
+        "classification/regression toy sets (iris, wine, diabetes), a daily web-traffic "
+        "time series, a product-review text corpus, and a retail transactions table."
+    )
 
     ports = [
         PortSpec(
@@ -50,7 +56,11 @@ class LoadSample(NodeDefinition):
             type_token="str",
             default="iris",
             label="Dataset",
-            help="Which bundled sample dataset to load.",
+            help=(
+                "Which bundled sample dataset to load: iris/wine/diabetes (sklearn), "
+                "web_traffic (timeseries), reviews (text/LLM), or transactions "
+                "(product analytics)."
+            ),
             hints=ValidationHints(choices=list(SAMPLE_DATASETS), widget="select"),
         ),
     ]

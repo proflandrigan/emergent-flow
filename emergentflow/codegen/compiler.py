@@ -98,6 +98,7 @@ class _AssembledModule:
     leaf_vars: list[str]  # OUT-port vars with no downstream consumer
     needs_llm: bool  # True iff any node needs the LLM client seam (ADR 0017/0018)
     needs_warehouse: bool  # True iff any node needs the warehouse client seam (ADR 0018)
+    needs_http: bool  # True iff any node needs the HTTP client seam (Epic 16 Story 1)
     env_hints: tuple[str, ...]  # sorted, deduped env vars a standalone run of this script needs
     connection_hints: tuple[str, ...]  # sorted, deduped LLM connection profile NAMES referenced
     # by nodes whose credential can't be resolved to a real env var without I/O (ADR 0002)
@@ -152,6 +153,7 @@ def _assemble(graph: Graph) -> _AssembledModule:
     code_fragments: list[CodeFragment] = []
     needs_llm = False
     needs_warehouse = False
+    needs_http = False
     env_hint_set: set[str] = set()
     connection_hint_set: set[str] = set()
 
@@ -202,6 +204,8 @@ def _assemble(graph: Graph) -> _AssembledModule:
                     env_hint_set.add(resolve_api_key_env_name(provider, api_key_env))
         if ClientKind.WAREHOUSE in kinds:
             needs_warehouse = True
+        if ClientKind.HTTP in kinds:
+            needs_http = True
         ctx = build_codegen_context(node, name_map, wiring_map)
         fragment = definition.codegen(node, ctx)
         code_fragments.append(fragment)
@@ -242,6 +246,7 @@ def _assemble(graph: Graph) -> _AssembledModule:
         leaf_vars=leaf_vars,
         needs_llm=needs_llm,
         needs_warehouse=needs_warehouse,
+        needs_http=needs_http,
         env_hints=tuple(sorted(env_hint_set)),
         connection_hints=tuple(sorted(connection_hint_set)),
     )
@@ -287,13 +292,17 @@ def compile_to_code(graph: Graph) -> str:
 
     import_block = "\n".join(assembled.imports)
 
-    # A warehouse graph (ADR 0018) threads the extensible Clients bundle; main()
+    # A warehouse or HTTP graph threads the extensible Clients bundle; main()
     # unpacks each needed seam into the local names node fragments reference
-    # (`warehouse`, and `client` when an LLM node is also present). Emitted before
-    # the node bodies so those locals are in scope.
+    # (`warehouse`, `http`, and `client` when an LLM node is also present).
+    # Emitted before the node bodies so those locals are in scope.
+    needs_bundle = assembled.needs_warehouse or assembled.needs_http
     preamble_lines: list[str] = []
-    if assembled.needs_warehouse:
-        preamble_lines.append("warehouse = clients.warehouse if clients is not None else None")
+    if needs_bundle:
+        if assembled.needs_warehouse:
+            preamble_lines.append("warehouse = clients.warehouse if clients is not None else None")
+        if assembled.needs_http:
+            preamble_lines.append("http = clients.http if clients is not None else None")
         if assembled.needs_llm:
             preamble_lines.append("client = clients.llm if clients is not None else None")
 
@@ -307,21 +316,31 @@ def compile_to_code(graph: Graph) -> str:
 
     main_body = "\n".join(body_lines)
 
-    if assembled.needs_warehouse:
+    if needs_bundle:
         main_signature = "def main(*, clients: object | None = None) -> dict[str, object]:"
         boiler = "    from emergentflow.clients import Clients\n"
         seams = []
         if assembled.needs_llm:
             boiler += "    from emergentflow.llm.gateway import GatewayClient\n"
             seams.append("llm=GatewayClient()")
-        seams.append("warehouse=None")
-        boiler += (
-            "\n"
-            "    # A warehouse graph needs a WarehouseClient injected "
-            "(emergentflow.data.warehouse);\n"
-            "    # replace warehouse=None with your configured client before running.\n"
-            f"    _results = main(clients=Clients({', '.join(seams)}))"
-        )
+        if assembled.needs_warehouse:
+            seams.append("warehouse=None")
+        if assembled.needs_http:
+            seams.append("http=None")
+        boiler += "\n"
+        if assembled.needs_warehouse:
+            boiler += (
+                "    # A warehouse graph needs a WarehouseClient injected "
+                "(emergentflow.data.warehouse);\n"
+                "    # replace warehouse=None with your configured client before running.\n"
+            )
+        if assembled.needs_http:
+            boiler += (
+                "    # An HTTP graph needs an HttpClient injected "
+                "(emergentflow.data.http);\n"
+                "    # replace http=None with your configured client before running.\n"
+            )
+        boiler += f"    _results = main(clients=Clients({', '.join(seams)}))"
         main_call = boiler
     elif assembled.needs_llm:
         # Byte-identical to the pre-ADR-0018 LLM path (Epic 9 Story 1 back-compat gate).

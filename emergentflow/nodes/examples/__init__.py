@@ -62,11 +62,14 @@ from .forecast_ets import ForecastEts
 from .generate_features import GenerateFeatures
 from .grid_search import GridSearch
 from .group_by_aggregate import GroupByAggregate
+from .http_fetch import HttpFetch
 from .impute import ImputeMissing
 from .llm_call import LlmCall
 from .llm_prompt import LlmPrompt
 from .llm_prompt_from_file import LlmPromptFromFile
 from .load_csv import LoadCsv
+from .load_excel import LoadExcel
+from .load_google_sheet import LoadGoogleSheet
 from .load_json import LoadJson
 from .load_parquet import LoadParquet
 from .load_sample import LoadSample
@@ -171,6 +174,7 @@ __all__ = [
     "GenerateHtmlSummary",
     "GridSearch",
     "GroupByAggregate",
+    "HttpFetch",
     "HybridSwitching",
     "HybridWeighted",
     "ImputeMissing",
@@ -178,6 +182,8 @@ __all__ = [
     "LlmPrompt",
     "LlmPromptFromFile",
     "LoadCsv",
+    "LoadExcel",
+    "LoadGoogleSheet",
     "LoadJson",
     "LoadParquet",
     "LoadSample",

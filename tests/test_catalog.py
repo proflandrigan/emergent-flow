@@ -17,6 +17,8 @@ from emergentflow.nodes.examples import (
     ImputeMissing,
     LlmCall,
     LoadCsv,
+    LoadExcel,
+    LoadGoogleSheet,
     LoadJson,
     LoadParquet,
     LoadSample,
@@ -38,6 +40,8 @@ from emergentflow.nodes.registry import NodeRegistry
 
 REFERENCE_NODES = [
     LoadCsv,
+    LoadExcel,
+    LoadGoogleSheet,
     LoadParquet,
     LoadJson,
     LoadSample,

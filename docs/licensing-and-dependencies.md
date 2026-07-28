@@ -84,6 +84,23 @@ the binary-artifact problem the `PlotSpec` (`fig.to_json()`, JSON-native) contra
 designed to avoid. The pingouin GPL ban recorded above likewise still stands: it is not
 reintroduced for any convenience.
 
+## Bundled sample datasets (`ef.data.load_sample`)
+
+`ef.data.load_sample` bundles six sample datasets, split across two licensing categories:
+
+| Dataset | Source | License |
+|---|---|---|
+| `iris`, `wine`, `diabetes` | scikit-learn's bundled toy datasets | BSD-3-Clause (already a dependency) |
+| `web_traffic`, `reviews`, `transactions` | Generated in-process from a fixed seed | None (synthetic, no upstream license) |
+
+The first three wrap real scikit-learn toy datasets and inherit scikit-learn's BSD-3-Clause
+license, already covered by the compatibility matrix above. The last three (`web_traffic`, a
+daily time series; `reviews`, a short product-review text corpus; `transactions`, a retail
+transaction/event table) are synthetic data generated deterministically at call time from a
+fixed seed (`emergentflow/data/__init__.py`) — they raise no licensing question at all, since
+there is no upstream source, and they are not checked into the repo as data files. They are
+not real-world data and must never be presented as such.
+
 ## Policy
 
 To ensure ongoing license compliance and maintain the SDK's embeddability:

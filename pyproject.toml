@@ -138,6 +138,24 @@ explain = [
 embed = [
     "sentence-transformers>=3,<4",
 ]
+# `pip install emergentflow[cloud]` enables remote object-storage URIs (`s3://`/`gs://`/`az://`)
+# for the data loaders, routed through fsspec (Epic 16). fsspec, s3fs, and gcsfs are all
+# BSD-3-Clause; adlfs is BSD-3-Clause — none are GPL. Kept optional so a bare SDK install stays
+# light (ADR 0007) and never pulls cloud SDKs; a remote-URI load in a base install raises a typed
+# MissingOptionalDependencyError, never an opaque ImportError.
+cloud = [
+    "fsspec>=2024.2",
+    "s3fs>=2024.2",
+    "gcsfs>=2024.2",
+    "adlfs>=2024.2",
+]
+# `pip install emergentflow[excel]` enables `ef.data.load_excel`. openpyxl is MIT
+# (compatible with this SDK's Apache-2.0 license; not GPL). Kept optional so a bare
+# SDK install stays light (ADR 0007); a `load_excel` call in a base install raises a
+# typed MissingOptionalDependencyError, never an opaque ImportError.
+excel = [
+    "openpyxl>=3.1,<4",
+]
 # `pip install emergentflow[bigquery]` enables the BigQuery warehouse adapter (Epic 13).
 # google-cloud-bigquery is Apache-2.0 (compatible; not GPL). Kept optional so a bare SDK
 # install stays credential-free and light (ADR 0007 / ADR 0018); a BigQuery node in a base
@@ -170,7 +188,7 @@ mcp = [
 # modeling, and the MCP tool wrapper. Convenient for local development or
 # exploration; production installs should cherry-pick only the extras they need.
 all = [
-    "emergentflow[server,llm,bayes,embed,explain,bigquery,redshift,postgres,mcp]",
+    "emergentflow[server,llm,bayes,embed,explain,cloud,excel,bigquery,redshift,postgres,mcp]",
 ]
 
 [project.urls]
@@ -293,5 +311,9 @@ module = [
     # inside `emergentflow/embed/__init__.py`, absent from the bare `uv sync --locked`
     # CI env (like torch/litellm/pymc).
     "sentence_transformers.*",
+    # The optional `emergentflow[cloud]` extra (Epic 16): fsspec ships no type stubs and is
+    # imported lazily inside `emergentflow/data/__init__.py`'s remote-URI loaders, absent
+    # from the bare `uv sync --locked` CI env (like torch/litellm/pymc).
+    "fsspec.*",
 ]
 ignore_missing_imports = true

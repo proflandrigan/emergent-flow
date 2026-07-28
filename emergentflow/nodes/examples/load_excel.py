@@ -1,18 +1,21 @@
 """
-emergentflow.nodes.examples.load_parquet
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Reference node: ``data.load_parquet`` — a *source* node (0 inputs, 1 output).
+emergentflow.nodes.examples.load_excel
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Reference node: ``data.load_excel`` — a *source* node (0 inputs, 1 output).
 
-Real, pandas/pyarrow-backed loader (Epic 6, Story 3). ``execute`` calls
-``emergentflow.data.load_parquet`` directly and the code emitted by ``codegen`` calls the
-same wrapper via the ``ef.`` alias, so the two paths are equivalent by construction (ADR 0002).
+Real, pandas-backed Excel loader (Epic 16, Story 3). ``execute`` calls
+``emergentflow.data.load_excel`` directly and the code emitted by ``codegen``
+calls the same wrapper via the ``ef.`` alias, so the two paths are equivalent
+by construction (ADR 0002).
+
+Requires the optional ``[excel]`` extra at run time (provides ``openpyxl``).
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from emergentflow.data import load_parquet
+from emergentflow.data import load_excel
 from emergentflow.ir.common import Direction
 from emergentflow.ir.node import Node
 
@@ -25,18 +28,19 @@ if TYPE_CHECKING:
 
 
 @register
-class LoadParquet(NodeDefinition):
-    """Load a Parquet file into a pandas DataFrame."""
+class LoadExcel(NodeDefinition):
+    """Load a sheet from an Excel workbook into a pandas DataFrame."""
 
-    type = "data.load_parquet"
-    version = 4
+    type = "data.load_excel"
+    version = 2
     family = "data"
-    label = "Load Parquet"
+    label = "Load Excel"
     category = "Ingest"
-    description = "Load a Parquet file into a pandas DataFrame."
+    description = "Load a sheet from an Excel workbook into a pandas DataFrame."
     # execute() re-reads the file at `path` on every call; the file's content can
     # change without the `path` param changing, so this is not a pure function of
     # its declared params (see NodeDefinition.cacheable's docstring).
+    advisor_persona = "data_modeller"
     cacheable = False
 
     ports = [
@@ -53,19 +57,38 @@ class LoadParquet(NodeDefinition):
             name="path",
             type_token="str",
             required=True,
-            label="Parquet path",
-            help="Filesystem path to the .parquet file to load. Accepts a glob pattern "
-            "(e.g. `data/*.parquet`) to row-concatenate every match in sorted order, or "
-            "an object-store URI (`s3://`, `gs://`, `az://`) which requires the "
-            "`[cloud]` extra.",
+            label="Excel path",
+            help="Filesystem path to the .xlsx file to load. Accepts a glob pattern (e.g. "
+            "`data/*.xlsx`) to row-concatenate every match in sorted order, or an "
+            "object-store URI (`s3://`, `gs://`, `az://`) which requires the `[cloud]` "
+            "extra.",
             hints=ValidationHints(widget="file"),
         ),
         ParamSpec(
-            name="columns",
-            type_token="list[str]",
+            name="sheet",
+            type_token="str",
+            default="0",
+            label="Sheet name or index",
+            help="A sheet name, or a zero-based index like ``0``. A string of all digits "
+            "is automatically converted to an integer index.",
+            hints=ValidationHints(widget="text"),
+        ),
+        ParamSpec(
+            name="header_row",
+            type_token="int",
+            default=0,
+            label="Header row",
+            help="Zero-based row index to use as the column header.",
+            hints=ValidationHints(widget="number", min=0),
+        ),
+        ParamSpec(
+            name="usecols",
+            type_token="str",
             default=None,
-            label="Columns",
-            help="Optional subset of columns to read; leave unset to read all columns.",
+            label="Columns to load",
+            help='An Excel range string (e.g. ``"A:D"``) or a comma-separated list of '
+            "column names. Passed through to pandas.read_excel.",
+            hints=ValidationHints(widget="text"),
         ),
         ParamSpec(
             name="source_file",
@@ -110,36 +133,64 @@ class LoadParquet(NodeDefinition):
 
     def _args(
         self, node: Node
-    ) -> tuple[str, list[str] | None, bool, str | None, list[str] | None, dict[str, str] | None]:
+    ) -> tuple[
+        str, str | int, int, str | None, bool, str | None, list[str] | None, dict[str, str] | None
+    ]:
         values = {p.name: p.value for p in node.params}
+        path = values.get("path")
+        sheet_raw = values.get("sheet", "0")
+        if sheet_raw is None:
+            sheet_raw = "0"
+        # coerce all-digit strings to int so codegen and execute pass the same type
+        sheet: str | int
+        if isinstance(sheet_raw, str):
+            sheet = sheet_raw.strip()
+            if sheet.isdigit():
+                sheet = int(sheet)
+        else:
+            sheet = cast("str | int", sheet_raw)
+        header_row = values.get("header_row", 0)
+        if header_row is None:
+            header_row = 0
+        usecols = values.get("usecols")
         source_file = values.get("source_file", False)
         if source_file is None:
             source_file = False
+        connection = values.get("connection")
         return (
-            cast(str, values.get("path")),
-            cast("list[str] | None", values.get("columns")),
+            cast(str, path),
+            sheet,
+            cast(int, header_row),
+            cast("str | None", usecols),
             cast(bool, source_file),
-            cast("str | None", values.get("connection")),
+            cast("str | None", connection),
             cast("list[str] | None", values.get("expect_columns")),
             cast("dict[str, str] | None", values.get("expect_dtypes")),
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        path, columns, source_file, connection, expect_columns, expect_dtypes = self._args(node)
+        path, sheet, header_row, usecols, source_file, connection, expect_columns, expect_dtypes = (
+            self._args(node)
+        )
         return CodeFragment(
             imports=["import emergentflow as ef"],
-            body=f"{ctx.out_var('frame')} = ef.data.load_parquet("
-            f"{path!r}, columns={columns!r}, source_file={source_file!r}, "
+            body=f"{ctx.out_var('frame')} = ef.data.load_excel("
+            f"{path!r}, sheet={sheet!r}, header_row={header_row!r}, "
+            f"usecols={usecols!r}, source_file={source_file!r}, "
             f"connection={connection!r}, expect_columns={expect_columns!r}, "
             f"expect_dtypes={expect_dtypes!r})",
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        path, columns, source_file, connection, expect_columns, expect_dtypes = self._args(node)
+        path, sheet, header_row, usecols, source_file, connection, expect_columns, expect_dtypes = (
+            self._args(node)
+        )
         return {
-            "frame": load_parquet(
+            "frame": load_excel(
                 path,
-                columns=columns,
+                sheet=sheet,
+                header_row=header_row,
+                usecols=usecols,
                 source_file=source_file,
                 connection=connection,
                 expect_columns=expect_columns,
