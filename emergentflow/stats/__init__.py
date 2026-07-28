@@ -310,8 +310,9 @@ def mann_whitney(
     """Mann-Whitney U rank-sum test between two groups.
 
     Thin wrapper over ``scipy.stats.mannwhitneyu``. ``group_col`` must contain exactly two
-    groups. Effect size is the rank-biserial correlation ``r = 1 - (2*U) / (n_a*n_b)``.
-    Deterministic.
+    groups. Effect size is the rank-biserial correlation ``r = (2*U) / (n_a*n_b) - 1``, where
+    ``U`` is the U statistic for group_a (positive means group_a is stochastically greater than
+    group_b, matching the sign convention used by ``ttest``'s Cohen's d). Deterministic.
     """
     if group_col not in df.columns:
         raise ValueError(f"unknown group_col {group_col!r}; expected one of {list(df.columns)!r}.")
@@ -335,7 +336,7 @@ def mann_whitney(
     n_a, n_b = int(a.shape[0]), int(b.shape[0])
     res = mannwhitneyu(a, b, alternative=alternative)
     u_stat = float(res.statistic)
-    effect_size = 1.0 - (2.0 * u_stat) / (n_a * n_b) if n_a * n_b > 0 else float("nan")
+    effect_size = (2.0 * u_stat) / (n_a * n_b) - 1.0 if n_a * n_b > 0 else float("nan")
     return pd.DataFrame(
         [
             {
@@ -547,8 +548,9 @@ def test_proportions(
     Thin wrapper over ``statsmodels.stats.proportion.proportions_ztest`` (test statistic/p-value)
     and ``confint_proportions_2indep`` (CI). ``group_col`` must contain exactly 2 distinct groups
     (sorted labels group_a < group_b); ``success_col`` must be a binary 0/1/True/False column.
-    ``diff``/``ci_low``/``ci_high``/``relative_uplift`` are all expressed as GROUP B RELATIVE TO
-    GROUP A (``p_b - p_a``), so a positive ``diff`` means group_b's rate is higher. Deterministic.
+    ``statistic``/``diff``/``ci_low``/``ci_high``/``relative_uplift`` are all expressed as GROUP B
+    RELATIVE TO GROUP A (``p_b - p_a``), so a positive ``diff`` (and a positive ``statistic``)
+    means group_b's rate is higher. Deterministic.
     """
     if group_col not in df.columns:
         raise ValueError(f"unknown group_col {group_col!r}; expected one of {list(df.columns)!r}.")
@@ -573,7 +575,7 @@ def test_proportions(
     count_a, count_b = int(a.sum()), int(b.sum())
     p_a = count_a / n_a if n_a > 0 else float("nan")
     p_b = count_b / n_b if n_b > 0 else float("nan")
-    stat, p_value = proportions_ztest([count_a, count_b], [n_a, n_b])
+    stat, p_value = proportions_ztest([count_b, count_a], [n_b, n_a])
     ci_low, ci_high = confint_proportions_2indep(
         count_b, n_b, count_a, n_a, compare="diff", alpha=alpha
     )
