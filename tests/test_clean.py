@@ -428,6 +428,20 @@ def test_merge_no_keys_raises() -> None:
         merge(left, right)
 
 
+def test_merge_empty_on_raises() -> None:
+    left = pd.DataFrame({"a": [1]})
+    right = pd.DataFrame({"a": [1]})
+    with pytest.raises(ValueError, match="non-empty"):
+        merge(left, right, on=[])
+
+
+def test_merge_empty_left_on_right_on_raises() -> None:
+    left = pd.DataFrame({"a": [1]})
+    right = pd.DataFrame({"a": [1]})
+    with pytest.raises(ValueError, match="non-empty"):
+        merge(left, right, left_on=[], right_on=[])
+
+
 def test_merge_unknown_key_column_raises() -> None:
     left = pd.DataFrame({"a": [1]})
     right = pd.DataFrame({"a": [1]})
@@ -550,6 +564,20 @@ def test_semi_join_no_keys_spec_raises() -> None:
     keys = pd.DataFrame({"a": [1]})
     with pytest.raises(ValueError, match="must specify"):
         semi_join(frame, keys)
+
+
+def test_semi_join_empty_on_raises() -> None:
+    frame = pd.DataFrame({"a": [1]})
+    keys = pd.DataFrame({"a": [1]})
+    with pytest.raises(ValueError, match="non-empty"):
+        semi_join(frame, keys, on=[])
+
+
+def test_semi_join_empty_left_on_right_on_raises() -> None:
+    frame = pd.DataFrame({"a": [1]})
+    keys = pd.DataFrame({"a": [1]})
+    with pytest.raises(ValueError, match="non-empty"):
+        semi_join(frame, keys, left_on=[], right_on=[])
 
 
 def test_semi_join_unequal_left_on_right_on_length_raises() -> None:

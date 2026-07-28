@@ -345,6 +345,8 @@ def merge(
             raise ValueError("left_on and right_on must be given together.")
         if on is None and left_on is None:
             raise ValueError("must specify 'on' or 'left_on'/'right_on' (unless how='cross').")
+        if on is not None and len(on) == 0:
+            raise ValueError("'on' must be a non-empty list of column names.")
         if on is not None:
             unknown_left = [c for c in on if c not in left.columns]
             unknown_right = [c for c in on if c not in right.columns]
@@ -360,6 +362,8 @@ def merge(
                 )
         else:
             assert left_on is not None and right_on is not None
+            if len(left_on) == 0 or len(right_on) == 0:
+                raise ValueError("'left_on'/'right_on' must be non-empty lists of column names.")
             if len(left_on) != len(right_on):
                 raise ValueError(
                     f"left_on and right_on must be the same length; "
@@ -441,6 +445,9 @@ def semi_join(
                 f"left_on and right_on must be the same length; "
                 f"got {len(left_keys)} and {len(right_keys)}."
             )
+
+    if not left_keys or not right_keys:
+        raise ValueError("key column list(s) must be non-empty.")
 
     unknown_left = [c for c in left_keys if c not in frame.columns]
     if unknown_left:
