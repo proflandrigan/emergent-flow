@@ -78,11 +78,19 @@ def sample_rows(
         return df.head(n).copy()
 
     if mode == "random":
+        if n is not None and n > len(df):
+            raise CleanError(
+                f"n={n} exceeds the number of available rows ({len(df)}); sample_rows draws "
+                "without replacement, so n cannot exceed the row count."
+            )
         return df.sample(n=n, frac=frac, random_state=seed)
 
     assert by is not None
     parts: list[pd.DataFrame] = []
-    for _key, group in df.groupby(by, sort=True, observed=True):
+    # dropna=False: a stratified sample must not silently discard rows whose 'by' key is
+    # NaN -- they form their own stratum like any other group value, rather than vanishing
+    # from the output with no error raised.
+    for _key, group in df.groupby(by, sort=True, observed=True, dropna=False):
         if n is not None:
             take = min(n, len(group))
             parts.append(group.sample(n=take, random_state=seed))
@@ -147,18 +155,28 @@ def fuzzy_join(
         )
 
     scorer_fn = getattr(fuzz, scorer)
-    right_values = right[right_on].astype(str).tolist()
+    # A missing key (NaN/NA) stringifies to the literal text "nan" via astype(str); left
+    # unguarded, two unrelated rows that are BOTH simply missing a key would then score a
+    # perfect/high similarity match against each other. Right rows with a missing key are
+    # therefore excluded from the candidate pool entirely (kept as unmatched, same as any
+    # other below-threshold miss), and left rows with a missing key never attempt a match.
+    right_key = right[right_on]
+    valid_positions = [pos for pos, is_na in enumerate(right_key.isna()) if not is_na]
+    right_values = right_key.astype(str).iloc[valid_positions].tolist()
+    left_key = left[left_on]
     left_positions: list[int] = []
     right_positions: list[int] = []
     scores: list[float] = []
-    for i, value in enumerate(left[left_on].astype(str).tolist()):
-        matches = process.extract(
-            value, right_values, scorer=scorer_fn, limit=limit, score_cutoff=threshold
-        )
+    for i, (value, is_na) in enumerate(zip(left_key.astype(str), left_key.isna(), strict=True)):
+        matches = []
+        if not is_na:
+            matches = process.extract(
+                value, right_values, scorer=scorer_fn, limit=limit, score_cutoff=threshold
+            )
         if matches:
             for _choice, score, j in matches:
                 left_positions.append(i)
-                right_positions.append(j)
+                right_positions.append(valid_positions[j])
                 scores.append(float(score))
         elif how == "left":
             left_positions.append(i)

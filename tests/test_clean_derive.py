@@ -217,3 +217,28 @@ def test_derive_empty_columns_raises() -> None:
 def test_derive_result_is_inspectable() -> None:
     result = derive_column(_df(), columns=[{"name": "margin", "expr": "revenue - cost"}])
     assert is_inspectable(result) is True
+
+
+def test_case_when_mixes_string_and_numeric_literals() -> None:
+    """A numeric result with a string fallback label is a legitimate case-when.
+
+    numpy.select has no common dtype for that mix and raises a bare TypeError, so the
+    choices are forced to object dtype -- each value must keep its original Python type
+    rather than being coerced or crashing.
+    """
+    df = pd.DataFrame({"flag": [1, 2, 3]})
+    result = derive_column(
+        df,
+        columns=[
+            {
+                "name": "x",
+                "when": [
+                    {"if": "flag == 1", "then": 100},
+                    {"if": "flag == 2", "then": "unknown"},
+                ],
+                "else": 0,
+            }
+        ],
+    )
+    assert result["x"].tolist() == [100, "unknown", 0]
+    assert [type(v).__name__ for v in result["x"]] == ["int", "str", "int"]

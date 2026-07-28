@@ -277,3 +277,50 @@ def test_fuzzy_join_score_column_collides_with_suffix_renamed_column() -> None:
     right = pd.DataFrame({"company": ["Apple Inc."], "score": [2]})
     with pytest.raises(ColumnCollisionError, match="collides"):
         fuzzy_join(left, right, left_on="name", right_on="company", score_column="score_x")
+
+
+# ---------------------------------------------------------------------------
+# Missing-key / edge-case guards (added by the Story group B bug-hunt review).
+# ---------------------------------------------------------------------------
+
+
+def test_fuzzy_join_missing_keys_do_not_match_each_other() -> None:
+    """Two rows that are each merely *missing* a key carry no matching information.
+
+    ``astype(str)`` renders a missing key as the literal text ``"nan"``/``"None"``, which
+    would otherwise score a perfect self-similarity and silently join unrelated rows.
+    """
+    pytest.importorskip("rapidfuzz")
+    left = pd.DataFrame({"name": ["Acme", None], "lid": [1, 2]})
+    right = pd.DataFrame({"company": ["Acme Inc", None], "rid": [10, 20]})
+    result = fuzzy_join(left, right, left_on="name", right_on="company", how="left", threshold=80)
+    # The None-keyed left row must come back unmatched, not paired with the None-keyed right row.
+    unmatched = result[result["name"].isna()]
+    assert len(unmatched) == 1
+    assert pd.isna(unmatched.iloc[0]["rid"])
+
+
+def test_fuzzy_join_remaps_positions_past_missing_right_keys() -> None:
+    """Excluding NaN-keyed right rows from the candidate pool must not shift the match.
+
+    rapidfuzz returns indices into the filtered candidate list, so they have to be mapped
+    back to original row positions or the join silently attaches the wrong right row.
+    """
+    pytest.importorskip("rapidfuzz")
+    left = pd.DataFrame({"name": ["Microsoft Corp"], "lid": [1]})
+    right = pd.DataFrame({"company": [None, "Microsoft Corp"], "rid": [99, 42]})
+    result = fuzzy_join(left, right, left_on="name", right_on="company", threshold=80)
+    assert result["rid"].tolist() == [42]
+
+
+def test_sample_stratified_keeps_missing_key_as_its_own_stratum() -> None:
+    """pandas' groupby drops NaN keys by default, which would silently discard those rows."""
+    df = pd.DataFrame({"grp": ["a", "a", None], "v": [1, 2, 3]})
+    result = sample_rows(df, mode="stratified", by=["grp"], n=1, seed=0)
+    assert len(result) == 2  # one from the "a" stratum, one from the NaN stratum
+
+
+def test_sample_random_n_larger_than_frame_is_typed() -> None:
+    """pandas raises a bare ValueError here; every other failure in this family is typed."""
+    with pytest.raises(CleanError, match="exceeds the number of available rows"):
+        sample_rows(pd.DataFrame({"a": [1, 2]}), mode="random", n=5)

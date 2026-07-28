@@ -135,6 +135,19 @@ def _case_when(frame: pd.DataFrame, name: str, spec: dict[str, Any]) -> Any:
     if len(frame) == 0:
         return pd.Series([], index=frame.index, dtype=object)
 
+    # numpy.select needs a common dtype across choices + default. A spec mixing a string with
+    # a numeric/bool literal has none, so numpy 2.x raises a bare TypeError ("Choicelist and
+    # default value do not have a common dtype") -- e.g. choices [100, "unknown"] with else 0.
+    # That is a legitimate case-when though (a numeric result with a string fallback label), so
+    # force object dtype for the mixed case: every value then keeps its original Python type.
+    # A single consistent type never hits the promotion, and None is already object-compatible.
+    all_values: list[Any] = [*choices, default]
+    has_str = any(isinstance(v, str) for v in all_values)
+    has_non_str = any(not isinstance(v, str) and v is not None for v in all_values)
+    if has_str and has_non_str:
+        choices = [np.full(len(frame), choice, dtype=object) for choice in choices]
+        default = np.array(default, dtype=object)
+
     # ``cast`` only undoes the isinstance narrowing above: numpy's stubs reject ``None`` as a
     # default, but it is a legitimate (and the default) case-when fallback at runtime.
     return np.select(conditions, choices, default=cast(Any, default))
