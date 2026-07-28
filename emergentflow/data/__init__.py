@@ -141,12 +141,35 @@ def _open_remote(filepath: str, connection: str | None):
     Raises
     ------
     MissingOptionalDependencyError
-        If the ``[cloud]`` extra is not installed.
+        If the ``[cloud]`` extra is not installed, or fsspec itself is present but the
+        URI's scheme-specific backend (``s3fs``/``gcsfs``/``adlfs``) is not -- fsspec
+        resolves that backend lazily inside ``fsspec.open()`` and raises a bare
+        ``ImportError``, which is translated here so a base install (or one with fsspec
+        but not the matching backend) never surfaces an opaque ``ImportError``.
     """
     _require_extra("emergentflow[cloud]")
     import fsspec
 
-    return fsspec.open(filepath, mode="rb", **_resolve_storage_options(connection))
+    try:
+        return fsspec.open(filepath, mode="rb", **_resolve_storage_options(connection))
+    except ImportError as exc:
+        raise MissingOptionalDependencyError("emergentflow[cloud]") from exc
+
+
+def _read_remote_file(
+    filepath: str,
+    connection: str | None,
+    reader: Callable[[object], pd.DataFrame],
+) -> pd.DataFrame:
+    """Open one remote object-store file, read it with *reader*, then close the handle.
+
+    The single-file remote path closes its fsspec handle via a ``with`` block; this
+    is the equivalent for each match in a remote glob, called once per file from
+    inside ``_concat_files``'s reader callback so no handle is left open after the
+    read completes.
+    """
+    with _open_remote(filepath, connection).open() as handle:
+        return reader(handle)
 
 
 def _resolve_remote_glob(filepath: str, connection: str | None, *, kind: str) -> list[str]:
@@ -160,12 +183,19 @@ def _resolve_remote_glob(filepath: str, connection: str | None, *, kind: str) ->
     ------
     DataLoadError
         If the pattern matches nothing. The message names the pattern and *kind*.
+    MissingOptionalDependencyError
+        If the ``[cloud]`` extra is not installed, or fsspec itself is present but the
+        URI's scheme-specific backend (``s3fs``/``gcsfs``/``adlfs``) is not (see
+        ``_open_remote``).
     """
     _require_extra("emergentflow[cloud]")
     import fsspec
 
     storage_options = _resolve_storage_options(connection)
-    fs, path = fsspec.core.url_to_fs(filepath, **storage_options)
+    try:
+        fs, path = fsspec.core.url_to_fs(filepath, **storage_options)
+    except ImportError as exc:
+        raise MissingOptionalDependencyError("emergentflow[cloud]") from exc
     scheme = filepath[: filepath.index("://") + len("://")]
     matches = sorted(f"{scheme}{m}" for m in fs.glob(path))
     if not matches:
@@ -279,7 +309,9 @@ def load_csv(
             uris = _resolve_remote_glob(filepath, connection, kind="CSV")
             frame = _concat_files(
                 uris,
-                lambda p: pd.read_csv(_open_remote(str(p), connection).open(), encoding=encoding),
+                lambda p: _read_remote_file(
+                    str(p), connection, lambda h: pd.read_csv(h, encoding=encoding)
+                ),
                 source_file=source_file,
             )
         else:
@@ -354,7 +386,9 @@ def load_parquet(
             uris = _resolve_remote_glob(filepath, connection, kind="Parquet")
             frame = _concat_files(
                 uris,
-                lambda p: pd.read_parquet(_open_remote(str(p), connection).open(), columns=columns),
+                lambda p: _read_remote_file(
+                    str(p), connection, lambda h: pd.read_parquet(h, columns=columns)
+                ),
                 source_file=source_file,
             )
         else:
@@ -430,8 +464,8 @@ def load_json(
             uris = _resolve_remote_glob(filepath, connection, kind="JSON")
             frame = _concat_files(
                 uris,
-                lambda p: pd.read_json(
-                    _open_remote(str(p), connection).open(), orient=orient, lines=lines
+                lambda p: _read_remote_file(
+                    str(p), connection, lambda h: pd.read_json(h, orient=orient, lines=lines)
                 ),
                 source_file=source_file,
             )
@@ -534,7 +568,9 @@ def load_excel(
             uris = _resolve_remote_glob(filepath, connection, kind="Excel")
             frame = _concat_files(
                 uris,
-                lambda p: _read_excel(_open_remote(str(p), connection).open(), display=p),
+                lambda p: _read_remote_file(
+                    str(p), connection, lambda h: _read_excel(h, display=p)
+                ),
                 source_file=source_file,
             )
         else:

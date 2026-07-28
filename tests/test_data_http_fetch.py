@@ -195,6 +195,30 @@ def test_cursor_pagination_respects_max_pages() -> None:
     assert len(result) == 3
 
 
+def test_cursor_pagination_continues_on_falsy_but_present_cursor() -> None:
+    """A cursor value of ``0`` (or ``""``) is a real, present cursor -- not "missing".
+
+    Only an *absent* key or an explicit ``null`` means "no more pages" (see
+    ``_select_cursor``'s docstring). A falsy-but-present value like the integer
+    ``0`` must NOT be treated the same as "missing" and end pagination early.
+    """
+    client = _stub(
+        _ok('{"items":[{"a":1}],"next_cursor":0}'),
+        _ok('{"items":[{"a":2}],"next_cursor":null}'),
+    )
+    result = http_fetch(
+        url="http://example.com",
+        client=client,
+        json_path="items",
+        pagination="cursor",
+        cursor_path="next_cursor",
+        max_pages=10,
+    )
+    assert len(client.requests) == 2
+    assert len(result) == 2
+    assert ("cursor", "0") in client.requests[1].params
+
+
 def test_page_pagination_stops_on_empty_page() -> None:
     client = _stub(
         _ok('[{"a":1}]'),

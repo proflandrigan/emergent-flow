@@ -229,7 +229,10 @@ def http_fetch(
         elif pagination == "cursor":
             assert cursor_path is not None  # validated above
             next_cursor_obj = _select_cursor(parsed, cursor_path)
-            if not next_cursor_obj:
+            # Only an ABSENT key or an explicit null means "no more pages" (see
+            # _select_cursor's docstring, which maps both to None). A falsy-but-present
+            # cursor value (0, "", ...) is a real cursor and must not end pagination.
+            if next_cursor_obj is None:
                 break
             next_cursor = str(next_cursor_obj)
         elif pagination in ("offset", "page") and isinstance(records, list) and len(records) == 0:
