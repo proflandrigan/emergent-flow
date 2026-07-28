@@ -86,10 +86,15 @@ def _prepare_model_spec(
                     f"frame; available columns: {sorted(columns)!r}."
                 )
 
-    if "family" in spec and spec["family"] is not None:
+    family_given = spec.get("family") is not None
+    link_given = spec.get("link") is not None
+    if family_given or link_given:
         from emergentflow.stats.catalog import _GLM_FAMILIES, _GLM_LINKS
 
-        family = spec["family"]
+        # A model may leave 'family' unspecified and default it internally (e.g. GAM/BayesianGLM
+        # both default to "gaussian" when the caller only supplies 'link'); mirror that default
+        # here so an invalid link is caught at the gate instead of reaching the fitter raw.
+        family = spec["family"] if family_given else "gaussian"
         if family not in _GLM_FAMILIES:
             raise InvalidModelSpecError(
                 f"unknown GLM family {family!r}; expected one of {sorted(_GLM_FAMILIES)!r}."

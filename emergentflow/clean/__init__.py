@@ -382,12 +382,12 @@ def merge(
                     f"expected one of {list(right.columns)!r}."
                 )
 
-    if suffixes is not None and len(suffixes) != 2:
+    if suffixes is None or len(suffixes) != 2:
         raise ValueError(f"suffixes must be a 2-tuple/list of exactly 2 strings; got {suffixes!r}.")
 
     kwargs: dict[str, Any] = {
         "how": how,
-        "suffixes": tuple(suffixes) if suffixes is not None else suffixes,
+        "suffixes": tuple(suffixes),
     }
     if validate is not None:
         kwargs["validate"] = validate
