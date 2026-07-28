@@ -117,6 +117,24 @@ def _pivot(
     else:
         result.columns = [str(c) for c in result.columns]
     result.columns.name = None
+
+    # Unlike melt's var_name/value_name, pivot's output column names are only known after
+    # flattening (they're built from the runtime values found in 'columns'), so this collision
+    # check has to run post-hoc rather than as a pre-flight -- but the guarantee is the same one
+    # ColumnCollisionError provides everywhere else in this family: never silently produce
+    # duplicate-labeled output columns.
+    seen_names: set[str] = set()
+    duplicates: list[str] = []
+    for name in result.columns:
+        if name in seen_names and name not in duplicates:
+            duplicates.append(name)
+        seen_names.add(name)
+    if duplicates:
+        raise ColumnCollisionError(
+            f"pivot produced duplicate output column name(s) {duplicates!r} after flattening; "
+            "rename the colliding index/columns/values so every output column name is unique."
+        )
+
     return result.reset_index(drop=True)
 
 
@@ -141,10 +159,12 @@ def _melt(
         )
 
     collisions = [name for name in (var_name, value_name) if name in (id_vars or [])]
+    if var_name == value_name and var_name not in collisions:
+        collisions.append(var_name)
     if collisions:
         raise ColumnCollisionError(
-            f"melt output column(s) {collisions!r} collide with existing id_vars column(s); "
-            "choose a different var_name/value_name."
+            f"melt output column(s) {collisions!r} collide with existing id_vars column(s) or "
+            "with each other; choose a different var_name/value_name."
         )
 
     result = df.melt(

@@ -137,10 +137,13 @@ def fuzzy_join(
         raise CleanError(f"limit must be at least 1; got {limit!r}.")
     if not (0 <= threshold <= 100):
         raise CleanError(f"threshold must be between 0 and 100; got {threshold!r}.")
-    if score_column in left.columns or score_column in right.columns:
+    overlap = set(left.columns) & set(right.columns)
+    final_left_columns = {f"{c}{suffixes[0]}" if c in overlap else c for c in left.columns}
+    final_right_columns = {f"{c}{suffixes[1]}" if c in overlap else c for c in right.columns}
+    if score_column in final_left_columns or score_column in final_right_columns:
         raise ColumnCollisionError(
-            f"score column {score_column!r} collides with an existing column; choose a "
-            "different score_column."
+            f"score column {score_column!r} collides with an existing (or suffix-renamed) "
+            "column; choose a different score_column."
         )
 
     scorer_fn = getattr(fuzz, scorer)
@@ -162,7 +165,6 @@ def fuzzy_join(
             right_positions.append(-1)
             scores.append(float("nan"))
 
-    overlap = (set(left.columns) & set(right.columns)) - {score_column}
     left_part = left.iloc[left_positions].reset_index(drop=True)
     right_part = right.reset_index(drop=True).reindex(right_positions).reset_index(drop=True)
     if overlap:

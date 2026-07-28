@@ -182,3 +182,30 @@ def test_reshape_result_is_inspectable() -> None:
     melt_result = reshape(_wide_df(), mode="melt", id_vars=["date"], value_vars=["clicks", "views"])
     assert is_inspectable(pivot_result) is True
     assert is_inspectable(melt_result) is True
+
+
+# ---------------------------------------------------------------------------
+# Output-name collision guards (added by the Story group B cross-task review).
+# ---------------------------------------------------------------------------
+
+
+def test_pivot_duplicate_output_columns_raise() -> None:
+    """Pivot's output names come from runtime cell values, so two distinct values that
+    stringify identically (1 and "1") would otherwise yield a duplicate-labeled frame."""
+    df = pd.DataFrame({"date": ["d1", "d1"], "metric": [1, "1"], "amount": [3, 4]})
+    with pytest.raises(ColumnCollisionError, match="duplicate output column"):
+        reshape(df, mode="pivot", index=["date"], columns=["metric"], values=["amount"])
+
+
+def test_melt_var_name_equal_to_value_name_raises() -> None:
+    """var_name and value_name colliding with *each other* is as invalid as either one
+    colliding with an id var -- both produce a duplicate-labeled frame."""
+    with pytest.raises(ColumnCollisionError, match="collide"):
+        reshape(
+            _wide_df(),
+            mode="melt",
+            id_vars=["date"],
+            value_vars=["clicks", "views"],
+            var_name="x",
+            value_name="x",
+        )

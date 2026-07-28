@@ -263,3 +263,17 @@ def test_sampling_results_are_inspectable() -> None:
     if pytest.importorskip("rapidfuzz"):
         fuzzy_result = fuzzy_join(_left(), _right(), left_on="name", right_on="company")
         assert is_inspectable(fuzzy_result) is True
+
+
+def test_fuzzy_join_score_column_collides_with_suffix_renamed_column() -> None:
+    """The score column must be checked against the POST-suffix-rename names.
+
+    Both frames carry a ``score`` column, so it is renamed to ``score_x``/``score_y``; a
+    caller asking for ``score_column="score_x"`` would otherwise silently overwrite the
+    renamed left-hand column instead of raising.
+    """
+    pytest.importorskip("rapidfuzz")
+    left = pd.DataFrame({"name": ["Apple Inc"], "score": [1]})
+    right = pd.DataFrame({"company": ["Apple Inc."], "score": [2]})
+    with pytest.raises(ColumnCollisionError, match="collides"):
+        fuzzy_join(left, right, left_on="name", right_on="company", score_column="score_x")
