@@ -122,6 +122,12 @@ class GatewayClient:
         if request.response_format == "json":
             import json
 
+            if content is None:
+                raise GatewayResponseError(
+                    "Requested response_format='json' but the provider returned no "
+                    f"message content (finish_reason={finish_reason!r}); there is "
+                    "nothing to parse as JSON."
+                )
             try:
                 data = json.loads(content)
             except json.JSONDecodeError as exc:
