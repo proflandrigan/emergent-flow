@@ -50,6 +50,7 @@ __all__ = [
     "plot_metric_comparison",
     "plot_coverage_vs_accuracy",
     "plot_popularity_distribution",
+    "plot_projection",
 ]
 
 
@@ -561,6 +562,35 @@ def plot_popularity_distribution(
         yaxis_title="Recommendation Frequency",
     )
     return PlotSpec.from_figure("recommend_popularity_distribution", fig)
+
+
+@public_op(name="ef.viz.plot_projection")
+def plot_projection(
+    df: pd.DataFrame,
+    *,
+    x_col: str = "component_1",
+    y_col: str = "component_2",
+    color_col: str | None = None,
+) -> PlotSpec:
+    """Render a 2-D projection scatter plot, optionally colored by a label column.
+
+    A convenience wrapper over ``ef.viz.plot(chart="scatter", ...)``, pre-filling the x/y
+    encoding for the two leading coordinate columns a dimensionality-reduction op
+    (``ef.ml.reduce_dimensions``) produces by default. Reuses the SAME curated Epic 12 chart
+    adapter/allow-list as ``plot`` -- no new rendering path, no new chart registered.
+    """
+    if x_col not in df.columns:
+        raise ValueError(f"unknown x_col {x_col!r}; expected one of {list(df.columns)!r}.")
+    if y_col not in df.columns:
+        raise ValueError(f"unknown y_col {y_col!r}; expected one of {list(df.columns)!r}.")
+    encoding: dict[str, Any] = {"x": x_col, "y": y_col}
+    if color_col is not None:
+        if color_col not in df.columns:
+            raise ValueError(
+                f"unknown color_col {color_col!r}; expected one of {list(df.columns)!r}."
+            )
+        encoding["color"] = color_col
+    return plot(df, chart="scatter", encoding=encoding)
 
 
 # Register the curated seed chart catalog as an import-time side effect (mirrors

@@ -7977,6 +7977,118 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "description": "Reduce numeric columns to N coordinate columns via PCA/t-SNE/UMAP.",
+      "family": "ml",
+      "label": "Reduce Dimensions",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Numeric columns to reduce.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Feature columns",
+          "name": "feature_cols",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "pca",
+          "help": "Dimensionality reduction algorithm.",
+          "hints": {
+            "choices": [
+              "pca",
+              "tsne",
+              "umap"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Method",
+          "name": "method",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 2,
+          "help": "Number of reduced dimensions.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Components",
+          "name": "n_components",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": 0,
+          "help": "Random seed for reproducibility.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Seed",
+          "name": "seed",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the numeric feature columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DimensionReductionResult",
+          "direction": "out",
+          "help": "Reduced coordinates plus metadata.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "ml.reduce_dimensions",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Machine Learning",
       "description": "Fit a curated feature-selector estimator and keep only the selected features.",
       "family": "ml",
       "label": "Select Features",
@@ -9923,6 +10035,280 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "description": "Chi-square test of independence on a contingency table.",
+      "family": "stats",
+      "label": "Chi-Square Test",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column whose values form the rows of the contingency table.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Row column",
+          "name": "row_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column whose values form the columns of the contingency table.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Column column",
+          "name": "col_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": true,
+          "help": "Apply Yates's continuity correction.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Yates correction",
+          "name": "correction",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the two categorical columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Chi-square test results as a one-row DataFrame.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.chi_square",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Cohort retention analysis over a user activity log.",
+      "family": "stats",
+      "label": "Cohort Retention",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column identifying each user.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "User column",
+          "name": "user_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column with each row's activity timestamp.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Date column",
+          "name": "date_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "M",
+          "help": "Calendar period granularity for cohorts.",
+          "hints": {
+            "choices": [
+              "D",
+              "W",
+              "M"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Period",
+          "name": "period",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the user and date columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "CohortRetentionResult",
+          "direction": "out",
+          "help": "Inspectable tidy + wide cohort retention tables.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.cohort_retention",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Apply a multiple-comparison correction (Bonferroni / Benjamini-Hochberg).",
+      "family": "stats",
+      "label": "Correct P-Values",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "p_value",
+          "help": "Name of the column containing uncorrected p-values.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "P-value column",
+          "name": "p_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "bonferroni",
+          "help": "Bonferroni or Benjamini-Hochberg FDR control.",
+          "hints": {
+            "choices": [
+              "bonferroni",
+              "benjamini_hochberg"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Correction method",
+          "name": "method",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 0.05,
+          "help": "Significance threshold for the adjusted p-values.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Alpha",
+          "name": "alpha",
+          "required": false,
+          "type_token": "float"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing a p-value column.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input DataFrame with p_adjusted and reject_null columns appended.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "stats.correct_pvalues",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
       "description": "Compute a pairwise correlation matrix.",
       "family": "stats",
       "label": "Correlation",
@@ -9992,6 +10378,119 @@
         }
       ],
       "type": "stats.correlation",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Cross-tabulation of two categorical columns with chi-square test.",
+      "family": "stats",
+      "label": "Crosstab",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Categorical column for table rows.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Row column",
+          "name": "row_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Categorical column for table columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Column column",
+          "name": "col_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "none",
+          "help": "Normalization mode for the table.",
+          "hints": {
+            "choices": [
+              "none",
+              "index",
+              "columns",
+              "all"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Normalize",
+          "name": "normalize",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": true,
+          "help": "Add a 'Total' row and column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Show margins",
+          "name": "margins",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the two categorical columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "CrosstabResult",
+          "direction": "out",
+          "help": "Inspectable cross-tabulation table and chi-square test results.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.crosstab",
       "version": 1
     },
     {
@@ -10901,6 +11400,85 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "description": "Per-step conversion and drop-off funnel over an event log.",
+      "family": "stats",
+      "label": "Funnel",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column identifying each user.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "User column",
+          "name": "user_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column with each row's event name.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Event column",
+          "name": "event_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Ordered list of event names defining the funnel.",
+          "hints": null,
+          "label": "Steps",
+          "name": "steps",
+          "required": true,
+          "type_token": "list[str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the user and event columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Tidy per-step conversion/drop-off funnel table.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.funnel",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
       "description": "Split-apply-combine: group by column(s) and aggregate.",
       "family": "stats",
       "label": "Group By Aggregate",
@@ -10998,6 +11576,169 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "description": "Kruskal-Wallis H-test across two or more groups.",
+      "family": "stats",
+      "label": "Kruskal-Wallis",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column whose distinct values define the groups.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group column",
+          "name": "group_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column whose values are compared across groups.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Value column",
+          "name": "value_col",
+          "required": true,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the group and value columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Kruskal-Wallis test results as a one-row DataFrame.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.kruskal",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Mann-Whitney U rank-sum test between two groups.",
+      "family": "stats",
+      "label": "Mann-Whitney U",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column with exactly two groups.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group column",
+          "name": "group_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Numeric column to compare.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Value column",
+          "name": "value_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "two-sided",
+          "help": "Direction of the alternative hypothesis.",
+          "hints": {
+            "choices": [
+              "two-sided",
+              "less",
+              "greater"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Alternative",
+          "name": "alternative",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the group and value columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Mann-Whitney U test results as a one-row DataFrame.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.mann_whitney",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
       "description": "Per-column null counts and percentages.",
       "family": "stats",
       "label": "Missingness",
@@ -11044,6 +11785,196 @@
         }
       ],
       "type": "stats.missingness",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Solve a power equation for effect size, sample size, or power.",
+      "family": "stats",
+      "label": "Power Analysis",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Minimum detectable effect size (MDE). Leave unset to solve for this.",
+          "hints": null,
+          "label": "Effect size (Cohen's d)",
+          "name": "effect_size",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Sample size per group. Leave unset to solve for this.",
+          "hints": null,
+          "label": "Sample size per group",
+          "name": "nobs",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Desired statistical power. Leave unset to solve for this.",
+          "hints": null,
+          "label": "Power",
+          "name": "power",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": 0.05,
+          "help": "Significance level.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Alpha",
+          "name": "alpha",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": 1.0,
+          "help": "Ratio of sample sizes (n_b / n_a).",
+          "hints": null,
+          "label": "Ratio",
+          "name": "ratio",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": "two-sided",
+          "help": "Direction of the alternative hypothesis.",
+          "hints": {
+            "choices": [
+              "two-sided",
+              "larger",
+              "smaller"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Alternative",
+          "name": "alternative",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Inspectable power-analysis results.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.power_analysis",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Two-proportion z-test comparing a binary outcome across two groups.",
+      "family": "stats",
+      "label": "Test Proportions",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column with exactly two groups.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group column",
+          "name": "group_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Binary outcome column (0/1/True/False).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Success column",
+          "name": "success_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": 0.05,
+          "help": "Significance level used for the confidence interval.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Alpha",
+          "name": "alpha",
+          "required": false,
+          "type_token": "float"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the group and success columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Inspectable two-proportion z-test metrics.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.test_proportions",
       "version": 1
     },
     {
@@ -11152,6 +12083,99 @@
         }
       ],
       "type": "stats.ttest",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Wilcoxon signed-rank test for paired samples in two columns.",
+      "family": "stats",
+      "label": "Wilcoxon Signed-Rank",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "First paired column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Column A",
+          "name": "col_a",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Second paired column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Column B",
+          "name": "col_b",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "two-sided",
+          "help": "Direction of the alternative hypothesis.",
+          "hints": {
+            "choices": [
+              "two-sided",
+              "less",
+              "greater"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Alternative",
+          "name": "alternative",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the two paired columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Wilcoxon signed-rank test results as a one-row DataFrame.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.wilcoxon",
       "version": 1
     },
     {
@@ -12839,6 +13863,65 @@
         }
       ],
       "type": "viz.plot_precision_recall_curve",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Visualization",
+      "description": "Render a 2-D dimensionality-reduction projection as a scatter plot.",
+      "family": "viz",
+      "label": "Plot Projection",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "component_1",
+          "help": "Column to plot on the x-axis.",
+          "hints": null,
+          "label": "X column",
+          "name": "x_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "component_2",
+          "help": "Column to plot on the y-axis.",
+          "hints": null,
+          "label": "Y column",
+          "name": "y_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional column to color points by (e.g. a cluster/class label).",
+          "hints": null,
+          "label": "Color column",
+          "name": "color_col",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the projection coordinate columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered projection scatter plot as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "viz.plot_projection",
       "version": 1
     },
     {

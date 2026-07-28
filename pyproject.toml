@@ -157,6 +157,14 @@ cloud = [
 fuzzy = [
     "rapidfuzz>=3,<4",
 ]
+# `pip install emergentflow[umap]` enables the UMAP dimensionality-reduction method for
+# ef.ml.reduce_dimensions (Epic 16). umap-learn is BSD-3-Clause. Kept optional so a bare SDK
+# install stays light (ADR 0007); PCA and t-SNE (both scikit-learn, already a hard dep) work
+# without this extra. A method="umap" call in a base install raises a typed
+# MissingOptionalDependencyError("emergentflow[umap]"), never an opaque ImportError.
+umap = [
+    "umap-learn>=0.5,<1",
+]
 # `pip install emergentflow[excel]` enables `ef.data.load_excel`. openpyxl is MIT
 # (compatible with this SDK's Apache-2.0 license; not GPL). Kept optional so a bare
 # SDK install stays light (ADR 0007); a `load_excel` call in a base install raises a
@@ -323,5 +331,9 @@ module = [
     # imported lazily inside `emergentflow/data/__init__.py`'s remote-URI loaders, absent
     # from the bare `uv sync --locked` CI env (like torch/litellm/pymc).
     "fsspec.*",
+    # The optional `emergentflow[umap]` extra (Epic 16): umap-learn is imported lazily inside
+    # `ef.ml.reduce_dimensions`'s `method="umap"` branch, absent from the bare
+    # `uv sync --locked` CI env (like torch/litellm/pymc).
+    "umap.*",
 ]
 ignore_missing_imports = true

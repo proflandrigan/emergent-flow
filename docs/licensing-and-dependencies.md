@@ -90,6 +90,21 @@ extension. The base package must import and run with `rapidfuzz` absent; a `fuzz
 base install raises a typed `MissingOptionalDependencyError("emergentflow[fuzzy]")` rather than an
 opaque `ImportError`.
 
+## Optional extra: `[umap]` (umap-learn)
+
+Epic 16's UMAP dimensionality-reduction method (`ef.ml.reduce_dimensions`, method="umap") ships
+as an **optional extra**, installed with `pip install emergentflow[umap]`, never as part of the
+base install. Its one dependency is permissively licensed and compatible with Apache-2.0:
+
+| Dependency | Version constraint | License | Compatible with Apache-2.0? |
+|---|---|---|---|
+| umap-learn | >=0.5,<1 | BSD-3-Clause | Yes |
+
+The extra is kept optional so a bare SDK install stays light (ADR 0007). PCA and t-SNE (both
+`scikit-learn`, already a hard dependency) work without this extra. The base package must import
+and run with `umap-learn` absent; a `method="umap"` call in a base install raises a typed
+`MissingOptionalDependencyError("emergentflow[umap]")` rather than an opaque `ImportError`.
+
 ## Deliberately not added: seaborn
 
 `plotly` (MIT) covers the interactive-charting surface Epic 12 needs, so **seaborn is intentionally

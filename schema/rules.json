@@ -10,9 +10,12 @@
   "types": [
     "AnovaResult",
     "ClassifierResult",
+    "CohortRetentionResult",
     "CostEstimate",
+    "CrosstabResult",
     "DataFrame",
     "DecomposeResult",
+    "DimensionReductionResult",
     "EvalResult",
     "EvaluationResult",
     "ForecastResult",

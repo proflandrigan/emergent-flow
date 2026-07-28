@@ -34,6 +34,24 @@ register_type(
     )
 )
 register_type(TypeDef(token="TTestResult", description="The result of a two-sample t-test."))
+register_type(
+    TypeDef(
+        token="CrosstabResult",
+        description=(
+            "The result of a cross-tabulation (ef.stats.crosstab): a tidy counts/proportions "
+            "table plus a chi-square test of independence on the raw contingency table."
+        ),
+    )
+)
+register_type(
+    TypeDef(
+        token="CohortRetentionResult",
+        description=(
+            "The result of ef.stats.cohort_retention: a tidy long-format retention table "
+            "plus a cohort x period-number wide retention matrix."
+        ),
+    )
+)
 register_type(TypeDef(token="HTML", description="A rendered HTML document/report fragment."))
 register_type(
     TypeDef(
@@ -66,6 +84,16 @@ register_type(
         description=(
             "A structural, JSON-native inspectable summary of a fitted model or "
             "transformer (accuracy/coefficients, explained variance, cluster sizes, ...)."
+        ),
+    )
+)
+register_type(
+    TypeDef(
+        token="DimensionReductionResult",
+        description=(
+            "The result of ef.ml.reduce_dimensions (PCA/t-SNE/UMAP): the input frame with "
+            "new component_N coordinate columns appended, plus a PCA explained-variance "
+            "frame when applicable."
         ),
     )
 )

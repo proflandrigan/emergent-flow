@@ -9,6 +9,7 @@ import csv
 
 import pandas as pd
 import pytest
+from pandas.testing import assert_frame_equal
 
 from emergentflow.codegen.context import build_codegen_context
 from emergentflow.codegen.naming import build_name_map
@@ -21,7 +22,11 @@ from emergentflow.nodes.examples import (
     Anova,
     ApplyEstimator,
     CastTypes,
+    ChiSquare,
+    CohortRetention,
+    CorrectPvalues,
     Correlation,
+    Crosstab,
     Describe,
     DropMissing,
     EncodeLists,
@@ -29,23 +34,31 @@ from emergentflow.nodes.examples import (
     ExplodeLists,
     FilterRows,
     FitEstimator,
+    Funnel,
     GenerateHtmlSummary,
     ImputeMissing,
+    Kruskal,
     LoadCsv,
     LoadJson,
     LoadParquet,
     LoadSample,
+    MannWhitney,
     MarkdownNote,
     Merge,
+    PowerAnalysis,
     Predict,
+    ReduceDimensions,
     SelectColumns,
     SemiJoin,
     Summarize,
+    TestProportions,
     TrainClassifier,
     TrainRandomForest,
     TrainRegressor,
     TrainTestSplit,
     TTest,
+    VizPlotProjection,
+    Wilcoxon,
 )
 
 
@@ -334,6 +347,8 @@ class TestAnova:
         assert generated.f_statistic == executed.f_statistic
         assert generated.p_value == executed.p_value
         assert generated.effect_size == executed.effect_size
+        assert generated.ci_low == executed.ci_low
+        assert generated.ci_high == executed.ci_high
         assert generated.summary.equals(executed.summary)
 
 
@@ -378,6 +393,215 @@ class TestTTest:
         assert generated.mean_b == executed.mean_b
         assert generated.equal_var == executed.equal_var
         assert generated.alpha == executed.alpha
+        assert generated.effect_size == executed.effect_size
+        assert generated.ci_low == executed.ci_low
+        assert generated.ci_high == executed.ci_high
+
+
+# ---------------------------------------------------------------------------
+# stats.mann_whitney
+# ---------------------------------------------------------------------------
+
+
+class TestMannWhitney:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = MannWhitney()
+        df = pd.DataFrame(
+            {
+                "grp": ["a", "a", "a", "b", "b", "b"],
+                "score": [1.0, 2.0, 3.0, 5.0, 6.0, 7.0],
+            }
+        )
+        node = defn.instantiate(group_col="grp", value_col="score")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+        assert_frame_equal(generated, executed)
+
+
+# ---------------------------------------------------------------------------
+# stats.wilcoxon
+# ---------------------------------------------------------------------------
+
+
+class TestWilcoxon:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Wilcoxon()
+        df = pd.DataFrame(
+            {
+                "before": [10.0, 12.0, 9.0, 11.0, 13.0],
+                "after": [12.0, 14.0, 10.0, 13.0, 15.0],
+            }
+        )
+        node = defn.instantiate(col_a="before", col_b="after")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+        assert_frame_equal(generated, executed)
+
+
+# ---------------------------------------------------------------------------
+# stats.kruskal
+# ---------------------------------------------------------------------------
+
+
+class TestKruskal:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Kruskal()
+        df = pd.DataFrame(
+            {
+                "grp": ["a", "a", "a", "b", "b", "b", "c", "c", "c"],
+                "score": [1.0, 1.1, 0.9, 5.0, 5.1, 4.9, 9.0, 9.1, 8.9],
+            }
+        )
+        node = defn.instantiate(group_col="grp", value_col="score")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+        assert_frame_equal(generated, executed)
+
+
+# ---------------------------------------------------------------------------
+# stats.chi_square
+# ---------------------------------------------------------------------------
+
+
+class TestChiSquare:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = ChiSquare()
+        df = pd.DataFrame(
+            {
+                "treatment": ["A", "A", "B", "B", "B", "A", "B", "A"],
+                "outcome": ["good", "bad", "good", "bad", "bad", "good", "good", "bad"],
+            }
+        )
+        node = defn.instantiate(row_col="treatment", col_col="outcome")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+        assert_frame_equal(generated, executed)
+
+
+# ---------------------------------------------------------------------------
+# stats.correct_pvalues
+# ---------------------------------------------------------------------------
+
+
+class TestCorrectPvalues:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = CorrectPvalues()
+        df = pd.DataFrame(
+            {
+                "group": ["a", "a", "b", "b", "c", "c"],
+                "p_value": [0.01, 0.03, 0.2, 0.4, 0.6, 0.9],
+            }
+        )
+        node = defn.instantiate(p_col="p_value", method="bonferroni")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["frame"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        assert_frame_equal(scope["frame"], executed)
+
+
+# ---------------------------------------------------------------------------
+# stats.crosstab
+# ---------------------------------------------------------------------------
+
+
+class TestCrosstab:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Crosstab()
+        df = pd.DataFrame(
+            {
+                "treatment": ["A", "A", "B", "B", "B", "A", "B", "A"],
+                "outcome": ["good", "bad", "good", "bad", "bad", "good", "good", "bad"],
+            }
+        )
+        node = defn.instantiate(row_col="treatment", col_col="outcome")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+
+        assert generated.chi_square == executed.chi_square
+        assert generated.p_value == executed.p_value
+        assert generated.dof == executed.dof
+        assert generated.n == executed.n
+        assert_frame_equal(generated.table, executed.table)
+
+
+class TestCohortRetention:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = CohortRetention()
+        df = pd.DataFrame(
+            {
+                "user": ["A", "A", "A", "B", "C"],
+                "ts": [
+                    "2024-01-05",
+                    "2024-02-10",
+                    "2024-03-15",
+                    "2024-02-20",
+                    "2024-01-25",
+                ],
+            }
+        )
+        node = defn.instantiate(user_col="user", date_col="ts", period="M")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+
+        assert_frame_equal(generated.tidy, executed.tidy)
+        assert_frame_equal(generated.wide, executed.wide)
+
+
+class TestFunnel:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Funnel()
+        rows = []
+        for i in range(10):
+            rows.append({"user": f"u{i}", "event": "view"})
+        for i in range(6):
+            rows.append({"user": f"u{i}", "event": "add_to_cart"})
+        for i in range(3):
+            rows.append({"user": f"u{i}", "event": "purchase"})
+        df = pd.DataFrame(rows)
+        node = defn.instantiate(
+            user_col="user", event_col="event", steps=["view", "add_to_cart", "purchase"]
+        )
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+
+        assert_frame_equal(generated, executed)
+
+
+class TestReduceDimensions:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = ReduceDimensions()
+        df = pd.DataFrame(
+            {
+                "a": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+                "b": [2.0, 1.0, 4.0, 3.0, 6.0, 5.0, 8.0, 7.0],
+                "c": [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5],
+            }
+        )
+        node = defn.instantiate(feature_cols=["a", "b", "c"], method="pca", n_components=2, seed=0)
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+
+        pd.testing.assert_frame_equal(generated.coordinates, executed.coordinates)
+        assert generated.method == executed.method
+        assert generated.n_components == executed.n_components
+        assert generated.seed == executed.seed
+        pd.testing.assert_frame_equal(generated.explained_variance, executed.explained_variance)
 
 
 # ---------------------------------------------------------------------------
@@ -1079,3 +1303,68 @@ class TestSemiJoin:
         scope = {"frame": frame.copy(), "keys": keys.copy()}
         _run_codegen(defn, node, scope)
         assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
+# stats.test_proportions
+# ---------------------------------------------------------------------------
+
+
+class TestTestProportions:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = TestProportions()
+        np = pytest.importorskip("numpy")
+        rng = np.random.default_rng(42)
+        n_a, n_b = 50, 50
+        df = pd.DataFrame(
+            {
+                "group": ["a"] * n_a + ["b"] * n_b,
+                "success": (list(rng.binomial(1, 0.20, n_a)) + list(rng.binomial(1, 0.40, n_b))),
+            }
+        )
+        node = defn.instantiate(group_col="group", success_col="success")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+        assert_frame_equal(generated, executed)
+
+
+# ---------------------------------------------------------------------------
+# stats.power_analysis
+# ---------------------------------------------------------------------------
+
+
+class TestPowerAnalysis:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = PowerAnalysis()
+        node = defn.instantiate(effect_size=0.5, nobs=100, alpha=0.05)
+        executed = defn.execute(node, inputs={})["result"]
+        scope = _run_codegen(defn, node, {})
+        generated = scope["result"]
+        assert_frame_equal(generated, executed)
+
+
+# ---------------------------------------------------------------------------
+# viz.plot_projection
+# ---------------------------------------------------------------------------
+
+
+class TestVizPlotProjection:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = VizPlotProjection()
+        df = pd.DataFrame(
+            {
+                "component_1": [1.0, 2.0, 3.0, 4.0],
+                "component_2": [4.0, 3.0, 2.0, 1.0],
+                "label": ["a", "a", "b", "b"],
+            }
+        )
+        node = defn.instantiate(color_col="label")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["plot"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["plot"]
+        assert generated.chart == executed.chart
+        assert generated.spec == executed.spec

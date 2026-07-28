@@ -112,21 +112,22 @@ explicitly **defers retrieval/vector-store** to Epic 11 rather than duplicating 
   `CleanError` subclasses `ValueError`.
 
 ### Analytics
-- [ ] **Non-parametric tests + inference plumbing.** Mann-Whitney, Wilcoxon, Kruskal-Wallis, and
+- [x] **Non-parametric tests + inference plumbing.** Mann-Whitney, Wilcoxon, Kruskal-Wallis, and
   chi-square/Fisher ship as `ef.stats` ops; existing `ttest`/`anova` gain **effect sizes** (Cohen's
   d, η²) and **confidence intervals** as first-class output columns, plus a shared
   **multiple-comparison correction** (Bonferroni/BH) utility.
-- [ ] **Experiment analysis + power.** A `test_proportions` node (two-proportion z-test / uplift
+- [x] **Experiment analysis + power.** A `test_proportions` node (two-proportion z-test / uplift
   with CI) and a `power_analysis` node (sample-size / MDE) ship — the study-design pair researchers
   ask for constantly.
-- [ ] **Crosstab.** A `crosstab` node (counts + margins + chi-square), distinct from
+- [x] **Crosstab.** A `crosstab` node (counts + margins + chi-square), distinct from
   `group_by_aggregate`.
-- [ ] **Dimensionality reduction.** A `reduce_dimensions` transform (PCA/t-SNE on hard deps; UMAP
+- [x] **Dimensionality reduction.** A `reduce_dimensions` transform (PCA/t-SNE on hard deps; UMAP
   behind `[umap]`) plus a projection scatter viz, feeding exploration/clustering/embeddings.
-- [ ] **Causal inference (stretch, gated).** Diff-in-diff + propensity-score matching on statsmodels
-  (already a dep); CATE/uplift behind `[causal]`. Ships as a **parallel seam** to `stats` (like
-  `recommend` is to `ml`), or is explicitly deferred to a follow-up epic if descoped.
-- [ ] **Product analytics.** `cohort_retention` and `funnel` analysis nodes ship over event frames.
+- [x] **Product analytics.** `cohort_retention` and `funnel` analysis nodes ship over event frames.
+- [ ] **Causal inference (stretch, gated) — descoped.** Diff-in-diff + propensity-score matching on
+  statsmodels; CATE/uplift behind `[causal]`. Per the epic's own Notes/Risks ("Story 15 is the most
+  likely descope candidate") and the planning decision at Story group C kickoff, this is
+  **deliberately deferred to a follow-up epic**, not built here. See Story 15 below.
 
 ### Research & reproducibility
 - [ ] **Multi-section report builder.** A `build_report` node composes markdown notes + figures
@@ -319,7 +320,8 @@ explicitly **defers retrieval/vector-store** to Epic 11 rather than duplicating 
 > nine nodes, with four sweeps per case (ADR-0002 equivalence, inspectable contract, determinism,
 > non-mutation) plus a coverage guard that fails if a new clean node is not added to the matrix.
 >
-> Story group C (analytics depth) is the next increment and is not started.
+> Story group C (analytics depth) is now complete — see its status blockquote below. Story
+> group D (research & reproducibility) is the next increment and is not started.
 
 ## Story 5 — Reshape (`pivot` / `melt`) — ✅ done
 - [x] `ef.clean.reshape` wrapper with `mode="pivot"|"melt"` and the pandas-mapped params
@@ -424,47 +426,146 @@ explicitly **defers retrieval/vector-store** to Epic 11 rather than duplicating 
 
 ---
 
-## Story group C — Analytics depth
+## Story group C — Analytics depth — ✅ **COMPLETE** (Stories 10-14; Story 15 descoped)
 
-## Story 10 — Non-parametric tests + inference plumbing
-- [ ] `ef.stats` gains `mann_whitney`, `wilcoxon`, `kruskal`, `chi_square` (+ Fisher exact for 2×2),
+> **Group C status.** Stories 10-14 are delivered; Story 15 (causal inference, stretch/gated) is
+> **descoped** per the epic's own Notes/Risks guidance and a planning decision at kickoff — struck
+> from this epic's DoD, left for a follow-up epic. Gates at completion: `uv run ruff check .`
+> clean, `uv run ruff format --check .` clean (514 files), `uv run mypy emergentflow` clean (290
+> source files), full suite **3155 passed / 23 skipped / 0 failed** (Group B finished at 3040
+> passed / 23 skipped), ADR-0002 equivalence gate **303 passed / 7 skipped** (unchanged from
+> Group B — the new nodes' `test_codegen_matches_execute` checks live in
+> `tests/test_reference_nodes.py`, still real per-node ADR-0002 checks, just not yet folded into
+> a `@pytest.mark.equivalence`-tagged matrix file; building that matrix for the whole new surface
+> is Story 24's job in Story group E, not repeated here), and the UI gates green — `npm run lint`
+> 0 errors (3 pre-existing warnings, unrelated to this work), `npm run typecheck` clean, `npm
+> test` **612 passed** (unchanged — no new UI code was needed; every new result type renders via
+> the canvas's existing generic DataFrame/dataclass inspector, no bespoke renderer required).
+> `scripts/check_ui_boundary.py` — OK, `ui/` imports zero `emergentflow`. Contract artifacts
+> regenerated: `schema/rules.json`, `ui/src/generated/{catalog.json,mutation.schema.json,
+> session_event.schema.json,ir.ts,mutation.ts,session_event.ts}`.
+>
+> **New surface:** twelve new nodes (`stats.mann_whitney`, `stats.wilcoxon`, `stats.kruskal`,
+> `stats.chi_square`, `stats.correct_pvalues`, `stats.test_proportions`, `stats.power_analysis`,
+> `stats.crosstab`, `ml.reduce_dimensions`, `viz.plot_projection`, `stats.cohort_retention`,
+> `stats.funnel`); three new type tokens (`CrosstabResult`, `DimensionReductionResult`,
+> `CohortRetentionResult`); one new optional extra, `[umap]` (umap-learn, BSD-3-Clause),
+> documented in `docs/licensing-and-dependencies.md`, with **no new hard dependencies**; a new
+> `MissingOptionalDependencyError` added to `emergentflow/ml/errors.py` (mirroring the existing
+> per-family pattern in `emergentflow/clean/errors.py`/`emergentflow/stats/errors.py`); and
+> `TTestResult`/`AnovaResult` extended in place with `effect_size`/`ci_low`/`ci_high` fields
+> (Cohen's d for `ttest`, a noncentral-F confidence interval on partial η² for `anova`, via
+> Steiger's method).
+
+## Story 10 — Non-parametric tests + inference plumbing — ✅ done
+- [x] `ef.stats` gains `mann_whitney`, `wilcoxon`, `kruskal`, `chi_square` (+ Fisher exact for 2×2),
   each returning a tidy result frame (statistic, p, df, effect size where defined).
-- [ ] **Effect sizes + CIs on existing tests.** Extend `ttest`/`anova` output with Cohen's d / η²
+- [x] **Effect sizes + CIs on existing tests.** Extend `ttest`/`anova` output with Cohen's d / η²
   and confidence intervals. Shared `emergentflow/stats/` helper.
-- [ ] **Multiple-comparison correction** utility (Bonferroni/Benjamini-Hochberg) applicable to any
+- [x] **Multiple-comparison correction** utility (Bonferroni/Benjamini-Hochberg) applicable to any
   p-value frame.
-- [ ] Reference nodes (`mann_whitney`, `wilcoxon`, `kruskal`, `chi_square`) + catalog; goldens +
+- [x] Reference nodes (`mann_whitney`, `wilcoxon`, `kruskal`, `chi_square`) + catalog; goldens +
   equivalence; extend the existing ttest/anova goldens.
 
-## Story 11 — Experiment analysis + power (`test_proportions`, `power_analysis`)
-- [ ] `ef.stats.test_proportions`: two-proportion z-test / uplift with CI + relative lift, tidy
-  output. `ef.stats.power_analysis`: sample size / MDE / achieved power (statsmodels power).
-- [ ] Two nodes + catalog; goldens + equivalence.
+> **Delivered as:** `emergentflow/stats/__init__.py`: `mann_whitney` (rank-biserial `r` effect
+> size), `wilcoxon` (paired-sample signed-rank, no effect size — scipy's `wilcoxon` does not
+> expose the z-score needed for `r = Z/sqrt(N)` without extra plumbing), `kruskal` (epsilon-squared
+> effect size), `chi_square` (Cramér's V, plus Fisher's exact test — p-value and odds ratio — as
+> extra columns whenever the contingency table is exactly 2×2), each a thin wrapper over the
+> matching `scipy.stats` function returning a one-row tidy `DataFrame`. `TTestResult` gained
+> `effect_size` (Cohen's d, pooled-variance form) with a normal-approximation CI (Hedges & Olkin);
+> `AnovaResult` gained a CI on its existing partial-η² `effect_size` via a noncentral-F
+> root-finding method (Steiger, 2004) — deterministic, no randomness. `correct_pvalues`
+> (Bonferroni/Benjamini-Hochberg) delegates to `statsmodels.stats.multitest.multipletests` rather
+> than hand-rolling the correction math, appending `p_adjusted`/`reject_null` columns to a copy of
+> any p-value-bearing frame, with a column-collision guard. Four new reference nodes
+> (`stats.mann_whitney`, `stats.wilcoxon`, `stats.kruskal`, `stats.chi_square`) plus
+> `stats.correct_pvalues`.
 
-## Story 12 — Crosstab (`crosstab`)
-- [ ] `ef.stats.crosstab`: rows × cols counts, margins, normalized options, chi-square of
+## Story 11 — Experiment analysis + power (`test_proportions`, `power_analysis`) — ✅ done
+- [x] `ef.stats.test_proportions`: two-proportion z-test / uplift with CI + relative lift, tidy
+  output. `ef.stats.power_analysis`: sample size / MDE / achieved power (statsmodels power).
+- [x] Two nodes + catalog; goldens + equivalence.
+
+> **Delivered as:** `test_proportions` wraps `statsmodels.stats.proportion.proportions_ztest`
+> (statistic/p-value) and `confint_proportions_2indep` (CI), reporting `diff`/`ci_low`/`ci_high`/
+> `relative_uplift` all as **group B relative to group A** (`p_b - p_a`) — the CI call passes
+> group B's counts first so its sign matches `diff` directly, rather than negating a
+> group-A-relative CI. `power_analysis` is a zero-input **source** node (mirroring `load_sample`)
+> wrapping `statsmodels.stats.power.TTestIndPower.solve_power`: exactly one of `effect_size`
+> (MDE)/`nobs`/`power` is left `None` and solved for, the other two plus `alpha` given. The
+> `stats.test_proportions` and `stats.power_analysis` nodes.
+
+## Story 12 — Crosstab (`crosstab`) — ✅ done
+- [x] `ef.stats.crosstab`: rows × cols counts, margins, normalized options, chi-square of
   independence. Distinct from `group_by_aggregate`. Node + catalog; goldens + equivalence.
 
-## Story 13 — Dimensionality reduction (`reduce_dimensions` + projection viz)
-- [ ] `ef.ml.reduce_dimensions` (or `ef.stats`): PCA + t-SNE on hard deps, UMAP behind `[umap]`;
+> **Delivered as:** `emergentflow/stats/__init__.py::crosstab`, returning a new
+> `CrosstabResult` dataclass (`table` + `chi_square`/`p_value`/`dof`/`n`) — unlike Story 10's
+> four ops, this needs a real pivoted table alongside scalar test stats, so it follows the
+> `AnovaResult`/`ForecastResult` dataclass pattern rather than a plain frame. The chi-square test
+> always runs on the **raw**, un-margined, un-normalized contingency table regardless of the
+> `normalize`/`margins` params used to shape the returned `table` — verified by a test asserting
+> identical `chi_square`/`p_value`/`dof` across every `normalize` setting on the same input. The
+> `stats.crosstab` node; the new `CrosstabResult` type token.
+
+## Story 13 — Dimensionality reduction (`reduce_dimensions` + projection viz) — ✅ done
+- [x] `ef.ml.reduce_dimensions` (or `ef.stats`): PCA + t-SNE on hard deps, UMAP behind `[umap]`;
   returns the reduced-coordinate frame (+ explained-variance frame for PCA). Non-mutating; seed
   captured.
-- [ ] A projection scatter **`PlotSpec`** viz node (reuse Epic 12 chart adapter) colored by a label
+- [x] A projection scatter **`PlotSpec`** viz node (reuse Epic 12 chart adapter) colored by a label
   column.
-- [ ] Two nodes + catalog; goldens + equivalence (UMAP under its extra lane).
+- [x] Two nodes + catalog; goldens + equivalence (UMAP under its extra lane).
 
-## Story 14 — Product analytics (`cohort_retention`, `funnel`)
-- [ ] `ef.stats.cohort_retention`: cohort key + period → retention matrix (tidy + wide). `funnel`:
+> **Delivered as:** `emergentflow/ml/__init__.py::reduce_dimensions`, landing in `ef.ml` (the
+> epic's first-listed option) as a **self-contained** function — it does not route through the
+> `fit_estimator`/`FittedTransformer` curated-estimator seam, calling `sklearn.decomposition.PCA`/
+> `sklearn.manifold.TSNE`/`umap.UMAP` directly, the same way `ef.stats.anova` calls `statsmodels`
+> directly rather than a generic model-fitting seam. Returns a new `DimensionReductionResult`
+> dataclass (`coordinates` + `method`/`n_components`/`seed` + `explained_variance` — populated
+> only for PCA). `seed` threads into every method's `random_state` for determinism. The new
+> `[umap]` extra (umap-learn, BSD-3-Clause) gates the UMAP branch behind
+> `importlib.util.find_spec`, raising a new `emergentflow.ml.errors.MissingOptionalDependencyError`
+> (added to that file, mirroring the existing per-family pattern) before any `umap` import.
+> `ef.viz.plot_projection` is a thin convenience wrapper delegating to the existing curated
+> `ef.viz.plot(chart="scatter", ...)` adapter (Epic 12) — no new chart type registered, literally
+> reusing the chart allow-list as the story asks. The `ml.reduce_dimensions` and
+> `viz.plot_projection` nodes; the new `DimensionReductionResult` type token.
+
+## Story 14 — Product analytics (`cohort_retention`, `funnel`) — ✅ done
+- [x] `ef.stats.cohort_retention`: cohort key + period → retention matrix (tidy + wide). `funnel`:
   ordered step columns/events → per-step conversion + drop-off frame.
-- [ ] Two nodes + catalog; goldens + equivalence on deterministic event fixtures.
+- [x] Two nodes + catalog; goldens + equivalence on deterministic event fixtures.
 
-## Story 15 — Causal inference *(stretch; gated)*
+> **Delivered as:** `cohort_retention` assigns each user to the calendar period (day/week/month,
+> via `pandas.Period` arithmetic) of their earliest activity, then tracks `period_number` (periods
+> elapsed since cohort start) for every period they remain active in; returns a new
+> `CohortRetentionResult` dataclass pairing a long-format `tidy` retention table with a `wide`
+> cohort × period-number matrix (period columns named `period_0`/`period_1`/... rather than bare
+> integers, so the frame stays JSON-round-trippable). `funnel` operates over an **event log**
+> (matching the bundled `transactions` sample dataset's shape — `customer_id`/`event`, built for
+> exactly this) rather than boolean step columns: for an ordered list of event names, it counts
+> distinct users reaching each step. **Deviation, decided in planning:** funnel counts are
+> deliberately **not** temporally-ordered per user (a user counts at every step whose event they
+> have, regardless of chronological order) — strict per-user event-sequencing would need a
+> timestamp column and materially more complex ordering logic; the simpler "reached this step at
+> some point" definition is documented explicitly in the docstring. The `stats.cohort_retention`
+> and `stats.funnel` nodes; the new `CohortRetentionResult` type token.
+
+## Story 15 — Causal inference *(stretch; gated)* — ⏭️ descoped, deferred to a follow-up epic
 - [ ] **Base (statsmodels, already a dep):** difference-in-differences and propensity-score matching
   as `ef.stats` ops returning tidy effect frames with CIs.
 - [ ] **Optional (`[causal]`/econml or dowhy):** CATE / uplift estimation, typed error on missing
   extra.
-- [ ] Ships as a parallel `emergentflow/causal/` seam **or** is explicitly deferred to a follow-up
+- [x] Ships as a parallel `emergentflow/causal/` seam **or** is explicitly deferred to a follow-up
   epic and struck from this epic's DoD — decide in planning. Nodes + catalog + goldens if kept.
+
+> **Decided in planning:** deferred, not built. The epic's own Notes/Risks section flagged this as
+> "the most likely descope candidate," and Story group C's planning discussion confirmed cutting
+> it rather than adding a new `emergentflow/causal/` seam — DiD/PSM plus the optional
+> econml/dowhy-backed CATE/uplift surface is substantial enough to warrant its own focused epic
+> rather than being squeezed into Story group C's scope. No code, tests, or catalog entries were
+> added for this story; nothing else in Story group C depends on it.
 
 ---
 
