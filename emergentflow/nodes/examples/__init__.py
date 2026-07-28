@@ -18,11 +18,15 @@ from .anova import Anova
 from .apply_estimator import ApplyEstimator
 from .auto_eda import AutoEda
 from .cast_types import CastTypes
+from .clean_text import CleanText
 from .cluster_detect import ClusterDetect
 from .compare_models import CompareModels
+from .concat import Concat
 from .correlation import Correlation
 from .cross_validate import CrossValidate
 from .custom_code import CustomCode
+from .deduplicate import Deduplicate
+from .derive_column import DeriveColumn
 from .describe import Describe
 from .describe_relation import DescribeRelation
 from .diagnostic_frame import DiagnosticFrame
@@ -59,6 +63,7 @@ from .fit_mixed_model import FitMixedModel
 from .fit_transform import FitTransform
 from .forecast_arima import ForecastArima
 from .forecast_ets import ForecastEts
+from .fuzzy_join import FuzzyJoin
 from .generate_features import GenerateFeatures
 from .grid_search import GridSearch
 from .group_by_aggregate import GroupByAggregate
@@ -79,6 +84,7 @@ from .missingness import Missingness
 from .nn_linear import NnLinear
 from .nn_module import NnModule
 from .nn_relu import NnReLU
+from .parse_dates import ParseDates
 from .pipeline import Pipeline
 from .predict import Predict
 from .prepare_interactions import PrepareInteractions
@@ -94,11 +100,14 @@ from .recommend_recommend import Recommend
 from .recommend_similar_items import SimilarItems
 from .recommend_temporal_split import RecommendTemporalSplit
 from .report import GenerateHtmlSummary
+from .reshape import Reshape
+from .sample_rows import SampleRows
 from .scale_features import ScaleFeatures
 from .seasonal_decompose import SeasonalDecompose
 from .select_columns import SelectColumns
 from .select_features import SelectFeatures
 from .semi_join import SemiJoin
+from .sort import Sort
 from .sql_query import SqlQuery
 from .summarize import Summarize
 from .train import TrainClassifier
@@ -129,11 +138,15 @@ __all__ = [
     "ApplyEstimator",
     "AutoEda",
     "CastTypes",
+    "CleanText",
     "ClusterDetect",
     "CompareModels",
+    "Concat",
     "Correlation",
     "CrossValidate",
     "CustomCode",
+    "Deduplicate",
+    "DeriveColumn",
     "Describe",
     "DescribeRelation",
     "DiagnosticFrame",
@@ -170,6 +183,7 @@ __all__ = [
     "FitTransform",
     "ForecastArima",
     "ForecastEts",
+    "FuzzyJoin",
     "GenerateFeatures",
     "GenerateHtmlSummary",
     "GridSearch",
@@ -193,6 +207,7 @@ __all__ = [
     "NnLinear",
     "NnModule",
     "NnReLU",
+    "ParseDates",
     "Pipeline",
     "Predict",
     "PrepareInteractions",
@@ -204,12 +219,15 @@ __all__ = [
     "RecommendFit",
     "RecommendFitTwoTower",
     "RecommendTemporalSplit",
+    "Reshape",
+    "SampleRows",
     "ScaleFeatures",
     "SeasonalDecompose",
     "SelectColumns",
     "SelectFeatures",
     "SemiJoin",
     "SimilarItems",
+    "Sort",
     "SqlQuery",
     "Summarize",
     "TrainClassifier",

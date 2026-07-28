@@ -22,6 +22,18 @@ from sklearn.preprocessing import MultiLabelBinarizer
 
 from emergentflow.api import public_op
 
+from .combine import DEDUP_KEEP, NA_POSITIONS, concat, deduplicate, sort
+from .derive import derive_column
+from .errors import (
+    CleanError,
+    ColumnCollisionError,
+    MissingOptionalDependencyError,
+    UnknownColumnError,
+)
+from .reshaping import PIVOT_AGGFUNCS, RESHAPE_MODES, reshape
+from .sampling import FUZZY_HOWS, FUZZY_SCORERS, SAMPLE_MODES, fuzzy_join, sample_rows
+from .text_dates import DATE_COMPONENTS, DATE_ERRORS, TEXT_OPERATIONS, clean_text, parse_dates
+
 STRATEGIES = ["mean", "median", "most_frequent"]
 AXES = {"rows": 0, "columns": 1}
 HOWS = ("any", "all")
@@ -45,8 +57,31 @@ __all__ = [
     "encode_lists",
     "merge",
     "semi_join",
+    "reshape",
+    "derive_column",
+    "concat",
+    "deduplicate",
+    "sort",
+    "clean_text",
+    "parse_dates",
+    "sample_rows",
+    "fuzzy_join",
+    "TEXT_OPERATIONS",
+    "DATE_COMPONENTS",
+    "DATE_ERRORS",
     "STRATEGIES",
     "OPERATORS",
+    "RESHAPE_MODES",
+    "PIVOT_AGGFUNCS",
+    "DEDUP_KEEP",
+    "NA_POSITIONS",
+    "SAMPLE_MODES",
+    "FUZZY_SCORERS",
+    "FUZZY_HOWS",
+    "CleanError",
+    "ColumnCollisionError",
+    "MissingOptionalDependencyError",
+    "UnknownColumnError",
 ]
 
 
@@ -70,13 +105,15 @@ def impute_missing(
     will surface scikit-learn's own error.
     """
     if strategy not in STRATEGIES:
-        raise ValueError(f"unknown strategy {strategy!r}; expected one of {STRATEGIES!r}.")
+        raise CleanError(f"unknown strategy {strategy!r}; expected one of {STRATEGIES!r}.")
 
     if columns is not None:
         target = columns
         unknown = [col for col in target if col not in df.columns]
         if unknown:
-            raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+            raise UnknownColumnError(
+                f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}."
+            )
     elif strategy == "most_frequent":
         target = list(df.columns)
     else:
@@ -105,15 +142,17 @@ def drop_missing(
     only if all are. ``subset`` (row-axis only) limits which columns are considered.
     """
     if axis not in AXES:
-        raise ValueError(f"unknown axis {axis!r}; expected one of {list(AXES)!r}.")
+        raise CleanError(f"unknown axis {axis!r}; expected one of {list(AXES)!r}.")
     if how not in HOWS:
-        raise ValueError(f"unknown how {how!r}; expected one of {list(HOWS)!r}.")
+        raise CleanError(f"unknown how {how!r}; expected one of {list(HOWS)!r}.")
     if subset is not None:
         if axis == "columns":
-            raise ValueError("subset is only supported when axis='rows'.")
+            raise CleanError("subset is only supported when axis='rows'.")
         unknown = [c for c in subset if c not in df.columns]
         if unknown:
-            raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+            raise UnknownColumnError(
+                f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}."
+            )
     return df.dropna(axis=AXES[axis], how=how, subset=subset)
 
 
@@ -131,10 +170,12 @@ def select_columns(
     removed and the rest kept in their original order. Never mutates the input.
     """
     if not columns:
-        raise ValueError("columns must be a non-empty list of column names.")
+        raise CleanError("columns must be a non-empty list of column names.")
     unknown = [c for c in columns if c not in df.columns]
     if unknown:
-        raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+        raise UnknownColumnError(
+            f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}."
+        )
     if drop:
         keep = [c for c in df.columns if c not in set(columns)]
         return df[keep].copy()
@@ -156,13 +197,15 @@ def cast_types(
     each token one of ``int``/``float``/``str``/``bool``/``category``. Never mutates the input.
     """
     if not dtypes:
-        raise ValueError("dtypes must be a non-empty mapping of column -> dtype.")
+        raise CleanError("dtypes must be a non-empty mapping of column -> dtype.")
     unknown_cols = [c for c in dtypes if c not in df.columns]
     if unknown_cols:
-        raise ValueError(f"unknown columns {unknown_cols!r}; expected one of {list(df.columns)!r}.")
+        raise UnknownColumnError(
+            f"unknown columns {unknown_cols!r}; expected one of {list(df.columns)!r}."
+        )
     bad = {c: t for c, t in dtypes.items() if t not in CAST_DTYPES}
     if bad:
-        raise ValueError(f"unknown dtype(s) {bad!r}; expected one of {list(CAST_DTYPES)!r}.")
+        raise CleanError(f"unknown dtype(s) {bad!r}; expected one of {list(CAST_DTYPES)!r}.")
     return df.astype(dtypes)
 
 
@@ -181,20 +224,22 @@ def filter_rows(
     is never mutated.
     """
     if column not in df.columns:
-        raise ValueError(f"unknown column {column!r}; expected one of {list(df.columns)!r}.")
+        raise UnknownColumnError(
+            f"unknown column {column!r}; expected one of {list(df.columns)!r}."
+        )
     if operator == "isin":
         if not isinstance(value, (list, tuple)):
-            raise ValueError(f"operator 'isin' requires a list value; got {type(value).__name__}.")
+            raise CleanError(f"operator 'isin' requires a list value; got {type(value).__name__}.")
         mask = df[column].isin(list(value))
     elif operator in _COMPARATORS:
         if value is None:
-            raise ValueError(
+            raise CleanError(
                 f"operator {operator!r} requires a non-None value; got None. "
                 "Use drop_missing() to filter on missing values."
             )
         mask = _COMPARATORS[operator](df[column], value)
     else:
-        raise ValueError(f"unknown operator {operator!r}; expected one of {list(OPERATORS)!r}.")
+        raise CleanError(f"unknown operator {operator!r}; expected one of {list(OPERATORS)!r}.")
     return df[mask].copy()
 
 
@@ -227,10 +272,12 @@ def explode_lists(
     result 0..n-1. Never mutates the input.
     """
     if not columns:
-        raise ValueError("columns must be a non-empty list of column names.")
+        raise CleanError("columns must be a non-empty list of column names.")
     unknown = [c for c in columns if c not in df.columns]
     if unknown:
-        raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+        raise UnknownColumnError(
+            f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}."
+        )
     if drop_empty:
         is_empty = df[columns].apply(lambda col: col.map(_is_empty_list_cell))
         df = df[~is_empty.all(axis=1)]
@@ -272,18 +319,21 @@ def encode_lists(
     ``sep`` is given, string cells are first split on it (e.g. ``"rock|jazz"`` with ``sep="|"``);
     otherwise cells are expected to already hold Python lists. ``drop`` removes the original
     ``column`` from the output. Row order and index are preserved. Never mutates the input.
-    Raises ``ValueError`` if a generated indicator column name collides with an existing
-    column in the output (after ``drop``) instead of silently producing duplicate labels.
+    Raises ``ColumnCollisionError`` if a generated indicator column name collides with an
+    existing column in the output (after ``drop``) instead of silently producing duplicate
+    labels.
     """
     if column not in df.columns:
-        raise ValueError(f"unknown column {column!r}; expected one of {list(df.columns)!r}.")
+        raise UnknownColumnError(
+            f"unknown column {column!r}; expected one of {list(df.columns)!r}."
+        )
     resolved_prefix = prefix if prefix is not None else column
     labels = [_coerce_labels(v, sep) for v in df[column]]
     binarizer = MultiLabelBinarizer()
     try:
         encoded = binarizer.fit_transform(labels)
     except TypeError as exc:
-        raise ValueError(
+        raise CleanError(
             f"column {column!r} has labels of mixed, mutually unsortable types "
             f"(e.g. str and int); encode_lists requires every label to be of a "
             f"consistently comparable type."
@@ -292,7 +342,7 @@ def encode_lists(
     base = df.drop(columns=[column]) if drop else df.copy()
     collisions = [c for c in indicator_columns if c in base.columns]
     if collisions:
-        raise ValueError(
+        raise ColumnCollisionError(
             f"generated indicator column(s) {collisions!r} collide with existing column(s) "
             f"in the input frame; choose a different prefix."
         )
@@ -333,57 +383,57 @@ def merge(
     input is mutated.
     """
     if how not in _MERGE_HOWS:
-        raise ValueError(f"unknown how {how!r}; expected one of {_MERGE_HOWS!r}.")
+        raise CleanError(f"unknown how {how!r}; expected one of {_MERGE_HOWS!r}.")
 
     if how == "cross":
         if on is not None or left_on is not None or right_on is not None:
-            raise ValueError("cross join takes no key columns; on/left_on/right_on must be None.")
+            raise CleanError("cross join takes no key columns; on/left_on/right_on must be None.")
     else:
         if on is not None and (left_on is not None or right_on is not None):
-            raise ValueError("pass either 'on' or 'left_on'/'right_on', not both.")
+            raise CleanError("pass either 'on' or 'left_on'/'right_on', not both.")
         if (left_on is None) != (right_on is None):
-            raise ValueError("left_on and right_on must be given together.")
+            raise CleanError("left_on and right_on must be given together.")
         if on is None and left_on is None:
-            raise ValueError("must specify 'on' or 'left_on'/'right_on' (unless how='cross').")
+            raise CleanError("must specify 'on' or 'left_on'/'right_on' (unless how='cross').")
         if on is not None and len(on) == 0:
-            raise ValueError("'on' must be a non-empty list of column names.")
+            raise CleanError("'on' must be a non-empty list of column names.")
         if on is not None:
             unknown_left = [c for c in on if c not in left.columns]
             unknown_right = [c for c in on if c not in right.columns]
             if unknown_left:
-                raise ValueError(
+                raise UnknownColumnError(
                     f"unknown column(s) {unknown_left!r} in left; "
                     f"expected one of {list(left.columns)!r}."
                 )
             if unknown_right:
-                raise ValueError(
+                raise UnknownColumnError(
                     f"unknown column(s) {unknown_right!r} in right; "
                     f"expected one of {list(right.columns)!r}."
                 )
         else:
             assert left_on is not None and right_on is not None
             if len(left_on) == 0 or len(right_on) == 0:
-                raise ValueError("'left_on'/'right_on' must be non-empty lists of column names.")
+                raise CleanError("'left_on'/'right_on' must be non-empty lists of column names.")
             if len(left_on) != len(right_on):
-                raise ValueError(
+                raise CleanError(
                     f"left_on and right_on must be the same length; "
                     f"got {len(left_on)} and {len(right_on)}."
                 )
             unknown_left = [c for c in left_on if c not in left.columns]
             unknown_right = [c for c in right_on if c not in right.columns]
             if unknown_left:
-                raise ValueError(
+                raise UnknownColumnError(
                     f"unknown column(s) {unknown_left!r} in left; "
                     f"expected one of {list(left.columns)!r}."
                 )
             if unknown_right:
-                raise ValueError(
+                raise UnknownColumnError(
                     f"unknown column(s) {unknown_right!r} in right; "
                     f"expected one of {list(right.columns)!r}."
                 )
 
     if suffixes is None or len(suffixes) != 2:
-        raise ValueError(f"suffixes must be a 2-tuple/list of exactly 2 strings; got {suffixes!r}.")
+        raise CleanError(f"suffixes must be a 2-tuple/list of exactly 2 strings; got {suffixes!r}.")
 
     kwargs: dict[str, Any] = {
         "how": how,
@@ -427,13 +477,13 @@ def semi_join(
     ``frame`` are preserved.
     """
     if mode not in _SEMI_JOIN_MODES:
-        raise ValueError(f"unknown mode {mode!r}; expected one of {_SEMI_JOIN_MODES!r}.")
+        raise CleanError(f"unknown mode {mode!r}; expected one of {_SEMI_JOIN_MODES!r}.")
     if on is not None and (left_on is not None or right_on is not None):
-        raise ValueError("pass either 'on' or 'left_on'/'right_on', not both.")
+        raise CleanError("pass either 'on' or 'left_on'/'right_on', not both.")
     if (left_on is None) != (right_on is None):
-        raise ValueError("left_on and right_on must be given together.")
+        raise CleanError("left_on and right_on must be given together.")
     if on is None and left_on is None:
-        raise ValueError("must specify 'on' or 'left_on'/'right_on'.")
+        raise CleanError("must specify 'on' or 'left_on'/'right_on'.")
 
     if on is not None:
         left_keys, right_keys = list(on), list(on)
@@ -441,22 +491,22 @@ def semi_join(
         assert left_on is not None and right_on is not None
         left_keys, right_keys = list(left_on), list(right_on)
         if len(left_keys) != len(right_keys):
-            raise ValueError(
+            raise CleanError(
                 f"left_on and right_on must be the same length; "
                 f"got {len(left_keys)} and {len(right_keys)}."
             )
 
     if not left_keys or not right_keys:
-        raise ValueError("key column list(s) must be non-empty.")
+        raise CleanError("key column list(s) must be non-empty.")
 
     unknown_left = [c for c in left_keys if c not in frame.columns]
     if unknown_left:
-        raise ValueError(
+        raise UnknownColumnError(
             f"unknown column(s) {unknown_left!r} in frame; expected one of {list(frame.columns)!r}."
         )
     unknown_right = [c for c in right_keys if c not in keys.columns]
     if unknown_right:
-        raise ValueError(
+        raise UnknownColumnError(
             f"unknown column(s) {unknown_right!r} in keys; expected one of {list(keys.columns)!r}."
         )
 

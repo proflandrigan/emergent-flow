@@ -149,6 +149,14 @@ cloud = [
     "gcsfs>=2024.2",
     "adlfs>=2024.2",
 ]
+# `pip install emergentflow[fuzzy]` enables ef.clean.fuzzy_join, the string-similarity keyed
+# merge (Epic 16, Story 9): rapidfuzz (MIT license) supplies the scorers and the top-k matcher.
+# Kept optional so a bare SDK install stays light (ADR 0007) and never pulls a C++ extension; a
+# fuzzy_join in a base install raises a typed MissingOptionalDependencyError("emergentflow[fuzzy]"),
+# never an opaque ImportError.
+fuzzy = [
+    "rapidfuzz>=3,<4",
+]
 # `pip install emergentflow[excel]` enables `ef.data.load_excel`. openpyxl is MIT
 # (compatible with this SDK's Apache-2.0 license; not GPL). Kept optional so a bare
 # SDK install stays light (ADR 0007); a `load_excel` call in a base install raises a

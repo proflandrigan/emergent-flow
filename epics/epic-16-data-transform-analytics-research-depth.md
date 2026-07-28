@@ -94,20 +94,22 @@ explicitly **defers retrieval/vector-store** to Epic 11 rather than duplicating 
   a transactions/events table (permissively licensed) so demos and personas have material.
 
 ### Transform
-- [ ] **Reshape verbs.** `reshape` node covers `pivot` (long→wide) and `melt` (wide→long), the
+- [x] **Reshape verbs.** `reshape` node covers `pivot` (long→wide) and `melt` (wide→long), the
   single biggest missing transform.
-- [ ] **Derive / case-when.** A `derive_column` node adds computed and conditional (case-when)
+- [x] **Derive / case-when.** A `derive_column` node adds computed and conditional (case-when)
   columns via a safe expression grammar — no drop to `custom_code` for the common case.
-- [ ] **Row-combining verbs.** `concat` (row-wise union of ≥2 frames, schema-aligned), `deduplicate`
+- [x] **Row-combining verbs.** `concat` (row-wise union of ≥2 frames, schema-aligned), `deduplicate`
   (subset + keep), and `sort` nodes ship.
-- [ ] **String & date verbs.** A `clean_text` node (trim, case-normalize, regex extract/replace,
+- [x] **String & date verbs.** A `clean_text` node (trim, case-normalize, regex extract/replace,
   split) and a `parse_dates` node (string→datetime + extract year/month/dow/quarter) close the
   "impossible without custom code" gap.
-- [ ] **Sampling & fuzzy join.** A `sample_rows` node (random/stratified/top-n, **seed captured**)
+- [x] **Sampling & fuzzy join.** A `sample_rows` node (random/stratified/top-n, **seed captured**)
   and a `fuzzy_join` node (string-similarity keyed merge, `[fuzzy]` extra) ship.
-- [ ] **Every transform is non-mutating.** New transforms return an augmented/new frame and guard
+- [x] **Every transform is non-mutating.** New transforms return an augmented/new frame and guard
   against silently overwriting existing columns (the `ef.timeseries` discipline), with a typed
-  `CleanError` on collision.
+  `CleanError` on collision. The `CleanError` hierarchy was also **retrofitted onto the nine
+  pre-existing `ef.clean` ops**, so the whole family is typed — a non-breaking change, since
+  `CleanError` subclasses `ValueError`.
 
 ### Analytics
 - [ ] **Non-parametric tests + inference plumbing.** Mann-Whitney, Wilcoxon, Kruskal-Wallis, and
@@ -186,7 +188,8 @@ explicitly **defers retrieval/vector-store** to Epic 11 rather than duplicating 
 > client seam (`ClientKind.HTTP`), and the shared schema-on-load validator that Story 19's
 > `assert_data` gate will reuse. **No new hard dependencies.**
 >
-> Story group B (transform verbs) is the next increment and is not started.
+> Story group B (transform verbs) is now complete — see its status blockquote below. Story
+> group C (analytics depth) is the next increment and is not started.
 
 ## Story 1 — HTTP/REST source node (`data.http_fetch`) — ✅ done
 - [x] **Decide the seam up front.** `http_fetch` is `requires_client = True`; it never calls the
@@ -295,43 +298,129 @@ explicitly **defers retrieval/vector-store** to Epic 11 rather than duplicating 
 
 ---
 
-## Story group B — Transform verbs (reshape, derive, combine, clean)
+## Story group B — Transform verbs (reshape, derive, combine, clean) — ✅ **COMPLETE** (Stories 5-9)
 
-## Story 5 — Reshape (`pivot` / `melt`)
-- [ ] `ef.clean.reshape` wrapper with `mode="pivot"|"melt"` and the pandas-mapped params
+> **Group B status.** All five stories are delivered. Gates at completion: `uv run ruff check .`
+> clean, `uv run ruff format --check .` clean (500 files), `uv run mypy emergentflow` clean (278
+> source files), full suite **3040 passed / 23 skipped / 0 failed** (Group A finished at 2714
+> passed / 23 skipped), ADR-0002 equivalence gate **303 passed / 7 skipped** (Group A finished at
+> 261), and the UI gates green — `npm run lint` 0 errors, `npm run typecheck` clean, `npm test`
+> **612 passed**. `scripts/check_ui_boundary.py` — OK, `ui/` imports zero `emergentflow`.
+>
+> **New surface:** nine new nodes (`clean.reshape`, `clean.derive_column`, `clean.concat`,
+> `clean.deduplicate`, `clean.sort`, `clean.clean_text`, `clean.parse_dates`,
+> `clean.sample_rows`, `clean.fuzzy_join`); seven new modules under `emergentflow/clean/`
+> (`errors.py`, `reshaping.py`, `expressions.py`, `derive.py`, `combine.py`, `text_dates.py`,
+> `sampling.py`); one new optional extra, `[fuzzy]`
+> (rapidfuzz, MIT), documented in `docs/licensing-and-dependencies.md`, with **no new hard
+> dependencies**; a new typed error hierarchy, `CleanError(ValueError)` with
+> `UnknownColumnError`, `ColumnCollisionError`, `MissingOptionalDependencyError`; and a new
+> equivalence harness, `tests/test_clean_transform_equivalence.py` — a 31-case matrix across all
+> nine nodes, with four sweeps per case (ADR-0002 equivalence, inspectable contract, determinism,
+> non-mutation) plus a coverage guard that fails if a new clean node is not added to the matrix.
+>
+> Story group C (analytics depth) is the next increment and is not started.
+
+## Story 5 — Reshape (`pivot` / `melt`) — ✅ done
+- [x] `ef.clean.reshape` wrapper with `mode="pivot"|"melt"` and the pandas-mapped params
   (index/columns/values/aggfunc for pivot; id_vars/value_vars/var_name/value_name for melt).
   Non-mutating; typed `CleanError` on duplicate-index-without-aggfunc.
-- [ ] `reshape` reference node + catalog; goldens for both modes; equivalence via Story 24.
+- [x] `reshape` reference node + catalog; goldens for both modes; equivalence via Story 24.
 
-## Story 6 — Derive column / case-when (`derive_column`)
-- [ ] **Safe expression grammar.** A restricted, `ast`-validated expression evaluator (arithmetic,
+> **Delivered as:** `emergentflow/clean/reshaping.py`: `reshape` with `mode="pivot"|"melt"`,
+> plus `RESHAPE_MODES`/`PIVOT_AGGFUNCS` allow-lists reused as the node's `choices` hints so
+> wrapper and node cannot drift. `pivot` dispatches to `DataFrame.pivot` (no `aggfunc`) or
+> `pivot_table` (with one), and a duplicate index/columns combination without an `aggfunc` raises
+> a typed `CleanError` naming `aggfunc` as the fix. The `clean.reshape` node.
+> **Deviation:** the pivot result is **flattened** before return — `MultiIndex` columns are
+> joined with `_`, the index is reset, and `columns.name` is cleared — so the output stays a
+> flat, tidy, JSON-round-trippable frame rather than the MultiIndex frame pandas returns. A
+> consequence worth knowing: with a list-valued `values` (e.g. `values=["amount"]`) pandas keeps
+> the value level, so columns come out as `amount_clicks`/`amount_views`, not `clicks`/`views`.
+
+## Story 6 — Derive column / case-when (`derive_column`) — ✅ done
+- [x] **Safe expression grammar.** A restricted, `ast`-validated expression evaluator (arithmetic,
   comparisons, string ops, `where`/case-when over existing columns) — **no arbitrary eval**, no
   `custom_code` trust level. Reuse the `emergentflow/script/` AST-renaming discipline for wiring.
-- [ ] Params: ordered list of `(new_column, expression)` or `(new_column, [when/then], else)`.
+- [x] Params: ordered list of `(new_column, expression)` or `(new_column, [when/then], else)`.
   Column-overwrite guard.
-- [ ] `derive_column` node + catalog; goldens covering arithmetic, string, and multi-branch
+- [x] `derive_column` node + catalog; goldens covering arithmetic, string, and multi-branch
   case-when; equivalence.
 
-## Story 7 — Combine & order (`concat`, `deduplicate`, `sort`)
-- [ ] `ef.clean.concat` (≥2 DataFrame inputs, schema-align, optional `keys`/`source` column);
+> **Delivered as:** `emergentflow/clean/expressions.py` (`validate_expression`, an `ast`
+> allow-list) plus `emergentflow/clean/derive.py` (`derive_column`, expression and case-when
+> forms, ordered so a later spec may reference an earlier derived column, first-match-wins via
+> `numpy.select`, column-overwrite guard). The `clean.derive_column` node.
+> **Deviation, decided in planning:** the story called for a restricted `ast`-validated
+> *evaluator*. What shipped instead delegates **evaluation** to `pandas.DataFrame.eval` (with
+> `engine="python"` pinned so numexpr's presence cannot change results and break the ADR-0002
+> gate, and `local_dict`/`global_dict` emptied), fronted by an `ast` **pre-screen** that enforces
+> the restriction. The pre-screen rejects any node type outside a literal allow-list — notably
+> `ast.Call`, `ast.Attribute`, and `ast.Subscript` — and additionally requires every bare name to
+> be an existing column. Because pandas' `@name` scope-escape syntax is not valid Python,
+> `ast.parse` rejects it for free. The invariant the epic's risk note protects — that this must
+> not become a second unsandboxed trust niche alongside `custom_code` — holds: an adversarial
+> battery covering `@`-locals, `__import__`, `open()`, `globals()`, dunder/`__subclasses__` reach,
+> subscripting, lambdas, and comprehensions is blocked with a typed `CleanError`.
+
+## Story 7 — Combine & order (`concat`, `deduplicate`, `sort`) — ✅ done
+- [x] `ef.clean.concat` (≥2 DataFrame inputs, schema-align, optional `keys`/`source` column);
   variadic-input node archetype. `ef.clean.deduplicate` (subset, keep first/last). `ef.clean.sort`
   (multi-key, asc/desc, na_position).
-- [ ] Three reference nodes + catalog entries; goldens + equivalence each.
+- [x] Three reference nodes + catalog entries; goldens + equivalence each.
 
-## Story 8 — String & date cleaning (`clean_text`, `parse_dates`)
-- [ ] `ef.clean.clean_text`: per-column pipeline of trim / lower-upper / regex extract / regex
+> **Delivered as:** `emergentflow/clean/combine.py`: `concat` (≥2 frames, schema-aligned,
+> optional `keys`/`source_column` provenance with a collision guard), `deduplicate` (`subset`,
+> `keep="first"|"last"|"none"`), `sort` (multi-key, per-key direction, `na_position`). The
+> `clean.concat`, `clean.deduplicate`, and `clean.sort` nodes — `concat` is the variadic
+> archetype, reusing the `Cardinality.MANY` fan-in already proven by `recommend.compare`, so no
+> new codegen machinery was needed.
+> **Note on determinism:** `pd.concat(..., sort=False)` and `sort_values(..., kind="stable")` are
+> both pinned deliberately. pandas' default sort is quicksort, which is not stable, so ties would
+> order non-deterministically and make goldens flaky.
+
+## Story 8 — String & date cleaning (`clean_text`, `parse_dates`) — ✅ done
+- [x] `ef.clean.clean_text`: per-column pipeline of trim / lower-upper / regex extract / regex
   replace / split-to-list. Non-mutating.
-- [ ] `ef.clean.parse_dates`: string→datetime (format or inferred) + extract components
+- [x] `ef.clean.parse_dates`: string→datetime (format or inferred) + extract components
   (year/month/day/dow/quarter/hour) into new columns. Overwrite guard.
-- [ ] Two nodes + catalog; goldens + equivalence.
+- [x] Two nodes + catalog; goldens + equivalence.
 
-## Story 9 — Sampling & fuzzy join (`sample_rows`, `fuzzy_join`)
-- [ ] `ef.clean.sample_rows`: `mode="random"|"stratified"|"top_n"`, `n`/`frac`, `by` for strata,
+> **Delivered as:** `emergentflow/clean/text_dates.py`: `clean_text` (an ordered per-column
+> pipeline of trim / lower / upper / title / regex replace / regex extract / split, with an
+> optional `suffix` that writes to new columns instead of cleaning in place) and `parse_dates`
+> (string→datetime with an optional explicit format, `errors="raise"|"coerce"`, and
+> calendar-component extraction into new `<column>_<component>` columns behind a collision
+> guard). The `clean.clean_text` and `clean.parse_dates` nodes.
+> **Note:** the whole `operations` list is validated **before** any operation touches data, so a
+> malformed pipeline cannot leave a half-cleaned frame. Text columns come back as pandas'
+> nullable `string` dtype (so missing values stay `<NA>` rather than becoming the literal text
+> `"nan"`); `split` is the exception, yielding object cells holding lists, ready for
+> `explode_lists`.
+
+## Story 9 — Sampling & fuzzy join (`sample_rows`, `fuzzy_join`) — ✅ done
+- [x] `ef.clean.sample_rows`: `mode="random"|"stratified"|"top_n"`, `n`/`frac`, `by` for strata,
   **explicit `seed` captured** and threaded into the reproducibility block (Story 19).
-- [ ] `ef.clean.fuzzy_join` (`[fuzzy]`/rapidfuzz): left/right key, similarity metric + threshold,
+- [x] `ef.clean.fuzzy_join` (`[fuzzy]`/rapidfuzz): left/right key, similarity metric + threshold,
   one-to-one vs one-to-many. Typed error on missing extra.
-- [ ] Two nodes + catalog; goldens + equivalence (fuzzy under a `[fuzzy]`-available lane; seed makes
+- [x] Two nodes + catalog; goldens + equivalence (fuzzy under a `[fuzzy]`-available lane; seed makes
   sampling deterministic).
+
+> **Delivered as:** `emergentflow/clean/sampling.py`: `sample_rows` (`mode="random"|"stratified"|
+> "top_n"`, `n`/`frac`, `by` for strata) and `fuzzy_join` (single-column string-similarity keyed
+> merge, rapidfuzz scorers, threshold, one-to-one vs one-to-many via `limit`,
+> `how="inner"|"left"`, similarity written to a `match_score` column). The `[fuzzy]` extra
+> (rapidfuzz, MIT) with an `importlib.util.find_spec` gate that raises
+> `MissingOptionalDependencyError` **before** any rapidfuzz import and before param validation,
+> so a base-install user is told to install the extra rather than being handed an unrelated
+> error. The `clean.sample_rows` and `clean.fuzzy_join` nodes.
+> **Deviation:** the story's "explicit `seed` captured" is implemented as `seed: int = 0` — a
+> concrete default rather than an optional `None`. A `None` seed would draw from the global RNG,
+> so `execute` and the compiled module would return different rows and the ADR-0002 gate would
+> fail. Reproducibility is therefore the default, not an opt-in. Threading the captured seed into
+> a reproducibility block remains Story 18's work, as written.
+> Following Story group A's precedent for `[cloud]`/`[excel]`, no dedicated CI job was added for
+> `[fuzzy]`; it has an `importorskip` lane plus a monkeypatched base-install typed-error test.
 
 ---
 

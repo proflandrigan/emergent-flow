@@ -75,6 +75,21 @@ This mirrors the repo's existing optional-dependency discipline (the `torch`-sty
 torch-optional deep-recommender path) were all considered and deliberately not added — `implicit`
 is the only library needed to cover the optimized implicit-feedback surface.
 
+## Optional extra: `[fuzzy]` (rapidfuzz)
+
+Epic 16's string-similarity keyed merge (`ef.clean.fuzzy_join`, Story 9) ships as an **optional
+extra**, installed with `pip install emergentflow[fuzzy]`, never as part of the base install. Its
+one dependency is permissively licensed and compatible with Apache-2.0:
+
+| Dependency | Version constraint | License | Compatible with Apache-2.0? |
+|---|---|---|---|
+| rapidfuzz | >=3,<4 | MIT | Yes |
+
+The extra is kept optional so a bare SDK install stays light (ADR 0007) and never pulls a C++
+extension. The base package must import and run with `rapidfuzz` absent; a `fuzzy_join` call in a
+base install raises a typed `MissingOptionalDependencyError("emergentflow[fuzzy]")` rather than an
+opaque `ImportError`.
+
 ## Deliberately not added: seaborn
 
 `plotly` (MIT) covers the interactive-charting surface Epic 12 needs, so **seaborn is intentionally
