@@ -36,8 +36,10 @@ from emergentflow.nodes.examples import (
     LoadParquet,
     LoadSample,
     MarkdownNote,
+    Merge,
     Predict,
     SelectColumns,
+    SemiJoin,
     Summarize,
     TrainClassifier,
     TrainRandomForest,
@@ -993,3 +995,81 @@ class TestMarkdownNote:
         # exec adds __builtins__; no user variables should be set.
         user_keys = {k for k in scope if not k.startswith("__")}
         assert user_keys == set()
+
+
+# ---------------------------------------------------------------------------
+# clean.merge
+# ---------------------------------------------------------------------------
+
+
+class TestMerge:
+    def test_to_spec(self):
+        spec = Merge().to_spec()
+        assert spec.type == "clean.merge"
+        assert spec.family == "clean"
+        assert spec.paradigm == Paradigm.FUNCTIONAL
+        in_ports = [p.name for p in spec.ports if p.direction == Direction.IN]
+        out_ports = [p.name for p in spec.ports if p.direction == Direction.OUT]
+        assert in_ports == ["left", "right"]
+        assert out_ports == ["frame"]
+
+    def test_codegen_matches_execute_on(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Merge()
+        left = pd.DataFrame({"user_id": [1, 2, 3], "name": ["a", "b", "c"]})
+        right = pd.DataFrame({"user_id": [2, 3, 4], "score": [10, 20, 30]})
+        node = defn.instantiate(on=["user_id"], how="inner")
+        executed = defn.execute(node, inputs={"left": left.copy(), "right": right.copy()})
+        scope = {"left": left.copy(), "right": right.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+    def test_codegen_matches_execute_left_on_right_on_how_left(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Merge()
+        left = pd.DataFrame({"uid": [1, 2, 3]})
+        right = pd.DataFrame({"user_id": [2], "score": [10]})
+        node = defn.instantiate(left_on=["uid"], right_on=["user_id"], how="left")
+        executed = defn.execute(node, inputs={"left": left.copy(), "right": right.copy()})
+        scope = {"left": left.copy(), "right": right.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
+# clean.semi_join
+# ---------------------------------------------------------------------------
+
+
+class TestSemiJoin:
+    def test_to_spec(self):
+        spec = SemiJoin().to_spec()
+        assert spec.type == "clean.semi_join"
+        assert spec.family == "clean"
+        assert spec.paradigm == Paradigm.FUNCTIONAL
+        in_ports = [p.name for p in spec.ports if p.direction == Direction.IN]
+        out_ports = [p.name for p in spec.ports if p.direction == Direction.OUT]
+        assert in_ports == ["frame", "keys"]
+        assert out_ports == ["frame"]
+
+    def test_codegen_matches_execute_keep(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = SemiJoin()
+        frame = pd.DataFrame({"user_id": [1, 2, 3, 4], "event": ["a", "b", "c", "d"]})
+        keys = pd.DataFrame({"user_id": [2, 4]})
+        node = defn.instantiate(on=["user_id"], mode="keep")
+        executed = defn.execute(node, inputs={"frame": frame.copy(), "keys": keys.copy()})
+        scope = {"frame": frame.copy(), "keys": keys.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+    def test_codegen_matches_execute_exclude(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = SemiJoin()
+        frame = pd.DataFrame({"user_id": [1, 2, 3, 4], "event": ["a", "b", "c", "d"]})
+        keys = pd.DataFrame({"user_id": [2, 4]})
+        node = defn.instantiate(on=["user_id"], mode="exclude")
+        executed = defn.execute(node, inputs={"frame": frame.copy(), "keys": keys.copy()})
+        scope = {"frame": frame.copy(), "keys": keys.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])

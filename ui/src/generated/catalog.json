@@ -2694,6 +2694,175 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "description": "Join two DataFrames on key column(s) (pandas-style inner/left/right/outer/cross).",
+      "family": "clean",
+      "label": "Merge",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column(s) shared by both frames. Alternative to left_on/right_on.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "On",
+          "name": "on",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Left-frame key column(s). Pair with right_on when column names differ.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Left on",
+          "name": "left_on",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Right-frame key column(s). Pair with left_on when column names differ.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Right on",
+          "name": "right_on",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "inner",
+          "help": "Join type.",
+          "hints": {
+            "choices": [
+              "inner",
+              "left",
+              "right",
+              "outer",
+              "cross"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "How",
+          "name": "how",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": [
+            "_x",
+            "_y"
+          ],
+          "help": "Suffixes appended to overlapping non-key column names from (left, right).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Suffixes",
+          "name": "suffixes",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional relationship check: 1:1, 1:m, m:1, or m:m. Raises if violated.",
+          "hints": {
+            "choices": [
+              "1:1",
+              "1:m",
+              "m:1",
+              "m:m"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Validate",
+          "name": "validate",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The left DataFrame.",
+          "label": "Left",
+          "name": "left",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The right DataFrame.",
+          "label": "Right",
+          "name": "right",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The joined DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.merge",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
       "description": "Keep or drop a chosen subset of columns.",
       "family": "clean",
       "label": "Select Columns",
@@ -2759,6 +2928,126 @@
         }
       ],
       "type": "clean.select_columns",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
+      "description": "Keep or exclude rows whose key column(s) match another DataFrame (semi-join / anti-join); never adds columns from the keys frame.",
+      "family": "clean",
+      "label": "Semi Join",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column(s) shared by both frames. Alternative to left_on/right_on.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "On",
+          "name": "on",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Key column(s) on the Data frame. Pair with right_on when column names differ.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Left on (Data)",
+          "name": "left_on",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Key column(s) on the Keys frame. Pair with left_on when column names differ.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Right on (Keys)",
+          "name": "right_on",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "keep",
+          "help": "Keep matching rows (semi-join) or drop them (anti-join).",
+          "hints": {
+            "choices": [
+              "keep",
+              "exclude"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Mode",
+          "name": "mode",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The DataFrame to filter.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The DataFrame whose key column(s) define membership.",
+          "label": "Keys",
+          "name": "keys",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The filtered DataFrame (same columns as the input Data).",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.semi_join",
       "version": 1
     },
     {

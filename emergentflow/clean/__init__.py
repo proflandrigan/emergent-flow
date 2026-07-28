@@ -43,6 +43,8 @@ __all__ = [
     "filter_rows",
     "explode_lists",
     "encode_lists",
+    "merge",
+    "semi_join",
     "STRATEGIES",
     "OPERATORS",
 ]
@@ -301,3 +303,167 @@ def encode_lists(
         dtype=int,
     )
     return pd.concat([base, indicator], axis=1)
+
+
+_MERGE_HOWS = ("inner", "left", "right", "outer", "cross")
+
+
+@public_op(name="ef.clean.merge")
+def merge(
+    left: pd.DataFrame,
+    right: pd.DataFrame,
+    *,
+    on: list[str] | None = None,
+    left_on: list[str] | None = None,
+    right_on: list[str] | None = None,
+    how: str = "inner",
+    suffixes: tuple[str, str] = ("_x", "_y"),
+    validate: str | None = None,
+) -> pd.DataFrame:
+    """Join two DataFrames on key column(s), returning a NEW DataFrame.
+
+    Thin wrapper over ``pandas.DataFrame.merge``. Exactly one key spec is required
+    (unless ``how="cross"``, which takes none): either ``on`` (column name(s) present
+    in both frames) or ``left_on``/``right_on`` together (differently-named or
+    composite keys — one list per side, equal length). ``how`` is one of
+    ``inner``/``left``/``right``/``outer``/``cross``. ``suffixes`` disambiguates
+    overlapping non-key column names between the two frames. ``validate``, when
+    given, is one of ``"1:1"``/``"1:m"``/``"m:1"``/``"m:m"`` and is passed through
+    to pandas, which raises if the declared relationship does not hold. Neither
+    input is mutated.
+    """
+    if how not in _MERGE_HOWS:
+        raise ValueError(f"unknown how {how!r}; expected one of {_MERGE_HOWS!r}.")
+
+    if how == "cross":
+        if on is not None or left_on is not None or right_on is not None:
+            raise ValueError("cross join takes no key columns; on/left_on/right_on must be None.")
+    else:
+        if on is not None and (left_on is not None or right_on is not None):
+            raise ValueError("pass either 'on' or 'left_on'/'right_on', not both.")
+        if (left_on is None) != (right_on is None):
+            raise ValueError("left_on and right_on must be given together.")
+        if on is None and left_on is None:
+            raise ValueError("must specify 'on' or 'left_on'/'right_on' (unless how='cross').")
+        if on is not None:
+            unknown_left = [c for c in on if c not in left.columns]
+            unknown_right = [c for c in on if c not in right.columns]
+            if unknown_left:
+                raise ValueError(
+                    f"unknown column(s) {unknown_left!r} in left; "
+                    f"expected one of {list(left.columns)!r}."
+                )
+            if unknown_right:
+                raise ValueError(
+                    f"unknown column(s) {unknown_right!r} in right; "
+                    f"expected one of {list(right.columns)!r}."
+                )
+        else:
+            assert left_on is not None and right_on is not None
+            if len(left_on) != len(right_on):
+                raise ValueError(
+                    f"left_on and right_on must be the same length; "
+                    f"got {len(left_on)} and {len(right_on)}."
+                )
+            unknown_left = [c for c in left_on if c not in left.columns]
+            unknown_right = [c for c in right_on if c not in right.columns]
+            if unknown_left:
+                raise ValueError(
+                    f"unknown column(s) {unknown_left!r} in left; "
+                    f"expected one of {list(left.columns)!r}."
+                )
+            if unknown_right:
+                raise ValueError(
+                    f"unknown column(s) {unknown_right!r} in right; "
+                    f"expected one of {list(right.columns)!r}."
+                )
+
+    if suffixes is not None and len(suffixes) != 2:
+        raise ValueError(f"suffixes must be a 2-tuple/list of exactly 2 strings; got {suffixes!r}.")
+
+    kwargs: dict[str, Any] = {
+        "how": how,
+        "suffixes": tuple(suffixes) if suffixes is not None else suffixes,
+    }
+    if validate is not None:
+        kwargs["validate"] = validate
+    if how != "cross":
+        if on is not None:
+            kwargs["on"] = on
+        else:
+            kwargs["left_on"] = left_on
+            kwargs["right_on"] = right_on
+
+    return left.merge(right, **kwargs)
+
+
+_SEMI_JOIN_MODES = ("keep", "exclude")
+
+
+@public_op(name="ef.clean.semi_join")
+def semi_join(
+    frame: pd.DataFrame,
+    keys: pd.DataFrame,
+    *,
+    on: list[str] | None = None,
+    left_on: list[str] | None = None,
+    right_on: list[str] | None = None,
+    mode: str = "keep",
+) -> pd.DataFrame:
+    """Filter ``frame``'s rows by key membership against ``keys``; returns a NEW DataFrame.
+
+    A membership test, not a join: columns from ``keys`` are never added to the output,
+    and duplicate key rows in ``keys`` never fan out rows in ``frame`` (each ``frame`` row
+    appears at most once in the result). Exactly one key spec is required: either ``on``
+    (column name(s) present in both frames) or ``left_on``/``right_on`` together
+    (differently-named or composite keys — one list per side, equal length).
+    ``mode="keep"`` (semi-join) keeps ``frame`` rows whose key tuple appears anywhere in
+    ``keys``; ``mode="exclude"`` (anti-join) keeps rows whose key tuple does NOT appear.
+    Neither ``frame`` nor ``keys`` is mutated; the original row order and index of
+    ``frame`` are preserved.
+    """
+    if mode not in _SEMI_JOIN_MODES:
+        raise ValueError(f"unknown mode {mode!r}; expected one of {_SEMI_JOIN_MODES!r}.")
+    if on is not None and (left_on is not None or right_on is not None):
+        raise ValueError("pass either 'on' or 'left_on'/'right_on', not both.")
+    if (left_on is None) != (right_on is None):
+        raise ValueError("left_on and right_on must be given together.")
+    if on is None and left_on is None:
+        raise ValueError("must specify 'on' or 'left_on'/'right_on'.")
+
+    if on is not None:
+        left_keys, right_keys = list(on), list(on)
+    else:
+        assert left_on is not None and right_on is not None
+        left_keys, right_keys = list(left_on), list(right_on)
+        if len(left_keys) != len(right_keys):
+            raise ValueError(
+                f"left_on and right_on must be the same length; "
+                f"got {len(left_keys)} and {len(right_keys)}."
+            )
+
+    unknown_left = [c for c in left_keys if c not in frame.columns]
+    if unknown_left:
+        raise ValueError(
+            f"unknown column(s) {unknown_left!r} in frame; expected one of {list(frame.columns)!r}."
+        )
+    unknown_right = [c for c in right_keys if c not in keys.columns]
+    if unknown_right:
+        raise ValueError(
+            f"unknown column(s) {unknown_right!r} in keys; expected one of {list(keys.columns)!r}."
+        )
+
+    right_subset = keys[right_keys].drop_duplicates()
+    temp_names = [f"__semi_join_key_{i}__" for i in range(len(right_keys))]
+    right_subset = right_subset.rename(columns=dict(zip(right_keys, temp_names, strict=True)))
+
+    probe = frame[left_keys].merge(
+        right_subset,
+        how="left",
+        left_on=left_keys,
+        right_on=temp_names,
+        indicator="__semi_join_indicator__",
+    )
+    matched = (probe["__semi_join_indicator__"] == "both").to_numpy()
+    keep_mask = matched if mode == "keep" else ~matched
+    return frame[keep_mask].copy()

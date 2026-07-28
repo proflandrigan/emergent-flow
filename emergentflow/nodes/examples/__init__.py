@@ -71,6 +71,7 @@ from .load_json import LoadJson
 from .load_parquet import LoadParquet
 from .load_sample import LoadSample
 from .markdown_note import MarkdownNote
+from .merge import Merge
 from .missingness import Missingness
 from .nn_linear import NnLinear
 from .nn_module import NnModule
@@ -94,6 +95,7 @@ from .scale_features import ScaleFeatures
 from .seasonal_decompose import SeasonalDecompose
 from .select_columns import SelectColumns
 from .select_features import SelectFeatures
+from .semi_join import SemiJoin
 from .sql_query import SqlQuery
 from .summarize import Summarize
 from .train import TrainClassifier
@@ -180,6 +182,7 @@ __all__ = [
     "LoadParquet",
     "LoadSample",
     "MarkdownNote",
+    "Merge",
     "Missingness",
     "NnLinear",
     "NnModule",
@@ -199,6 +202,7 @@ __all__ = [
     "SeasonalDecompose",
     "SelectColumns",
     "SelectFeatures",
+    "SemiJoin",
     "SimilarItems",
     "SqlQuery",
     "Summarize",
