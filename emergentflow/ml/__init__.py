@@ -355,6 +355,8 @@ def predict(model: FittedModel, df: pd.DataFrame) -> pd.DataFrame:
     missing = [c for c in model.feature_names if c not in df.columns]
     if missing:
         raise ValueError(f"missing feature columns {missing!r}; expected {model.feature_names!r}.")
+    if "prediction" in df.columns:
+        raise ValueError("df already has a 'prediction' column; rename it before predicting.")
     result = df.copy()
     result["prediction"] = model.estimator.predict(df[model.feature_names])
     return result
