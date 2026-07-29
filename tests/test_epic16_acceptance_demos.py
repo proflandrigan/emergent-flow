@@ -55,9 +55,18 @@ def _repo_relative(path: pathlib.Path) -> str:
 
 
 def _make(node_type: str, node_id: str, **params) -> Node:
-    """Instantiate a registered node definition and give it a stable, readable id."""
+    """Instantiate a registered node definition with stable, readable node and port ids.
+
+    `instantiate` mints a fresh UUID per port, which is right for a live canvas but wrong for a
+    graph committed to `examples/`: every test run would rewrite all three pipeline JSONs with
+    new ids, dirtying the working tree and putting pure churn in every future diff. Deriving each
+    port id from `<node id>:<direction>:<port name>` makes the emitted JSON byte-stable across
+    runs (`Port.id` is a plain `str` with no UUID constraint) and readable in the committed file.
+    """
     node = get_node_definition(node_type)().instantiate(**params)
     node.id = node_id
+    for port in node.ports:
+        port.id = f"{node_id}:{port.direction.value}:{port.name}"
     return node
 
 
@@ -500,3 +509,20 @@ def test_research_demo_pdf_lane() -> None:
     pdf_bytes = results["n-report"]["report"].pdf_bytes
     assert isinstance(pdf_bytes, bytes)
     assert pdf_bytes
+
+
+def test_committed_pipelines_are_byte_stable_across_runs() -> None:
+    """Rebuilding a demo graph twice must serialize identically.
+
+    The demo JSONs are committed to `examples/`, and every test run rewrites them. If node or
+    port ids were nondeterministic (as raw `instantiate` makes them -- see `_make`), each
+    `uv run pytest` would dirty the working tree and every future PR would carry pure id churn.
+    """
+    for build in (
+        lambda: build_north_star_demo(),
+        lambda: build_transform_demo(_write_transform_fixtures()),
+        lambda: build_research_demo(_write_research_fixture()),
+    ):
+        first = build().model_dump_json(indent=2)
+        second = build().model_dump_json(indent=2)
+        assert first == second

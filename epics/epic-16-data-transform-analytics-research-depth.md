@@ -875,7 +875,14 @@ explicitly **defers retrieval/vector-store** to Epic 11 rather than duplicating 
 >    `monkeypatch.chdir(REPO_ROOT)` fixture — the same contract
 >    `tests/test_data_connectors_acceptance_demo.py` gets by passing `cwd=REPO_ROOT` to its
 >    compiled subprocess.
-> 7. **The transform demo's two fixture CSVs are regenerated, not committed.** `.gitignore:98`
+> 7. **The demo graphs' node *and port* ids are derived, not minted.** `NodeDefinition.instantiate`
+>    assigns a fresh UUID per port — correct for a live canvas, wrong for a graph committed to
+>    `examples/`, because every `uv run pytest` would rewrite all three pipeline JSONs with new
+>    ids and dirty the working tree. `_make` therefore overwrites each port id with
+>    `<node id>:<direction>:<port name>` (`Port.id` is a plain `str`, no UUID constraint), which
+>    also makes the committed files readable. `test_committed_pipelines_are_byte_stable_across_runs`
+>    asserts two builds of each demo serialize identically, so the churn cannot come back.
+> 8. **The transform demo's two fixture CSVs are regenerated, not committed.** `.gitignore:98`
 >    ignores `*.csv` repo-wide, so `examples/epic16_acceptance_demos/sales/*.csv` cannot be
 >    checked in without a deliberate `git add -f` overriding that policy — which was left as the
 >    repo owner's call rather than taken unilaterally. `_write_transform_fixtures()` recreates

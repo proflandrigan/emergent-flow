@@ -30,7 +30,7 @@
       ],
       "ports": [
         {
-          "id": "c1eaa799-0ddb-41b7-b092-71b04d4a77ee",
+          "id": "n-docs:out:frame",
           "name": "frame",
           "direction": "out",
           "data_type": "DocumentFrame",
@@ -72,7 +72,7 @@
       ],
       "ports": [
         {
-          "id": "5680ae42-715f-4a2b-b967-7e5f27ad9cf6",
+          "id": "n-dict:in:frame",
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
@@ -80,7 +80,7 @@
           "label": "Data"
         },
         {
-          "id": "37a55412-5e7d-43da-a001-bb4b1a87684b",
+          "id": "n-dict:out:dictionary",
           "name": "dictionary",
           "direction": "out",
           "data_type": "DataFrame",
@@ -131,7 +131,7 @@
       ],
       "ports": [
         {
-          "id": "bc5b2c35-7bbf-4674-9c75-b4c6c78bb2dd",
+          "id": "n-redact:in:frame",
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
@@ -139,7 +139,7 @@
           "label": "Data"
         },
         {
-          "id": "ebeac35e-f657-49d3-8435-13f8adedee1b",
+          "id": "n-redact:out:frame",
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
@@ -205,7 +205,7 @@
       ],
       "ports": [
         {
-          "id": "8efbdb85-86bf-424d-a4f8-3a80c5449e01",
+          "id": "n-report:in:sections",
           "name": "sections",
           "direction": "in",
           "data_type": "any",
@@ -213,7 +213,7 @@
           "label": "Sections"
         },
         {
-          "id": "c284baea-8c45-4ea6-8a3c-acdcdf581bb5",
+          "id": "n-report:out:report",
           "name": "report",
           "direction": "out",
           "data_type": "Report",
@@ -234,11 +234,11 @@
       "id": "e-docs-dict",
       "source": {
         "node_id": "n-docs",
-        "port_id": "c1eaa799-0ddb-41b7-b092-71b04d4a77ee"
+        "port_id": "n-docs:out:frame"
       },
       "target": {
         "node_id": "n-dict",
-        "port_id": "5680ae42-715f-4a2b-b967-7e5f27ad9cf6"
+        "port_id": "n-dict:in:frame"
       },
       "type_compatible": null
     },
@@ -246,11 +246,11 @@
       "id": "e-dict-redact",
       "source": {
         "node_id": "n-dict",
-        "port_id": "37a55412-5e7d-43da-a001-bb4b1a87684b"
+        "port_id": "n-dict:out:dictionary"
       },
       "target": {
         "node_id": "n-redact",
-        "port_id": "bc5b2c35-7bbf-4674-9c75-b4c6c78bb2dd"
+        "port_id": "n-redact:in:frame"
       },
       "type_compatible": null
     },
@@ -258,11 +258,11 @@
       "id": "e-redact-report",
       "source": {
         "node_id": "n-redact",
-        "port_id": "ebeac35e-f657-49d3-8435-13f8adedee1b"
+        "port_id": "n-redact:out:frame"
       },
       "target": {
         "node_id": "n-report",
-        "port_id": "8efbdb85-86bf-424d-a4f8-3a80c5449e01"
+        "port_id": "n-report:in:sections"
       },
       "type_compatible": null
     }

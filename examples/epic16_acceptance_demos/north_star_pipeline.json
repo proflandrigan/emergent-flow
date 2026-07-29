@@ -108,7 +108,7 @@
       ],
       "ports": [
         {
-          "id": "82628a4d-7e2c-4157-ac46-3b64d0b5260b",
+          "id": "n-fetch:out:frame",
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
@@ -160,7 +160,7 @@
       ],
       "ports": [
         {
-          "id": "5584319f-d142-4d14-8426-497af2e7e676",
+          "id": "n-dates:in:frame",
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
@@ -168,7 +168,7 @@
           "label": "Data"
         },
         {
-          "id": "b794aaaf-aea3-4621-9b09-9d4829291374",
+          "id": "n-dates:out:frame",
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
@@ -203,7 +203,7 @@
       ],
       "ports": [
         {
-          "id": "a2fcc0b0-d8e6-4697-886b-58a2d5db6e19",
+          "id": "n-derive:in:frame",
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
@@ -211,7 +211,7 @@
           "label": "Data"
         },
         {
-          "id": "dc089f9d-79cb-4784-9de3-917441903a02",
+          "id": "n-derive:out:frame",
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
@@ -254,7 +254,7 @@
       ],
       "ports": [
         {
-          "id": "67e02bc2-3094-444f-a261-de8442fc14cc",
+          "id": "n-gate:in:frame",
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
@@ -262,7 +262,7 @@
           "label": "Data"
         },
         {
-          "id": "f96ff1c8-1919-43a3-9fe2-8e134618ffd3",
+          "id": "n-gate:out:frame",
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
@@ -304,7 +304,7 @@
       ],
       "ports": [
         {
-          "id": "43a6793a-deae-4e80-ab96-8beedf8a2187",
+          "id": "n-prop:in:frame",
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
@@ -312,7 +312,7 @@
           "label": "Data"
         },
         {
-          "id": "c7bfd100-ca44-4c70-8cca-2e1540f89523",
+          "id": "n-prop:out:result",
           "name": "result",
           "direction": "out",
           "data_type": "DataFrame",
@@ -378,7 +378,7 @@
       ],
       "ports": [
         {
-          "id": "0c08e15a-ae79-4b1d-9b77-d1c23dfa647f",
+          "id": "n-report:in:sections",
           "name": "sections",
           "direction": "in",
           "data_type": "any",
@@ -386,7 +386,7 @@
           "label": "Sections"
         },
         {
-          "id": "a702ed6d-41fb-4a24-a1ef-79a5c15480c7",
+          "id": "n-report:out:report",
           "name": "report",
           "direction": "out",
           "data_type": "Report",
@@ -407,11 +407,11 @@
       "id": "e-fetch-dates",
       "source": {
         "node_id": "n-fetch",
-        "port_id": "82628a4d-7e2c-4157-ac46-3b64d0b5260b"
+        "port_id": "n-fetch:out:frame"
       },
       "target": {
         "node_id": "n-dates",
-        "port_id": "5584319f-d142-4d14-8426-497af2e7e676"
+        "port_id": "n-dates:in:frame"
       },
       "type_compatible": null
     },
@@ -419,11 +419,11 @@
       "id": "e-dates-derive",
       "source": {
         "node_id": "n-dates",
-        "port_id": "b794aaaf-aea3-4621-9b09-9d4829291374"
+        "port_id": "n-dates:out:frame"
       },
       "target": {
         "node_id": "n-derive",
-        "port_id": "a2fcc0b0-d8e6-4697-886b-58a2d5db6e19"
+        "port_id": "n-derive:in:frame"
       },
       "type_compatible": null
     },
@@ -431,11 +431,11 @@
       "id": "e-derive-gate",
       "source": {
         "node_id": "n-derive",
-        "port_id": "dc089f9d-79cb-4784-9de3-917441903a02"
+        "port_id": "n-derive:out:frame"
       },
       "target": {
         "node_id": "n-gate",
-        "port_id": "67e02bc2-3094-444f-a261-de8442fc14cc"
+        "port_id": "n-gate:in:frame"
       },
       "type_compatible": null
     },
@@ -443,11 +443,11 @@
       "id": "e-gate-prop",
       "source": {
         "node_id": "n-gate",
-        "port_id": "f96ff1c8-1919-43a3-9fe2-8e134618ffd3"
+        "port_id": "n-gate:out:frame"
       },
       "target": {
         "node_id": "n-prop",
-        "port_id": "43a6793a-deae-4e80-ab96-8beedf8a2187"
+        "port_id": "n-prop:in:frame"
       },
       "type_compatible": null
     },
@@ -455,11 +455,11 @@
       "id": "e-prop-report",
       "source": {
         "node_id": "n-prop",
-        "port_id": "c7bfd100-ca44-4c70-8cca-2e1540f89523"
+        "port_id": "n-prop:out:result"
       },
       "target": {
         "node_id": "n-report",
-        "port_id": "0c08e15a-ae79-4b1d-9b77-d1c23dfa647f"
+        "port_id": "n-report:in:sections"
       },
       "type_compatible": null
     }

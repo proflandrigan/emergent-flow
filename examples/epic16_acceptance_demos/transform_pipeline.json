@@ -48,7 +48,7 @@
       ],
       "ports": [
         {
-          "id": "8279dfc7-b817-4cb9-95a8-61a485048052",
+          "id": "n-load:out:frame",
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
@@ -99,7 +99,7 @@
       ],
       "ports": [
         {
-          "id": "1f587607-0a77-4906-baef-996f28b6a602",
+          "id": "n-text:in:frame",
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
@@ -107,7 +107,7 @@
           "label": "Data"
         },
         {
-          "id": "afeeb3e8-600b-44d8-bf61-ff2a173fcab9",
+          "id": "n-text:out:frame",
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
@@ -191,7 +191,7 @@
       ],
       "ports": [
         {
-          "id": "fcd80217-9352-4e0a-a0ce-ef5f93b39be9",
+          "id": "n-melt:in:frame",
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
@@ -199,7 +199,7 @@
           "label": "Data"
         },
         {
-          "id": "8329666d-7bac-42e3-9b3a-a725342852c5",
+          "id": "n-melt:out:frame",
           "name": "frame",
           "direction": "out",
           "data_type": "DataFrame",
@@ -246,7 +246,7 @@
       ],
       "ports": [
         {
-          "id": "406746c2-50a2-469a-bf37-ea0517806823",
+          "id": "n-agg:in:frame",
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
@@ -254,7 +254,7 @@
           "label": "Data"
         },
         {
-          "id": "744b632c-a5c0-44aa-befd-420b5a3f8385",
+          "id": "n-agg:out:summary",
           "name": "summary",
           "direction": "out",
           "data_type": "DataFrame",
@@ -302,7 +302,7 @@
       ],
       "ports": [
         {
-          "id": "2bf45843-901e-4f57-b2c7-68bf72da82b4",
+          "id": "n-tab:in:frame",
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
@@ -310,7 +310,7 @@
           "label": "Data"
         },
         {
-          "id": "0b047c87-b3c2-4585-ae38-91d293e1e4d2",
+          "id": "n-tab:out:result",
           "name": "result",
           "direction": "out",
           "data_type": "CrosstabResult",
@@ -355,7 +355,7 @@
       ],
       "ports": [
         {
-          "id": "f97cbc9a-05cb-462f-aae7-7d4e23a05123",
+          "id": "n-plot:in:frame",
           "name": "frame",
           "direction": "in",
           "data_type": "DataFrame",
@@ -363,7 +363,7 @@
           "label": "Data"
         },
         {
-          "id": "53e92ff1-1567-49d0-8151-a4743addfdf4",
+          "id": "n-plot:out:plot",
           "name": "plot",
           "direction": "out",
           "data_type": "PlotSpec",
@@ -384,11 +384,11 @@
       "id": "e-load-text",
       "source": {
         "node_id": "n-load",
-        "port_id": "8279dfc7-b817-4cb9-95a8-61a485048052"
+        "port_id": "n-load:out:frame"
       },
       "target": {
         "node_id": "n-text",
-        "port_id": "1f587607-0a77-4906-baef-996f28b6a602"
+        "port_id": "n-text:in:frame"
       },
       "type_compatible": null
     },
@@ -396,11 +396,11 @@
       "id": "e-text-melt",
       "source": {
         "node_id": "n-text",
-        "port_id": "afeeb3e8-600b-44d8-bf61-ff2a173fcab9"
+        "port_id": "n-text:out:frame"
       },
       "target": {
         "node_id": "n-melt",
-        "port_id": "fcd80217-9352-4e0a-a0ce-ef5f93b39be9"
+        "port_id": "n-melt:in:frame"
       },
       "type_compatible": null
     },
@@ -408,11 +408,11 @@
       "id": "e-melt-agg",
       "source": {
         "node_id": "n-melt",
-        "port_id": "8329666d-7bac-42e3-9b3a-a725342852c5"
+        "port_id": "n-melt:out:frame"
       },
       "target": {
         "node_id": "n-agg",
-        "port_id": "406746c2-50a2-469a-bf37-ea0517806823"
+        "port_id": "n-agg:in:frame"
       },
       "type_compatible": null
     },
@@ -420,11 +420,11 @@
       "id": "e-melt-tab",
       "source": {
         "node_id": "n-melt",
-        "port_id": "8329666d-7bac-42e3-9b3a-a725342852c5"
+        "port_id": "n-melt:out:frame"
       },
       "target": {
         "node_id": "n-tab",
-        "port_id": "2bf45843-901e-4f57-b2c7-68bf72da82b4"
+        "port_id": "n-tab:in:frame"
       },
       "type_compatible": null
     },
@@ -432,11 +432,11 @@
       "id": "e-agg-plot",
       "source": {
         "node_id": "n-agg",
-        "port_id": "744b632c-a5c0-44aa-befd-420b5a3f8385"
+        "port_id": "n-agg:out:summary"
       },
       "target": {
         "node_id": "n-plot",
-        "port_id": "f97cbc9a-05cb-462f-aae7-7d4e23a05123"
+        "port_id": "n-plot:in:frame"
       },
       "type_compatible": null
     }
