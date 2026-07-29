@@ -790,7 +790,7 @@ explicitly **defers retrieval/vector-store** to Epic 11 rather than duplicating 
 > `render_pdf=True` lane, which `importorskip`s weasyprint), ADR-0002 equivalence gate **336
 > passed / 7 skipped** (up from 303 — Story 24's new matrix file is the whole of that delta), and
 > the UI gates green — `npm run lint` 0 errors (3 pre-existing warnings, unrelated to this work),
-> `npm run typecheck` clean, `npm test` **630 passed** (up from 612: 8 `ReportView` + 8
+> `npm run typecheck` clean, `npm test` **631 passed** (up from 612: 8 `ReportView` + 9
 > `LineagePanel` + 2 `Inspector` tab tests). `scripts/check_ui_boundary.py` — OK, `ui/` imports
 > zero `emergentflow`. Contract artifacts regenerated: `schema/rules.json` (now carrying the
 > catalog's first explicit subtype edge); `ui/src/generated/*` regenerated **byte-identical**,
@@ -816,6 +816,16 @@ explicitly **defers retrieval/vector-store** to Epic 11 rather than duplicating 
 >    turning one of those typed errors back into an opaque `ImportError` would have shipped
 >    silently. All four now have a lane, plus a matching "the default path still works without the
 >    extra" test.
+> 3. **`LineagePanel` rendered raw port ids instead of port names** (caught in the group's final
+>    review pass). The `/lineage` DTO's `source_port`/`target_port` are port **ids** —
+>    `emergentflow/research/lineage.py:133` fills them from `edge.source.port_id`, since the IR
+>    keys edges by id — not the `"frame"`-style names the panel was displaying verbatim. The hop
+>    line therefore read `port:a1b2… → port:d4e5…` on a real graph. The panel now resolves each id
+>    back through the graph store's node/port shape (`label ?? name ?? id`, so a port deleted
+>    since the trace degrades to its id rather than rendering blank). The original test passed
+>    only because its hand-written fixture used `"frame"` as the port value; it has been replaced
+>    with one that mints real port ids via `addNodeFromSpec` and asserts neither id leaks into the
+>    UI, plus a companion test for the deleted-port fallback.
 >
 > **Deviations, decided during implementation:**
 > 1. **The Lineage renderer is a fifth Inspector tab that fetches `POST /lineage`, not a Results-area
@@ -908,8 +918,9 @@ explicitly **defers retrieval/vector-store** to Epic 11 rather than duplicating 
 > `CodePanel.tsx`, wired as a fifth `Segmented` tab in `Inspector.tsx` (see deviation #1 for why a
 > tab rather than a Results renderer). Both are pure of `emergentflow` imports; `LineagePanel`
 > declares the `Lineage` DTO shape locally with runtime type guards, since the generated contracts
-> do not cover it. 18 new vitest cases; `npm test` 612 → **630 passed**, `tsc --noEmit` clean,
-> eslint 0 errors.
+> do not cover it, and resolves the DTO's port **ids** back to display names against the graph
+> store (see defect #3 above). 19 new vitest cases; `npm test` 612 → **631 passed**,
+> `tsc --noEmit` clean, eslint 0 errors.
 
 ## Story 24 — Equivalence & golden testing at scale — ✅ done
 - [x] Extend the parametrized equivalence harness to cover the full new node matrix, keyed on each

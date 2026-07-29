@@ -208,6 +208,17 @@ export function LineagePanel({
       (edge) => edge.source_node_id === fromId && edge.target_node_id === toId,
     );
 
+  // `source_port`/`target_port` on the DTO are port IDs (opaque UUIDs, per
+  // `emergentflow/research/lineage.py`), not port names -- the IR keys edges by id for
+  // CRDT-friendliness (see `ui/src/generated/ir.ts`). Resolve them back to the port's
+  // display label/name via the current graph's node/port shape so the hop reads "frame →
+  // frame" instead of a raw UUID; fall back to the id itself if the node or port can no
+  // longer be found (e.g. it was deleted after the lineage was traced).
+  const portLabel = (ownerNodeId: string, portId: string): string => {
+    const port = nodes[ownerNodeId]?.ports.find((p) => p.id === portId);
+    return port?.label ?? port?.name ?? portId;
+  };
+
   return (
     <div>
       <div data-testid="lineage-summary" style={mutedStyle}>
@@ -228,7 +239,8 @@ export function LineagePanel({
             >
               {hop ? (
                 <div data-testid="lineage-hop" style={mutedStyle}>
-                  {hop.source_port} → {hop.target_port}
+                  {portLabel(hop.source_node_id, hop.source_port)} →{" "}
+                  {portLabel(hop.target_node_id, hop.target_port)}
                 </div>
               ) : null}
               <div>
