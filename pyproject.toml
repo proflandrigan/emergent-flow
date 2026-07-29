@@ -375,5 +375,9 @@ module = [
     # from the bare `uv sync --locked` CI env (like torch/litellm/pymc).
     "presidio_analyzer.*",
     "presidio_anonymizer.*",
+    # The optional `emergentflow[fuzzy]` extra (Epic 16): rapidfuzz is imported lazily inside
+    # `ef.clean.fuzzy_join`, absent from the bare `uv sync --locked` CI env (like
+    # torch/litellm/pymc).
+    "rapidfuzz.*",
 ]
 ignore_missing_imports = true

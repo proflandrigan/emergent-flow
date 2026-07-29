@@ -112,6 +112,11 @@ class Case:
     node_type: str
     params: dict[str, Any]
     make_inputs: Callable[[], dict[str, Any]]
+    #: Import name of an optional extra this case cannot run without, or None when the node
+    #: works on the base install. A gated node raises a typed MissingOptionalDependencyError
+    #: rather than skipping itself, so the case has to declare the requirement -- same
+    #: `pytest.importorskip` discipline the file/client tests below already use for openpyxl.
+    requires: str | None = None
 
 
 CASES: list[Case] = [
@@ -189,6 +194,7 @@ CASES: list[Case] = [
             "left": pd.DataFrame({"user_id": ["alpha", "beta"], "v": [1, 2]}),
             "right": pd.DataFrame({"uid": ["alpah", "beta"], "w": [3, 4]}),
         },
+        requires="rapidfuzz",
     ),
     Case(
         "stats.chi_square",
@@ -276,6 +282,8 @@ CASES: list[Case] = [
 @pytest.mark.parametrize("case", CASES, ids=[c.node_type for c in CASES])
 def test_codegen_matches_execute(case: Case) -> None:
     """ADR-0002: execute() and the emitted codegen fragment produce equivalent OUT ports."""
+    if case.requires is not None:
+        pytest.importorskip(case.requires)
     defn = get_node_definition(case.node_type)()
     node = defn.instantiate(**case.params)
 
