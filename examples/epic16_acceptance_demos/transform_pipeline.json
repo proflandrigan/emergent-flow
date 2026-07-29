@@ -1,0 +1,444 @@
+{
+  "schema_version": 1,
+  "paradigm": "functional",
+  "name": "epic16_transform",
+  "nodes": {
+    "n-load": {
+      "id": "n-load",
+      "type": "data.load_csv",
+      "label": "Load monthly CSVs",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "path",
+          "type_token": "str",
+          "value": "examples/epic16_acceptance_demos/sales/sales_*.csv",
+          "default": null
+        },
+        {
+          "name": "encoding",
+          "type_token": "str",
+          "value": "utf-8",
+          "default": "utf-8"
+        },
+        {
+          "name": "source_file",
+          "type_token": "bool",
+          "value": false,
+          "default": false
+        },
+        {
+          "name": "connection",
+          "type_token": "str",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "expect_columns",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "expect_dtypes",
+          "type_token": "dict",
+          "value": null,
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "8279dfc7-b817-4cb9-95a8-61a485048052",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-text": {
+      "id": "n-text",
+      "type": "clean.clean_text",
+      "label": "Normalize region",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "columns",
+          "type_token": "list[str]",
+          "value": [
+            "region"
+          ],
+          "default": null
+        },
+        {
+          "name": "operations",
+          "type_token": "list[dict[str, any]]",
+          "value": [
+            {
+              "op": "trim"
+            },
+            {
+              "op": "lower"
+            }
+          ],
+          "default": null
+        },
+        {
+          "name": "suffix",
+          "type_token": "str",
+          "value": null,
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "1f587607-0a77-4906-baef-996f28b6a602",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        },
+        {
+          "id": "afeeb3e8-600b-44d8-bf61-ff2a173fcab9",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-melt": {
+      "id": "n-melt",
+      "type": "clean.reshape",
+      "label": "Melt metrics",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "mode",
+          "type_token": "str",
+          "value": "melt",
+          "default": "pivot"
+        },
+        {
+          "name": "index",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "columns",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "values",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "aggfunc",
+          "type_token": "str",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "id_vars",
+          "type_token": "list[str]",
+          "value": [
+            "region",
+            "channel"
+          ],
+          "default": null
+        },
+        {
+          "name": "value_vars",
+          "type_token": "list[str]",
+          "value": [
+            "revenue",
+            "units"
+          ],
+          "default": null
+        },
+        {
+          "name": "var_name",
+          "type_token": "str",
+          "value": "metric",
+          "default": "variable"
+        },
+        {
+          "name": "value_name",
+          "type_token": "str",
+          "value": "amount",
+          "default": "value"
+        }
+      ],
+      "ports": [
+        {
+          "id": "fcd80217-9352-4e0a-a0ce-ef5f93b39be9",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        },
+        {
+          "id": "8329666d-7bac-42e3-9b3a-a725342852c5",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-agg": {
+      "id": "n-agg",
+      "type": "stats.group_by_aggregate",
+      "label": "Mean by region/metric",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "by",
+          "type_token": "list[str]",
+          "value": [
+            "region",
+            "metric"
+          ],
+          "default": null
+        },
+        {
+          "name": "agg",
+          "type_token": "str",
+          "value": "mean",
+          "default": "mean"
+        },
+        {
+          "name": "columns",
+          "type_token": "list[str]",
+          "value": [
+            "amount"
+          ],
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "406746c2-50a2-469a-bf37-ea0517806823",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        },
+        {
+          "id": "744b632c-a5c0-44aa-befd-420b5a3f8385",
+          "name": "summary",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-tab": {
+      "id": "n-tab",
+      "type": "stats.crosstab",
+      "label": "Region x metric",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "row_col",
+          "type_token": "str",
+          "value": "region",
+          "default": null
+        },
+        {
+          "name": "col_col",
+          "type_token": "str",
+          "value": "metric",
+          "default": null
+        },
+        {
+          "name": "normalize",
+          "type_token": "str",
+          "value": "none",
+          "default": "none"
+        },
+        {
+          "name": "margins",
+          "type_token": "bool",
+          "value": false,
+          "default": true
+        }
+      ],
+      "ports": [
+        {
+          "id": "2bf45843-901e-4f57-b2c7-68bf72da82b4",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        },
+        {
+          "id": "0b047c87-b3c2-4585-ae38-91d293e1e4d2",
+          "name": "result",
+          "direction": "out",
+          "data_type": "CrosstabResult",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-plot": {
+      "id": "n-plot",
+      "type": "viz.plot",
+      "label": "Region bar chart",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "chart",
+          "type_token": "str",
+          "value": "bar",
+          "default": null
+        },
+        {
+          "name": "encoding",
+          "type_token": "dict[str, any]",
+          "value": {
+            "x": "region",
+            "y": "amount"
+          },
+          "default": {}
+        },
+        {
+          "name": "options",
+          "type_token": "dict[str, any]",
+          "value": {},
+          "default": {}
+        }
+      ],
+      "ports": [
+        {
+          "id": "f97cbc9a-05cb-462f-aae7-7d4e23a05123",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        },
+        {
+          "id": "53e92ff1-1567-49d0-8151-a4743addfdf4",
+          "name": "plot",
+          "direction": "out",
+          "data_type": "PlotSpec",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    }
+  },
+  "edges": {
+    "e-load-text": {
+      "id": "e-load-text",
+      "source": {
+        "node_id": "n-load",
+        "port_id": "8279dfc7-b817-4cb9-95a8-61a485048052"
+      },
+      "target": {
+        "node_id": "n-text",
+        "port_id": "1f587607-0a77-4906-baef-996f28b6a602"
+      },
+      "type_compatible": null
+    },
+    "e-text-melt": {
+      "id": "e-text-melt",
+      "source": {
+        "node_id": "n-text",
+        "port_id": "afeeb3e8-600b-44d8-bf61-ff2a173fcab9"
+      },
+      "target": {
+        "node_id": "n-melt",
+        "port_id": "fcd80217-9352-4e0a-a0ce-ef5f93b39be9"
+      },
+      "type_compatible": null
+    },
+    "e-melt-agg": {
+      "id": "e-melt-agg",
+      "source": {
+        "node_id": "n-melt",
+        "port_id": "8329666d-7bac-42e3-9b3a-a725342852c5"
+      },
+      "target": {
+        "node_id": "n-agg",
+        "port_id": "406746c2-50a2-469a-bf37-ea0517806823"
+      },
+      "type_compatible": null
+    },
+    "e-melt-tab": {
+      "id": "e-melt-tab",
+      "source": {
+        "node_id": "n-melt",
+        "port_id": "8329666d-7bac-42e3-9b3a-a725342852c5"
+      },
+      "target": {
+        "node_id": "n-tab",
+        "port_id": "2bf45843-901e-4f57-b2c7-68bf72da82b4"
+      },
+      "type_compatible": null
+    },
+    "e-agg-plot": {
+      "id": "e-agg-plot",
+      "source": {
+        "node_id": "n-agg",
+        "port_id": "744b632c-a5c0-44aa-befd-420b5a3f8385"
+      },
+      "target": {
+        "node_id": "n-plot",
+        "port_id": "f97cbc9a-05cb-462f-aae7-7d4e23a05123"
+      },
+      "type_compatible": null
+    }
+  }
+}

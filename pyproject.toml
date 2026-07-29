@@ -231,7 +231,7 @@ mcp = [
 # modeling, and the MCP tool wrapper. Convenient for local development or
 # exploration; production installs should cherry-pick only the extras they need.
 all = [
-    "emergentflow[server,llm,bayes,embed,explain,cloud,excel,bigquery,redshift,postgres,mcp]",
+    "emergentflow[server,llm,bayes,embed,explain,cloud,excel,bigquery,redshift,postgres,mcp,recommend,fuzzy,umap,report-pdf,docs,pii]",
 ]
 
 [project.urls]

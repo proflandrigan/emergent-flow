@@ -1,0 +1,467 @@
+{
+  "schema_version": 1,
+  "paradigm": "functional",
+  "name": "epic16_north_star",
+  "nodes": {
+    "n-fetch": {
+      "id": "n-fetch",
+      "type": "data.http_fetch",
+      "label": "Signups API",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "url",
+          "type_token": "str",
+          "value": "https://api.example.com/signups",
+          "default": null
+        },
+        {
+          "name": "method",
+          "type_token": "str",
+          "value": "GET",
+          "default": "GET"
+        },
+        {
+          "name": "headers",
+          "type_token": "dict",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "params",
+          "type_token": "dict",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "body",
+          "type_token": "str",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "connection",
+          "type_token": "str",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "timeout_s",
+          "type_token": "float",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "json_path",
+          "type_token": "str",
+          "value": "rows",
+          "default": null
+        },
+        {
+          "name": "flatten",
+          "type_token": "bool",
+          "value": true,
+          "default": true
+        },
+        {
+          "name": "pagination",
+          "type_token": "str",
+          "value": "none",
+          "default": "none"
+        },
+        {
+          "name": "cursor_param",
+          "type_token": "str",
+          "value": "cursor",
+          "default": "cursor"
+        },
+        {
+          "name": "cursor_path",
+          "type_token": "str",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "page_param",
+          "type_token": "str",
+          "value": "page",
+          "default": "page"
+        },
+        {
+          "name": "offset_param",
+          "type_token": "str",
+          "value": "offset",
+          "default": "offset"
+        },
+        {
+          "name": "page_size",
+          "type_token": "int",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "max_pages",
+          "type_token": "int",
+          "value": 10,
+          "default": 10
+        }
+      ],
+      "ports": [
+        {
+          "id": "82628a4d-7e2c-4157-ac46-3b64d0b5260b",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-dates": {
+      "id": "n-dates",
+      "type": "clean.parse_dates",
+      "label": "Parse signup dates",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "columns",
+          "type_token": "list[str]",
+          "value": [
+            "signed_up"
+          ],
+          "default": null
+        },
+        {
+          "name": "format",
+          "type_token": "str",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "errors",
+          "type_token": "str",
+          "value": "raise",
+          "default": "raise"
+        },
+        {
+          "name": "components",
+          "type_token": "list[str]",
+          "value": [
+            "month"
+          ],
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "5584319f-d142-4d14-8426-497af2e7e676",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        },
+        {
+          "id": "b794aaaf-aea3-4621-9b09-9d4829291374",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-derive": {
+      "id": "n-derive",
+      "type": "clean.derive_column",
+      "label": "Derive cohort",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "columns",
+          "type_token": "list[dict[str, any]]",
+          "value": [
+            {
+              "name": "is_variant",
+              "expr": "group == 'variant'"
+            }
+          ],
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "a2fcc0b0-d8e6-4697-886b-58a2d5db6e19",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        },
+        {
+          "id": "dc089f9d-79cb-4784-9de3-917441903a02",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-gate": {
+      "id": "n-gate",
+      "type": "research.assert_data",
+      "label": "Quality gate",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "expectations",
+          "type_token": "list[dict[str, any]]",
+          "value": [
+            {
+              "type": "non_null",
+              "column": "user_id"
+            },
+            {
+              "type": "allowed_values",
+              "column": "group",
+              "values": [
+                "control",
+                "variant"
+              ]
+            }
+          ],
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "67e02bc2-3094-444f-a261-de8442fc14cc",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        },
+        {
+          "id": "f96ff1c8-1919-43a3-9fe2-8e134618ffd3",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-prop": {
+      "id": "n-prop",
+      "type": "stats.test_proportions",
+      "label": "Conversion lift",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "group_col",
+          "type_token": "str",
+          "value": "group",
+          "default": null
+        },
+        {
+          "name": "success_col",
+          "type_token": "str",
+          "value": "converted",
+          "default": null
+        },
+        {
+          "name": "alpha",
+          "type_token": "float",
+          "value": 0.05,
+          "default": 0.05
+        }
+      ],
+      "ports": [
+        {
+          "id": "43a6793a-deae-4e80-ab96-8beedf8a2187",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        },
+        {
+          "id": "c7bfd100-ca44-4c70-8cca-2e1540f89523",
+          "name": "result",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-report": {
+      "id": "n-report",
+      "type": "research.build_report",
+      "label": "Experiment report",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "title",
+          "type_token": "str",
+          "value": "Signup Experiment",
+          "default": "Emergent Flow Report"
+        },
+        {
+          "name": "author",
+          "type_token": "str",
+          "value": "Emergent Flow",
+          "default": null
+        },
+        {
+          "name": "description",
+          "type_token": "str",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "generated_at",
+          "type_token": "str",
+          "value": "2026-07-29",
+          "default": null
+        },
+        {
+          "name": "titles",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "kinds",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "render_pdf",
+          "type_token": "bool",
+          "value": false,
+          "default": false
+        }
+      ],
+      "ports": [
+        {
+          "id": "0c08e15a-ae79-4b1d-9b77-d1c23dfa647f",
+          "name": "sections",
+          "direction": "in",
+          "data_type": "any",
+          "cardinality": "many",
+          "label": "Sections"
+        },
+        {
+          "id": "a702ed6d-41fb-4a24-a1ef-79a5c15480c7",
+          "name": "report",
+          "direction": "out",
+          "data_type": "Report",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    }
+  },
+  "edges": {
+    "e-fetch-dates": {
+      "id": "e-fetch-dates",
+      "source": {
+        "node_id": "n-fetch",
+        "port_id": "82628a4d-7e2c-4157-ac46-3b64d0b5260b"
+      },
+      "target": {
+        "node_id": "n-dates",
+        "port_id": "5584319f-d142-4d14-8426-497af2e7e676"
+      },
+      "type_compatible": null
+    },
+    "e-dates-derive": {
+      "id": "e-dates-derive",
+      "source": {
+        "node_id": "n-dates",
+        "port_id": "b794aaaf-aea3-4621-9b09-9d4829291374"
+      },
+      "target": {
+        "node_id": "n-derive",
+        "port_id": "a2fcc0b0-d8e6-4697-886b-58a2d5db6e19"
+      },
+      "type_compatible": null
+    },
+    "e-derive-gate": {
+      "id": "e-derive-gate",
+      "source": {
+        "node_id": "n-derive",
+        "port_id": "dc089f9d-79cb-4784-9de3-917441903a02"
+      },
+      "target": {
+        "node_id": "n-gate",
+        "port_id": "67e02bc2-3094-444f-a261-de8442fc14cc"
+      },
+      "type_compatible": null
+    },
+    "e-gate-prop": {
+      "id": "e-gate-prop",
+      "source": {
+        "node_id": "n-gate",
+        "port_id": "f96ff1c8-1919-43a3-9fe2-8e134618ffd3"
+      },
+      "target": {
+        "node_id": "n-prop",
+        "port_id": "43a6793a-deae-4e80-ab96-8beedf8a2187"
+      },
+      "type_compatible": null
+    },
+    "e-prop-report": {
+      "id": "e-prop-report",
+      "source": {
+        "node_id": "n-prop",
+        "port_id": "c7bfd100-ca44-4c70-8cca-2e1540f89523"
+      },
+      "target": {
+        "node_id": "n-report",
+        "port_id": "0c08e15a-ae79-4b1d-9b77-d1c23dfa647f"
+      },
+      "type_compatible": null
+    }
+  }
+}

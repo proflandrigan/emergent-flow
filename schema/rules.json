@@ -5,7 +5,12 @@
     "unknown": "warn",
     "wildcard": "any"
   },
-  "subtypes": [],
+  "subtypes": [
+    [
+      "DocumentFrame",
+      "DataFrame"
+    ]
+  ],
   "top": "any",
   "types": [
     "AnovaResult",

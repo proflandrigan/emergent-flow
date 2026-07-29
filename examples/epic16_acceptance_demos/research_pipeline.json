@@ -1,0 +1,270 @@
+{
+  "schema_version": 1,
+  "paradigm": "functional",
+  "name": "epic16_research",
+  "nodes": {
+    "n-docs": {
+      "id": "n-docs",
+      "type": "data.load_documents",
+      "label": "Load documents",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "path",
+          "type_token": "str",
+          "value": "examples/epic16_acceptance_demos/documents/handbook.md",
+          "default": null
+        },
+        {
+          "name": "chunk_size",
+          "type_token": "int",
+          "value": 200,
+          "default": 1000
+        },
+        {
+          "name": "chunk_overlap",
+          "type_token": "int",
+          "value": 20,
+          "default": 100
+        }
+      ],
+      "ports": [
+        {
+          "id": "c1eaa799-0ddb-41b7-b092-71b04d4a77ee",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DocumentFrame",
+          "cardinality": "one",
+          "label": "Documents"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-dict": {
+      "id": "n-dict",
+      "type": "stats.data_dictionary",
+      "label": "Codebook",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "columns",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "top_n",
+          "type_token": "int",
+          "value": 3,
+          "default": 5
+        },
+        {
+          "name": "notes",
+          "type_token": "dict",
+          "value": null,
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "5680ae42-715f-4a2b-b967-7e5f27ad9cf6",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        },
+        {
+          "id": "37a55412-5e7d-43da-a001-bb4b1a87684b",
+          "name": "dictionary",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-redact": {
+      "id": "n-redact",
+      "type": "clean.redact_pii",
+      "label": "Redact PII",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "columns",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "categories",
+          "type_token": "list[str]",
+          "value": [
+            "email",
+            "phone"
+          ],
+          "default": null
+        },
+        {
+          "name": "mask",
+          "type_token": "str",
+          "value": "[REDACTED]",
+          "default": "[REDACTED]"
+        },
+        {
+          "name": "engine",
+          "type_token": "str",
+          "value": "regex",
+          "default": "regex"
+        }
+      ],
+      "ports": [
+        {
+          "id": "bc5b2c35-7bbf-4674-9c75-b4c6c78bb2dd",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        },
+        {
+          "id": "ebeac35e-f657-49d3-8435-13f8adedee1b",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-report": {
+      "id": "n-report",
+      "type": "research.build_report",
+      "label": "Corpus report",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "title",
+          "type_token": "str",
+          "value": "Document Corpus Codebook",
+          "default": "Emergent Flow Report"
+        },
+        {
+          "name": "author",
+          "type_token": "str",
+          "value": "Emergent Flow",
+          "default": null
+        },
+        {
+          "name": "description",
+          "type_token": "str",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "generated_at",
+          "type_token": "str",
+          "value": "2026-07-29",
+          "default": null
+        },
+        {
+          "name": "titles",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "kinds",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "render_pdf",
+          "type_token": "bool",
+          "value": false,
+          "default": false
+        }
+      ],
+      "ports": [
+        {
+          "id": "8efbdb85-86bf-424d-a4f8-3a80c5449e01",
+          "name": "sections",
+          "direction": "in",
+          "data_type": "any",
+          "cardinality": "many",
+          "label": "Sections"
+        },
+        {
+          "id": "c284baea-8c45-4ea6-8a3c-acdcdf581bb5",
+          "name": "report",
+          "direction": "out",
+          "data_type": "Report",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    }
+  },
+  "edges": {
+    "e-docs-dict": {
+      "id": "e-docs-dict",
+      "source": {
+        "node_id": "n-docs",
+        "port_id": "c1eaa799-0ddb-41b7-b092-71b04d4a77ee"
+      },
+      "target": {
+        "node_id": "n-dict",
+        "port_id": "5680ae42-715f-4a2b-b967-7e5f27ad9cf6"
+      },
+      "type_compatible": null
+    },
+    "e-dict-redact": {
+      "id": "e-dict-redact",
+      "source": {
+        "node_id": "n-dict",
+        "port_id": "37a55412-5e7d-43da-a001-bb4b1a87684b"
+      },
+      "target": {
+        "node_id": "n-redact",
+        "port_id": "bc5b2c35-7bbf-4674-9c75-b4c6c78bb2dd"
+      },
+      "type_compatible": null
+    },
+    "e-redact-report": {
+      "id": "e-redact-report",
+      "source": {
+        "node_id": "n-redact",
+        "port_id": "ebeac35e-f657-49d3-8435-13f8adedee1b"
+      },
+      "target": {
+        "node_id": "n-report",
+        "port_id": "8efbdb85-86bf-424d-a4f8-3a80c5449e01"
+      },
+      "type_compatible": null
+    }
+  }
+}

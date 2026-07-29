@@ -8,10 +8,11 @@ registry as an import-time side effect, mirroring how importing
 ``emergentflow.nodes`` fires every reference node's self-registration.
 
 The tokens were inventoried from the ``data_type=`` strings used across
-``emergentflow/nodes/examples/``. The built-in catalog is intentionally **flat** —
-every token is an implicit subtype of ``"any"`` and no explicit subtype edges are
-declared among the built-ins. Explicit subtyping is demonstrated by the
-out-of-core plugin stub (``examples/type_plugin_stub``) and the unit tests.
+``emergentflow/nodes/examples/``. The built-in catalog is almost entirely **flat**, with
+exactly one declared subtype edge -- ``DocumentFrame <: DataFrame`` (Epic 16, Story 22) --
+and every other token related only implicitly, via ``"any"``. Explicit subtyping is further
+demonstrated by the out-of-core plugin stub (``examples/type_plugin_stub``) and the unit
+tests.
 """
 
 from __future__ import annotations
@@ -235,7 +236,8 @@ register_type(
         token="Lineage",
         description=(
             "The upstream source->transform->artifact chain traced for a node "
-            "(ef.research.trace_lineage): inspect-only, not a data-flow port type."
+            "(ef.research.trace_lineage): inspect-only, not a data-flow port type. No "
+            "declared supertype: it is compatible only with an 'any' port."
         ),
     )
 )
@@ -245,7 +247,9 @@ register_type(
         description=(
             "A composed, multi-section report (ef.research.build_report): markdown/HTML "
             "text, PlotSpec figures, tidy tables, and model summaries, rendered to a "
-            "self-contained HTML document (and optionally PDF)."
+            "self-contained HTML document (and optionally PDF). Wires into export/inspect "
+            "consumers only -- deliberately NOT a subtype of 'DataFrame', so a composed "
+            "report cannot be fed to a frame consumer."
         ),
     )
 )
@@ -256,7 +260,11 @@ register_type(
             "A tagged DataFrame produced by ef.data.load_documents (Epic 16, Story 20): "
             "(doc_id, chunk_id, chunk_index, text, source_path, char_count) rows, one per "
             "chunk. Not embeddings -- no vector/retrieval semantics; wire into Epic 11 for "
-            "that."
+            "that. Declared a subtype of 'DataFrame' (Epic 16, Story 22) so a document frame "
+            "wires anywhere a DataFrame does -- the only explicit subtype edge in the "
+            "built-in catalog; the reverse direction stays incompatible, so a plain "
+            "DataFrame cannot be passed where document structure is required."
         ),
+        supertypes=("DataFrame",),
     )
 )
