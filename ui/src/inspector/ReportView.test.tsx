@@ -92,7 +92,7 @@ test("renders the composed html in a sandboxed iframe", () => {
   expect(frame.getAttribute("sandbox")).toBe("allow-scripts");
 });
 
-test("does not leak the unsupported sections repr", () => {
+test("renders the fallback for the live unsupported-sections payload, leaking no repr", () => {
   const payload = makeReportPayload();
   render(<ReportView payload={payload} />);
   expect(screen.queryByText(/Section\(kind=/)).toBeNull();
@@ -102,7 +102,11 @@ test("does not leak the unsupported sections repr", () => {
   );
 });
 
-test("renders a section index when sections arrive as json", () => {
+// Forward-compatible only: the current server always sends `sections` as
+// `{kind: "unsupported"}` (a `list[Section]` of dataclasses is not JSON-serializable, see
+// `emergentflow/server/payload.py::to_payload`). This pins the branch's behaviour for the day
+// the payload contract can carry a list of records; the test above covers the LIVE path.
+test("renders a section index when sections arrive as json (not the live payload shape)", () => {
   const payload = makeReportPayload({
     sections: {
       kind: "json",

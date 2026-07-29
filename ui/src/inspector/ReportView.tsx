@@ -62,6 +62,13 @@ export function ReportView({
     (v): v is string => v !== null,
   );
 
+  // NOTE: today's server ALWAYS sends `sections` as `{kind: "unsupported"}` -- `Report.sections`
+  // is a `list[Section]` of dataclasses, and `emergentflow/server/payload.py::to_payload` cannot
+  // `json.dumps` that, so it degrades to a Python repr. The `"json"` branch below is therefore
+  // forward-compatible handling, not the live path: it only lights up if the payload contract
+  // later gains a way to serialize a list of records. Until then every real Report renders the
+  // fallback message. Do not "simplify" this by deleting the branch -- and do not read the
+  // `unsupported` repr to fake an index, which would put a Python repr in front of the user.
   const sectionsField = payload.fields.sections;
   const sectionEntries =
     sectionsField?.kind === "json" && Array.isArray(sectionsField.value)

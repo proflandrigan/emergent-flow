@@ -916,11 +916,22 @@ explicitly **defers retrieval/vector-store** to Epic 11 rather than duplicating 
   coverage; eslint/tsc gates.
 
 > **Delivered as:** `ui/src/inspector/ReportView.tsx` — dispatched from `PayloadView`'s `"record"`
-> case when `payload.type === "Report"`, rendering the meta header, a section index, and the
-> composed HTML in the same `sandbox="allow-scripts"` iframe the existing `"html"` payload branch
-> uses. It deliberately **suppresses** the `sections` field's `"unsupported"` blob (the payload
-> contract cannot JSON-serialize a list of `Section` dataclasses, so it degrades to a Python
-> `repr`) and never renders `pdf_bytes`' repr, showing a "PDF rendered" note instead.
+> case when `payload.type === "Report"`, rendering the meta header and the composed HTML in the
+> same `sandbox="allow-scripts"` iframe the existing `"html"` payload branch uses. It deliberately
+> **suppresses** the `sections` field's `"unsupported"` blob and never renders `pdf_bytes`' repr,
+> showing a "PDF rendered" note instead.
+>
+> **A titled section index is NOT part of what ships**, despite the component carrying code for
+> one. `Report.sections` is a `list[Section]` of dataclasses, which
+> `emergentflow/server/payload.py::to_payload` cannot `json.dumps`, so it *always* degrades to
+> `{"kind": "unsupported"}` — the renderer's `"json"` branch is therefore unreachable with real
+> server data and every live Report shows the "Section detail is not JSON-serializable" fallback
+> instead. The branch was kept as forward-compatible handling (and its test renamed to say so
+> explicitly) rather than deleted, because the honest alternatives were both worse: parsing the
+> Python `repr` would put internal representation in front of the user, and teaching `to_payload`
+> to serialize lists-of-dataclasses is a change to the shared payload contract every node's output
+> flows through, plus a new `Payload` union member in `ui/src/store/execution.ts` — well beyond
+> Story 23. Delivering a real section index is the follow-up; it needs that contract change first.
 > `ui/src/inspector/LineagePanel.tsx` — a debounced `POST /lineage` fetch mirroring
 > `CodePanel.tsx`, wired as a fifth `Segmented` tab in `Inspector.tsx` (see deviation #1 for why a
 > tab rather than a Results renderer). Both are pure of `emergentflow` imports; `LineagePanel`

@@ -218,9 +218,33 @@ def test_north_star_demo_executes_and_compiles() -> None:
         "n-report",
     }
 
+    # `derive_column`'s "is_variant" is computed here but never read downstream (`test_proportions`
+    # keys off the pre-existing "group" column) -- assert it directly so a regression in
+    # `derive_column`'s expression evaluation cannot silently pass this demo.
+    derive_frame = results["n-derive"]["frame"]
+    assert derive_frame["is_variant"].tolist() == [
+        row == "variant" for row in derive_frame["group"]
+    ]
+
+    # The quality gate is a pass-through on data that satisfies its expectations here; pin its
+    # output shape too so a gate that silently drops/mutates rows would be caught.
+    gate_frame = results["n-gate"]["frame"]
+    assert len(gate_frame) == 6
+    assert gate_frame["user_id"].notna().all()
+
     prop_result = results["n-prop"]["result"]
     assert not prop_result.empty
     assert "p_value" in prop_result.columns
+    # Pin the actual computed lift (3/6 control converted, 2 of 3 variant converted) so a
+    # regression anywhere upstream (parse_dates/derive_column/the gate) that corrupts the
+    # "group"/"converted" columns would fail this test, not just an emptiness check.
+    row = prop_result.iloc[0]
+    assert row["group_a"] == "control"
+    assert row["group_b"] == "variant"
+    assert (row["n_a"], row["n_b"]) == (3, 3)
+    assert row["p_a"] == pytest.approx(1 / 3)
+    assert row["p_b"] == pytest.approx(2 / 3)
+    assert row["diff"] == pytest.approx(1 / 3)
 
     report_result = results["n-report"]["report"]
     assert report_result.html
@@ -232,6 +256,11 @@ def test_north_star_demo_executes_and_compiles() -> None:
     exec(code, ns)  # noqa: S102 -- test-only, on our own emitted code
     main_results = ns["main"](clients=clients)
     assert main_results
+    # The compiled module's sole sink is the report; its content must match the interpreted
+    # `execute()` path byte-for-byte (an ADR-0002 check at whole-pipeline granularity, not just
+    # the single-node coverage `test_epic16_equivalence_matrix.py` provides).
+    (compiled_report,) = main_results.values()
+    assert compiled_report.html == report_result.html
 
 
 def test_north_star_demo_traces_lineage_and_captures_reproducibility() -> None:
@@ -389,17 +418,40 @@ def test_transform_demo_executes_and_compiles() -> None:
     assert len(summary) == 4
     assert all(region == region.strip().lower() for region in summary["region"])
 
+    # The DAG deliberately branches at the melt node into both `group_by_aggregate -> viz` and
+    # `crosstab` (Story 25); the crosstab branch was previously never inspected by this test, so
+    # a regression there could pass silently.
+    crosstab = results["n-tab"]["result"]
+    assert list(crosstab.table.columns) == ["region", "revenue", "units"]
+    assert sorted(crosstab.table["region"]) == ["east", "west"]
+    # 2 files x 3 rows x 2 melted metrics = 12 melted rows total, split 4 east / 2 west per metric.
+    assert crosstab.table["revenue"].sum() == 6
+    assert crosstab.table["units"].sum() == 6
+
+    plot = results["n-plot"]["plot"]
+    assert plot.chart == "bar"
+
     code = compile_to_code(graph)
     ast.parse(code)
     ns: dict = {}
     exec(code, ns)  # noqa: S102 -- test-only, on our own emitted code
     main_results = ns["main"]()
     assert main_results
+    # Both branch tips (`viz.plot` and `stats.crosstab`) are sinks, so both are returned by the
+    # compiled module; compare each against the interpreted path (ADR-0002 at whole-pipeline
+    # granularity).
+    compiled_by_type = {type(v).__name__: v for v in main_results.values()}
+    assert compiled_by_type["PlotSpec"].chart == plot.chart
+    assert compiled_by_type["PlotSpec"].spec == plot.spec
+    assert compiled_by_type["CrosstabResult"].table.equals(crosstab.table)
 
 
 # ---------------------------------------------------------------------------
 # Demo 3 -- research
 # ---------------------------------------------------------------------------
+
+
+PLANTED_EMAIL = "research@example.com"
 
 
 def _write_research_fixture() -> str:
@@ -409,7 +461,7 @@ def _write_research_fixture() -> str:
     path = docs_dir / "handbook.md"
     path.write_text(
         "# Field Handbook\n\n"
-        "Contact the research desk at research@example.com for access requests.\n\n"
+        f"Contact the research desk at {PLANTED_EMAIL} for access requests.\n\n"
         "## Sampling\n\n"
         "Every survey wave draws 400 respondents, stratified by region.\n",
         encoding="utf-8",
@@ -486,10 +538,23 @@ def test_research_demo_executes_and_compiles() -> None:
     assert "column" in dictionary.columns
     assert "top_values" in dictionary.columns
     assert "notes" in dictionary.columns
+    # The planted email must actually reach the dictionary (as the "text" column's sole
+    # top_value) before redaction, or the assertions below would pass vacuously -- there would
+    # be nothing to redact.
+    assert any(PLANTED_EMAIL in str(v) for v in dictionary["top_values"])
+
+    redacted = results["n-redact"]["frame"]
+    assert not any(PLANTED_EMAIL in str(v) for v in redacted["top_values"])
+    assert any("[REDACTED]" in str(v) for v in redacted["top_values"])
 
     report_result = results["n-report"]["report"]
     assert report_result.html
     assert report_result.pdf_bytes is None
+    # The report is built from the redacted frame; a regression that turned redact_pii into a
+    # no-op (or mis-wired the report to read from the pre-redaction dictionary) would leak PII
+    # straight into the rendered report.
+    assert PLANTED_EMAIL not in report_result.html
+    assert "[REDACTED]" in report_result.html
 
     code = compile_to_code(graph)
     ast.parse(code)
@@ -497,6 +562,8 @@ def test_research_demo_executes_and_compiles() -> None:
     exec(code, ns)  # noqa: S102 -- test-only, on our own emitted code
     main_results = ns["main"]()
     assert main_results
+    (compiled_report,) = main_results.values()
+    assert compiled_report.html == report_result.html
 
 
 def test_research_demo_pdf_lane() -> None:
