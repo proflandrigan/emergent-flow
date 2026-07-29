@@ -28,7 +28,9 @@ if TYPE_CHECKING:
 @register
 class RecommendFitTwoTower(NodeDefinition):
     """Fit a two-tower retrieval model, optionally consuming item-side and/or user-side
-    feature DataFrames."""
+    feature DataFrames. ``item_features`` is one row per item keyed by an 'item_id' column
+    plus numeric feature columns; ``user_features`` is the same keyed by a 'user_id' column.
+    Non-numeric columns are ignored."""
 
     type = "recommend.fit_two_tower"
     version = 1
@@ -36,8 +38,9 @@ class RecommendFitTwoTower(NodeDefinition):
     label = "Fit Two-Tower Recommender"
     category = "Recommenders"
     description = (
-        "Fit a two-tower retrieval model, optionally consuming item-side and/or "
-        "user-side feature DataFrames."
+        "Fit a two-tower retrieval model. Optionally consumes an item-features frame "
+        "(one row per item, keyed by an 'item_id' column plus numeric columns) and a "
+        "user-features frame (one row per user, keyed by 'user_id' plus numeric columns)."
     )
 
     ports = [
@@ -54,7 +57,11 @@ class RecommendFitTwoTower(NodeDefinition):
             direction=Direction.IN,
             data_type="DataFrame",
             required=False,
-            help="Optional item-side features for the item tower.",
+            help=(
+                "Optional item-side features for the item tower: one row per item, an 'item_id' "
+                "column matching the interactions, plus numeric feature columns (e.g. multi-hot "
+                "columns from clean.encode_lists). Non-numeric columns are ignored."
+            ),
         ),
         PortSpec(
             name="user_features",
@@ -62,7 +69,11 @@ class RecommendFitTwoTower(NodeDefinition):
             direction=Direction.IN,
             data_type="DataFrame",
             required=False,
-            help="Optional user-side features for the user tower.",
+            help=(
+                "Optional user-side features for the user tower: one row per user, a 'user_id' "
+                "column matching the interactions, plus numeric feature columns. Non-numeric "
+                "columns are ignored."
+            ),
         ),
         PortSpec(
             name="recommender",
@@ -77,7 +88,11 @@ class RecommendFitTwoTower(NodeDefinition):
             type_token="dict[str, any]",
             default={},
             label="Algorithm params",
-            help="Keyword arguments for the two-tower model.",
+            help=(
+                "Keyword arguments for the two-tower model (e.g. epochs, user_embedding_dim, "
+                "item_embedding_dim, loss). Use item_id_col / user_id_col to point at non-default "
+                "id columns in the feature frames."
+            ),
         ),
     ]
 

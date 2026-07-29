@@ -27,6 +27,7 @@ class ClientKind(enum.Enum):
 
     LLM = "llm"
     WAREHOUSE = "warehouse"
+    HTTP = "http"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -41,10 +42,12 @@ class Clients:
     ----------
     llm: the injected ``LLMClient`` (ADR 0017), or ``None``.
     warehouse: the injected ``WarehouseClient`` (ADR 0018), or ``None``.
+    http: the injected ``HttpClient`` (Epic 16 Story 1), or ``None``.
     """
 
     llm: Any | None = None
     warehouse: Any | None = None
+    http: Any | None = None
 
     def for_kind(self, kind: ClientKind) -> Any | None:
         """Return the client seam for *kind* (``None`` if not supplied)."""
@@ -52,6 +55,8 @@ class Clients:
             return self.llm
         if kind is ClientKind.WAREHOUSE:
             return self.warehouse
+        if kind is ClientKind.HTTP:
+            return self.http
         raise KeyError(f"Unknown client kind: {kind!r}")
 
     @classmethod

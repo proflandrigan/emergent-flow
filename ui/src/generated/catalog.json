@@ -2251,6 +2251,308 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "description": "Apply an ordered pipeline of text operations (trim, case, regex replace/extract, split) to one or more string columns.",
+      "family": "clean",
+      "label": "Clean Text",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Text column(s) to clean.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Ordered pipeline of operation specs, e.g. {'op': 'trim'}, {'op': 'lower'}, {'op': 'replace', 'pattern': ..., 'replacement': ...}, {'op': 'extract', 'pattern': ...}, {'op': 'split', 'sep': ...}. Put 'split' last.",
+          "hints": null,
+          "label": "Operations",
+          "name": "operations",
+          "required": true,
+          "type_token": "list[dict[str, any]]"
+        },
+        {
+          "default": null,
+          "help": "When set, write results to new columns named <column><suffix> instead of cleaning in place.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Suffix",
+          "name": "suffix",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the text column(s) to clean.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The DataFrame with the cleaned text column(s).",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.clean_text",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
+      "description": "Row-wise union of two or more DataFrames, schema-aligned by column name, with an optional provenance column.",
+      "family": "clean",
+      "label": "Concat",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Optional name for a provenance column recording which input frame each row came from.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Source column",
+          "name": "source_column",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional label per input frame for the provenance column. Defaults to frame_0, frame_1, ...",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Keys",
+          "name": "keys",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": true,
+          "help": "Renumber the result index 0..n-1.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Reset index",
+          "name": "ignore_index",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "many",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Two or more DataFrames to stack row-wise.",
+          "label": "Data",
+          "name": "frames",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The row-wise union of the input frames.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.concat",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
+      "description": "Drop duplicate rows, optionally keying on a subset of columns.",
+      "family": "clean",
+      "label": "Deduplicate",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column(s) that define a duplicate. Defaults to every column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Subset",
+          "name": "subset",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "first",
+          "help": "Which duplicate to retain: the first, the last, or none (drop every duplicated row).",
+          "hints": {
+            "choices": [
+              "first",
+              "last",
+              "none"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Keep",
+          "name": "keep",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": false,
+          "help": "Renumber the result index 0..n-1.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Reset index",
+          "name": "ignore_index",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame to deduplicate.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The deduplicated DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.deduplicate",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
+      "description": "Add computed and conditional (case-when) columns using a safe, restricted expression grammar.",
+      "family": "clean",
+      "label": "Derive Column",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Ordered list of column specs. Each is either {'name': str, 'expr': str} for a computed column, or {'name': str, 'when': [{'if': str, 'then': value}, ...], 'else': value} for a case-when column. Later specs may reference earlier ones.",
+          "hints": null,
+          "label": "Derived columns",
+          "name": "columns",
+          "required": true,
+          "type_token": "list[dict[str, any]]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame to derive new columns from.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "A copy of the input with the derived column(s) appended.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.derive_column",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
       "description": "Drop rows or columns that contain missing values.",
       "family": "clean",
       "label": "Drop Missing",
@@ -2341,6 +2643,183 @@
         }
       ],
       "type": "clean.drop_missing",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
+      "description": "Multi-hot encode a list-valued column into wide 0/1 indicator columns (one per distinct label).",
+      "family": "clean",
+      "label": "Encode Lists",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "The list-valued column to multi-hot encode.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Column",
+          "name": "column",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Prefix for the generated indicator columns (defaults to the column name).",
+          "hints": null,
+          "label": "Prefix",
+          "name": "prefix",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": true,
+          "help": "Drop the original list column from the output.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Drop original",
+          "name": "drop",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": null,
+          "help": "If set, split string cells on this separator instead of expecting lists.",
+          "hints": null,
+          "label": "Separator",
+          "name": "sep",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing a list-valued column to encode.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The DataFrame with wide indicator columns appended.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.encode_lists",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
+      "description": "Explode one or more index-aligned list columns into long rows (like pandas explode).",
+      "family": "clean",
+      "label": "Explode Lists",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "List column(s) to explode. Multiple columns are exploded together (aligned).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": true,
+          "help": "Drop rows produced from empty lists / missing values.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Drop empty",
+          "name": "drop_empty",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": true,
+          "help": "Renumber the result index 0..n-1.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Reset index",
+          "name": "ignore_index",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing list-valued column(s) to explode.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The long-form DataFrame with list elements expanded to one row each.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.explode_lists",
       "version": 1
     },
     {
@@ -2443,6 +2922,210 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "description": "Merge two DataFrames on a string-similarity match between one left and one right key column, rather than on exact equality. Requires the [fuzzy] extra.",
+      "family": "clean",
+      "label": "Fuzzy Join",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Left-frame key column to match on.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Left on",
+          "name": "left_on",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Right-frame key column to match against.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Right on",
+          "name": "right_on",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": 85.0,
+          "help": "Minimum similarity score (0-100) for a pair to count as a match.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 100.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Threshold",
+          "name": "threshold",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": "ratio",
+          "help": "Similarity metric used to score candidate pairs.",
+          "hints": {
+            "choices": [
+              "ratio",
+              "partial_ratio",
+              "token_sort_ratio",
+              "token_set_ratio"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Scorer",
+          "name": "scorer",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "inner",
+          "help": "inner drops unmatched left rows; left keeps them with NaN on the right-hand columns.",
+          "hints": {
+            "choices": [
+              "inner",
+              "left"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "How",
+          "name": "how",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 1,
+          "help": "Matches to keep per left row: 1 for a one-to-one join, more for one-to-many.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Limit",
+          "name": "limit",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": [
+            "_x",
+            "_y"
+          ],
+          "help": "Suffixes appended to overlapping column names from (left, right).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Suffixes",
+          "name": "suffixes",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "match_score",
+          "help": "Name of the output column holding the realised similarity score.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Score column",
+          "name": "score_column",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The left DataFrame.",
+          "label": "Left",
+          "name": "left",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The right DataFrame.",
+          "label": "Right",
+          "name": "right",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The fuzzy-matched join result, with a similarity-score column.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.fuzzy_join",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
       "description": "Fill missing values in selected columns using a chosen strategy.",
       "family": "clean",
       "label": "Impute Missing",
@@ -2517,6 +3200,743 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "description": "Join two DataFrames on key column(s) (pandas-style inner/left/right/outer/cross).",
+      "family": "clean",
+      "label": "Merge",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column(s) shared by both frames. Alternative to left_on/right_on.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "On",
+          "name": "on",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Left-frame key column(s). Pair with right_on when column names differ.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Left on",
+          "name": "left_on",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Right-frame key column(s). Pair with left_on when column names differ.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Right on",
+          "name": "right_on",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "inner",
+          "help": "Join type.",
+          "hints": {
+            "choices": [
+              "inner",
+              "left",
+              "right",
+              "outer",
+              "cross"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "How",
+          "name": "how",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": [
+            "_x",
+            "_y"
+          ],
+          "help": "Suffixes appended to overlapping non-key column names from (left, right).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Suffixes",
+          "name": "suffixes",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional relationship check: 1:1, 1:m, m:1, or m:m. Raises if violated.",
+          "hints": {
+            "choices": [
+              "1:1",
+              "1:m",
+              "m:1",
+              "m:m"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Validate",
+          "name": "validate",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The left DataFrame.",
+          "label": "Left",
+          "name": "left",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The right DataFrame.",
+          "label": "Right",
+          "name": "right",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The joined DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.merge",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
+      "description": "Parse string column(s) to datetime and optionally extract calendar components (year, month, day, quarter, ...) into new columns.",
+      "family": "clean",
+      "label": "Parse Dates",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column(s) to parse as datetimes.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional strptime format (e.g. %Y-%m-%d). Leave unset to let pandas infer.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Format",
+          "name": "format",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "raise",
+          "help": "raise fails on an unparseable value; coerce turns it into NaT.",
+          "hints": {
+            "choices": [
+              "raise",
+              "coerce"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "On error",
+          "name": "errors",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Calendar components to extract into new <column>_<component> columns. One or more of: year, month, day, dayofweek, dayofyear, quarter, hour, minute, second.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Components",
+          "name": "components",
+          "required": false,
+          "type_token": "list[str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the date column(s) to parse.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The DataFrame with the parsed datetime column(s) and any extracted components.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.parse_dates",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
+      "description": "Detect and mask common PII (email, phone, SSN-like, credit-card-like) in text columns via regex, or NER-based via presidio ([pii] extra); positioned to run right after ingestion.",
+      "family": "clean",
+      "label": "Redact PII",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Columns to scan; defaults to every text column when unset.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Which PII categories to redact ('email'|'phone'|'ssn'|'credit_card'); defaults to all of them.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Categories",
+          "name": "categories",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "[REDACTED]",
+          "help": "Replacement text for each detected match.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Mask text",
+          "name": "mask",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "regex",
+          "help": "'regex' (base install) or 'presidio' (NER-based, requires the optional [pii] extra).",
+          "hints": {
+            "choices": [
+              "regex",
+              "presidio"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Engine",
+          "name": "engine",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame to scan for PII.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The DataFrame with detected PII masked.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.redact_pii",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
+      "description": "Reshape a DataFrame between long and wide form: pivot (long->wide) or melt (wide->long).",
+      "family": "clean",
+      "label": "Reshape",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "pivot",
+          "help": "pivot reshapes long->wide; melt reshapes wide->long.",
+          "hints": {
+            "choices": [
+              "pivot",
+              "melt"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Mode",
+          "name": "mode",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Pivot only: column(s) whose values become the output rows.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Index",
+          "name": "index",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Pivot only: column(s) whose values become the output column names.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Pivot only: column(s) to fill the cells with. Defaults to all remaining columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Values",
+          "name": "values",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Pivot only: how to aggregate duplicate index/column pairs. Required when duplicates exist.",
+          "hints": {
+            "choices": [
+              "mean",
+              "sum",
+              "count",
+              "min",
+              "max",
+              "median",
+              "first",
+              "last"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Aggregate",
+          "name": "aggfunc",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Melt only: column(s) to keep as identifier columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Id vars",
+          "name": "id_vars",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Melt only: column(s) to unpivot. Defaults to every non-id column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Value vars",
+          "name": "value_vars",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "variable",
+          "help": "Melt only: name of the output column holding the former column names.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Variable name",
+          "name": "var_name",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "value",
+          "help": "Melt only: name of the output column holding the values.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Value name",
+          "name": "value_name",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame to reshape.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The reshaped DataFrame (flat columns, reset index).",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.reshape",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
+      "description": "Draw a subset of rows -- uniformly at random, stratified within groups, or the first n rows -- with an always-captured seed so the result is reproducible.",
+      "family": "clean",
+      "label": "Sample Rows",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "random",
+          "help": "random samples uniformly; stratified samples within each group; top_n takes the first n rows.",
+          "hints": {
+            "choices": [
+              "random",
+              "stratified",
+              "top_n"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Mode",
+          "name": "mode",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Number of rows to draw. Required for top_n; use either n or frac for the other modes.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "N",
+          "name": "n",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Fraction of rows to draw, between 0 and 1. Alternative to n.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Fraction",
+          "name": "frac",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Stratified mode only: column(s) defining the groups to sample within.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Stratify by",
+          "name": "by",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": 0,
+          "help": "Random seed, always captured so the same graph draws the same rows on every run.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Seed",
+          "name": "seed",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame to sample from.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The sampled subset of rows.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.sample_rows",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
       "description": "Keep or drop a chosen subset of columns.",
       "family": "clean",
       "label": "Select Columns",
@@ -2582,6 +4002,227 @@
         }
       ],
       "type": "clean.select_columns",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
+      "description": "Keep or exclude rows whose key column(s) match another DataFrame (semi-join / anti-join); never adds columns from the keys frame.",
+      "family": "clean",
+      "label": "Semi Join",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column(s) shared by both frames. Alternative to left_on/right_on.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "On",
+          "name": "on",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Key column(s) on the Data frame. Pair with right_on when column names differ.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Left on (Data)",
+          "name": "left_on",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Key column(s) on the Keys frame. Pair with left_on when column names differ.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Right on (Keys)",
+          "name": "right_on",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "keep",
+          "help": "Keep matching rows (semi-join) or drop them (anti-join).",
+          "hints": {
+            "choices": [
+              "keep",
+              "exclude"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Mode",
+          "name": "mode",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The DataFrame to filter.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The DataFrame whose key column(s) define membership.",
+          "label": "Keys",
+          "name": "keys",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The filtered DataFrame (same columns as the input Data).",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.semi_join",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
+      "description": "Sort rows by one or more columns, with per-key direction and NA placement.",
+      "family": "clean",
+      "label": "Sort",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Sort key column(s), in priority order.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "By",
+          "name": "by",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "One bool per sort key. Leave unset to sort every key ascending.",
+          "hints": null,
+          "label": "Ascending",
+          "name": "ascending",
+          "required": false,
+          "type_token": "list[bool]"
+        },
+        {
+          "default": "last",
+          "help": "Place missing values first or last.",
+          "hints": {
+            "choices": [
+              "first",
+              "last"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "NA position",
+          "name": "na_position",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": false,
+          "help": "Renumber the result index 0..n-1.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Reset index",
+          "name": "ignore_index",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame to sort.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The sorted DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.sort",
       "version": 1
     },
     {
@@ -2686,6 +4327,341 @@
     {
       "advisor_persona": "data_modeller",
       "category": "Ingest",
+      "description": "Fetch JSON records from an HTTP/REST endpoint into a tidy DataFrame.",
+      "family": "data",
+      "label": "HTTP Fetch",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "The URL to fetch.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "URL",
+          "name": "url",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "GET",
+          "help": "HTTP method for the request.",
+          "hints": {
+            "choices": [
+              "GET",
+              "POST"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Method",
+          "name": "method",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional HTTP headers as a dict of key-value pairs.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Headers",
+          "name": "headers",
+          "required": false,
+          "type_token": "dict"
+        },
+        {
+          "default": null,
+          "help": "Optional query-string parameters as a dict of key-value pairs.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Query params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict"
+        },
+        {
+          "default": null,
+          "help": "Optional request body string (e.g. JSON or form-encoded).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "textarea"
+          },
+          "label": "Body",
+          "name": "body",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "A connection-profile name (never a credential). Resolved to live credentials by the HttpClient at fetch time.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Connection",
+          "name": "connection",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Request timeout in seconds.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Timeout (s)",
+          "name": "timeout_s",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Dot-separated path into the JSON response to select records (e.g. \"data.items\"). No wildcards or array indexing are supported.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "JSON path",
+          "name": "json_path",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": true,
+          "help": "When True, normalize nested JSON objects into flat columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Flatten",
+          "name": "flatten",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": "none",
+          "help": "Pagination strategy: none, cursor, offset, or page.",
+          "hints": {
+            "choices": [
+              "none",
+              "cursor",
+              "offset",
+              "page"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Pagination",
+          "name": "pagination",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "cursor",
+          "help": "Query-parameter name for the cursor value when pagination is 'cursor'.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Cursor param",
+          "name": "cursor_param",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Dot-separated path to the next-cursor value in the response body, required when pagination is 'cursor'.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Cursor path",
+          "name": "cursor_path",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "page",
+          "help": "Query-parameter name for the page number when pagination is 'page'.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Page param",
+          "name": "page_param",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "offset",
+          "help": "Query-parameter name for the offset value when pagination is 'offset'.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Offset param",
+          "name": "offset_param",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Number of records per page; required when pagination is 'offset' or 'page'.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Page size",
+          "name": "page_size",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": 10,
+          "help": "Maximum number of pages to fetch before stopping.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Max pages",
+          "name": "max_pages",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The fetched records as a tidy pandas DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.http_fetch",
+      "version": 1
+    },
+    {
+      "advisor_persona": "data_modeller",
+      "category": "Ingest",
       "description": "Load a CSV file into a pandas DataFrame.",
       "family": "data",
       "label": "Load CSV",
@@ -2693,7 +4669,7 @@
       "params": [
         {
           "default": null,
-          "help": "Filesystem path to the .csv file to load.",
+          "help": "Filesystem path to the .csv file to load. Accepts a glob pattern (e.g. `data/*.csv`) to row-concatenate every match in sorted order, or an object-store URI (`s3://`, `gs://`, `az://`) which requires the `[cloud]` extra.",
           "hints": {
             "choices": null,
             "connection_kind": null,
@@ -2728,6 +4704,82 @@
           "name": "encoding",
           "required": false,
           "type_token": "str"
+        },
+        {
+          "default": false,
+          "help": "Add a 'source_file' column naming the file each row came from. Useful when loading a glob pattern across many files.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Add source file column",
+          "name": "source_file",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": null,
+          "help": "Name of a connection profile supplying object-store credentials for a remote URI. A profile NAME only -- never a credential, which is resolved from the profile's env-var names at load time. Ignored for local paths.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Connection profile",
+          "name": "connection",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional list of column names that must be present after loading. A missing column fails the load with a typed SchemaContractError naming every mismatch at once, rather than surfacing as a KeyError further downstream.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected columns",
+          "name": "expect_columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional map of column name to expected pandas dtype string (e.g. {'id': 'int64', 'name': 'object'}). Checked after loading; a mismatch fails the load with a typed SchemaContractError.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected dtypes",
+          "name": "expect_dtypes",
+          "required": false,
+          "type_token": "dict"
         }
       ],
       "ports": [
@@ -2742,6 +4794,417 @@
         }
       ],
       "type": "data.load_csv",
+      "version": 4
+    },
+    {
+      "advisor_persona": "data_modeller",
+      "category": "Ingest",
+      "description": "Chunk PDF/text/markdown file(s) into a tidy (doc_id, chunk_id, text, ...) frame. No embedding or retrieval -- that's Epic 11; this only produces the frame.",
+      "family": "data",
+      "label": "Load Documents",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "A single .pdf/.txt/.md/.markdown file, or a directory containing them (processed in sorted filename order).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "file"
+          },
+          "label": "Path",
+          "name": "path",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": 1000,
+          "help": "Maximum characters per chunk.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Chunk size",
+          "name": "chunk_size",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": 100,
+          "help": "Characters of overlap between consecutive chunks; must be less than the chunk size.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Chunk overlap",
+          "name": "chunk_overlap",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DocumentFrame",
+          "direction": "out",
+          "help": "One row per chunk: doc_id, chunk_id, chunk_index, text, source_path, char_count.",
+          "label": "Documents",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.load_documents",
+      "version": 1
+    },
+    {
+      "advisor_persona": "data_modeller",
+      "category": "Ingest",
+      "description": "Load a sheet from an Excel workbook into a pandas DataFrame.",
+      "family": "data",
+      "label": "Load Excel",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Filesystem path to the .xlsx file to load. Accepts a glob pattern (e.g. `data/*.xlsx`) to row-concatenate every match in sorted order, or an object-store URI (`s3://`, `gs://`, `az://`) which requires the `[cloud]` extra.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "file"
+          },
+          "label": "Excel path",
+          "name": "path",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "0",
+          "help": "A sheet name, or a zero-based index like ``0``. A string of all digits is automatically converted to an integer index.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Sheet name or index",
+          "name": "sheet",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 0,
+          "help": "Zero-based row index to use as the column header.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Header row",
+          "name": "header_row",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "An Excel range string (e.g. ``\"A:D\"``) or a comma-separated list of column names. Passed through to pandas.read_excel.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Columns to load",
+          "name": "usecols",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": false,
+          "help": "Add a 'source_file' column naming the file each row came from. Useful when loading a glob pattern across many files.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Add source file column",
+          "name": "source_file",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": null,
+          "help": "Name of a connection profile supplying object-store credentials for a remote URI. A profile NAME only -- never a credential, which is resolved from the profile's env-var names at load time. Ignored for local paths.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Connection profile",
+          "name": "connection",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional list of column names that must be present after loading. A missing column fails the load with a typed SchemaContractError naming every mismatch at once, rather than surfacing as a KeyError further downstream.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected columns",
+          "name": "expect_columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional map of column name to expected pandas dtype string (e.g. {'id': 'int64', 'name': 'object'}). Checked after loading; a mismatch fails the load with a typed SchemaContractError.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected dtypes",
+          "name": "expect_dtypes",
+          "required": false,
+          "type_token": "dict"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The loaded data as a pandas DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.load_excel",
+      "version": 2
+    },
+    {
+      "advisor_persona": "data_modeller",
+      "category": "Ingest",
+      "description": "Load a Google Sheets tab into a pandas DataFrame over the HTTP client seam.",
+      "family": "data",
+      "label": "Load Google Sheet",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "The id from the sheet's URL.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Spreadsheet ID",
+          "name": "spreadsheet_id",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Tab name within the spreadsheet (omit for the first/default tab).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Sheet name",
+          "name": "sheet",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 0,
+          "help": "Zero-based row index to use as column header.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Header row",
+          "name": "header_row",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "A connection-profile name (never a credential). Resolved to live credentials by the HttpClient at fetch time.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Connection",
+          "name": "connection",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Request timeout in seconds.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Timeout (s)",
+          "name": "timeout_s",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Optional list of column names that must be present after loading. A missing column fails the load with a typed SchemaContractError naming every mismatch at once, rather than surfacing as a KeyError further downstream.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected columns",
+          "name": "expect_columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional map of column name to expected pandas dtype string (e.g. {'id': 'int64', 'name': 'object'}). Checked after loading; a mismatch fails the load with a typed SchemaContractError.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected dtypes",
+          "name": "expect_dtypes",
+          "required": false,
+          "type_token": "dict"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The loaded sheet data as a pandas DataFrame.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.load_google_sheet",
       "version": 2
     },
     {
@@ -2754,7 +5217,7 @@
       "params": [
         {
           "default": null,
-          "help": "Filesystem path to the .json file to load.",
+          "help": "Filesystem path to the .json file to load. Accepts a glob pattern (e.g. `data/*.json`) to row-concatenate every match in sorted order, or an object-store URI (`s3://`, `gs://`, `az://`) which requires the `[cloud]` extra.",
           "hints": {
             "choices": null,
             "connection_kind": null,
@@ -2788,6 +5251,82 @@
           "name": "lines",
           "required": false,
           "type_token": "bool"
+        },
+        {
+          "default": false,
+          "help": "Add a 'source_file' column naming the file each row came from. Useful when loading a glob pattern across many files.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Add source file column",
+          "name": "source_file",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": null,
+          "help": "Name of a connection profile supplying object-store credentials for a remote URI. A profile NAME only -- never a credential, which is resolved from the profile's env-var names at load time. Ignored for local paths.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Connection profile",
+          "name": "connection",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional list of column names that must be present after loading. A missing column fails the load with a typed SchemaContractError naming every mismatch at once, rather than surfacing as a KeyError further downstream.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected columns",
+          "name": "expect_columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional map of column name to expected pandas dtype string (e.g. {'id': 'int64', 'name': 'object'}). Checked after loading; a mismatch fails the load with a typed SchemaContractError.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected dtypes",
+          "name": "expect_dtypes",
+          "required": false,
+          "type_token": "dict"
         }
       ],
       "ports": [
@@ -2802,7 +5341,7 @@
         }
       ],
       "type": "data.load_json",
-      "version": 2
+      "version": 4
     },
     {
       "advisor_persona": null,
@@ -2814,7 +5353,7 @@
       "params": [
         {
           "default": null,
-          "help": "Filesystem path to the .parquet file to load.",
+          "help": "Filesystem path to the .parquet file to load. Accepts a glob pattern (e.g. `data/*.parquet`) to row-concatenate every match in sorted order, or an object-store URI (`s3://`, `gs://`, `az://`) which requires the `[cloud]` extra.",
           "hints": {
             "choices": null,
             "connection_kind": null,
@@ -2839,6 +5378,82 @@
           "name": "columns",
           "required": false,
           "type_token": "list[str]"
+        },
+        {
+          "default": false,
+          "help": "Add a 'source_file' column naming the file each row came from. Useful when loading a glob pattern across many files.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Add source file column",
+          "name": "source_file",
+          "required": false,
+          "type_token": "bool"
+        },
+        {
+          "default": null,
+          "help": "Name of a connection profile supplying object-store credentials for a remote URI. A profile NAME only -- never a credential, which is resolved from the profile's env-var names at load time. Ignored for local paths.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Connection profile",
+          "name": "connection",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional list of column names that must be present after loading. A missing column fails the load with a typed SchemaContractError naming every mismatch at once, rather than surfacing as a KeyError further downstream.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected columns",
+          "name": "expect_columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional map of column name to expected pandas dtype string (e.g. {'id': 'int64', 'name': 'object'}). Checked after loading; a mismatch fails the load with a typed SchemaContractError.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expected dtypes",
+          "name": "expect_dtypes",
+          "required": false,
+          "type_token": "dict"
         }
       ],
       "ports": [
@@ -2853,24 +5468,27 @@
         }
       ],
       "type": "data.load_parquet",
-      "version": 1
+      "version": 4
     },
     {
       "advisor_persona": null,
       "category": "Ingest",
-      "description": "Load a small bundled sample dataset (zero filesystem setup).",
+      "description": "Load a small bundled sample dataset (zero filesystem setup): the sklearn classification/regression toy sets (iris, wine, diabetes), a daily web-traffic time series, a product-review text corpus, and a retail transactions table.",
       "family": "data",
       "label": "Load Sample",
       "paradigm": "functional",
       "params": [
         {
           "default": "iris",
-          "help": "Which bundled sample dataset to load.",
+          "help": "Which bundled sample dataset to load: iris/wine/diabetes (sklearn), web_traffic (timeseries), reviews (text/LLM), or transactions (product analytics).",
           "hints": {
             "choices": [
               "iris",
               "wine",
-              "diabetes"
+              "diabetes",
+              "web_traffic",
+              "reviews",
+              "transactions"
             ],
             "connection_kind": null,
             "max": null,
@@ -2899,7 +5517,7 @@
         }
       ],
       "type": "data.load_sample",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -5550,6 +8168,118 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "description": "Reduce numeric columns to N coordinate columns via PCA/t-SNE/UMAP.",
+      "family": "ml",
+      "label": "Reduce Dimensions",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Numeric columns to reduce.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": null
+          },
+          "label": "Feature columns",
+          "name": "feature_cols",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "pca",
+          "help": "Dimensionality reduction algorithm.",
+          "hints": {
+            "choices": [
+              "pca",
+              "tsne",
+              "umap"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Method",
+          "name": "method",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 2,
+          "help": "Number of reduced dimensions.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Components",
+          "name": "n_components",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": 0,
+          "help": "Random seed for reproducibility.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Seed",
+          "name": "seed",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the numeric feature columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DimensionReductionResult",
+          "direction": "out",
+          "help": "Reduced coordinates plus metadata.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "ml.reduce_dimensions",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Machine Learning",
       "description": "Fit a curated feature-selector estimator and keep only the selected features.",
       "family": "ml",
       "label": "Select Features",
@@ -6505,6 +9235,65 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "description": "Fit a two-tower retrieval model. Optionally consumes an item-features frame (one row per item, keyed by an 'item_id' column plus numeric columns) and a user-features frame (one row per user, keyed by 'user_id' plus numeric columns).",
+      "family": "recommend",
+      "label": "Fit Two-Tower Recommender",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": {},
+          "help": "Keyword arguments for the two-tower model (e.g. epochs, user_embedding_dim, item_embedding_dim, loss). Use item_id_col / user_id_col to point at non-default id columns in the feature frames.",
+          "hints": null,
+          "label": "Algorithm params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "InteractionMatrix",
+          "direction": "in",
+          "help": "The prepared user-item interaction matrix.",
+          "label": "Interactions",
+          "name": "interactions",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Optional item-side features for the item tower: one row per item, an 'item_id' column matching the interactions, plus numeric feature columns (e.g. multi-hot columns from clean.encode_lists). Non-numeric columns are ignored.",
+          "label": "Item Features",
+          "name": "item_features",
+          "required": false
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Optional user-side features for the user tower: one row per user, a 'user_id' column matching the interactions, plus numeric feature columns. Non-numeric columns are ignored.",
+          "label": "User Features",
+          "name": "user_features",
+          "required": false
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Recommender",
+          "direction": "out",
+          "help": "The fitted two-tower recommender model.",
+          "label": null,
+          "name": "recommender",
+          "required": true
+        }
+      ],
+      "type": "recommend.fit_two_tower",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
       "description": "Route cold-start users to one recommender and warm users to another, based on known-interaction count.",
       "family": "recommend",
       "label": "Hybrid (Switching)",
@@ -7191,6 +9980,202 @@
     },
     {
       "advisor_persona": null,
+      "category": "Reporting",
+      "description": "Run declarative data-quality expectations (non-null, range, uniqueness, allowed-values, regex-match, row-count, schema) against a DataFrame; passes it through unchanged on success, raises a typed error with a violations frame on failure.",
+      "family": "research",
+      "label": "Assert Data",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Ordered list of expectation dicts, each with a 'type' ('non_null'|'range'|'unique'|'allowed_values'|'regex_match'|'row_count'|'schema') plus type-specific keys -- see emergentflow.research.quality.check_data_quality for the full reference.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expectations",
+          "name": "expectations",
+          "required": true,
+          "type_token": "list[dict[str, any]]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The DataFrame to check.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The same DataFrame, unchanged, when every expectation passes.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "research.assert_data",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Reporting",
+      "description": "Compose upstream artifacts (tables, figures, model summaries, markdown/HTML text) into one multi-section report.",
+      "family": "research",
+      "label": "Build Report",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "Emergent Flow Report",
+          "help": "Report title.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Title",
+          "name": "title",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional report author.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Author",
+          "name": "author",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional one-line report description.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Description",
+          "name": "description",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional caller-supplied timestamp/date string. build_report never reads the wall clock itself (it must stay a pure function), so this is blank unless explicitly filled in.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Generated at",
+          "name": "generated_at",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional per-section titles, matched positionally to the Sections input. Missing/blank entries default to 'Section 1', 'Section 2', ...",
+          "hints": null,
+          "label": "Section titles",
+          "name": "titles",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional per-section kind override ('markdown'|'html'|'figure'|'table'|'model_summary'), matched positionally to the Sections input. Missing/blank entries auto-detect from each value's Python type.",
+          "hints": null,
+          "label": "Section kinds",
+          "name": "kinds",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": false,
+          "help": "Also render a PDF (requires the optional [report-pdf] extra).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Render PDF",
+          "name": "render_pdf",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "many",
+          "data_type": "any",
+          "direction": "in",
+          "help": "Upstream artifacts to compose, in order: DataFrames, PlotSpec figures, model-summary dataclasses, or markdown/HTML strings.",
+          "label": "Sections",
+          "name": "sections",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Report",
+          "direction": "out",
+          "help": "The composed report.",
+          "label": null,
+          "name": "report",
+          "required": true
+        }
+      ],
+      "type": "research.build_report",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "Custom Code",
       "description": "Run a user-authored Python transform() function against an input value.",
       "family": "script",
@@ -7437,6 +10422,280 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "description": "Chi-square test of independence on a contingency table.",
+      "family": "stats",
+      "label": "Chi-Square Test",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column whose values form the rows of the contingency table.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Row column",
+          "name": "row_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column whose values form the columns of the contingency table.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Column column",
+          "name": "col_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": true,
+          "help": "Apply Yates's continuity correction.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Yates correction",
+          "name": "correction",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the two categorical columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Chi-square test results as a one-row DataFrame.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.chi_square",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Cohort retention analysis over a user activity log.",
+      "family": "stats",
+      "label": "Cohort Retention",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column identifying each user.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "User column",
+          "name": "user_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column with each row's activity timestamp.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Date column",
+          "name": "date_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "M",
+          "help": "Calendar period granularity for cohorts.",
+          "hints": {
+            "choices": [
+              "D",
+              "W",
+              "M"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Period",
+          "name": "period",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the user and date columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "CohortRetentionResult",
+          "direction": "out",
+          "help": "Inspectable tidy + wide cohort retention tables.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.cohort_retention",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Apply a multiple-comparison correction (Bonferroni / Benjamini-Hochberg).",
+      "family": "stats",
+      "label": "Correct P-Values",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "p_value",
+          "help": "Name of the column containing uncorrected p-values.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "P-value column",
+          "name": "p_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "bonferroni",
+          "help": "Bonferroni or Benjamini-Hochberg FDR control.",
+          "hints": {
+            "choices": [
+              "bonferroni",
+              "benjamini_hochberg"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Correction method",
+          "name": "method",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 0.05,
+          "help": "Significance threshold for the adjusted p-values.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Alpha",
+          "name": "alpha",
+          "required": false,
+          "type_token": "float"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing a p-value column.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input DataFrame with p_adjusted and reject_null columns appended.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "stats.correct_pvalues",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
       "description": "Compute a pairwise correlation matrix.",
       "family": "stats",
       "label": "Correlation",
@@ -7506,6 +10765,208 @@
         }
       ],
       "type": "stats.correlation",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Cross-tabulation of two categorical columns with chi-square test.",
+      "family": "stats",
+      "label": "Crosstab",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Categorical column for table rows.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Row column",
+          "name": "row_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Categorical column for table columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Column column",
+          "name": "col_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "none",
+          "help": "Normalization mode for the table.",
+          "hints": {
+            "choices": [
+              "none",
+              "index",
+              "columns",
+              "all"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Normalize",
+          "name": "normalize",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": true,
+          "help": "Add a 'Total' row and column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Show margins",
+          "name": "margins",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the two categorical columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "CrosstabResult",
+          "direction": "out",
+          "help": "Inspectable cross-tabulation table and chi-square test results.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.crosstab",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Auto-emit a documented schema per column: type, null rate, cardinality, range/top-values, and optional user notes.",
+      "family": "stats",
+      "label": "Data Dictionary",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Optional subset of columns to document; defaults to every column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": 5,
+          "help": "How many of each column's most frequent values to record.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Top N values",
+          "name": "top_n",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Optional map of column name to a free-text note, carried through untouched.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Column notes",
+          "name": "notes",
+          "required": false,
+          "type_token": "dict"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The DataFrame to document.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "One row per column: type/null-rate/cardinality/range/top-values/notes.",
+          "label": null,
+          "name": "dictionary",
+          "required": true
+        }
+      ],
+      "type": "stats.data_dictionary",
       "version": 1
     },
     {
@@ -8415,6 +11876,85 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "description": "Per-step conversion and drop-off funnel over an event log.",
+      "family": "stats",
+      "label": "Funnel",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column identifying each user.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "User column",
+          "name": "user_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column with each row's event name.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Event column",
+          "name": "event_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Ordered list of event names defining the funnel.",
+          "hints": null,
+          "label": "Steps",
+          "name": "steps",
+          "required": true,
+          "type_token": "list[str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the user and event columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Tidy per-step conversion/drop-off funnel table.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.funnel",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
       "description": "Split-apply-combine: group by column(s) and aggregate.",
       "family": "stats",
       "label": "Group By Aggregate",
@@ -8512,6 +12052,169 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "description": "Kruskal-Wallis H-test across two or more groups.",
+      "family": "stats",
+      "label": "Kruskal-Wallis",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column whose distinct values define the groups.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group column",
+          "name": "group_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column whose values are compared across groups.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Value column",
+          "name": "value_col",
+          "required": true,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the group and value columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Kruskal-Wallis test results as a one-row DataFrame.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.kruskal",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Mann-Whitney U rank-sum test between two groups.",
+      "family": "stats",
+      "label": "Mann-Whitney U",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column with exactly two groups.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group column",
+          "name": "group_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Numeric column to compare.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Value column",
+          "name": "value_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "two-sided",
+          "help": "Direction of the alternative hypothesis.",
+          "hints": {
+            "choices": [
+              "two-sided",
+              "less",
+              "greater"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Alternative",
+          "name": "alternative",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the group and value columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Mann-Whitney U test results as a one-row DataFrame.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.mann_whitney",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
       "description": "Per-column null counts and percentages.",
       "family": "stats",
       "label": "Missingness",
@@ -8558,6 +12261,196 @@
         }
       ],
       "type": "stats.missingness",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Solve a power equation for effect size, sample size, or power.",
+      "family": "stats",
+      "label": "Power Analysis",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Minimum detectable effect size (MDE). Leave unset to solve for this.",
+          "hints": null,
+          "label": "Effect size (Cohen's d)",
+          "name": "effect_size",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Sample size per group. Leave unset to solve for this.",
+          "hints": null,
+          "label": "Sample size per group",
+          "name": "nobs",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Desired statistical power. Leave unset to solve for this.",
+          "hints": null,
+          "label": "Power",
+          "name": "power",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": 0.05,
+          "help": "Significance level.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Alpha",
+          "name": "alpha",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": 1.0,
+          "help": "Ratio of sample sizes (n_b / n_a).",
+          "hints": null,
+          "label": "Ratio",
+          "name": "ratio",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": "two-sided",
+          "help": "Direction of the alternative hypothesis.",
+          "hints": {
+            "choices": [
+              "two-sided",
+              "larger",
+              "smaller"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Alternative",
+          "name": "alternative",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Inspectable power-analysis results.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.power_analysis",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Two-proportion z-test comparing a binary outcome across two groups.",
+      "family": "stats",
+      "label": "Test Proportions",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column with exactly two groups.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group column",
+          "name": "group_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Binary outcome column (0/1/True/False).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Success column",
+          "name": "success_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": 0.05,
+          "help": "Significance level used for the confidence interval.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Alpha",
+          "name": "alpha",
+          "required": false,
+          "type_token": "float"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the group and success columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Inspectable two-proportion z-test metrics.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.test_proportions",
       "version": 1
     },
     {
@@ -8666,6 +12559,99 @@
         }
       ],
       "type": "stats.ttest",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Wilcoxon signed-rank test for paired samples in two columns.",
+      "family": "stats",
+      "label": "Wilcoxon Signed-Rank",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "First paired column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Column A",
+          "name": "col_a",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Second paired column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Column B",
+          "name": "col_b",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "two-sided",
+          "help": "Direction of the alternative hypothesis.",
+          "hints": {
+            "choices": [
+              "two-sided",
+              "less",
+              "greater"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Alternative",
+          "name": "alternative",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the two paired columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Wilcoxon signed-rank test results as a one-row DataFrame.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.wilcoxon",
       "version": 1
     },
     {
@@ -10353,6 +14339,65 @@
         }
       ],
       "type": "viz.plot_precision_recall_curve",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Visualization",
+      "description": "Render a 2-D dimensionality-reduction projection as a scatter plot.",
+      "family": "viz",
+      "label": "Plot Projection",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "component_1",
+          "help": "Column to plot on the x-axis.",
+          "hints": null,
+          "label": "X column",
+          "name": "x_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "component_2",
+          "help": "Column to plot on the y-axis.",
+          "hints": null,
+          "label": "Y column",
+          "name": "y_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional column to color points by (e.g. a cluster/class label).",
+          "hints": null,
+          "label": "Color column",
+          "name": "color_col",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing the projection coordinate columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PlotSpec",
+          "direction": "out",
+          "help": "The rendered projection scatter plot as a JSON-native PlotSpec.",
+          "label": null,
+          "name": "plot",
+          "required": true
+        }
+      ],
+      "type": "viz.plot_projection",
       "version": 1
     },
     {

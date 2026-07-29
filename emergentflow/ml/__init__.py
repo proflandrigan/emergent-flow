@@ -20,6 +20,7 @@ See ``docs/public-api-conventions.md`` and ``docs/sdk-design-philosophy.md``.
 from __future__ import annotations
 
 import contextlib
+import importlib.util
 import sys
 from dataclasses import dataclass
 from typing import Any, cast
@@ -46,7 +47,11 @@ from sklearn.pipeline import Pipeline as _SkPipeline
 from tqdm import tqdm
 
 from emergentflow.api import public_op
-from emergentflow.ml.errors import InvalidEstimatorParamsError, UnknownEstimatorError
+from emergentflow.ml.errors import (
+    InvalidEstimatorParamsError,
+    MissingOptionalDependencyError,
+    UnknownEstimatorError,
+)
 from emergentflow.ml.registry import get_estimator_spec, keys_for_archetype
 
 __all__ = [
@@ -61,6 +66,7 @@ __all__ = [
     "fit_transform",
     "grid_search",
     "predict",
+    "reduce_dimensions",
     "select_features",
     "summarize",
     "train_classifier",
@@ -68,6 +74,7 @@ __all__ = [
     "train_regressor",
     "train_test_split",
     "ClassifierResult",
+    "DimensionReductionResult",
     "EvaluationResult",
     "FittedModel",
     "FittedTransformer",
@@ -355,6 +362,8 @@ def predict(model: FittedModel, df: pd.DataFrame) -> pd.DataFrame:
     missing = [c for c in model.feature_names if c not in df.columns]
     if missing:
         raise ValueError(f"missing feature columns {missing!r}; expected {model.feature_names!r}.")
+    if "prediction" in df.columns:
+        raise ValueError("df already has a 'prediction' column; rename it before predicting.")
     result = df.copy()
     result["prediction"] = model.estimator.predict(df[model.feature_names])
     return result
@@ -1148,6 +1157,107 @@ def fit_and_label(
     result = df.copy()
     result["cluster"] = labels
     return model, result
+
+
+@dataclass
+class DimensionReductionResult:
+    """Structured, inspectable result of a dimensionality reduction.
+
+    Attributes
+    ----------
+    coordinates: a COPY of the input DataFrame with ``n_components`` new columns
+        (``component_1``, ``component_2``, ...) appended.
+    method: ``"pca"``, ``"tsne"``, or ``"umap"``.
+    n_components: how many reduced dimensions were produced.
+    seed: the random seed used (captured for reproducibility).
+    explained_variance: for ``method="pca"`` only, a tidy DataFrame with columns
+        ``component``/``explained_variance_ratio``/``cumulative_variance_ratio``. ``None`` for
+        ``"tsne"``/``"umap"`` (neither method produces a variance-explained decomposition).
+    """
+
+    coordinates: pd.DataFrame
+    method: str
+    n_components: int
+    seed: int
+    explained_variance: pd.DataFrame | None = None
+
+
+_REDUCE_DIM_METHODS = ("pca", "tsne", "umap")
+
+
+@public_op(name="ef.ml.reduce_dimensions")
+def reduce_dimensions(
+    df: pd.DataFrame,
+    *,
+    feature_cols: list[str],
+    method: str = "pca",
+    n_components: int = 2,
+    seed: int = 0,
+) -> DimensionReductionResult:
+    """Reduce ``feature_cols`` to ``n_components`` new coordinate columns via PCA/t-SNE/UMAP.
+
+    PCA (``sklearn.decomposition.PCA``) and t-SNE (``sklearn.manifold.TSNE``) run on hard deps
+    (scikit-learn is already a hard dependency of this SDK); UMAP (``umap-learn``) is
+    lazy-imported behind the optional ``[umap]`` extra, raising a typed
+    ``MissingOptionalDependencyError`` if absent -- checked BEFORE any ``umap`` import and before
+    the rest of the computation runs. Appends ``component_1``..``component_<n_components>`` to a
+    COPY of ``df`` (never mutates ``df``), guarding against a column-name collision with a typed
+    ``ValueError``. ``seed`` is captured for reproducibility, threaded into each method's
+    ``random_state``. PCA additionally returns a tidy explained-variance frame.
+    """
+    if method not in _REDUCE_DIM_METHODS:
+        raise ValueError(
+            f"unknown method {method!r}; expected one of {list(_REDUCE_DIM_METHODS)!r}."
+        )
+    unknown = [c for c in feature_cols if c not in df.columns]
+    if unknown:
+        raise ValueError(f"unknown feature_cols {unknown!r}; expected one of {list(df.columns)!r}.")
+    if n_components < 1:
+        raise ValueError(f"n_components must be >= 1; got {n_components}.")
+    new_cols = [f"component_{i + 1}" for i in range(n_components)]
+    collisions = [c for c in new_cols if c in df.columns]
+    if collisions:
+        raise ValueError(
+            f"reduce_dimensions would overwrite existing column(s) {collisions!r}; "
+            f"rename them before calling."
+        )
+    x = df[feature_cols].to_numpy()
+    explained_variance: pd.DataFrame | None = None
+    if method == "pca":
+        from sklearn.decomposition import PCA
+
+        model = PCA(n_components=n_components, random_state=seed)
+        coords = model.fit_transform(x)
+        ratios = model.explained_variance_ratio_
+        explained_variance = pd.DataFrame(
+            {
+                "component": new_cols,
+                "explained_variance_ratio": ratios,
+                "cumulative_variance_ratio": ratios.cumsum(),
+            }
+        )
+    elif method == "tsne":
+        from sklearn.manifold import TSNE
+
+        model = TSNE(n_components=n_components, random_state=seed)
+        coords = model.fit_transform(x)
+    else:
+        if importlib.util.find_spec("umap") is None:
+            raise MissingOptionalDependencyError("emergentflow[umap]")
+        from umap import UMAP
+
+        model = UMAP(n_components=n_components, random_state=seed)
+        coords = model.fit_transform(x)
+    result_df = df.copy()
+    for i, col in enumerate(new_cols):
+        result_df[col] = coords[:, i]
+    return DimensionReductionResult(
+        coordinates=result_df,
+        method=method,
+        n_components=n_components,
+        seed=seed,
+        explained_variance=explained_variance,
+    )
 
 
 # Importing the seed catalog registers its estimator allow-list entries (LogisticRegression,

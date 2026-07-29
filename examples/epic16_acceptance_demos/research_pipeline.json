@@ -1,0 +1,270 @@
+{
+  "schema_version": 1,
+  "paradigm": "functional",
+  "name": "epic16_research",
+  "nodes": {
+    "n-docs": {
+      "id": "n-docs",
+      "type": "data.load_documents",
+      "label": "Load documents",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "path",
+          "type_token": "str",
+          "value": "examples/epic16_acceptance_demos/documents/handbook.md",
+          "default": null
+        },
+        {
+          "name": "chunk_size",
+          "type_token": "int",
+          "value": 200,
+          "default": 1000
+        },
+        {
+          "name": "chunk_overlap",
+          "type_token": "int",
+          "value": 20,
+          "default": 100
+        }
+      ],
+      "ports": [
+        {
+          "id": "n-docs:out:frame",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DocumentFrame",
+          "cardinality": "one",
+          "label": "Documents"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-dict": {
+      "id": "n-dict",
+      "type": "stats.data_dictionary",
+      "label": "Codebook",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "columns",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "top_n",
+          "type_token": "int",
+          "value": 3,
+          "default": 5
+        },
+        {
+          "name": "notes",
+          "type_token": "dict",
+          "value": null,
+          "default": null
+        }
+      ],
+      "ports": [
+        {
+          "id": "n-dict:in:frame",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        },
+        {
+          "id": "n-dict:out:dictionary",
+          "name": "dictionary",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-redact": {
+      "id": "n-redact",
+      "type": "clean.redact_pii",
+      "label": "Redact PII",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "columns",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "categories",
+          "type_token": "list[str]",
+          "value": [
+            "email",
+            "phone"
+          ],
+          "default": null
+        },
+        {
+          "name": "mask",
+          "type_token": "str",
+          "value": "[REDACTED]",
+          "default": "[REDACTED]"
+        },
+        {
+          "name": "engine",
+          "type_token": "str",
+          "value": "regex",
+          "default": "regex"
+        }
+      ],
+      "ports": [
+        {
+          "id": "n-redact:in:frame",
+          "name": "frame",
+          "direction": "in",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        },
+        {
+          "id": "n-redact:out:frame",
+          "name": "frame",
+          "direction": "out",
+          "data_type": "DataFrame",
+          "cardinality": "one",
+          "label": "Data"
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    },
+    "n-report": {
+      "id": "n-report",
+      "type": "research.build_report",
+      "label": "Corpus report",
+      "paradigm": "functional",
+      "params": [
+        {
+          "name": "title",
+          "type_token": "str",
+          "value": "Document Corpus Codebook",
+          "default": "Emergent Flow Report"
+        },
+        {
+          "name": "author",
+          "type_token": "str",
+          "value": "Emergent Flow",
+          "default": null
+        },
+        {
+          "name": "description",
+          "type_token": "str",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "generated_at",
+          "type_token": "str",
+          "value": "2026-07-29",
+          "default": null
+        },
+        {
+          "name": "titles",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "kinds",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null
+        },
+        {
+          "name": "render_pdf",
+          "type_token": "bool",
+          "value": false,
+          "default": false
+        }
+      ],
+      "ports": [
+        {
+          "id": "n-report:in:sections",
+          "name": "sections",
+          "direction": "in",
+          "data_type": "any",
+          "cardinality": "many",
+          "label": "Sections"
+        },
+        {
+          "id": "n-report:out:report",
+          "name": "report",
+          "direction": "out",
+          "data_type": "Report",
+          "cardinality": "one",
+          "label": null
+        }
+      ],
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      },
+      "group_id": null,
+      "subgraph": null
+    }
+  },
+  "edges": {
+    "e-docs-dict": {
+      "id": "e-docs-dict",
+      "source": {
+        "node_id": "n-docs",
+        "port_id": "n-docs:out:frame"
+      },
+      "target": {
+        "node_id": "n-dict",
+        "port_id": "n-dict:in:frame"
+      },
+      "type_compatible": null
+    },
+    "e-dict-redact": {
+      "id": "e-dict-redact",
+      "source": {
+        "node_id": "n-dict",
+        "port_id": "n-dict:out:dictionary"
+      },
+      "target": {
+        "node_id": "n-redact",
+        "port_id": "n-redact:in:frame"
+      },
+      "type_compatible": null
+    },
+    "e-redact-report": {
+      "id": "e-redact-report",
+      "source": {
+        "node_id": "n-redact",
+        "port_id": "n-redact:out:frame"
+      },
+      "target": {
+        "node_id": "n-report",
+        "port_id": "n-report:in:sections"
+      },
+      "type_compatible": null
+    }
+  }
+}

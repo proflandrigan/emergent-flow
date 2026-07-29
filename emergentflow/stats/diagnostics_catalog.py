@@ -51,7 +51,7 @@ def _vif(
         raise InvalidModelSpecError("diagnostic 'vif' requires a DataFrame input.")
     columns = spec.get("columns") or list(df.select_dtypes(include="number").columns)
     threshold = float(spec.get("threshold", 5.0))
-    exog = sm.add_constant(df[columns]).to_numpy()
+    exog = sm.add_constant(df[columns], has_constant="add").to_numpy()
     rows = []
     for i, col in enumerate(columns, start=1):
         vif = float(variance_inflation_factor(exog, i))

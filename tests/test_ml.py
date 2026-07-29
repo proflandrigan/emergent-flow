@@ -334,6 +334,15 @@ def test_predict_missing_feature_column_raises() -> None:
         predict(model, df_bad)
 
 
+def test_predict_existing_prediction_column_raises() -> None:
+    df = _make_linear_df()
+    model = train_regressor(df, target="y")
+    df_with_prediction = df.copy()
+    df_with_prediction["prediction"] = "real data"
+    with pytest.raises(ValueError, match="already has a 'prediction' column"):
+        predict(model, df_with_prediction)
+
+
 def test_predict_registered_as_public_op() -> None:
     assert "ef.ml.predict" in PUBLIC_OPS
 

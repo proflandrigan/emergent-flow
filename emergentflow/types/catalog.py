@@ -8,10 +8,11 @@ registry as an import-time side effect, mirroring how importing
 ``emergentflow.nodes`` fires every reference node's self-registration.
 
 The tokens were inventoried from the ``data_type=`` strings used across
-``emergentflow/nodes/examples/``. The built-in catalog is intentionally **flat** —
-every token is an implicit subtype of ``"any"`` and no explicit subtype edges are
-declared among the built-ins. Explicit subtyping is demonstrated by the
-out-of-core plugin stub (``examples/type_plugin_stub``) and the unit tests.
+``emergentflow/nodes/examples/``. The built-in catalog is almost entirely **flat**, with
+exactly one declared subtype edge -- ``DocumentFrame <: DataFrame`` (Epic 16, Story 22) --
+and every other token related only implicitly, via ``"any"``. Explicit subtyping is further
+demonstrated by the out-of-core plugin stub (``examples/type_plugin_stub``) and the unit
+tests.
 """
 
 from __future__ import annotations
@@ -34,6 +35,24 @@ register_type(
     )
 )
 register_type(TypeDef(token="TTestResult", description="The result of a two-sample t-test."))
+register_type(
+    TypeDef(
+        token="CrosstabResult",
+        description=(
+            "The result of a cross-tabulation (ef.stats.crosstab): a tidy counts/proportions "
+            "table plus a chi-square test of independence on the raw contingency table."
+        ),
+    )
+)
+register_type(
+    TypeDef(
+        token="CohortRetentionResult",
+        description=(
+            "The result of ef.stats.cohort_retention: a tidy long-format retention table "
+            "plus a cohort x period-number wide retention matrix."
+        ),
+    )
+)
 register_type(TypeDef(token="HTML", description="A rendered HTML document/report fragment."))
 register_type(
     TypeDef(
@@ -66,6 +85,16 @@ register_type(
         description=(
             "A structural, JSON-native inspectable summary of a fitted model or "
             "transformer (accuracy/coefficients, explained variance, cluster sizes, ...)."
+        ),
+    )
+)
+register_type(
+    TypeDef(
+        token="DimensionReductionResult",
+        description=(
+            "The result of ef.ml.reduce_dimensions (PCA/t-SNE/UMAP): the input frame with "
+            "new component_N coordinate columns appended, plus a PCA explained-variance "
+            "frame when applicable."
         ),
     )
 )
@@ -200,5 +229,42 @@ register_type(
             "plus a system-level aggregate dict (mean ranking metrics, coverage, diversity, "
             "novelty)."
         ),
+    )
+)
+register_type(
+    TypeDef(
+        token="Lineage",
+        description=(
+            "The upstream source->transform->artifact chain traced for a node "
+            "(ef.research.trace_lineage): inspect-only, not a data-flow port type. No "
+            "declared supertype: it is compatible only with an 'any' port."
+        ),
+    )
+)
+register_type(
+    TypeDef(
+        token="Report",
+        description=(
+            "A composed, multi-section report (ef.research.build_report): markdown/HTML "
+            "text, PlotSpec figures, tidy tables, and model summaries, rendered to a "
+            "self-contained HTML document (and optionally PDF). Wires into export/inspect "
+            "consumers only -- deliberately NOT a subtype of 'DataFrame', so a composed "
+            "report cannot be fed to a frame consumer."
+        ),
+    )
+)
+register_type(
+    TypeDef(
+        token="DocumentFrame",
+        description=(
+            "A tagged DataFrame produced by ef.data.load_documents (Epic 16, Story 20): "
+            "(doc_id, chunk_id, chunk_index, text, source_path, char_count) rows, one per "
+            "chunk. Not embeddings -- no vector/retrieval semantics; wire into Epic 11 for "
+            "that. Declared a subtype of 'DataFrame' (Epic 16, Story 22) so a document frame "
+            "wires anywhere a DataFrame does -- the only explicit subtype edge in the "
+            "built-in catalog; the reverse direction stays incompatible, so a plain "
+            "DataFrame cannot be passed where document structure is required."
+        ),
+        supertypes=("DataFrame",),
     )
 )

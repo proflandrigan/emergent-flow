@@ -50,6 +50,21 @@ class _WarehouseRefNode(NodeDefinition):
         return {"out": "x"}
 
 
+@register
+class _HttpRefNode(NodeDefinition):
+    type = "_test.http_ref"
+    family = "_test"
+    label = "HTTP Ref (test-only)"
+    requires = frozenset({ClientKind.HTTP})
+    ports = [PortSpec(name="out", direction=Direction.OUT, data_type="str")]
+
+    def codegen(self, node, ctx):
+        return CodeFragment(imports=(), body=f"{ctx.out_var('out')} = http")
+
+    def execute(self, node, inputs, *, client=None):
+        return {"out": "x"}
+
+
 def _llm_graph() -> Graph:
     node = Node(
         id="n1",
@@ -68,6 +83,19 @@ def _warehouse_graph() -> Graph:
         id="n1",
         type="_test.warehouse_ref",
         label="warehouse",
+        paradigm=Paradigm.FUNCTIONAL,
+        params=[],
+        ports=[Port(id="p1", name="out", direction=Direction.OUT, data_type="str")],
+        position=Position(x=0.0, y=0.0),
+    )
+    return Graph(name="g", nodes={node.id: node})
+
+
+def _http_graph() -> Graph:
+    node = Node(
+        id="n1",
+        type="_test.http_ref",
+        label="http",
         paradigm=Paradigm.FUNCTIONAL,
         params=[],
         ports=[Port(id="p1", name="out", direction=Direction.OUT, data_type="str")],
@@ -96,6 +124,28 @@ def _both_graph() -> Graph:
         position=Position(x=1.0, y=0.0),
     )
     return Graph(name="g", nodes={llm_node.id: llm_node, warehouse_node.id: warehouse_node})
+
+
+def _http_and_warehouse_graph() -> Graph:
+    http_node = Node(
+        id="n1",
+        type="_test.http_ref",
+        label="http",
+        paradigm=Paradigm.FUNCTIONAL,
+        params=[],
+        ports=[Port(id="p1", name="out", direction=Direction.OUT, data_type="str")],
+        position=Position(x=0.0, y=0.0),
+    )
+    warehouse_node = Node(
+        id="n2",
+        type="_test.warehouse_ref",
+        label="warehouse",
+        paradigm=Paradigm.FUNCTIONAL,
+        params=[],
+        ports=[Port(id="p2", name="out", direction=Direction.OUT, data_type="str")],
+        position=Position(x=1.0, y=0.0),
+    )
+    return Graph(name="g", nodes={http_node.id: http_node, warehouse_node.id: warehouse_node})
 
 
 def test_no_client_graph_emits_plain_main():
@@ -141,8 +191,41 @@ def test_both_graph_threads_both():
     assert "main(clients=Clients(llm=GatewayClient(), warehouse=None))" in code
 
 
+def test_http_graph_emits_clients_signature():
+    code = compile_to_code(_http_graph())
+    assert "def main(*, clients: object | None = None) -> dict[str, object]:" in code
+    assert "http = clients.http if clients is not None else None" in code
+    ast.parse(code)
+
+
+def test_http_graph_boilerplate_mentions_http():
+    code = compile_to_code(_http_graph())
+    assert "http=None" in code
+    assert "emergentflow.data.http" in code
+
+
+def test_http_graph_does_not_mention_warehouse():
+    code = compile_to_code(_http_graph())
+    assert "warehouse" not in code
+    assert "clients.warehouse" not in code
+
+
+def test_http_and_warehouse_graph_threads_both():
+    code = compile_to_code(_http_and_warehouse_graph())
+    assert "warehouse = clients.warehouse if clients is not None else None" in code
+    assert "http = clients.http if clients is not None else None" in code
+    assert "warehouse=None" in code
+    assert "http=None" in code
+
+
 def test_all_emitted_modules_parse():
-    for graph in (_llm_graph(), _warehouse_graph(), _both_graph()):
+    for graph in (
+        _llm_graph(),
+        _warehouse_graph(),
+        _both_graph(),
+        _http_graph(),
+        _http_and_warehouse_graph(),
+    ):
         src = compile_to_code(graph)
         tree = ast.parse(src)
         compile(src, "<gen>", "exec")

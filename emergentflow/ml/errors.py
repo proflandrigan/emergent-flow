@@ -12,6 +12,7 @@ from __future__ import annotations
 
 __all__ = [
     "MLAdapterError",
+    "MissingOptionalDependencyError",
     "UnknownEstimatorError",
     "InvalidEstimatorParamsError",
 ]
@@ -27,3 +28,14 @@ class UnknownEstimatorError(MLAdapterError):
 
 class InvalidEstimatorParamsError(MLAdapterError):
     """Raised when a kwarg passed to an estimator is not in its accepted-kwargs allow-list."""
+
+
+class MissingOptionalDependencyError(MLAdapterError):
+    """Raised when an ml-family op needs an optional dependency group that is not installed."""
+
+    def __init__(self, extra: str) -> None:
+        self.extra = extra
+        super().__init__(
+            f"this feature requires the optional dependency group {extra!r}; "
+            f"install it with `pip install {extra}`."
+        )

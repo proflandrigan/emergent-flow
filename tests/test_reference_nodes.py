@@ -6,10 +6,14 @@ result as running the code emitted by ``codegen``.
 """
 
 import csv
+import pathlib
 
 import pandas as pd
 import pytest
+from pandas.testing import assert_frame_equal
 
+from emergentflow.api import is_inspectable
+from emergentflow.clean.errors import CleanError
 from emergentflow.codegen.context import build_codegen_context
 from emergentflow.codegen.naming import build_name_map
 from emergentflow.codegen.wiring import build_wiring_map
@@ -20,29 +24,51 @@ from emergentflow.ml import train_regressor
 from emergentflow.nodes.examples import (
     Anova,
     ApplyEstimator,
+    AssertData,
+    BuildReport,
     CastTypes,
+    ChiSquare,
+    CohortRetention,
+    CorrectPvalues,
     Correlation,
+    Crosstab,
+    DataDictionary,
     Describe,
     DropMissing,
+    EncodeLists,
     Evaluate,
+    ExplodeLists,
     FilterRows,
     FitEstimator,
+    Funnel,
     GenerateHtmlSummary,
     ImputeMissing,
+    Kruskal,
     LoadCsv,
+    LoadDocuments,
     LoadJson,
     LoadParquet,
     LoadSample,
+    MannWhitney,
     MarkdownNote,
+    Merge,
+    PowerAnalysis,
     Predict,
+    RedactPii,
+    ReduceDimensions,
     SelectColumns,
+    SemiJoin,
     Summarize,
+    TestProportions,
     TrainClassifier,
     TrainRandomForest,
     TrainRegressor,
     TrainTestSplit,
     TTest,
+    VizPlotProjection,
+    Wilcoxon,
 )
+from emergentflow.research.errors import DataQualityError
 
 
 @pytest.fixture
@@ -206,6 +232,60 @@ class TestSelectColumns:
 
 
 # ---------------------------------------------------------------------------
+# clean.explode_lists
+# ---------------------------------------------------------------------------
+
+
+class TestExplodeLists:
+    def test_codegen_body_golden(self):
+        defn = ExplodeLists()
+        node = defn.instantiate(columns=["items"])
+        frag = defn.preview(node)
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == (
+            "frame = ef.clean.explode_lists(frame, columns=['items'], "
+            "drop_empty=True, ignore_index=True)"
+        )
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = ExplodeLists()
+        df = pd.DataFrame({"u": [1, 2], "items": [["a", "b"], ["c"]]})
+        node = defn.instantiate(columns=["items"])
+        executed = defn.execute(node, inputs={"frame": df.copy()})
+        scope = {"frame": df.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
+# clean.encode_lists
+# ---------------------------------------------------------------------------
+
+
+class TestEncodeLists:
+    def test_codegen_body_golden(self):
+        defn = EncodeLists()
+        node = defn.instantiate(column="genres")
+        frag = defn.preview(node)
+        assert frag.imports == ["import emergentflow as ef"]
+        assert frag.body == (
+            "frame = ef.clean.encode_lists(frame, column='genres', prefix=None, "
+            "drop=True, sep=None)"
+        )
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = EncodeLists()
+        df = pd.DataFrame({"u": [1, 2], "genres": [["rock", "jazz"], ["pop"]]})
+        node = defn.instantiate(column="genres")
+        executed = defn.execute(node, inputs={"frame": df.copy()})
+        scope = {"frame": df.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
 # clean.cast_types
 # ---------------------------------------------------------------------------
 
@@ -276,6 +356,8 @@ class TestAnova:
         assert generated.f_statistic == executed.f_statistic
         assert generated.p_value == executed.p_value
         assert generated.effect_size == executed.effect_size
+        assert generated.ci_low == executed.ci_low
+        assert generated.ci_high == executed.ci_high
         assert generated.summary.equals(executed.summary)
 
 
@@ -320,6 +402,215 @@ class TestTTest:
         assert generated.mean_b == executed.mean_b
         assert generated.equal_var == executed.equal_var
         assert generated.alpha == executed.alpha
+        assert generated.effect_size == executed.effect_size
+        assert generated.ci_low == executed.ci_low
+        assert generated.ci_high == executed.ci_high
+
+
+# ---------------------------------------------------------------------------
+# stats.mann_whitney
+# ---------------------------------------------------------------------------
+
+
+class TestMannWhitney:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = MannWhitney()
+        df = pd.DataFrame(
+            {
+                "grp": ["a", "a", "a", "b", "b", "b"],
+                "score": [1.0, 2.0, 3.0, 5.0, 6.0, 7.0],
+            }
+        )
+        node = defn.instantiate(group_col="grp", value_col="score")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+        assert_frame_equal(generated, executed)
+
+
+# ---------------------------------------------------------------------------
+# stats.wilcoxon
+# ---------------------------------------------------------------------------
+
+
+class TestWilcoxon:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Wilcoxon()
+        df = pd.DataFrame(
+            {
+                "before": [10.0, 12.0, 9.0, 11.0, 13.0],
+                "after": [12.0, 14.0, 10.0, 13.0, 15.0],
+            }
+        )
+        node = defn.instantiate(col_a="before", col_b="after")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+        assert_frame_equal(generated, executed)
+
+
+# ---------------------------------------------------------------------------
+# stats.kruskal
+# ---------------------------------------------------------------------------
+
+
+class TestKruskal:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Kruskal()
+        df = pd.DataFrame(
+            {
+                "grp": ["a", "a", "a", "b", "b", "b", "c", "c", "c"],
+                "score": [1.0, 1.1, 0.9, 5.0, 5.1, 4.9, 9.0, 9.1, 8.9],
+            }
+        )
+        node = defn.instantiate(group_col="grp", value_col="score")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+        assert_frame_equal(generated, executed)
+
+
+# ---------------------------------------------------------------------------
+# stats.chi_square
+# ---------------------------------------------------------------------------
+
+
+class TestChiSquare:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = ChiSquare()
+        df = pd.DataFrame(
+            {
+                "treatment": ["A", "A", "B", "B", "B", "A", "B", "A"],
+                "outcome": ["good", "bad", "good", "bad", "bad", "good", "good", "bad"],
+            }
+        )
+        node = defn.instantiate(row_col="treatment", col_col="outcome")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+        assert_frame_equal(generated, executed)
+
+
+# ---------------------------------------------------------------------------
+# stats.correct_pvalues
+# ---------------------------------------------------------------------------
+
+
+class TestCorrectPvalues:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = CorrectPvalues()
+        df = pd.DataFrame(
+            {
+                "group": ["a", "a", "b", "b", "c", "c"],
+                "p_value": [0.01, 0.03, 0.2, 0.4, 0.6, 0.9],
+            }
+        )
+        node = defn.instantiate(p_col="p_value", method="bonferroni")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["frame"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        assert_frame_equal(scope["frame"], executed)
+
+
+# ---------------------------------------------------------------------------
+# stats.crosstab
+# ---------------------------------------------------------------------------
+
+
+class TestCrosstab:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Crosstab()
+        df = pd.DataFrame(
+            {
+                "treatment": ["A", "A", "B", "B", "B", "A", "B", "A"],
+                "outcome": ["good", "bad", "good", "bad", "bad", "good", "good", "bad"],
+            }
+        )
+        node = defn.instantiate(row_col="treatment", col_col="outcome")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+
+        assert generated.chi_square == executed.chi_square
+        assert generated.p_value == executed.p_value
+        assert generated.dof == executed.dof
+        assert generated.n == executed.n
+        assert_frame_equal(generated.table, executed.table)
+
+
+class TestCohortRetention:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = CohortRetention()
+        df = pd.DataFrame(
+            {
+                "user": ["A", "A", "A", "B", "C"],
+                "ts": [
+                    "2024-01-05",
+                    "2024-02-10",
+                    "2024-03-15",
+                    "2024-02-20",
+                    "2024-01-25",
+                ],
+            }
+        )
+        node = defn.instantiate(user_col="user", date_col="ts", period="M")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+
+        assert_frame_equal(generated.tidy, executed.tidy)
+        assert_frame_equal(generated.wide, executed.wide)
+
+
+class TestFunnel:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Funnel()
+        rows = []
+        for i in range(10):
+            rows.append({"user": f"u{i}", "event": "view"})
+        for i in range(6):
+            rows.append({"user": f"u{i}", "event": "add_to_cart"})
+        for i in range(3):
+            rows.append({"user": f"u{i}", "event": "purchase"})
+        df = pd.DataFrame(rows)
+        node = defn.instantiate(
+            user_col="user", event_col="event", steps=["view", "add_to_cart", "purchase"]
+        )
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+
+        assert_frame_equal(generated, executed)
+
+
+class TestReduceDimensions:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = ReduceDimensions()
+        df = pd.DataFrame(
+            {
+                "a": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+                "b": [2.0, 1.0, 4.0, 3.0, 6.0, 5.0, 8.0, 7.0],
+                "c": [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5],
+            }
+        )
+        node = defn.instantiate(feature_cols=["a", "b", "c"], method="pca", n_components=2, seed=0)
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+
+        pd.testing.assert_frame_equal(generated.coordinates, executed.coordinates)
+        assert generated.method == executed.method
+        assert generated.n_components == executed.n_components
+        assert generated.seed == executed.seed
+        pd.testing.assert_frame_equal(generated.explained_variance, executed.explained_variance)
 
 
 # ---------------------------------------------------------------------------
@@ -625,6 +916,359 @@ class TestGenerateHtmlSummary:
             assert "Equivalence Check" in html
 
 
+class TestBuildReport:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code.
+
+        Compared structurally (the story's own instruction: "keyed on the structured report
+        model, not rendered bytes") rather than via Report.__eq__, because a Section's content
+        may be a DataFrame -- comparing two DataFrames with == raises ("truth value of a
+        DataFrame is ambiguous"), so a plain dataclass equality check on Section is unsafe
+        whenever a table section is present.
+        """
+        defn = BuildReport()
+        frame = pd.DataFrame({"a": [1, 2, 3]})
+        node = defn.instantiate(title="Equivalence Check", author="Ada")
+
+        executed = defn.execute(node, inputs={"sections": [frame.copy(), "hello world"]})["report"]
+        scope = _run_codegen(defn, node, {"sections": [frame.copy(), "hello world"]})
+        generated = scope["report"]
+
+        assert executed.meta == generated.meta
+        assert len(executed.sections) == len(generated.sections) == 2
+        for exp, gen in zip(executed.sections, generated.sections, strict=True):
+            assert exp.kind == gen.kind
+            assert exp.title == gen.title
+            if isinstance(exp.content, pd.DataFrame):
+                pd.testing.assert_frame_equal(exp.content, gen.content)
+            else:
+                assert exp.content == gen.content
+        assert executed.html == generated.html
+        assert executed.pdf_bytes is None
+        assert generated.pdf_bytes is None
+
+    def test_result_is_inspectable(self):
+        defn = BuildReport()
+        node = defn.instantiate(title="t")
+        result = defn.execute(node, inputs={"sections": ["hello"]})["report"]
+        assert is_inspectable(result) is True
+
+    def test_deterministic(self):
+        defn = BuildReport()
+        frame = pd.DataFrame({"a": [1, 2]})
+        node = defn.instantiate(title="Determinism Check")
+        r1 = defn.execute(node, inputs={"sections": [frame.copy(), "note"]})["report"]
+        r2 = defn.execute(node, inputs={"sections": [frame.copy(), "note"]})["report"]
+        assert r1.html == r2.html
+
+    def test_empty_sections_still_builds(self):
+        defn = BuildReport()
+        node = defn.instantiate(title="Empty Report")
+        result = defn.execute(node, inputs={"sections": []})["report"]
+        assert result.sections == []
+        assert "<h1>Empty Report</h1>" in result.html
+
+
+class TestAssertData:
+    def test_codegen_matches_execute_pass_path(self):
+        """ADR 0002: execute == result of running the emitted code, when the expectations pass."""
+        defn = AssertData()
+        frame = pd.DataFrame({"age": [25, 30, 40]})
+        node = defn.instantiate(expectations=[{"type": "non_null", "column": "age"}])
+
+        executed = defn.execute(node, inputs={"frame": frame.copy()})["frame"]
+        scope = _run_codegen(defn, node, {"frame": frame.copy()})
+        generated = scope["frame"]
+
+        pd.testing.assert_frame_equal(executed, generated)
+        pd.testing.assert_frame_equal(executed, frame)
+
+    def test_codegen_matches_execute_fail_path(self):
+        """ADR 0002 extends to the failure path: both raise the same typed error, with
+        structurally equal violations frames -- not compared via == (DataFrame == raises
+        "truth value is ambiguous"), via pd.testing.assert_frame_equal instead."""
+        defn = AssertData()
+        frame = pd.DataFrame({"age": [25, -5, 200]})
+        node = defn.instantiate(
+            expectations=[{"type": "range", "column": "age", "min": 0, "max": 120}]
+        )
+
+        with pytest.raises(DataQualityError) as exec_exc_info:
+            defn.execute(node, inputs={"frame": frame.copy()})
+
+        with pytest.raises(DataQualityError) as codegen_exc_info:
+            _run_codegen(defn, node, {"frame": frame.copy()})
+
+        exec_violations = exec_exc_info.value.violations
+        codegen_violations = codegen_exc_info.value.violations
+        pd.testing.assert_frame_equal(
+            exec_violations.reset_index(drop=True), codegen_violations.reset_index(drop=True)
+        )
+        assert exec_violations.iloc[0]["expectation"] == "range"
+
+    def test_result_is_inspectable(self):
+        defn = AssertData()
+        frame = pd.DataFrame({"a": [1, 2]})
+        node = defn.instantiate(expectations=[])
+        result = defn.execute(node, inputs={"frame": frame})["frame"]
+        assert is_inspectable(result) is True
+
+    def test_does_not_mutate_input(self):
+        defn = AssertData()
+        frame = pd.DataFrame({"a": [1, 2, None]})
+        original = frame.copy()
+        node = defn.instantiate(expectations=[{"type": "non_null", "column": "a"}])
+        with pytest.raises(DataQualityError):
+            defn.execute(node, inputs={"frame": frame})
+        pd.testing.assert_frame_equal(frame, original)
+
+    def test_empty_expectations_always_passes(self):
+        defn = AssertData()
+        frame = pd.DataFrame({"a": [1, 2]})
+        node = defn.instantiate(expectations=[])
+        result = defn.execute(node, inputs={"frame": frame})["frame"]
+        pd.testing.assert_frame_equal(result, frame)
+
+
+_DOCUMENTS_FIXTURES_DIR = pathlib.Path(__file__).parent / "fixtures" / "documents"
+
+
+class TestLoadDocuments:
+    def test_to_spec(self):
+        spec = LoadDocuments().to_spec()
+        assert spec.type == "data.load_documents"
+        assert spec.family == "data"
+        assert spec.paradigm == Paradigm.FUNCTIONAL
+        out_ports = [p for p in spec.ports if p.direction == Direction.OUT]
+        assert [p.name for p in out_ports] == ["frame"]
+        assert not [p for p in spec.ports if p.direction == Direction.IN]
+
+    def test_instantiate_and_validate(self):
+        node = LoadDocuments().instantiate(path=str(_DOCUMENTS_FIXTURES_DIR / "sample.md"))
+        assert LoadDocuments().validate_node(node) == []
+
+    def test_missing_required_path_flagged(self):
+        node = LoadDocuments().instantiate()  # path unset
+        errors = LoadDocuments().validate_node(node)
+        assert any("required param 'path'" in e for e in errors)
+
+    def test_execute_reads_markdown_fixture(self):
+        node = LoadDocuments().instantiate(
+            path=str(_DOCUMENTS_FIXTURES_DIR / "sample.md"), chunk_size=120, chunk_overlap=20
+        )
+        out = LoadDocuments().execute(node, inputs={})
+        frame = out["frame"]
+        assert list(frame.columns) == [
+            "doc_id",
+            "chunk_id",
+            "chunk_index",
+            "text",
+            "source_path",
+            "char_count",
+        ]
+        assert (frame["doc_id"] == "sample").all()
+        assert len(frame) > 1
+        assert frame["chunk_id"].tolist() == [f"sample_{i}" for i in range(len(frame))]
+
+    def test_codegen_matches_execute_markdown_fixture(self):
+        node = LoadDocuments().instantiate(
+            path=str(_DOCUMENTS_FIXTURES_DIR / "sample.md"), chunk_size=120, chunk_overlap=20
+        )
+        defn = LoadDocuments()
+        executed = defn.execute(node, inputs={})["frame"]
+        scope = _run_codegen(defn, node, {})
+        generated = scope["frame"]
+        assert_frame_equal(executed, generated)
+
+    def test_result_is_inspectable(self):
+        node = LoadDocuments().instantiate(path=str(_DOCUMENTS_FIXTURES_DIR / "sample.md"))
+        out = LoadDocuments().execute(node, inputs={})
+        assert is_inspectable(out["frame"]) is True
+
+    def test_pdf_fixture_requires_docs_extra_or_parses_when_available(self):
+        """Golden on a checked-in tiny PDF fixture (Epic 16, Story 20). If pypdf ([docs]) is
+        not installed this asserts the typed error path instead of skipping outright, so the
+        base-install contract (never an opaque ImportError) stays covered even without the
+        extra."""
+        from emergentflow.data.errors import MissingOptionalDependencyError
+
+        node = LoadDocuments().instantiate(path=str(_DOCUMENTS_FIXTURES_DIR / "sample.pdf"))
+        defn = LoadDocuments()
+        try:
+            import pypdf  # noqa: F401
+        except ImportError:
+            with pytest.raises(MissingOptionalDependencyError):
+                defn.execute(node, inputs={})
+            return
+
+        out = defn.execute(node, inputs={})
+        frame = out["frame"]
+        assert (frame["doc_id"] == "sample").all()
+        assert "Hello PDF World" in frame["text"].iloc[0]
+
+        scope = _run_codegen(defn, node, {})
+        assert_frame_equal(frame, scope["frame"])
+
+
+class TestDataDictionary:
+    def _frame(self):
+        return pd.DataFrame(
+            {
+                "a": [1, 2, 2, 3, None],
+                "b": ["x", "y", "x", "x", "z"],
+            }
+        )
+
+    def test_to_spec(self):
+        spec = DataDictionary().to_spec()
+        assert spec.type == "stats.data_dictionary"
+        assert spec.family == "stats"
+        out_ports = [p for p in spec.ports if p.direction == Direction.OUT]
+        assert [p.name for p in out_ports] == ["dictionary"]
+
+    def test_execute_shape_and_content(self):
+        defn = DataDictionary()
+        node = defn.instantiate(top_n=2, notes={"a": "the numeric column"})
+        out = defn.execute(node, inputs={"frame": self._frame()})
+        result = out["dictionary"]
+        assert list(result["column"]) == ["a", "b"]
+        assert "top_values" in result.columns
+        assert "notes" in result.columns
+
+        a_row = result[result["column"] == "a"].iloc[0]
+        assert a_row["n_missing"] == 1
+        assert a_row["notes"] == "the numeric column"
+        assert len(a_row["top_values"]) <= 2
+        assert all({"value", "count"} == set(entry) for entry in a_row["top_values"])
+
+        b_row = result[result["column"] == "b"].iloc[0]
+        assert b_row["notes"] is None
+        # 'x' appears 3 times -- most frequent value in column b
+        assert b_row["top_values"][0] == {"value": "x", "count": 3}
+
+    def test_codegen_matches_execute(self):
+        defn = DataDictionary()
+        frame = self._frame()
+        node = defn.instantiate(top_n=3)
+
+        executed = defn.execute(node, inputs={"frame": frame.copy()})["dictionary"]
+        scope = _run_codegen(defn, node, {"frame": frame.copy()})
+        generated = scope["dictionary"]
+        assert_frame_equal(executed, generated)
+
+    def test_result_is_inspectable(self):
+        defn = DataDictionary()
+        node = defn.instantiate()
+        out = defn.execute(node, inputs={"frame": self._frame()})
+        assert is_inspectable(out["dictionary"]) is True
+
+    def test_does_not_mutate_input(self):
+        defn = DataDictionary()
+        frame = self._frame()
+        original = frame.copy()
+        node = defn.instantiate()
+        defn.execute(node, inputs={"frame": frame})
+        pd.testing.assert_frame_equal(frame, original)
+
+
+class TestRedactPii:
+    def _frame(self):
+        return pd.DataFrame(
+            {
+                "note": [
+                    "contact me at ada@example.com please",
+                    "call 555-123-4567 tomorrow",
+                    "no pii here at all",
+                ],
+                "id": [1, 2, 3],
+            }
+        )
+
+    def test_to_spec(self):
+        spec = RedactPii().to_spec()
+        assert spec.type == "clean.redact_pii"
+        assert spec.family == "clean"
+        in_ports = [p.name for p in spec.ports if p.direction == Direction.IN]
+        out_ports = [p.name for p in spec.ports if p.direction == Direction.OUT]
+        assert in_ports == ["frame"]
+        assert out_ports == ["frame"]
+
+    def test_execute_masks_email_and_phone(self):
+        defn = RedactPii()
+        node = defn.instantiate(columns=["note"])
+        out = defn.execute(node, inputs={"frame": self._frame()})
+        result = out["frame"]
+        assert "ada@example.com" not in result["note"].iloc[0]
+        assert "[REDACTED]" in result["note"].iloc[0]
+        assert "555-123-4567" not in result["note"].iloc[1]
+        assert result["note"].iloc[2] == "no pii here at all"
+
+    def test_execute_defaults_to_all_text_columns(self):
+        defn = RedactPii()
+        node = defn.instantiate()
+        out = defn.execute(node, inputs={"frame": self._frame()})
+        assert "[REDACTED]" in out["frame"]["note"].iloc[0]
+
+    def test_custom_mask_and_categories(self):
+        defn = RedactPii()
+        node = defn.instantiate(columns=["note"], categories=["email"], mask="<hidden>")
+        out = defn.execute(node, inputs={"frame": self._frame()})
+        result = out["frame"]
+        assert "<hidden>" in result["note"].iloc[0]
+        # phone category not requested -- phone number in row 1 stays untouched
+        assert "555-123-4567" in result["note"].iloc[1]
+
+    def test_unknown_category_raises(self):
+        defn = RedactPii()
+        node = defn.instantiate(columns=["note"], categories=["not-a-real-category"])
+        with pytest.raises(CleanError):
+            defn.execute(node, inputs={"frame": self._frame()})
+
+    def test_codegen_matches_execute(self):
+        defn = RedactPii()
+        frame = self._frame()
+        node = defn.instantiate(columns=["note"])
+
+        executed = defn.execute(node, inputs={"frame": frame.copy()})["frame"]
+        scope = _run_codegen(defn, node, {"frame": frame.copy()})
+        generated = scope["frame"]
+        assert_frame_equal(executed, generated)
+
+    def test_result_is_inspectable(self):
+        defn = RedactPii()
+        node = defn.instantiate(columns=["note"])
+        out = defn.execute(node, inputs={"frame": self._frame()})
+        assert is_inspectable(out["frame"]) is True
+
+    def test_does_not_mutate_input(self):
+        defn = RedactPii()
+        frame = self._frame()
+        original = frame.copy()
+        node = defn.instantiate(columns=["note"])
+        defn.execute(node, inputs={"frame": frame})
+        pd.testing.assert_frame_equal(frame, original)
+
+    def test_presidio_engine_threaded_through_codegen_and_execute(self):
+        """The engine param reaches ef.clean.redact_pii identically via both paths (ADR 0002);
+        presidio isn't installed in this environment, so both paths raise the same typed
+        error for engine="presidio" rather than actually redacting -- still proves equivalence."""
+        import sys
+
+        from emergentflow.clean.errors import MissingOptionalDependencyError
+
+        if "presidio_analyzer" in sys.modules or "presidio_anonymizer" in sys.modules:
+            pytest.skip("presidio is actually installed in this environment; typed-error path N/A")
+
+        defn = RedactPii()
+        frame = self._frame()
+        node = defn.instantiate(columns=["note"], engine="presidio")
+
+        with pytest.raises(MissingOptionalDependencyError):
+            defn.execute(node, inputs={"frame": frame.copy()})
+        with pytest.raises(MissingOptionalDependencyError):
+            _run_codegen(defn, node, {"frame": frame.copy()})
+
+
 # ---------------------------------------------------------------------------
 # whole-graph wiring (Epic 2, Story 4)
 # ---------------------------------------------------------------------------
@@ -704,7 +1348,11 @@ class TestLoadParquet:
         node = defn.instantiate(path=parquet_file)
         frag = defn.preview(node)
         assert frag.imports == ["import emergentflow as ef"]
-        assert frag.body == f"frame = ef.data.load_parquet({parquet_file!r}, columns=None)"
+        assert frag.body == (
+            f"frame = ef.data.load_parquet("
+            f"{parquet_file!r}, columns=None, source_file=False, connection=None, "
+            f"expect_columns=None, expect_dtypes=None)"
+        )
 
     def test_codegen_matches_execute(self, parquet_file):
         """ADR 0002: execute == result of running the emitted code."""
@@ -746,7 +1394,9 @@ class TestLoadJson:
         frag = defn.preview(node)
         assert frag.imports == ["import emergentflow as ef"]
         assert frag.body == (
-            f"frame = ef.data.load_json({json_file!r}, orient='records', lines=False)"
+            f"frame = ef.data.load_json("
+            f"{json_file!r}, orient='records', lines=False, source_file=False, "
+            f"connection=None, expect_columns=None, expect_dtypes=None)"
         )
 
     def test_codegen_matches_execute(self, json_file):
@@ -937,3 +1587,146 @@ class TestMarkdownNote:
         # exec adds __builtins__; no user variables should be set.
         user_keys = {k for k in scope if not k.startswith("__")}
         assert user_keys == set()
+
+
+# ---------------------------------------------------------------------------
+# clean.merge
+# ---------------------------------------------------------------------------
+
+
+class TestMerge:
+    def test_to_spec(self):
+        spec = Merge().to_spec()
+        assert spec.type == "clean.merge"
+        assert spec.family == "clean"
+        assert spec.paradigm == Paradigm.FUNCTIONAL
+        in_ports = [p.name for p in spec.ports if p.direction == Direction.IN]
+        out_ports = [p.name for p in spec.ports if p.direction == Direction.OUT]
+        assert in_ports == ["left", "right"]
+        assert out_ports == ["frame"]
+
+    def test_codegen_matches_execute_on(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Merge()
+        left = pd.DataFrame({"user_id": [1, 2, 3], "name": ["a", "b", "c"]})
+        right = pd.DataFrame({"user_id": [2, 3, 4], "score": [10, 20, 30]})
+        node = defn.instantiate(on=["user_id"], how="inner")
+        executed = defn.execute(node, inputs={"left": left.copy(), "right": right.copy()})
+        scope = {"left": left.copy(), "right": right.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+    def test_codegen_matches_execute_left_on_right_on_how_left(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = Merge()
+        left = pd.DataFrame({"uid": [1, 2, 3]})
+        right = pd.DataFrame({"user_id": [2], "score": [10]})
+        node = defn.instantiate(left_on=["uid"], right_on=["user_id"], how="left")
+        executed = defn.execute(node, inputs={"left": left.copy(), "right": right.copy()})
+        scope = {"left": left.copy(), "right": right.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
+# clean.semi_join
+# ---------------------------------------------------------------------------
+
+
+class TestSemiJoin:
+    def test_to_spec(self):
+        spec = SemiJoin().to_spec()
+        assert spec.type == "clean.semi_join"
+        assert spec.family == "clean"
+        assert spec.paradigm == Paradigm.FUNCTIONAL
+        in_ports = [p.name for p in spec.ports if p.direction == Direction.IN]
+        out_ports = [p.name for p in spec.ports if p.direction == Direction.OUT]
+        assert in_ports == ["frame", "keys"]
+        assert out_ports == ["frame"]
+
+    def test_codegen_matches_execute_keep(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = SemiJoin()
+        frame = pd.DataFrame({"user_id": [1, 2, 3, 4], "event": ["a", "b", "c", "d"]})
+        keys = pd.DataFrame({"user_id": [2, 4]})
+        node = defn.instantiate(on=["user_id"], mode="keep")
+        executed = defn.execute(node, inputs={"frame": frame.copy(), "keys": keys.copy()})
+        scope = {"frame": frame.copy(), "keys": keys.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+    def test_codegen_matches_execute_exclude(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = SemiJoin()
+        frame = pd.DataFrame({"user_id": [1, 2, 3, 4], "event": ["a", "b", "c", "d"]})
+        keys = pd.DataFrame({"user_id": [2, 4]})
+        node = defn.instantiate(on=["user_id"], mode="exclude")
+        executed = defn.execute(node, inputs={"frame": frame.copy(), "keys": keys.copy()})
+        scope = {"frame": frame.copy(), "keys": keys.copy()}
+        _run_codegen(defn, node, scope)
+        assert scope["frame"].equals(executed["frame"])
+
+
+# ---------------------------------------------------------------------------
+# stats.test_proportions
+# ---------------------------------------------------------------------------
+
+
+class TestTestProportions:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = TestProportions()
+        np = pytest.importorskip("numpy")
+        rng = np.random.default_rng(42)
+        n_a, n_b = 50, 50
+        df = pd.DataFrame(
+            {
+                "group": ["a"] * n_a + ["b"] * n_b,
+                "success": (list(rng.binomial(1, 0.20, n_a)) + list(rng.binomial(1, 0.40, n_b))),
+            }
+        )
+        node = defn.instantiate(group_col="group", success_col="success")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["result"]
+        assert_frame_equal(generated, executed)
+
+
+# ---------------------------------------------------------------------------
+# stats.power_analysis
+# ---------------------------------------------------------------------------
+
+
+class TestPowerAnalysis:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = PowerAnalysis()
+        node = defn.instantiate(effect_size=0.5, nobs=100, alpha=0.05)
+        executed = defn.execute(node, inputs={})["result"]
+        scope = _run_codegen(defn, node, {})
+        generated = scope["result"]
+        assert_frame_equal(generated, executed)
+
+
+# ---------------------------------------------------------------------------
+# viz.plot_projection
+# ---------------------------------------------------------------------------
+
+
+class TestVizPlotProjection:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code."""
+        defn = VizPlotProjection()
+        df = pd.DataFrame(
+            {
+                "component_1": [1.0, 2.0, 3.0, 4.0],
+                "component_2": [4.0, 3.0, 2.0, 1.0],
+                "label": ["a", "a", "b", "b"],
+            }
+        )
+        node = defn.instantiate(color_col="label")
+        executed = defn.execute(node, inputs={"frame": df.copy()})["plot"]
+        scope = _run_codegen(defn, node, {"frame": df.copy()})
+        generated = scope["plot"]
+        assert generated.chart == executed.chart
+        assert generated.spec == executed.spec

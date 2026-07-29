@@ -29,7 +29,7 @@ class LoadJson(NodeDefinition):
     """Load a JSON file into a pandas DataFrame."""
 
     type = "data.load_json"
-    version = 2
+    version = 4
     family = "data"
     label = "Load JSON"
     category = "Ingest"
@@ -54,7 +54,10 @@ class LoadJson(NodeDefinition):
             type_token="str",
             required=True,
             label="JSON path",
-            help="Filesystem path to the .json file to load.",
+            help="Filesystem path to the .json file to load. Accepts a glob pattern (e.g. "
+            "`data/*.json`) to row-concatenate every match in sorted order, or an "
+            "object-store URI (`s3://`, `gs://`, `az://`) which requires the `[cloud]` "
+            "extra.",
             hints=ValidationHints(widget="file"),
         ),
         ParamSpec(
@@ -72,24 +75,88 @@ class LoadJson(NodeDefinition):
             help="Read the file as JSON Lines / newline-delimited JSON (.jsonl): one JSON "
             "object per line.",
         ),
+        ParamSpec(
+            name="source_file",
+            type_token="bool",
+            default=False,
+            label="Add source file column",
+            help="Add a 'source_file' column naming the file each row came from. Useful "
+            "when loading a glob pattern across many files.",
+            hints=ValidationHints(widget="checkbox"),
+        ),
+        ParamSpec(
+            name="connection",
+            type_token="str",
+            default=None,
+            label="Connection profile",
+            help="Name of a connection profile supplying object-store credentials for a "
+            "remote URI. A profile NAME only -- never a credential, which is resolved from "
+            "the profile's env-var names at load time. Ignored for local paths.",
+            hints=ValidationHints(widget="text"),
+        ),
+        ParamSpec(
+            name="expect_columns",
+            type_token="list[str]",
+            default=None,
+            label="Expected columns",
+            help="Optional list of column names that must be present after loading. A "
+            "missing column fails the load with a typed SchemaContractError naming every "
+            "mismatch at once, rather than surfacing as a KeyError further downstream.",
+            hints=ValidationHints(widget="json"),
+        ),
+        ParamSpec(
+            name="expect_dtypes",
+            type_token="dict",
+            default=None,
+            label="Expected dtypes",
+            help="Optional map of column name to expected pandas dtype string (e.g. "
+            "{'id': 'int64', 'name': 'object'}). Checked after loading; a mismatch fails "
+            "the load with a typed SchemaContractError.",
+            hints=ValidationHints(widget="json"),
+        ),
     ]
 
-    def _args(self, node: Node) -> tuple[str, str | None, bool]:
+    def _args(
+        self, node: Node
+    ) -> tuple[str, str | None, bool, bool, str | None, list[str] | None, dict[str, str] | None]:
         values = {p.name: p.value for p in node.params}
+        source_file = values.get("source_file", False)
+        if source_file is None:
+            source_file = False
         return (
             cast(str, values.get("path")),
             cast("str | None", values.get("orient")),
             cast(bool, values.get("lines", False)),
+            cast(bool, source_file),
+            cast("str | None", values.get("connection")),
+            cast("list[str] | None", values.get("expect_columns")),
+            cast("dict[str, str] | None", values.get("expect_dtypes")),
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        path, orient, lines = self._args(node)
+        path, orient, lines, source_file, connection, expect_columns, expect_dtypes = self._args(
+            node
+        )
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=f"{ctx.out_var('frame')} = ef.data.load_json("
-            f"{path!r}, orient={orient!r}, lines={lines!r})",
+            f"{path!r}, orient={orient!r}, lines={lines!r}, source_file={source_file!r}, "
+            f"connection={connection!r}, expect_columns={expect_columns!r}, "
+            f"expect_dtypes={expect_dtypes!r})",
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        path, orient, lines = self._args(node)
-        return {"frame": load_json(path, orient=orient, lines=lines)}
+        path, orient, lines, source_file, connection, expect_columns, expect_dtypes = self._args(
+            node
+        )
+        return {
+            "frame": load_json(
+                path,
+                orient=orient,
+                lines=lines,
+                source_file=source_file,
+                connection=connection,
+                expect_columns=expect_columns,
+                expect_dtypes=expect_dtypes,
+            )
+        }

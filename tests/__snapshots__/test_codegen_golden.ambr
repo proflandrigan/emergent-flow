@@ -7,7 +7,14 @@
   
   
   def main() -> dict[str, object]:
-      load_csv_frame = ef.data.load_csv("sample.csv", encoding="utf-8")
+      load_csv_frame = ef.data.load_csv(
+          "sample.csv",
+          encoding="utf-8",
+          source_file=False,
+          connection=None,
+          expect_columns=None,
+          expect_dtypes=None,
+      )
       impute_missing_frame = ef.clean.impute_missing(load_csv_frame, strategy="median", columns=None)
       anova_result = ef.stats.anova(
           impute_missing_frame, group_col="cohort", value_col="score", alpha=0.05
@@ -44,7 +51,14 @@
   
   
   def main() -> dict[str, object]:
-      load_csv_frame = ef.data.load_csv("examples/vertical_slice/sample.csv", encoding="utf-8")
+      load_csv_frame = ef.data.load_csv(
+          "examples/vertical_slice/sample.csv",
+          encoding="utf-8",
+          source_file=False,
+          connection=None,
+          expect_columns=None,
+          expect_dtypes=None,
+      )
       impute_missing_frame = ef.clean.impute_missing(load_csv_frame, strategy="median", columns=None)
       anova_result = ef.stats.anova(
           impute_missing_frame, group_col="cohort", value_col="score", alpha=0.05

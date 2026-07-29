@@ -80,6 +80,19 @@ def test_exported_script_is_ruff_clean(tmp_path: pathlib.Path) -> None:
     ast.parse(result.script_path.read_text())
 
 
+def test_exported_script_includes_reproducibility_header_when_present(
+    tmp_path: pathlib.Path,
+) -> None:
+    """A graph with a data.* loader node gets a `# Reproducibility:` comment in the exported
+    script (Epic 16, Story 18) -- the banner's existing prefix is untouched (see the adjacent
+    startswith assertion in test_export_writes_script_and_requirements)."""
+    graph = load_graph(SLICE_DIR / "pipeline.json")
+    result = ef.export_script(graph, tmp_path)
+    script_text = result.script_path.read_text()
+    assert "# Reproducibility:" in script_text
+    assert "content_hashes:" in script_text
+
+
 def test_exported_script_reads_like_demo(tmp_path: pathlib.Path) -> None:
     """The exported script contains the same SDK calls, in the same order, as demo.py."""
     graph = load_graph(SLICE_DIR / "pipeline.json")

@@ -189,3 +189,42 @@ test("Clicking the X button in expanded modal closes it", () => {
   fireEvent.click(screen.getByTestId("overlay-modal-close"));
   expect(screen.queryByTestId("overlay-modal-close")).not.toBeInTheDocument();
 });
+
+test("clicking the Lineage tab shows the no-selection empty state", () => {
+  render(<Inspector />);
+  fireEvent.click(screen.getByTestId("inspector-tab-lineage"));
+  expect(
+    screen.getByTestId("lineage-empty-no-selection"),
+  ).toBeInTheDocument();
+  expect(screen.queryByTestId("inspector-empty")).not.toBeInTheDocument();
+});
+
+test("the Lineage tab traces the selected node without a prior run", async () => {
+  const nodeId = useGraphStore
+    .getState()
+    .addNodeFromSpec(fakeSpec, { x: 0, y: 0 });
+  useSelectionStore.setState({ nodes: { [nodeId]: true }, edges: {} });
+
+  // A fresh Response per call: a single Response instance can only have its body read once,
+  // and the panel may re-fetch when the graph store notifies.
+  vi.spyOn(globalThis, "fetch").mockImplementation(
+    async () =>
+      new Response(
+        JSON.stringify({
+          lineage: {
+            target_node_id: nodeId,
+            nodes: [{ node_id: nodeId, node_type: "t", label: "L" }],
+            edges: [],
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+  );
+
+  render(<Inspector />);
+  fireEvent.click(screen.getByTestId("inspector-tab-lineage"));
+
+  await waitFor(() =>
+    expect(screen.getByTestId("lineage-target")).toHaveTextContent("L"),
+  );
+});

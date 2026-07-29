@@ -143,6 +143,12 @@ def fit_two_tower(
     both the compiled code (via the dedicated ``RecommendFitTwoTower`` node) and ``execute``
     reach this only through this function, ADR-0002 equivalence holds by construction. Never
     mutates ``interactions``, ``item_features``, or ``user_features``.
+
+    ``item_features`` (optional) is one row per item keyed by an ``item_id`` column (or the
+    ``item_id_col`` param) plus numeric feature columns; ``user_features`` is the same keyed by a
+    ``user_id`` column (``user_id_col``). Only numeric columns feed the towers -- non-numeric
+    columns are ignored; multi-hot indicator columns from ``ef.clean.encode_lists`` are a natural
+    fit. Each id may appear at most once per feature frame.
     """
     from emergentflow.recommend.catalog import _fit_two_tower_impl  # noqa: PLC0415
 

@@ -28,6 +28,7 @@ import { Select } from "../ui/Select";
 import { CodeEditor } from "./CodeEditor";
 import { ColumnSelect, ColumnMultiSelect } from "./ColumnSelect";
 import { QueryBuilderPreview } from "./QueryBuilderPreview";
+import { JoinKeyField } from "./JoinKeyField";
 
 // Node types whose `params` dict param holds curated constructor kwargs for a choice param
 // (Epic 8 archetypes + recommend.fit). Restricted to an explicit config map rather than inferred
@@ -63,6 +64,12 @@ const CURATED_PARAM_NODES: Record<string, CuratedParamConfig> = {
   },
   "recommend.fit": { choiceParam: "algorithm", dictParam: "params", source: "recommenders" },
 };
+
+const JOIN_KEY_NODES: Record<string, { leftPort: string; rightPort: string }> = {
+  "clean.merge": { leftPort: "left", rightPort: "right" },
+  "clean.semi_join": { leftPort: "frame", rightPort: "keys" },
+};
+const JOIN_KEY_PARAMS = new Set(["on", "left_on", "right_on"]);
 
 function resolveCatalogParam(
   meta: CatalogParam | undefined,
@@ -156,6 +163,34 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
         }
       >
         <option value="" />
+        {choices.map((choice) => (
+          <option key={choice} value={choice}>
+            {choice}
+          </option>
+        ))}
+      </Select>
+    );
+  } else if (kind === "multiselect") {
+    // A list-typed param with choices: a native multi-select writing the selection straight
+    // back as an array. It deliberately does NOT route through parseValue -- the selected
+    // options are already the typed value, and stringifying them just to re-split on "," is
+    // both lossy and pointless.
+    const choices = catalogParam.hints?.choices ?? [];
+    const selected = Array.isArray(param.value) ? param.value.map(String) : [];
+    widget = (
+      <Select
+        multiple
+        size={Math.min(Math.max(choices.length, 2), 8)}
+        data-testid={testId}
+        value={selected}
+        onChange={(e) =>
+          setParam(
+            node.id,
+            param.name,
+            Array.from(e.target.selectedOptions, (o) => o.value),
+          )
+        }
+      >
         {choices.map((choice) => (
           <option key={choice} value={choice}>
             {choice}
@@ -611,6 +646,19 @@ export function ConfigForm({ node }: { node: NodeModel }): JSX.Element {
     <div data-testid="config-form">
       {node.params.map((param) => {
         const meta = spec?.params.find((p) => p.name === param.name);
+        const joinKeyPorts = JOIN_KEY_NODES[node.type];
+        if (joinKeyPorts && JOIN_KEY_PARAMS.has(param.name)) {
+          return (
+            <JoinKeyField
+              key={param.name}
+              node={node}
+              param={param}
+              meta={meta}
+              leftPort={joinKeyPorts.leftPort}
+              rightPort={joinKeyPorts.rightPort}
+            />
+          );
+        }
         if (curated && curatedEntry && param.name === curated.dictParam) {
           return (
             <EstimatorParamsField

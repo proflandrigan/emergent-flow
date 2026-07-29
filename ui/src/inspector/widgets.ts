@@ -5,7 +5,7 @@
 
 import type { CatalogParam } from "../catalog/types";
 
-export type WidgetKind = "select" | "checkbox" | "number" | "text" | "list" | "json" | "sql" | "code" | "connection" | "column" | "markdown";
+export type WidgetKind = "select" | "multiselect" | "checkbox" | "number" | "text" | "list" | "json" | "sql" | "code" | "connection" | "column" | "markdown";
 
 // True when the type token is a list/sequence, e.g. "list" or "list[str]".
 export function isListType(typeToken: string): boolean {
@@ -57,6 +57,14 @@ export function widgetForParam(param: CatalogParam): WidgetKind {
   if (param.hints?.widget === "column") {
     return "column";
   }
+  // A list-typed param that also declares choices (e.g. ml.compare_models' `estimators`,
+  // list[str] over the estimator catalog) needs to pick SEVERAL of the choices. Checking
+  // choices first and returning a single "select" would let the user pick only one and would
+  // store it as a bare string, which the backend then iterates character-by-character
+  // ("unknown estimator 'R'"). Match the list shape first, keeping the choice affordance.
+  if (param.hints?.choices && isListType(param.type_token)) {
+    return "multiselect";
+  }
   if (param.hints?.choices) {
     return "select";
   }
@@ -106,7 +114,7 @@ export function parseValue(param: CatalogParam, raw: string): unknown {
     const n = Number(raw);
     return Number.isNaN(n) ? null : n;
   }
-  if (kind === "list") {
+  if (kind === "list" || kind === "multiselect") {
     const items = raw
       .split(",")
       .map((s) => s.trim())
@@ -167,6 +175,28 @@ export function validateValue(
     }
     if (hints?.max != null && n > hints.max) {
       return `Must be ≤ ${hints.max}`;
+    }
+    return null;
+  }
+
+  if (kind === "multiselect") {
+    // Length-bounded like any other list, plus every selected item must be a known choice --
+    // the membership check the single "select" branch below does, applied per item instead of
+    // to the whole array stringified (which flagged a perfectly valid multi-item value).
+    const arr = Array.isArray(value) ? value : [];
+    if (!Array.isArray(value)) {
+      return "Must be a list";
+    }
+    if (hints?.min_length != null && arr.length < hints.min_length) {
+      return `Must have at least ${hints.min_length} items`;
+    }
+    if (hints?.max_length != null && arr.length > hints.max_length) {
+      return `Must have at most ${hints.max_length} items`;
+    }
+    const choices = hints?.choices ?? [];
+    const unknown = arr.filter((item) => !choices.includes(String(item)));
+    if (unknown.length > 0) {
+      return `Unknown: ${unknown.map(String).join(", ")}`;
     }
     return null;
   }

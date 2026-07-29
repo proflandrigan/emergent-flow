@@ -5,6 +5,7 @@
 import type { CSSProperties } from "react";
 
 import type { Payload } from "../store/execution";
+import { ReportView } from "./ReportView";
 
 const mutedStyle: CSSProperties = { color: "var(--text-secondary)" };
 
@@ -83,6 +84,9 @@ export function PayloadView({
     }
 
     case "record":
+      if (payload.type === "Report") {
+        return <ReportView payload={payload} />;
+      }
       return (
         <div data-testid="payload-record">
           <div style={{ fontWeight: 600 }}>{payload.type}</div>

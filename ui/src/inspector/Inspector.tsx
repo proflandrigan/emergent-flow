@@ -17,10 +17,11 @@ import { OverlayModal } from "../ui/OverlayModal";
 import { Segmented } from "../ui/Segmented";
 import { CodePanel } from "./CodePanel";
 import { ConfigForm } from "./ConfigForm";
+import { LineagePanel } from "./LineagePanel";
 import { PayloadView } from "./PayloadView";
 import { StepsPanel } from "./StepsPanel";
 
-type InspectorTab = "config" | "code" | "results" | "steps";
+type InspectorTab = "config" | "code" | "results" | "steps" | "lineage";
 
 function formatAgo(ms: number): string {
   const secs = Math.max(0, Math.round((Date.now() - ms) / 1000));
@@ -106,6 +107,11 @@ export function Inspector(): JSX.Element {
             label: "Results",
             testId: "inspector-tab-results",
           },
+          {
+            value: "lineage",
+            label: "Lineage",
+            testId: "inspector-tab-lineage",
+          },
         ]}
         value={tab}
         onChange={setTab}
@@ -138,6 +144,9 @@ export function Inspector(): JSX.Element {
         />
       );
     }
+    // Lineage is traced from the graph shape alone, so unlike Results it needs no prior run --
+    // the panel POSTs to /lineage for whichever node is selected (Epic 16, Story 23).
+    if (tab === "lineage") return <LineagePanel nodeId={nodeId} />;
     return renderResults();
   }
 

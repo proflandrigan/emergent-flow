@@ -1,0 +1,7 @@
+{
+  "body": "{\"rows\":[{\"user_id\":\"u1\",\"group\":\"control\",\"signed_up\":\"2026-01-05\",\"converted\":1},{\"user_id\":\"u2\",\"group\":\"control\",\"signed_up\":\"2026-01-06\",\"converted\":0},{\"user_id\":\"u3\",\"group\":\"control\",\"signed_up\":\"2026-01-07\",\"converted\":0},{\"user_id\":\"u4\",\"group\":\"variant\",\"signed_up\":\"2026-01-08\",\"converted\":1},{\"user_id\":\"u5\",\"group\":\"variant\",\"signed_up\":\"2026-01-09\",\"converted\":1},{\"user_id\":\"u6\",\"group\":\"variant\",\"signed_up\":\"2026-01-10\",\"converted\":0}]}",
+  "elapsed_ms": null,
+  "headers": [],
+  "status": 200,
+  "url": ""
+}

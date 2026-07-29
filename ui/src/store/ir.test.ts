@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { fromIR, toIR } from "./ir";
+import type { Graph } from "../generated/ir";
 import type { CanvasModel } from "./model";
 
 function emptyModel(): CanvasModel {
@@ -152,5 +153,96 @@ describe("toIR", () => {
     };
 
     expect(fromIR(toIR(model))).toEqual(model);
+  });
+});
+
+describe("composite/module subgraph fidelity", () => {
+  // A DECLARATIVE graph's whole substance lives in the `nn.module` node's `subgraph`. The
+  // canvas doesn't render subgraphs, but `fromIR`/`toIR` sit on every path that moves a graph
+  // in and out of the store -- file import/export, session join/push, accepting an agent
+  // proposal -- so dropping the field silently destroyed the model and left a graph that
+  // `compile_to_code` rejects with "nn.module node ... has no subgraph to compile."
+  const subgraph = {
+    paradigm: "declarative" as const,
+    name: "SimpleClassifier body",
+    nodes: {
+      "n-linear": {
+        id: "n-linear",
+        type: "nn.linear",
+        paradigm: "declarative" as const,
+        position: { x: 0, y: 0 },
+        params: [{ name: "out_features", type_token: "int", value: 64 }],
+        ports: [],
+      },
+    },
+    edges: {},
+  };
+
+  function moduleGraph(): Graph {
+    return {
+      paradigm: "declarative",
+      nodes: {
+        "n-module": {
+          id: "n-module",
+          type: "nn.module",
+          label: "Net",
+          paradigm: "declarative",
+          position: { x: 0, y: 0 },
+          params: [],
+          ports: [],
+          subgraph,
+        },
+      },
+      edges: {},
+    };
+  }
+
+  test("an nn.module's subgraph survives fromIR -> toIR", () => {
+    const graph = moduleGraph();
+    const roundTripped = toIR(fromIR(graph));
+
+    // Deep-equal, not just present: every layer, param and edge inside the module must come
+    // back untouched, since the canvas has no way to reconstruct them.
+    expect(roundTripped.nodes!["n-module"].subgraph).toEqual(subgraph);
+  });
+
+  test("an explicit `subgraph: null` is preserved as null, not dropped", () => {
+    const graph: Graph = {
+      paradigm: "functional",
+      nodes: {
+        "n-1": {
+          id: "n-1",
+          type: "data.load_csv",
+          paradigm: "functional",
+          position: { x: 0, y: 0 },
+          params: [],
+          ports: [],
+          subgraph: null,
+        },
+      },
+      edges: {},
+    };
+
+    expect(toIR(fromIR(graph)).nodes!["n-1"]).toHaveProperty("subgraph", null);
+  });
+
+  test("a canvas-built node with no subgraph key does not gain one", () => {
+    const model: CanvasModel = {
+      paradigm: "functional",
+      nodes: {
+        "n-1": {
+          id: "n-1",
+          type: "data.load_csv",
+          paradigm: "functional",
+          position: { x: 0, y: 0 },
+          params: [],
+          ports: [],
+          groupId: null,
+        },
+      },
+      edges: {},
+    };
+
+    expect(toIR(model).nodes!["n-1"]).not.toHaveProperty("subgraph");
   });
 });

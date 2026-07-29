@@ -418,8 +418,14 @@ def _recommend_popularity_segmented(
 
     rows: list[dict[str, Any]] = []
     for uid in user_ids:
-        seg = user_to_segment.get(uid)
-        scores = segment_scores.get(seg, global_scores)
+        # `.get(uid)` alone can't tell "uid absent from user_to_segment" apart from "uid
+        # present with an explicit segment of None" -- both default to None. Check
+        # membership explicitly so a genuinely-absent user always falls back to
+        # global_scores, even if some other user was explicitly assigned segment None.
+        if uid in user_to_segment:
+            scores = segment_scores.get(user_to_segment[uid], global_scores)
+        else:
+            scores = global_scores
         sorted_indices = np.argsort(-scores).tolist()
 
         candidates = sorted_indices

@@ -5,20 +5,30 @@
     "unknown": "warn",
     "wildcard": "any"
   },
-  "subtypes": [],
+  "subtypes": [
+    [
+      "DocumentFrame",
+      "DataFrame"
+    ]
+  ],
   "top": "any",
   "types": [
     "AnovaResult",
     "ClassifierResult",
+    "CohortRetentionResult",
     "CostEstimate",
+    "CrosstabResult",
     "DataFrame",
     "DecomposeResult",
+    "DimensionReductionResult",
+    "DocumentFrame",
     "EvalResult",
     "EvaluationResult",
     "ForecastResult",
     "HTML",
     "InteractionMatrix",
     "LLMResponse",
+    "Lineage",
     "Model",
     "ModelSummary",
     "PlotSpec",
@@ -26,6 +36,7 @@
     "PromptSpec",
     "RecommendationResult",
     "Recommender",
+    "Report",
     "Schema",
     "StatsModel",
     "TTestResult",

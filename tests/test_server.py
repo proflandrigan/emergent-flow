@@ -38,6 +38,7 @@ from emergentflow.server import (
     execute_node,
     get_catalog,
     get_schema,
+    lineage_for_node,
     validate_graph,
 )
 from emergentflow.server import cache as cache_mod
@@ -231,6 +232,15 @@ def test_validate_graph_returns_json_native_diagnostics() -> None:
     out = validate_graph(_load_csv_graph())
     assert "diagnostics" in out
     json.dumps(out)  # JSON-native: encodes without a custom encoder
+
+
+def test_lineage_for_node_returns_json_native_lineage() -> None:
+    graph = _load_csv_graph()
+    out = lineage_for_node({"graph": graph, "node_id": "n-load"})
+    assert "lineage" in out
+    json.dumps(out)  # JSON-native: encodes without a custom encoder
+    assert out["lineage"]["target_node_id"] == "n-load"
+    assert [n["node_id"] for n in out["lineage"]["nodes"]] == ["n-load"]
 
 
 def test_execute_graph_runs_in_process_and_is_json_safe() -> None:
