@@ -49,17 +49,17 @@ class ReportExportResult:
     pdf_path: pathlib.Path | None
 
 
-def _slug_filename(name: str | None) -> str:
-    """Derive a safe snake_case .py stem from a graph name; fall back to 'pipeline'.
+def _slug_filename(name: str | None, *, default: str = "pipeline") -> str:
+    """Derive a safe snake_case filename stem from *name*; fall back to *default*.
 
-    The stem is a valid Python identifier so the exported file is importable by
+    The stem is a valid Python identifier so an exported script is importable by
     its bare module name (e.g. a graph named "2024 Report" -> ``_2024_report``,
     not ``2024_report`` which is not a legal module name), mirroring the
     identifier discipline in :mod:`emergentflow.codegen.naming`.
     """
     slug = re.sub(r"[^0-9a-zA-Z]+", "_", (name or "").strip().lower()).strip("_")
     if not slug:
-        return "pipeline"
+        return default
     if slug[0].isdigit():
         slug = f"_{slug}"
     if keyword.iskeyword(slug) or keyword.issoftkeyword(slug):
@@ -152,7 +152,7 @@ def export_report(
     dest_dir = pathlib.Path(dest)
     dest_dir.mkdir(parents=True, exist_ok=True)
 
-    stem = _slug_filename(name if name is not None else report.meta.title)
+    stem = _slug_filename(name if name is not None else report.meta.title, default="report")
 
     html_path = dest_dir / f"{stem}.html"
     html_path.write_text(report.html, encoding="utf-8")

@@ -124,7 +124,7 @@ def validate_schema(
     lines = []
     if missing:
         lines.append(f"missing columns: {missing}")
-        lines.append(f"present columns: {sorted(frame.columns)}")
+        lines.append(f"present columns: {sorted(set(frame.columns))}")
     if extra:
         lines.append(f"unexpected extra columns: {extra}")
     if mistyped:
