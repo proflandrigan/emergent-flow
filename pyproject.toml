@@ -165,6 +165,33 @@ fuzzy = [
 umap = [
     "umap-learn>=0.5,<1",
 ]
+# `pip install emergentflow[report-pdf]` enables PDF rendering for `ef.research.build_report`
+# (`render_pdf=True`, Epic 16, Story 16), via weasyprint (BSD-3-Clause). Kept optional so a
+# bare SDK install stays light (ADR 0007) and never pulls weasyprint's native Pango/cairo
+# system dependencies; the base install always produces the HTML render. A `render_pdf=True`
+# call in a base install raises a typed
+# MissingOptionalDependencyError("emergentflow[report-pdf]"), never an opaque ImportError.
+report-pdf = [
+    "weasyprint>=62,<63",
+]
+# `pip install emergentflow[docs]` enables PDF parsing for `ef.data.load_documents`
+# (Epic 16, Story 20), via pypdf (BSD-3-Clause / MIT-equivalent permissive). Kept optional so a
+# bare SDK install stays light (ADR 0007); .txt/.md files load without this extra. A .pdf file
+# in a base install raises a typed MissingOptionalDependencyError("emergentflow[docs]"), never
+# an opaque ImportError.
+docs = [
+    "pypdf>=4,<5",
+]
+# `pip install emergentflow[pii]` enables NER-based PII detection for `ef.clean.redact_pii`
+# (`engine="presidio"`, Epic 16, Story 21), via presidio-analyzer + presidio-anonymizer (both
+# MIT). Kept optional so a bare SDK install stays light (ADR 0007) and never pulls a spaCy NER
+# model; regex-based detection (`engine="regex"`, the default) works without this extra. An
+# `engine="presidio"` call in a base install raises a typed
+# MissingOptionalDependencyError("emergentflow[pii]"), never an opaque ImportError.
+pii = [
+    "presidio-analyzer>=2,<3",
+    "presidio-anonymizer>=2,<3",
+]
 # `pip install emergentflow[excel]` enables `ef.data.load_excel`. openpyxl is MIT
 # (compatible with this SDK's Apache-2.0 license; not GPL). Kept optional so a bare
 # SDK install stays light (ADR 0007); a `load_excel` call in a base install raises a
@@ -335,5 +362,18 @@ module = [
     # `ef.ml.reduce_dimensions`'s `method="umap"` branch, absent from the bare
     # `uv sync --locked` CI env (like torch/litellm/pymc).
     "umap.*",
+    # The optional `emergentflow[report-pdf]` extra (Epic 16): weasyprint is imported lazily
+    # inside `ef.research.build_report`'s `render_pdf=True` branch, absent from the bare
+    # `uv sync --locked` CI env (like torch/litellm/pymc).
+    "weasyprint.*",
+    # The optional `emergentflow[docs]` extra (Epic 16): pypdf is imported lazily inside
+    # `ef.data.load_documents`'s PDF-parsing branch, absent from the bare `uv sync --locked`
+    # CI env (like torch/litellm/pymc).
+    "pypdf.*",
+    # The optional `emergentflow[pii]` extra (Epic 16): presidio-analyzer/presidio-anonymizer
+    # are imported lazily inside `ef.clean.redact_pii`'s `engine="presidio"` branch, absent
+    # from the bare `uv sync --locked` CI env (like torch/litellm/pymc).
+    "presidio_analyzer.*",
+    "presidio_anonymizer.*",
 ]
 ignore_missing_imports = true

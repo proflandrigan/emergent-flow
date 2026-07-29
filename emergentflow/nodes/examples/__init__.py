@@ -16,7 +16,9 @@ re-implementing them inline.
 
 from .anova import Anova
 from .apply_estimator import ApplyEstimator
+from .assert_data import AssertData
 from .auto_eda import AutoEda
+from .build_report import BuildReport
 from .cast_types import CastTypes
 from .chi_square import ChiSquare
 from .clean_text import CleanText
@@ -29,6 +31,7 @@ from .correlation import Correlation
 from .cross_validate import CrossValidate
 from .crosstab import Crosstab
 from .custom_code import CustomCode
+from .data_dictionary import DataDictionary
 from .deduplicate import Deduplicate
 from .derive_column import DeriveColumn
 from .describe import Describe
@@ -79,6 +82,7 @@ from .llm_call import LlmCall
 from .llm_prompt import LlmPrompt
 from .llm_prompt_from_file import LlmPromptFromFile
 from .load_csv import LoadCsv
+from .load_documents import LoadDocuments
 from .load_excel import LoadExcel
 from .load_google_sheet import LoadGoogleSheet
 from .load_json import LoadJson
@@ -107,6 +111,7 @@ from .recommend_hybrid_weighted import HybridWeighted
 from .recommend_recommend import Recommend
 from .recommend_similar_items import SimilarItems
 from .recommend_temporal_split import RecommendTemporalSplit
+from .redact_pii import RedactPii
 from .reduce_dimensions import ReduceDimensions
 from .report import GenerateHtmlSummary
 from .reshape import Reshape
@@ -148,7 +153,9 @@ from .wilcoxon import Wilcoxon
 __all__ = [
     "Anova",
     "ApplyEstimator",
+    "AssertData",
     "AutoEda",
+    "BuildReport",
     "CastTypes",
     "ChiSquare",
     "CleanText",
@@ -161,6 +168,7 @@ __all__ = [
     "Crosstab",
     "CrossValidate",
     "CustomCode",
+    "DataDictionary",
     "Deduplicate",
     "DeriveColumn",
     "Describe",
@@ -214,6 +222,7 @@ __all__ = [
     "LlmPrompt",
     "LlmPromptFromFile",
     "LoadCsv",
+    "LoadDocuments",
     "LoadExcel",
     "LoadGoogleSheet",
     "LoadJson",
@@ -239,6 +248,7 @@ __all__ = [
     "RecommendFit",
     "RecommendFitTwoTower",
     "RecommendTemporalSplit",
+    "RedactPii",
     "ReduceDimensions",
     "Reshape",
     "SampleRows",

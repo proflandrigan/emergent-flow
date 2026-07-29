@@ -18,6 +18,7 @@ from emergentflow.server.service import (
     get_catalog,
     get_schema,
     label_eval,
+    lineage_for_node,
     validate_graph,
 )
 
@@ -33,5 +34,6 @@ __all__ = [
     "get_catalog",
     "get_schema",
     "label_eval",
+    "lineage_for_node",
     "validate_graph",
 ]

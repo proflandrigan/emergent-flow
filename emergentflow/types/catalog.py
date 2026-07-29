@@ -230,3 +230,33 @@ register_type(
         ),
     )
 )
+register_type(
+    TypeDef(
+        token="Lineage",
+        description=(
+            "The upstream source->transform->artifact chain traced for a node "
+            "(ef.research.trace_lineage): inspect-only, not a data-flow port type."
+        ),
+    )
+)
+register_type(
+    TypeDef(
+        token="Report",
+        description=(
+            "A composed, multi-section report (ef.research.build_report): markdown/HTML "
+            "text, PlotSpec figures, tidy tables, and model summaries, rendered to a "
+            "self-contained HTML document (and optionally PDF)."
+        ),
+    )
+)
+register_type(
+    TypeDef(
+        token="DocumentFrame",
+        description=(
+            "A tagged DataFrame produced by ef.data.load_documents (Epic 16, Story 20): "
+            "(doc_id, chunk_id, chunk_index, text, source_path, char_count) rows, one per "
+            "chunk. Not embeddings -- no vector/retrieval semantics; wire into Epic 11 for "
+            "that."
+        ),
+    )
+)

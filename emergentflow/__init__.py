@@ -34,6 +34,7 @@ _LAZY_FAMILIES = frozenset(
         "viz",
         "timeseries",
         "recommend",
+        "research",
     }
 )
 
@@ -49,6 +50,7 @@ _LAZY_NAMESPACES = _LAZY_FAMILIES | frozenset({"codegen"})
 _LAZY_ENTRY_POINTS = {
     "compile_to_code": ("emergentflow.codegen.compiler", "compile_to_code"),
     "execute": ("emergentflow.codegen.executor", "execute"),
+    "export_report": ("emergentflow.codegen.export", "export_report"),
     "export_script": ("emergentflow.codegen.export", "export_script"),
     "validate": ("emergentflow.codegen.validation", "validate"),
     "apply_type_compatibility": ("emergentflow.codegen.validation", "apply_type_compatibility"),
@@ -72,6 +74,7 @@ if TYPE_CHECKING:  # let type-checkers resolve ef.data, ef.codegen, ... statical
         ml,
         recommend,
         reports,
+        research,
         script,
         stats,
         timeseries,
@@ -80,7 +83,7 @@ if TYPE_CHECKING:  # let type-checkers resolve ef.data, ef.codegen, ... statical
     from emergentflow.codegen.compiler import compile_to_code
     from emergentflow.codegen.diagnostics_schema import diagnostics_json_schema
     from emergentflow.codegen.executor import execute
-    from emergentflow.codegen.export import export_script
+    from emergentflow.codegen.export import export_report, export_script
     from emergentflow.codegen.validation import apply_type_compatibility, validate
     from emergentflow.nodes.catalog import export_catalog
     from emergentflow.types.rules_artifact import build_rules_artifact
@@ -100,6 +103,7 @@ __all__ = [
     "ml",
     "recommend",
     "reports",
+    "research",
     "script",
     "llm",
     "eval",
@@ -108,6 +112,7 @@ __all__ = [
     "codegen",
     "compile_to_code",
     "execute",
+    "export_report",
     "export_script",
     "validate",
     "apply_type_compatibility",

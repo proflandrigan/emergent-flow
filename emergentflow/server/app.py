@@ -108,6 +108,7 @@ from emergentflow.server.service import (
     get_session_event_schema,
     inspect_graph,
     label_eval,
+    lineage_for_node,
     list_connections,
     list_knowledge,
     save_knowledge,
@@ -187,6 +188,7 @@ _POST_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "/execute_node": execute_node,
     "/inspect": inspect_graph,
     "/knowledge": save_knowledge,
+    "/lineage": lineage_for_node,
     "/validate": validate_graph,
 }
 

@@ -30,6 +30,7 @@ from .errors import (
     MissingOptionalDependencyError,
     UnknownColumnError,
 )
+from .pii import DEFAULT_MASK, PII_CATEGORIES, PRESIDIO_ENTITY_MAP, REDACT_ENGINES, redact_pii
 from .reshaping import PIVOT_AGGFUNCS, RESHAPE_MODES, reshape
 from .sampling import FUZZY_HOWS, FUZZY_SCORERS, SAMPLE_MODES, fuzzy_join, sample_rows
 from .text_dates import DATE_COMPONENTS, DATE_ERRORS, TEXT_OPERATIONS, clean_text, parse_dates
@@ -66,6 +67,11 @@ __all__ = [
     "parse_dates",
     "sample_rows",
     "fuzzy_join",
+    "redact_pii",
+    "PII_CATEGORIES",
+    "PRESIDIO_ENTITY_MAP",
+    "REDACT_ENGINES",
+    "DEFAULT_MASK",
     "TEXT_OPERATIONS",
     "DATE_COMPONENTS",
     "DATE_ERRORS",

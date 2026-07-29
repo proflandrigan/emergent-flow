@@ -314,3 +314,47 @@ def auto_eda(df: pd.DataFrame, *, columns: list[str] | None = None) -> AutoEdaRe
             "missingness": missingness_plot,
         },
     )
+
+
+@public_op(name="ef.stats.data_dictionary")
+def data_dictionary(
+    df: pd.DataFrame,
+    *,
+    columns: list[str] | None = None,
+    top_n: int = 5,
+    notes: dict[str, str] | None = None,
+) -> pd.DataFrame:
+    """Auto-emit a documented schema (data dictionary) for *df*, one row per column.
+
+    Epic 16, Story 21. Pairs with :func:`auto_eda`: reuses :func:`profile` for the
+    type/null-rate/cardinality/range columns (``dtype``/``count``/``n_missing``/
+    ``pct_missing``/``n_unique``/``cardinality``, plus ``mean``/``std``/``min``/``max``/
+    ``skew``/``kurtosis`` for numeric columns, NaN for non-numeric) rather than recomputing
+    them, and adds two columns of its own:
+
+    - ``top_values``: the *top_n* most frequent values in that column, as a JSON-native list
+      of ``{"value": str, "count": int}`` dicts, most frequent first. Values are stringified
+      so the column stays JSON-native regardless of the source dtype.
+    - ``notes``: an optional caller-supplied note per column (``notes.get(column)``, ``None``
+      if not given for that column or *notes* is ``None``) -- free-text documentation a user
+      attaches to a column, carried through untouched.
+
+    With ``columns`` given, only those columns are profiled (each must exist, same contract as
+    :func:`profile`). Never mutates ``df``.
+    """
+    base = profile(df, columns=columns)
+    target = df[columns] if columns is not None else df
+
+    top_values: list[list[dict[str, Any]]] = []
+    note_values: list[str | None] = []
+    for col in base["column"]:
+        counts = target[col].value_counts().head(top_n)
+        top_values.append(
+            [{"value": str(value), "count": int(count)} for value, count in counts.items()]
+        )
+        note_values.append((notes or {}).get(col))
+
+    result = base.copy()
+    result["top_values"] = top_values
+    result["notes"] = note_values
+    return result

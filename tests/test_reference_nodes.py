@@ -6,11 +6,14 @@ result as running the code emitted by ``codegen``.
 """
 
 import csv
+import pathlib
 
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
 
+from emergentflow.api import is_inspectable
+from emergentflow.clean.errors import CleanError
 from emergentflow.codegen.context import build_codegen_context
 from emergentflow.codegen.naming import build_name_map
 from emergentflow.codegen.wiring import build_wiring_map
@@ -21,12 +24,15 @@ from emergentflow.ml import train_regressor
 from emergentflow.nodes.examples import (
     Anova,
     ApplyEstimator,
+    AssertData,
+    BuildReport,
     CastTypes,
     ChiSquare,
     CohortRetention,
     CorrectPvalues,
     Correlation,
     Crosstab,
+    DataDictionary,
     Describe,
     DropMissing,
     EncodeLists,
@@ -39,6 +45,7 @@ from emergentflow.nodes.examples import (
     ImputeMissing,
     Kruskal,
     LoadCsv,
+    LoadDocuments,
     LoadJson,
     LoadParquet,
     LoadSample,
@@ -47,6 +54,7 @@ from emergentflow.nodes.examples import (
     Merge,
     PowerAnalysis,
     Predict,
+    RedactPii,
     ReduceDimensions,
     SelectColumns,
     SemiJoin,
@@ -60,6 +68,7 @@ from emergentflow.nodes.examples import (
     VizPlotProjection,
     Wilcoxon,
 )
+from emergentflow.research.errors import DataQualityError
 
 
 @pytest.fixture
@@ -905,6 +914,359 @@ class TestGenerateHtmlSummary:
             assert isinstance(html, str)
             assert "<html" in html.lower()
             assert "Equivalence Check" in html
+
+
+class TestBuildReport:
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code.
+
+        Compared structurally (the story's own instruction: "keyed on the structured report
+        model, not rendered bytes") rather than via Report.__eq__, because a Section's content
+        may be a DataFrame -- comparing two DataFrames with == raises ("truth value of a
+        DataFrame is ambiguous"), so a plain dataclass equality check on Section is unsafe
+        whenever a table section is present.
+        """
+        defn = BuildReport()
+        frame = pd.DataFrame({"a": [1, 2, 3]})
+        node = defn.instantiate(title="Equivalence Check", author="Ada")
+
+        executed = defn.execute(node, inputs={"sections": [frame.copy(), "hello world"]})["report"]
+        scope = _run_codegen(defn, node, {"sections": [frame.copy(), "hello world"]})
+        generated = scope["report"]
+
+        assert executed.meta == generated.meta
+        assert len(executed.sections) == len(generated.sections) == 2
+        for exp, gen in zip(executed.sections, generated.sections, strict=True):
+            assert exp.kind == gen.kind
+            assert exp.title == gen.title
+            if isinstance(exp.content, pd.DataFrame):
+                pd.testing.assert_frame_equal(exp.content, gen.content)
+            else:
+                assert exp.content == gen.content
+        assert executed.html == generated.html
+        assert executed.pdf_bytes is None
+        assert generated.pdf_bytes is None
+
+    def test_result_is_inspectable(self):
+        defn = BuildReport()
+        node = defn.instantiate(title="t")
+        result = defn.execute(node, inputs={"sections": ["hello"]})["report"]
+        assert is_inspectable(result) is True
+
+    def test_deterministic(self):
+        defn = BuildReport()
+        frame = pd.DataFrame({"a": [1, 2]})
+        node = defn.instantiate(title="Determinism Check")
+        r1 = defn.execute(node, inputs={"sections": [frame.copy(), "note"]})["report"]
+        r2 = defn.execute(node, inputs={"sections": [frame.copy(), "note"]})["report"]
+        assert r1.html == r2.html
+
+    def test_empty_sections_still_builds(self):
+        defn = BuildReport()
+        node = defn.instantiate(title="Empty Report")
+        result = defn.execute(node, inputs={"sections": []})["report"]
+        assert result.sections == []
+        assert "<h1>Empty Report</h1>" in result.html
+
+
+class TestAssertData:
+    def test_codegen_matches_execute_pass_path(self):
+        """ADR 0002: execute == result of running the emitted code, when the expectations pass."""
+        defn = AssertData()
+        frame = pd.DataFrame({"age": [25, 30, 40]})
+        node = defn.instantiate(expectations=[{"type": "non_null", "column": "age"}])
+
+        executed = defn.execute(node, inputs={"frame": frame.copy()})["frame"]
+        scope = _run_codegen(defn, node, {"frame": frame.copy()})
+        generated = scope["frame"]
+
+        pd.testing.assert_frame_equal(executed, generated)
+        pd.testing.assert_frame_equal(executed, frame)
+
+    def test_codegen_matches_execute_fail_path(self):
+        """ADR 0002 extends to the failure path: both raise the same typed error, with
+        structurally equal violations frames -- not compared via == (DataFrame == raises
+        "truth value is ambiguous"), via pd.testing.assert_frame_equal instead."""
+        defn = AssertData()
+        frame = pd.DataFrame({"age": [25, -5, 200]})
+        node = defn.instantiate(
+            expectations=[{"type": "range", "column": "age", "min": 0, "max": 120}]
+        )
+
+        with pytest.raises(DataQualityError) as exec_exc_info:
+            defn.execute(node, inputs={"frame": frame.copy()})
+
+        with pytest.raises(DataQualityError) as codegen_exc_info:
+            _run_codegen(defn, node, {"frame": frame.copy()})
+
+        exec_violations = exec_exc_info.value.violations
+        codegen_violations = codegen_exc_info.value.violations
+        pd.testing.assert_frame_equal(
+            exec_violations.reset_index(drop=True), codegen_violations.reset_index(drop=True)
+        )
+        assert exec_violations.iloc[0]["expectation"] == "range"
+
+    def test_result_is_inspectable(self):
+        defn = AssertData()
+        frame = pd.DataFrame({"a": [1, 2]})
+        node = defn.instantiate(expectations=[])
+        result = defn.execute(node, inputs={"frame": frame})["frame"]
+        assert is_inspectable(result) is True
+
+    def test_does_not_mutate_input(self):
+        defn = AssertData()
+        frame = pd.DataFrame({"a": [1, 2, None]})
+        original = frame.copy()
+        node = defn.instantiate(expectations=[{"type": "non_null", "column": "a"}])
+        with pytest.raises(DataQualityError):
+            defn.execute(node, inputs={"frame": frame})
+        pd.testing.assert_frame_equal(frame, original)
+
+    def test_empty_expectations_always_passes(self):
+        defn = AssertData()
+        frame = pd.DataFrame({"a": [1, 2]})
+        node = defn.instantiate(expectations=[])
+        result = defn.execute(node, inputs={"frame": frame})["frame"]
+        pd.testing.assert_frame_equal(result, frame)
+
+
+_DOCUMENTS_FIXTURES_DIR = pathlib.Path(__file__).parent / "fixtures" / "documents"
+
+
+class TestLoadDocuments:
+    def test_to_spec(self):
+        spec = LoadDocuments().to_spec()
+        assert spec.type == "data.load_documents"
+        assert spec.family == "data"
+        assert spec.paradigm == Paradigm.FUNCTIONAL
+        out_ports = [p for p in spec.ports if p.direction == Direction.OUT]
+        assert [p.name for p in out_ports] == ["frame"]
+        assert not [p for p in spec.ports if p.direction == Direction.IN]
+
+    def test_instantiate_and_validate(self):
+        node = LoadDocuments().instantiate(path=str(_DOCUMENTS_FIXTURES_DIR / "sample.md"))
+        assert LoadDocuments().validate_node(node) == []
+
+    def test_missing_required_path_flagged(self):
+        node = LoadDocuments().instantiate()  # path unset
+        errors = LoadDocuments().validate_node(node)
+        assert any("required param 'path'" in e for e in errors)
+
+    def test_execute_reads_markdown_fixture(self):
+        node = LoadDocuments().instantiate(
+            path=str(_DOCUMENTS_FIXTURES_DIR / "sample.md"), chunk_size=120, chunk_overlap=20
+        )
+        out = LoadDocuments().execute(node, inputs={})
+        frame = out["frame"]
+        assert list(frame.columns) == [
+            "doc_id",
+            "chunk_id",
+            "chunk_index",
+            "text",
+            "source_path",
+            "char_count",
+        ]
+        assert (frame["doc_id"] == "sample").all()
+        assert len(frame) > 1
+        assert frame["chunk_id"].tolist() == [f"sample_{i}" for i in range(len(frame))]
+
+    def test_codegen_matches_execute_markdown_fixture(self):
+        node = LoadDocuments().instantiate(
+            path=str(_DOCUMENTS_FIXTURES_DIR / "sample.md"), chunk_size=120, chunk_overlap=20
+        )
+        defn = LoadDocuments()
+        executed = defn.execute(node, inputs={})["frame"]
+        scope = _run_codegen(defn, node, {})
+        generated = scope["frame"]
+        assert_frame_equal(executed, generated)
+
+    def test_result_is_inspectable(self):
+        node = LoadDocuments().instantiate(path=str(_DOCUMENTS_FIXTURES_DIR / "sample.md"))
+        out = LoadDocuments().execute(node, inputs={})
+        assert is_inspectable(out["frame"]) is True
+
+    def test_pdf_fixture_requires_docs_extra_or_parses_when_available(self):
+        """Golden on a checked-in tiny PDF fixture (Epic 16, Story 20). If pypdf ([docs]) is
+        not installed this asserts the typed error path instead of skipping outright, so the
+        base-install contract (never an opaque ImportError) stays covered even without the
+        extra."""
+        from emergentflow.data.errors import MissingOptionalDependencyError
+
+        node = LoadDocuments().instantiate(path=str(_DOCUMENTS_FIXTURES_DIR / "sample.pdf"))
+        defn = LoadDocuments()
+        try:
+            import pypdf  # noqa: F401
+        except ImportError:
+            with pytest.raises(MissingOptionalDependencyError):
+                defn.execute(node, inputs={})
+            return
+
+        out = defn.execute(node, inputs={})
+        frame = out["frame"]
+        assert (frame["doc_id"] == "sample").all()
+        assert "Hello PDF World" in frame["text"].iloc[0]
+
+        scope = _run_codegen(defn, node, {})
+        assert_frame_equal(frame, scope["frame"])
+
+
+class TestDataDictionary:
+    def _frame(self):
+        return pd.DataFrame(
+            {
+                "a": [1, 2, 2, 3, None],
+                "b": ["x", "y", "x", "x", "z"],
+            }
+        )
+
+    def test_to_spec(self):
+        spec = DataDictionary().to_spec()
+        assert spec.type == "stats.data_dictionary"
+        assert spec.family == "stats"
+        out_ports = [p for p in spec.ports if p.direction == Direction.OUT]
+        assert [p.name for p in out_ports] == ["dictionary"]
+
+    def test_execute_shape_and_content(self):
+        defn = DataDictionary()
+        node = defn.instantiate(top_n=2, notes={"a": "the numeric column"})
+        out = defn.execute(node, inputs={"frame": self._frame()})
+        result = out["dictionary"]
+        assert list(result["column"]) == ["a", "b"]
+        assert "top_values" in result.columns
+        assert "notes" in result.columns
+
+        a_row = result[result["column"] == "a"].iloc[0]
+        assert a_row["n_missing"] == 1
+        assert a_row["notes"] == "the numeric column"
+        assert len(a_row["top_values"]) <= 2
+        assert all({"value", "count"} == set(entry) for entry in a_row["top_values"])
+
+        b_row = result[result["column"] == "b"].iloc[0]
+        assert b_row["notes"] is None
+        # 'x' appears 3 times -- most frequent value in column b
+        assert b_row["top_values"][0] == {"value": "x", "count": 3}
+
+    def test_codegen_matches_execute(self):
+        defn = DataDictionary()
+        frame = self._frame()
+        node = defn.instantiate(top_n=3)
+
+        executed = defn.execute(node, inputs={"frame": frame.copy()})["dictionary"]
+        scope = _run_codegen(defn, node, {"frame": frame.copy()})
+        generated = scope["dictionary"]
+        assert_frame_equal(executed, generated)
+
+    def test_result_is_inspectable(self):
+        defn = DataDictionary()
+        node = defn.instantiate()
+        out = defn.execute(node, inputs={"frame": self._frame()})
+        assert is_inspectable(out["dictionary"]) is True
+
+    def test_does_not_mutate_input(self):
+        defn = DataDictionary()
+        frame = self._frame()
+        original = frame.copy()
+        node = defn.instantiate()
+        defn.execute(node, inputs={"frame": frame})
+        pd.testing.assert_frame_equal(frame, original)
+
+
+class TestRedactPii:
+    def _frame(self):
+        return pd.DataFrame(
+            {
+                "note": [
+                    "contact me at ada@example.com please",
+                    "call 555-123-4567 tomorrow",
+                    "no pii here at all",
+                ],
+                "id": [1, 2, 3],
+            }
+        )
+
+    def test_to_spec(self):
+        spec = RedactPii().to_spec()
+        assert spec.type == "clean.redact_pii"
+        assert spec.family == "clean"
+        in_ports = [p.name for p in spec.ports if p.direction == Direction.IN]
+        out_ports = [p.name for p in spec.ports if p.direction == Direction.OUT]
+        assert in_ports == ["frame"]
+        assert out_ports == ["frame"]
+
+    def test_execute_masks_email_and_phone(self):
+        defn = RedactPii()
+        node = defn.instantiate(columns=["note"])
+        out = defn.execute(node, inputs={"frame": self._frame()})
+        result = out["frame"]
+        assert "ada@example.com" not in result["note"].iloc[0]
+        assert "[REDACTED]" in result["note"].iloc[0]
+        assert "555-123-4567" not in result["note"].iloc[1]
+        assert result["note"].iloc[2] == "no pii here at all"
+
+    def test_execute_defaults_to_all_text_columns(self):
+        defn = RedactPii()
+        node = defn.instantiate()
+        out = defn.execute(node, inputs={"frame": self._frame()})
+        assert "[REDACTED]" in out["frame"]["note"].iloc[0]
+
+    def test_custom_mask_and_categories(self):
+        defn = RedactPii()
+        node = defn.instantiate(columns=["note"], categories=["email"], mask="<hidden>")
+        out = defn.execute(node, inputs={"frame": self._frame()})
+        result = out["frame"]
+        assert "<hidden>" in result["note"].iloc[0]
+        # phone category not requested -- phone number in row 1 stays untouched
+        assert "555-123-4567" in result["note"].iloc[1]
+
+    def test_unknown_category_raises(self):
+        defn = RedactPii()
+        node = defn.instantiate(columns=["note"], categories=["not-a-real-category"])
+        with pytest.raises(CleanError):
+            defn.execute(node, inputs={"frame": self._frame()})
+
+    def test_codegen_matches_execute(self):
+        defn = RedactPii()
+        frame = self._frame()
+        node = defn.instantiate(columns=["note"])
+
+        executed = defn.execute(node, inputs={"frame": frame.copy()})["frame"]
+        scope = _run_codegen(defn, node, {"frame": frame.copy()})
+        generated = scope["frame"]
+        assert_frame_equal(executed, generated)
+
+    def test_result_is_inspectable(self):
+        defn = RedactPii()
+        node = defn.instantiate(columns=["note"])
+        out = defn.execute(node, inputs={"frame": self._frame()})
+        assert is_inspectable(out["frame"]) is True
+
+    def test_does_not_mutate_input(self):
+        defn = RedactPii()
+        frame = self._frame()
+        original = frame.copy()
+        node = defn.instantiate(columns=["note"])
+        defn.execute(node, inputs={"frame": frame})
+        pd.testing.assert_frame_equal(frame, original)
+
+    def test_presidio_engine_threaded_through_codegen_and_execute(self):
+        """The engine param reaches ef.clean.redact_pii identically via both paths (ADR 0002);
+        presidio isn't installed in this environment, so both paths raise the same typed
+        error for engine="presidio" rather than actually redacting -- still proves equivalence."""
+        import sys
+
+        from emergentflow.clean.errors import MissingOptionalDependencyError
+
+        if "presidio_analyzer" in sys.modules or "presidio_anonymizer" in sys.modules:
+            pytest.skip("presidio is actually installed in this environment; typed-error path N/A")
+
+        defn = RedactPii()
+        frame = self._frame()
+        node = defn.instantiate(columns=["note"], engine="presidio")
+
+        with pytest.raises(MissingOptionalDependencyError):
+            defn.execute(node, inputs={"frame": frame.copy()})
+        with pytest.raises(MissingOptionalDependencyError):
+            _run_codegen(defn, node, {"frame": frame.copy()})
 
 
 # ---------------------------------------------------------------------------

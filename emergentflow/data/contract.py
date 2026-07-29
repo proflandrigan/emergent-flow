@@ -12,7 +12,56 @@ import pandas as pd
 
 from emergentflow.data.errors import SchemaContractError
 
-__all__ = ["validate_schema"]
+__all__ = ["detect_schema_violations", "validate_schema"]
+
+
+def detect_schema_violations(
+    frame: pd.DataFrame,
+    *,
+    expect_columns: list[str] | None = None,
+    expect_dtypes: dict[str, str] | None = None,
+    allow_extra_columns: bool = True,
+) -> dict[str, list[str]]:
+    """Detect (but do not raise on) schema-contract violations in *frame*.
+
+    The pure detection half of :func:`validate_schema` -- factored out so
+    ``emergentflow.research.quality.check_data_quality`` (Story 19's ``assert_data`` gate) can
+    reuse the exact same column/dtype checking logic without inheriting ``validate_schema``'s
+    raise-on-violation behavior, which loaders depend on unchanged.
+
+    Parameters are identical to :func:`validate_schema`'s corresponding parameters -- see that
+    function's docstring for the full contract.
+
+    Returns
+    -------
+    dict[str, list[str]]
+        ``{"missing": [...], "extra": [...], "mistyped": [...]}``, each list sorted, empty when
+        that category has no violations. All three lists empty means *frame* passes the
+        contract (including the fast-path case where both ``expect_columns`` and
+        ``expect_dtypes`` are ``None``).
+    """
+    if expect_columns is None and expect_dtypes is None:
+        return {"missing": [], "extra": [], "mistyped": []}
+
+    present_columns = set(frame.columns)
+    expected_columns = set(expect_columns or [])
+    dtype_columns = set(expect_dtypes or {})
+
+    missing: set[str] = (expected_columns | dtype_columns) - present_columns
+    extra: set[str] = set()
+    if not allow_extra_columns and expect_columns is not None:
+        extra = present_columns - expected_columns
+
+    mistyped: list[str] = []
+    if expect_dtypes:
+        for column, expected_dtype in sorted(expect_dtypes.items()):
+            if column in missing:
+                continue
+            actual_dtype = str(frame[column].dtype)
+            if actual_dtype != expected_dtype:
+                mistyped.append(f"{column}: expected {expected_dtype}, got {actual_dtype}")
+
+    return {"missing": sorted(missing), "extra": sorted(extra), "mistyped": mistyped}
 
 
 def validate_schema(
@@ -61,36 +110,23 @@ def validate_schema(
         All problems found are collected and reported together in a single
         error, with the three categories clearly separated.
     """
-    if expect_columns is None and expect_dtypes is None:
-        return frame
-
-    present_columns = set(frame.columns)
-    expected_columns = set(expect_columns or [])
-    dtype_columns = set(expect_dtypes or {})
-
-    missing: set[str] = (expected_columns | dtype_columns) - present_columns
-    extra: set[str] = set()
-    if not allow_extra_columns and expect_columns is not None:
-        extra = present_columns - expected_columns
-
-    mistyped: list[str] = []
-    if expect_dtypes:
-        for column, expected_dtype in sorted(expect_dtypes.items()):
-            if column in missing:
-                continue
-            actual_dtype = str(frame[column].dtype)
-            if actual_dtype != expected_dtype:
-                mistyped.append(f"{column}: expected {expected_dtype}, got {actual_dtype}")
+    result = detect_schema_violations(
+        frame,
+        expect_columns=expect_columns,
+        expect_dtypes=expect_dtypes,
+        allow_extra_columns=allow_extra_columns,
+    )
+    missing, extra, mistyped = result["missing"], result["extra"], result["mistyped"]
 
     if not missing and not extra and not mistyped:
         return frame
 
     lines = []
     if missing:
-        lines.append(f"missing columns: {sorted(missing)}")
-        lines.append(f"present columns: {sorted(present_columns)}")
+        lines.append(f"missing columns: {missing}")
+        lines.append(f"present columns: {sorted(frame.columns)}")
     if extra:
-        lines.append(f"unexpected extra columns: {sorted(extra)}")
+        lines.append(f"unexpected extra columns: {extra}")
     if mistyped:
         lines.append(f"mistyped columns: {mistyped}")
     raise SchemaContractError("schema contract violated: " + "; ".join(lines))

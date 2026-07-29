@@ -105,6 +105,56 @@ The extra is kept optional so a bare SDK install stays light (ADR 0007). PCA and
 and run with `umap-learn` absent; a `method="umap"` call in a base install raises a typed
 `MissingOptionalDependencyError("emergentflow[umap]")` rather than an opaque `ImportError`.
 
+## Optional extra: `[report-pdf]` (weasyprint)
+
+Epic 16's PDF report export (`ef.research.build_report`, `render_pdf=True`, Story 16) ships as
+an **optional extra**, installed with `pip install emergentflow[report-pdf]`, never as part of
+the base install. Its one dependency is permissively licensed and compatible with Apache-2.0:
+
+| Dependency | Version constraint | License | Compatible with Apache-2.0? |
+|---|---|---|---|
+| weasyprint | >=62,<63 | BSD-3-Clause | Yes |
+
+The extra is kept optional so a bare SDK install stays light (ADR 0007) and never pulls
+weasyprint's native Pango/cairo system dependencies. The base package must import and run with
+`weasyprint` absent -- `build_report` always produces its HTML render regardless; only
+`render_pdf=True` requires the extra, raising a typed
+`MissingOptionalDependencyError("emergentflow[report-pdf]")` rather than an opaque
+`ImportError` when it's missing.
+
+## Optional extra: `[docs]` (pypdf)
+
+Epic 16's document ingestion loader (`ef.data.load_documents`, Story 20) ships PDF parsing as
+an **optional extra**, installed with `pip install emergentflow[docs]`, never as part of the
+base install. Its one dependency is permissively licensed and compatible with Apache-2.0:
+
+| Dependency | Version constraint | License | Compatible with Apache-2.0? |
+|---|---|---|---|
+| pypdf | >=4,<5 | BSD-3-Clause | Yes |
+
+The extra is kept optional so a bare SDK install stays light (ADR 0007). `.txt`/`.md`/
+`.markdown` files load without this extra. The base package must import and run with `pypdf`
+absent -- only a `.pdf` file triggers the check, raising a typed
+`MissingOptionalDependencyError("emergentflow[docs]")` rather than an opaque `ImportError`
+when it's missing.
+
+## Optional extra: `[pii]` (presidio-analyzer, presidio-anonymizer)
+
+Epic 16's NER-based PII detection (`ef.clean.redact_pii`, `engine="presidio"`, Story 21) ships
+as an **optional extra**, installed with `pip install emergentflow[pii]`, never as part of the
+base install. Both dependencies are permissively licensed and compatible with Apache-2.0:
+
+| Dependency | Version constraint | License | Compatible with Apache-2.0? |
+|---|---|---|---|
+| presidio-analyzer | >=2,<3 | MIT | Yes |
+| presidio-anonymizer | >=2,<3 | MIT | Yes |
+
+The extra is kept optional so a bare SDK install stays light (ADR 0007) and never pulls a spaCy
+NER model. Regex-based detection (`engine="regex"`, the default) works without this extra. The
+base package must import and run with presidio absent -- only `engine="presidio"` requires the
+extra, raising a typed `MissingOptionalDependencyError("emergentflow[pii]")` rather than an
+opaque `ImportError` when it's missing.
+
 ## Deliberately not added: seaborn
 
 `plotly` (MIT) covers the interactive-charting surface Epic 12 needs, so **seaborn is intentionally

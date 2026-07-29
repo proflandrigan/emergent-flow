@@ -38,6 +38,7 @@ from emergentflow.ir.serialize import deserialize_graph
 from emergentflow.llm.gateway import GatewayClient
 from emergentflow.llm.secrets import validate_api_keys_present
 from emergentflow.nodes import get as get_node_definition
+from emergentflow.research.lineage import trace_lineage
 from emergentflow.server.cache import get_default_cache
 from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
 from emergentflow.server.reports import get_default_store
@@ -893,6 +894,25 @@ def execute_node(payload: dict[str, Any]) -> dict[str, Any]:
         "results": _results_to_payloads(results),
         "statuses": {node_id: status},
     }
+
+
+def lineage_for_node(payload: dict[str, Any]) -> dict[str, Any]:
+    """``POST /lineage``: {"graph": <ir>, "node_id": <node id>} ->
+    {"lineage": <Lineage, JSON-native>}.
+
+    Stateless: traces lineage fresh from the supplied graph on every call (Epic 16, Story 17).
+    No persistence -- lineage is never stored, only computed on demand (mirrors ADR 0019's
+    "state lives beside the graph, never on it" discipline).
+    """
+    graph_payload = payload.get("graph")
+    if not isinstance(graph_payload, dict):
+        raise CodegenError('lineage_for_node requires an envelope: {"graph": ..., "node_id": ...}')
+    node_id = payload.get("node_id")
+    if node_id is None:
+        raise CodegenError("lineage_for_node requires 'node_id' (a node id)")
+    graph = _to_graph(graph_payload)
+    lineage = trace_lineage(graph, node_id)
+    return {"lineage": asdict(lineage)}
 
 
 _warehouse_adapters_singleton: Mapping[str, WarehouseAdapter] | None = None

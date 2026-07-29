@@ -43,7 +43,8 @@ test("family sub-group header renders with correct node count", () => {
   const dataToggle = screen.getByText("Data").closest("button")!;
   // Bump this count whenever a data.* node is added to the catalog.
   // Epic 16 Story group A added http_fetch, load_excel, and load_google_sheet (7 -> 10).
-  expect(dataToggle).toHaveTextContent("10");
+  // Epic 16 Story group D added load_documents (10 -> 11).
+  expect(dataToggle).toHaveTextContent("11");
 });
 
 test("clicking a family sub-group header hides its node rows", () => {

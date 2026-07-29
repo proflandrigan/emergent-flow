@@ -24,6 +24,7 @@ import pandas as pd
 
 from emergentflow.api import public_op
 from emergentflow.data.contract import validate_schema
+from emergentflow.data.documents import load_documents
 from emergentflow.data.errors import (
     DataError,
     DataLoadError,
@@ -41,6 +42,7 @@ __all__ = [
     "describe_relation",
     "http_fetch",
     "load_csv",
+    "load_documents",
     "load_excel",
     "load_google_sheet",
     "load_json",

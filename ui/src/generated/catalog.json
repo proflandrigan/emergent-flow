@@ -3480,6 +3480,117 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "description": "Detect and mask common PII (email, phone, SSN-like, credit-card-like) in text columns via regex, or NER-based via presidio ([pii] extra); positioned to run right after ingestion.",
+      "family": "clean",
+      "label": "Redact PII",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Columns to scan; defaults to every text column when unset.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Which PII categories to redact ('email'|'phone'|'ssn'|'credit_card'); defaults to all of them.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Categories",
+          "name": "categories",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "[REDACTED]",
+          "help": "Replacement text for each detected match.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Mask text",
+          "name": "mask",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "regex",
+          "help": "'regex' (base install) or 'presidio' (NER-based, requires the optional [pii] extra).",
+          "hints": {
+            "choices": [
+              "regex",
+              "presidio"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Engine",
+          "name": "engine",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame to scan for PII.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The DataFrame with detected PII masked.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.redact_pii",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
       "description": "Reshape a DataFrame between long and wide form: pivot (long->wide) or melt (wide->long).",
       "family": "clean",
       "label": "Reshape",
@@ -4684,6 +4795,86 @@
       ],
       "type": "data.load_csv",
       "version": 4
+    },
+    {
+      "advisor_persona": "data_modeller",
+      "category": "Ingest",
+      "description": "Chunk PDF/text/markdown file(s) into a tidy (doc_id, chunk_id, text, ...) frame. No embedding or retrieval -- that's Epic 11; this only produces the frame.",
+      "family": "data",
+      "label": "Load Documents",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "A single .pdf/.txt/.md/.markdown file, or a directory containing them (processed in sorted filename order).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "file"
+          },
+          "label": "Path",
+          "name": "path",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": 1000,
+          "help": "Maximum characters per chunk.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Chunk size",
+          "name": "chunk_size",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": 100,
+          "help": "Characters of overlap between consecutive chunks; must be less than the chunk size.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Chunk overlap",
+          "name": "chunk_overlap",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DocumentFrame",
+          "direction": "out",
+          "help": "One row per chunk: doc_id, chunk_id, chunk_index, text, source_path, char_count.",
+          "label": "Documents",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "data.load_documents",
+      "version": 1
     },
     {
       "advisor_persona": "data_modeller",
@@ -9789,6 +9980,202 @@
     },
     {
       "advisor_persona": null,
+      "category": "Reporting",
+      "description": "Run declarative data-quality expectations (non-null, range, uniqueness, allowed-values, regex-match, row-count, schema) against a DataFrame; passes it through unchanged on success, raises a typed error with a violations frame on failure.",
+      "family": "research",
+      "label": "Assert Data",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Ordered list of expectation dicts, each with a 'type' ('non_null'|'range'|'unique'|'allowed_values'|'regex_match'|'row_count'|'schema') plus type-specific keys -- see emergentflow.research.quality.check_data_quality for the full reference.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Expectations",
+          "name": "expectations",
+          "required": true,
+          "type_token": "list[dict[str, any]]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The DataFrame to check.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The same DataFrame, unchanged, when every expectation passes.",
+          "label": null,
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "research.assert_data",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Reporting",
+      "description": "Compose upstream artifacts (tables, figures, model summaries, markdown/HTML text) into one multi-section report.",
+      "family": "research",
+      "label": "Build Report",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "Emergent Flow Report",
+          "help": "Report title.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Title",
+          "name": "title",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional report author.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Author",
+          "name": "author",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional one-line report description.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Description",
+          "name": "description",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional caller-supplied timestamp/date string. build_report never reads the wall clock itself (it must stay a pure function), so this is blank unless explicitly filled in.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Generated at",
+          "name": "generated_at",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional per-section titles, matched positionally to the Sections input. Missing/blank entries default to 'Section 1', 'Section 2', ...",
+          "hints": null,
+          "label": "Section titles",
+          "name": "titles",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional per-section kind override ('markdown'|'html'|'figure'|'table'|'model_summary'), matched positionally to the Sections input. Missing/blank entries auto-detect from each value's Python type.",
+          "hints": null,
+          "label": "Section kinds",
+          "name": "kinds",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": false,
+          "help": "Also render a PDF (requires the optional [report-pdf] extra).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Render PDF",
+          "name": "render_pdf",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "many",
+          "data_type": "any",
+          "direction": "in",
+          "help": "Upstream artifacts to compose, in order: DataFrames, PlotSpec figures, model-summary dataclasses, or markdown/HTML strings.",
+          "label": "Sections",
+          "name": "sections",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Report",
+          "direction": "out",
+          "help": "The composed report.",
+          "label": null,
+          "name": "report",
+          "required": true
+        }
+      ],
+      "type": "research.build_report",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "Custom Code",
       "description": "Run a user-authored Python transform() function against an input value.",
       "family": "script",
@@ -10491,6 +10878,95 @@
         }
       ],
       "type": "stats.crosstab",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Auto-emit a documented schema per column: type, null rate, cardinality, range/top-values, and optional user notes.",
+      "family": "stats",
+      "label": "Data Dictionary",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Optional subset of columns to document; defaults to every column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": 5,
+          "help": "How many of each column's most frequent values to record.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Top N values",
+          "name": "top_n",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Optional map of column name to a free-text note, carried through untouched.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Column notes",
+          "name": "notes",
+          "required": false,
+          "type_token": "dict"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The DataFrame to document.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "One row per column: type/null-rate/cardinality/range/top-values/notes.",
+          "label": null,
+          "name": "dictionary",
+          "required": true
+        }
+      ],
+      "type": "stats.data_dictionary",
       "version": 1
     },
     {
