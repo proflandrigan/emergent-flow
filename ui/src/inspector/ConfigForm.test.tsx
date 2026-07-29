@@ -341,3 +341,33 @@ test("transform.scale_features renders curated estimator widgets (feature-transf
   // No raw JSON blob for the dict param -- it's the curated field instead.
   expect(screen.getByTestId("estimator-params-advanced-params")).toBeInTheDocument();
 });
+
+test("a list-typed param with choices renders a multi-select storing an array", () => {
+  // ml.compare_models.estimators is list[str] over the estimator catalog. It previously
+  // rendered as a single-value <select>, so only one estimator could ever be chosen and the
+  // stored value was a bare string -- which the backend iterates character-by-character.
+  const id = addNode("ml.compare_models");
+  const select = screen.getByTestId("param-estimators") as HTMLSelectElement;
+
+  expect(select.multiple).toBe(true);
+
+  const options = Array.from(select.querySelectorAll("option")).map(
+    (o) => o.value,
+  );
+  expect(options).toContain("RandomForestClassifier");
+  expect(options).toContain("Ridge");
+  // No blank sentinel option: an empty selection is expressed by selecting nothing.
+  expect(options).not.toContain("");
+
+  for (const option of Array.from(select.querySelectorAll("option"))) {
+    if (option.value === "RandomForestClassifier" || option.value === "Ridge") {
+      option.selected = true;
+    }
+  }
+  fireEvent.change(select);
+
+  const param = useGraphStore
+    .getState()
+    .nodes[id].params.find((p) => p.name === "estimators");
+  expect(param?.value).toEqual(["RandomForestClassifier", "Ridge"]);
+});

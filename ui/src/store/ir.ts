@@ -54,7 +54,7 @@ function portFromIR(port: Port): PortModel {
 }
 
 function nodeToIR(node: NodeModel): Node {
-  return {
+  const ir: Node = {
     id: node.id,
     type: node.type,
     label: node.label ?? null,
@@ -64,10 +64,18 @@ function nodeToIR(node: NodeModel): Node {
     ports: node.ports.map(portToIR),
     group_id: node.groupId ?? null,
   };
+  // Carried through opaquely, and only when the node actually had the key: the canvas never
+  // authors a subgraph, so a canvas-built node stays free of a `subgraph: null` it never had,
+  // while an imported composite/module node keeps its inner graph byte-for-byte. Assigning
+  // unconditionally would also be wrong in the other direction -- see `nodeFromIR`.
+  if (node.subgraph !== undefined) {
+    ir.subgraph = node.subgraph;
+  }
+  return ir;
 }
 
 export function nodeFromIR(node: Node): NodeModel {
-  return {
+  const model: NodeModel = {
     id: node.id ?? "",
     type: node.type,
     label: node.label ?? undefined,
@@ -77,6 +85,13 @@ export function nodeFromIR(node: Node): NodeModel {
     position: { x: node.position?.x ?? 0, y: node.position?.y ?? 0 },
     groupId: node.group_id ?? null,
   };
+  // Preserve `null` vs absent exactly rather than collapsing both to one of them, so a
+  // round-trip through the canvas is byte-identical for graphs the SDK wrote (which set
+  // `subgraph: null` on every leaf node) and for graphs the canvas built (which omit it).
+  if (node.subgraph !== undefined) {
+    model.subgraph = node.subgraph;
+  }
+  return model;
 }
 
 function edgeToIR(edge: EdgeModel): Edge {

@@ -170,6 +170,34 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
         ))}
       </Select>
     );
+  } else if (kind === "multiselect") {
+    // A list-typed param with choices: a native multi-select writing the selection straight
+    // back as an array. It deliberately does NOT route through parseValue -- the selected
+    // options are already the typed value, and stringifying them just to re-split on "," is
+    // both lossy and pointless.
+    const choices = catalogParam.hints?.choices ?? [];
+    const selected = Array.isArray(param.value) ? param.value.map(String) : [];
+    widget = (
+      <Select
+        multiple
+        size={Math.min(Math.max(choices.length, 2), 8)}
+        data-testid={testId}
+        value={selected}
+        onChange={(e) =>
+          setParam(
+            node.id,
+            param.name,
+            Array.from(e.target.selectedOptions, (o) => o.value),
+          )
+        }
+      >
+        {choices.map((choice) => (
+          <option key={choice} value={choice}>
+            {choice}
+          </option>
+        ))}
+      </Select>
+    );
   } else if (kind === "checkbox") {
     widget = (
       <input

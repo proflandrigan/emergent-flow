@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import type { CatalogParam } from "../catalog/types";
+import catalogJson from "../generated/catalog.json";
+import type { Catalog, CatalogParam } from "../catalog/types";
 import {
   formatValue,
   isDictType,
@@ -356,5 +357,64 @@ describe("validateValue - list of dict", () => {
   test("a JSON object where a list is expected -> message", () => {
     const p = param({ type_token: "list[dict[str, any]]" });
     expect(validateValue(p, { estimator: "PCA" })).toBe("Must be a JSON array");
+  });
+});
+
+describe("list-typed params that also declare choices (multiselect)", () => {
+  // `ml.compare_models.estimators` is list[str] over the estimator catalog: the user must be
+  // able to pick SEVERAL. Because `hints.choices` was matched before the list types, it
+  // became a single "select" -- so only one estimator could ever be chosen, and parseValue
+  // handed the backend a bare string, which ef.ml.compare_models iterates
+  // character-by-character and rejects with `UnknownEstimatorError: unknown estimator 'R'`.
+  const choices = ["Ridge", "Lasso", "SVC"];
+  const multi = (overrides: Partial<CatalogParam> = {}): CatalogParam =>
+    param({ type_token: "list[str]", hints: { choices }, ...overrides });
+
+  test("a list type with choices picks multiselect, not a single select", () => {
+    expect(widgetForParam(multi())).toBe("multiselect");
+  });
+
+  test("a scalar type with choices still picks a single select", () => {
+    const p = param({ type_token: "str", hints: { choices } });
+    expect(widgetForParam(p)).toBe("select");
+  });
+
+  test("a valid multi-item selection is not flagged as an invalid choice", () => {
+    expect(validateValue(multi(), ["Ridge", "Lasso"])).toBeNull();
+  });
+
+  test("an item outside the choices is reported", () => {
+    expect(validateValue(multi(), ["Ridge", "Nope"])).toBe("Unknown: Nope");
+  });
+
+  test("a bare string (the old single-select value) is rejected", () => {
+    expect(validateValue(multi(), "Ridge")).toBe("Must be a list");
+  });
+
+  test("length hints bound the item count, not the stringified length", () => {
+    const atLeast2 = multi({ hints: { choices, min_length: 2 } });
+    expect(validateValue(atLeast2, ["Ridge"])).toBe(
+      "Must have at least 2 items",
+    );
+    const atMost1 = multi({ hints: { choices, max_length: 1 } });
+    expect(validateValue(atMost1, ["Ridge", "Lasso"])).toBe(
+      "Must have at most 1 items",
+    );
+  });
+
+  test("parseValue yields an array, never a bare string", () => {
+    expect(parseValue(multi(), "Ridge, Lasso")).toEqual(["Ridge", "Lasso"]);
+  });
+
+  test("the real ml.compare_models.estimators param resolves to multiselect", () => {
+    const node = (catalogJson as unknown as Catalog).nodes.find(
+      (n) => n.type === "ml.compare_models",
+    );
+    const estimators = node?.params.find((p) => p.name === "estimators");
+    expect(estimators?.type_token).toBe("list[str]");
+    expect(widgetForParam(estimators!)).toBe("multiselect");
+    expect(
+      validateValue(estimators!, ["RandomForestClassifier", "Ridge"]),
+    ).toBeNull();
   });
 });
