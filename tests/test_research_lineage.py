@@ -197,3 +197,45 @@ def test_trace_lineage_result_is_inspectable() -> None:
     )
     result = trace_lineage(graph, "c")
     assert is_inspectable(result) is True
+
+
+def test_trace_lineage_edge_order_is_insertion_order_independent() -> None:
+    """Two structurally identical graphs must trace to an identical Lineage.
+
+    ``edges`` was built by iterating ``graph.edges.values()``, i.e. dict INSERTION order, so
+    adding the same edges in a different order -- ordinary canvas editing -- produced a
+    different ``edges`` ordering for the same graph, while ``nodes`` (via
+    ``topological_sort``) was correctly stable. Every other pass in the codebase pins this
+    down explicitly, so lineage must too.
+    """
+    all_edges = {
+        "e-ab": _edge("e-ab", "a", "out", "b", "in"),
+        "e-ac": _edge("e-ac", "a", "out", "c", "in"),
+        "e-bd": _edge("e-bd", "b", "out", "d", "in_b"),
+        "e-cd": _edge("e-cd", "c", "out", "d", "in_c"),
+    }
+
+    def _build(edge_ids: list[str]) -> Graph:
+        a = _node("a", label="A", out_ports=["out"])
+        b = _node("b", type_="clean.impute_missing", label="B", in_ports=["in"], out_ports=["out"])
+        c = _node("c", type_="clean.impute_missing", label="C", in_ports=["in"], out_ports=["out"])
+        d = _node("d", label="D", in_ports=["in_b", "in_c"])
+        return Graph(
+            paradigm=Paradigm.FUNCTIONAL,
+            name="diamond",
+            nodes={n.id: n for n in (a, b, c, d)},
+            edges={eid: all_edges[eid] for eid in edge_ids},
+        )
+
+    forward = trace_lineage(_build(["e-ab", "e-ac", "e-bd", "e-cd"]), "d")
+    reversed_ = trace_lineage(_build(["e-cd", "e-bd", "e-ac", "e-ab"]), "d")
+
+    assert forward.nodes == reversed_.nodes
+    assert forward.edges == reversed_.edges
+    # And the order follows `nodes`' topological order by source, then target.
+    assert [(e.source_node_id, e.target_node_id) for e in forward.edges] == [
+        ("a", "b"),
+        ("a", "c"),
+        ("b", "d"),
+        ("c", "d"),
+    ]

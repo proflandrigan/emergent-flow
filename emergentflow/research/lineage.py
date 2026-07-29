@@ -54,7 +54,9 @@ class Lineage:
         ``ef.codegen.topological_sort`` would assign the whole graph, filtered to this subset).
         The target node is always last.
     edges: every edge in *graph* whose source and target are both in ``nodes`` — i.e. the
-        induced subgraph's edges.
+        induced subgraph's edges — in deterministic order (following ``nodes``' topological
+        order by source then target, with the edge id as the tie-break for parallel edges),
+        so a graph traces identically regardless of the order its edges were added in.
     """
 
     target_node_id: str
@@ -85,7 +87,8 @@ def trace_lineage(graph: Graph, node_id: IRId) -> Lineage:
     Lineage
         ``target_node_id=node_id``, ``nodes`` containing *node_id* and every ancestor in
         deterministic topological order (target last), and ``edges`` containing every edge of
-        *graph* connecting two nodes both present in ``nodes``.
+        *graph* connecting two nodes both present in ``nodes``, itself in a deterministic
+        order that does not depend on the order the edges were added to *graph*.
 
     Raises
     ------
@@ -127,6 +130,26 @@ def trace_lineage(graph: Graph, node_id: IRId) -> Lineage:
         LineageNode(node_id=nid, node_type=graph.nodes[nid].type, label=graph.nodes[nid].label)
         for nid in order
     ]
+    # Deterministic edge order, mirroring the discipline every other pass keeps
+    # (`topological_sort`'s node-id tie-break, `build_wiring_map`'s sorted fan-in sources,
+    # `validate`'s `sorted(graph.edges.items())`): iterating `graph.edges.values()` directly
+    # would follow dict INSERTION order, so two structurally identical graphs whose edges
+    # were added in a different order -- ordinary canvas editing -- would trace to different
+    # `edges` orderings. Keyed to follow `order` (so hops read along the chain `nodes`
+    # already presents) with the edge id as a final tie-break for parallel edges.
+    position = {nid: i for i, nid in enumerate(order)}
+    in_subgraph = [
+        (edge_id, edge)
+        for edge_id, edge in graph.edges.items()
+        if edge.source.node_id in visited and edge.target.node_id in visited
+    ]
+    in_subgraph.sort(
+        key=lambda item: (
+            position[item[1].source.node_id],
+            position[item[1].target.node_id],
+            item[0],
+        )
+    )
     edges = [
         LineageEdge(
             source_node_id=edge.source.node_id,
@@ -134,8 +157,7 @@ def trace_lineage(graph: Graph, node_id: IRId) -> Lineage:
             target_node_id=edge.target.node_id,
             target_port=edge.target.port_id,
         )
-        for edge in graph.edges.values()
-        if edge.source.node_id in visited and edge.target.node_id in visited
+        for _edge_id, edge in in_subgraph
     ]
 
     return Lineage(target_node_id=node_id, nodes=nodes, edges=edges)

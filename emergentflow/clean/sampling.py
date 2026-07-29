@@ -124,6 +124,11 @@ def fuzzy_join(
     ``how="left"`` keeps them with NaN on the right-hand columns. The realised similarity is
     written to ``score_column``. Requires the optional ``[fuzzy]`` extra. Never mutates
     either input.
+
+    Raises:
+        ColumnCollisionError: If ``suffixes`` would produce two identically-named output
+            columns (e.g. renaming ``k`` to ``k_x`` when a ``k_x`` column already exists),
+            or if ``score_column`` collides with an output column name.
     """
     if importlib.util.find_spec("rapidfuzz") is None:
         raise MissingOptionalDependencyError("emergentflow[fuzzy]")
@@ -146,9 +151,23 @@ def fuzzy_join(
     if not (0 <= threshold <= 100):
         raise CleanError(f"threshold must be between 0 and 100; got {threshold!r}.")
     overlap = set(left.columns) & set(right.columns)
-    final_left_columns = {f"{c}{suffixes[0]}" if c in overlap else c for c in left.columns}
-    final_right_columns = {f"{c}{suffixes[1]}" if c in overlap else c for c in right.columns}
-    if score_column in final_left_columns or score_column in final_right_columns:
+    # Lists, not sets: a set would silently collapse the very duplicates this checks for.
+    # Suffixing an overlapping key can land on a column that already exists under the
+    # suffixed name (left ["k", "k_x"] joined against right ["k"] renames k -> k_x), which
+    # would emit a frame with two identically-labelled columns instead of raising. Every
+    # sibling verb rejects this class of collision (concat's source_column, reshape's
+    # var_name/value_name, clean_text's suffix, parse_dates' components, and pandas' own
+    # merge via MergeError), so reject it here too rather than returning a corrupt frame.
+    final_left_columns = [f"{c}{suffixes[0]}" if c in overlap else c for c in left.columns]
+    final_right_columns = [f"{c}{suffixes[1]}" if c in overlap else c for c in right.columns]
+    final_columns = final_left_columns + final_right_columns
+    duplicated = sorted({c for c in final_columns if final_columns.count(c) > 1}, key=str)
+    if duplicated:
+        raise ColumnCollisionError(
+            f"suffixes {suffixes!r} produce duplicate output column(s) {duplicated!r}; "
+            "choose different suffixes or rename the colliding column(s) before joining."
+        )
+    if score_column in final_columns:
         raise ColumnCollisionError(
             f"score column {score_column!r} collides with an existing (or suffix-renamed) "
             "column; choose a different score_column."

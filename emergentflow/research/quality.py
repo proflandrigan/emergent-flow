@@ -164,6 +164,11 @@ _SINGLE_VIOLATION_CHECKS = {
     "row_count": _check_row_count,
 }
 
+#: Expectation types whose dict carries a ``"column"`` key that must name a real column
+#: (i.e. every check above except frame-scoped ``"row_count"``). ``"schema"`` is excluded
+#: too: reporting missing columns is precisely what it is for.
+_COLUMN_SCOPED_CHECKS = frozenset(_SINGLE_VIOLATION_CHECKS) - {"row_count"}
+
 
 @public_op(name="ef.research.check_data_quality")
 def check_data_quality(frame: pd.DataFrame, expectations: list[dict[str, Any]]) -> pd.DataFrame:
@@ -203,7 +208,8 @@ def check_data_quality(frame: pd.DataFrame, expectations: list[dict[str, Any]]) 
         If any expectation fails. Carries a tidy violations frame (columns: ``expectation``,
         ``column``, ``detail``) as ``exc.violations``, one row per violation found.
     ResearchError
-        If an expectation dict names a ``"type"`` not in :data:`EXPECTATION_TYPES`.
+        If an expectation dict names a ``"type"`` not in :data:`EXPECTATION_TYPES`, or if a
+        column-scoped expectation names a ``"column"`` that is not in *frame*.
     """
     violations: list[dict[str, Any]] = []
 
@@ -213,6 +219,19 @@ def check_data_quality(frame: pd.DataFrame, expectations: list[dict[str, Any]]) 
             raise ResearchError(
                 f"unknown expectation type {etype!r}; expected one of {EXPECTATION_TYPES!r}."
             )
+        # Every column-scoped check indexes `frame[column]` directly, which raises a bare,
+        # undocumented `KeyError` for a column that isn't there -- opaque next to this
+        # module's own typed errors and out of step with the rest of the SDK (clean's
+        # UnknownColumnError, stats' "unknown columns [...]; expected one of [...]"). Reject
+        # it up front with the same shape. "row_count" is frame-scoped and "schema" reports
+        # missing columns as violations, so neither carries a "column" to check.
+        if etype in _COLUMN_SCOPED_CHECKS:
+            column = exp.get("column")
+            if column not in frame.columns:
+                raise ResearchError(
+                    f"expectation {etype!r} names unknown column {column!r}; "
+                    f"expected one of {list(frame.columns)!r}."
+                )
         if etype == "schema":
             violations.extend(_check_schema(frame, exp))
         else:

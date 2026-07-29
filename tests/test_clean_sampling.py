@@ -324,3 +324,29 @@ def test_sample_random_n_larger_than_frame_is_typed() -> None:
     """pandas raises a bare ValueError here; every other failure in this family is typed."""
     with pytest.raises(CleanError, match="exceeds the number of available rows"):
         sample_rows(pd.DataFrame({"a": [1, 2]}), mode="random", n=5)
+
+
+def test_fuzzy_join_suffix_rename_collision_is_rejected() -> None:
+    """Suffixing an overlapping key must not land on a column that already exists.
+
+    ``left`` carries both ``k`` and ``k_x``; ``k`` overlaps with ``right`` and is therefore
+    renamed to ``k_x``, colliding with the existing one. Left unguarded, the result came
+    back with two identically-labelled ``k_x`` columns -- a silently corrupt frame that
+    breaks any downstream ``df[col]`` (it returns a DataFrame, not a Series). Every sibling
+    verb rejects this class of collision, and so does pandas' own ``merge``.
+    """
+    pytest.importorskip("rapidfuzz")
+    left = pd.DataFrame({"k": ["apple", "banana"], "k_x": [1, 2]})
+    right = pd.DataFrame({"k": ["apple"], "r": [9]})
+    with pytest.raises(ColumnCollisionError, match="duplicate output column"):
+        fuzzy_join(left, right, left_on="k", right_on="k", how="left")
+
+
+def test_fuzzy_join_non_colliding_suffixes_still_join() -> None:
+    """The collision guard must not fire on an ordinary overlapping-key join."""
+    pytest.importorskip("rapidfuzz")
+    left = pd.DataFrame({"k": ["apple", "banana"], "v": [1, 2]})
+    right = pd.DataFrame({"k": ["apple"], "w": [9]})
+    result = fuzzy_join(left, right, left_on="k", right_on="k", how="left")
+    assert list(result.columns) == ["k_x", "v", "k_y", "w", "match_score"]
+    assert not result.columns.duplicated().any()
