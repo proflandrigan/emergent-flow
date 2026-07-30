@@ -31,7 +31,7 @@ from emergentflow.viz.registry import get_chart_spec, known_chart_keys
 #: Version of the catalog artifact *shape*. Bump on a breaking change to the artifact
 #: structure (new/removed/renamed top-level or per-node fields). Distinct from
 #: ``Graph.schema_version`` (IR wire format) and each node's contract ``version``.
-CATALOG_VERSION = 5
+CATALOG_VERSION = 6
 
 
 @public_op(name="ef.export_catalog")

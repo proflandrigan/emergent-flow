@@ -126,7 +126,11 @@ export function Palette(): JSX.Element {
       }
       return (
         node.label.toLowerCase().includes(normalizedQuery) ||
-        node.type.toLowerCase().includes(normalizedQuery)
+        node.type.toLowerCase().includes(normalizedQuery) ||
+        (node.description ?? "").toLowerCase().includes(normalizedQuery) ||
+        (node.keywords ?? []).some((k) =>
+          k.toLowerCase().includes(normalizedQuery),
+        )
       );
     })
     .sort((a, b) => a.label.localeCompare(b.label));

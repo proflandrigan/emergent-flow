@@ -36,6 +36,17 @@ class Reshape(NodeDefinition):
     description = (
         "Reshape a DataFrame between long and wide form: pivot (long->wide) or melt (wide->long)."
     )
+    keywords = [
+        "melt",
+        "pivot",
+        "unpivot",
+        "spread",
+        "gather",
+        "wide",
+        "long",
+        "crosstab",
+        "transpose",
+    ]
 
     ports = [
         PortSpec(

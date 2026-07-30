@@ -1,5 +1,5 @@
 {
-  "catalog_version": 5,
+  "catalog_version": 6,
   "charts": [
     {
       "category": "Visualization",
@@ -2202,6 +2202,7 @@
       "category": "Transform",
       "description": "Cast selected columns to new data types.",
       "family": "clean",
+      "keywords": [],
       "label": "Cast Types",
       "paradigm": "functional",
       "params": [
@@ -2253,6 +2254,7 @@
       "category": "Transform",
       "description": "Apply an ordered pipeline of text operations (trim, case, regex replace/extract, split) to one or more string columns.",
       "family": "clean",
+      "keywords": [],
       "label": "Clean Text",
       "paradigm": "functional",
       "params": [
@@ -2332,6 +2334,7 @@
       "category": "Transform",
       "description": "Row-wise union of two or more DataFrames, schema-aligned by column name, with an optional provenance column.",
       "family": "clean",
+      "keywords": [],
       "label": "Concat",
       "paradigm": "functional",
       "params": [
@@ -2421,6 +2424,7 @@
       "category": "Transform",
       "description": "Drop duplicate rows, optionally keying on a subset of columns.",
       "family": "clean",
+      "keywords": [],
       "label": "Deduplicate",
       "paradigm": "functional",
       "params": [
@@ -2514,6 +2518,7 @@
       "category": "Transform",
       "description": "Add computed and conditional (case-when) columns using a safe, restricted expression grammar.",
       "family": "clean",
+      "keywords": [],
       "label": "Derive Column",
       "paradigm": "functional",
       "params": [
@@ -2555,6 +2560,7 @@
       "category": "Transform",
       "description": "Drop rows or columns that contain missing values.",
       "family": "clean",
+      "keywords": [],
       "label": "Drop Missing",
       "paradigm": "functional",
       "params": [
@@ -2650,6 +2656,7 @@
       "category": "Transform",
       "description": "Multi-hot encode a list-valued column into wide 0/1 indicator columns (one per distinct label).",
       "family": "clean",
+      "keywords": [],
       "label": "Encode Lists",
       "paradigm": "functional",
       "params": [
@@ -2738,6 +2745,13 @@
       "category": "Transform",
       "description": "Explode one or more index-aligned list columns into long rows (like pandas explode).",
       "family": "clean",
+      "keywords": [
+        "explode",
+        "unnest",
+        "flatten",
+        "expand",
+        "list"
+      ],
       "label": "Explode Lists",
       "paradigm": "functional",
       "params": [
@@ -2827,6 +2841,7 @@
       "category": "Transform",
       "description": "Keep rows matching a column/operator/value predicate.",
       "family": "clean",
+      "keywords": [],
       "label": "Filter Rows",
       "paradigm": "functional",
       "params": [
@@ -2924,6 +2939,7 @@
       "category": "Transform",
       "description": "Merge two DataFrames on a string-similarity match between one left and one right key column, rather than on exact equality. Requires the [fuzzy] extra.",
       "family": "clean",
+      "keywords": [],
       "label": "Fuzzy Join",
       "paradigm": "functional",
       "params": [
@@ -3128,6 +3144,7 @@
       "category": "Transform",
       "description": "Fill missing values in selected columns using a chosen strategy.",
       "family": "clean",
+      "keywords": [],
       "label": "Impute Missing",
       "paradigm": "functional",
       "params": [
@@ -3202,6 +3219,7 @@
       "category": "Transform",
       "description": "Join two DataFrames on key column(s) (pandas-style inner/left/right/outer/cross).",
       "family": "clean",
+      "keywords": [],
       "label": "Merge",
       "paradigm": "functional",
       "params": [
@@ -3371,6 +3389,7 @@
       "category": "Transform",
       "description": "Parse string column(s) to datetime and optionally extract calendar components (year, month, day, quarter, ...) into new columns.",
       "family": "clean",
+      "keywords": [],
       "label": "Parse Dates",
       "paradigm": "functional",
       "params": [
@@ -3482,6 +3501,7 @@
       "category": "Transform",
       "description": "Detect and mask common PII (email, phone, SSN-like, credit-card-like) in text columns via regex, or NER-based via presidio ([pii] extra); positioned to run right after ingestion.",
       "family": "clean",
+      "keywords": [],
       "label": "Redact PII",
       "paradigm": "functional",
       "params": [
@@ -3593,6 +3613,17 @@
       "category": "Transform",
       "description": "Reshape a DataFrame between long and wide form: pivot (long->wide) or melt (wide->long).",
       "family": "clean",
+      "keywords": [
+        "melt",
+        "pivot",
+        "unpivot",
+        "spread",
+        "gather",
+        "wide",
+        "long",
+        "crosstab",
+        "transpose"
+      ],
       "label": "Reshape",
       "paradigm": "functional",
       "params": [
@@ -3808,6 +3839,7 @@
       "category": "Transform",
       "description": "Draw a subset of rows -- uniformly at random, stratified within groups, or the first n rows -- with an always-captured seed so the result is reproducible.",
       "family": "clean",
+      "keywords": [],
       "label": "Sample Rows",
       "paradigm": "functional",
       "params": [
@@ -3939,6 +3971,7 @@
       "category": "Transform",
       "description": "Keep or drop a chosen subset of columns.",
       "family": "clean",
+      "keywords": [],
       "label": "Select Columns",
       "paradigm": "functional",
       "params": [
@@ -4009,6 +4042,7 @@
       "category": "Transform",
       "description": "Keep or exclude rows whose key column(s) match another DataFrame (semi-join / anti-join); never adds columns from the keys frame.",
       "family": "clean",
+      "keywords": [],
       "label": "Semi Join",
       "paradigm": "functional",
       "params": [
@@ -4129,6 +4163,7 @@
       "category": "Transform",
       "description": "Sort rows by one or more columns, with per-key direction and NA placement.",
       "family": "clean",
+      "keywords": [],
       "label": "Sort",
       "paradigm": "functional",
       "params": [
@@ -4230,6 +4265,7 @@
       "category": "Ingest",
       "description": "Describe a relation's columns (name/dtype/nullable) as a tidy DataFrame.",
       "family": "data",
+      "keywords": [],
       "label": "Describe Relation",
       "paradigm": "functional",
       "params": [
@@ -4329,6 +4365,7 @@
       "category": "Ingest",
       "description": "Fetch JSON records from an HTTP/REST endpoint into a tidy DataFrame.",
       "family": "data",
+      "keywords": [],
       "label": "HTTP Fetch",
       "paradigm": "functional",
       "params": [
@@ -4664,6 +4701,7 @@
       "category": "Ingest",
       "description": "Load a CSV file into a pandas DataFrame.",
       "family": "data",
+      "keywords": [],
       "label": "Load CSV",
       "paradigm": "functional",
       "params": [
@@ -4801,6 +4839,7 @@
       "category": "Ingest",
       "description": "Chunk PDF/text/markdown file(s) into a tidy (doc_id, chunk_id, text, ...) frame. No embedding or retrieval -- that's Epic 11; this only produces the frame.",
       "family": "data",
+      "keywords": [],
       "label": "Load Documents",
       "paradigm": "functional",
       "params": [
@@ -4881,6 +4920,7 @@
       "category": "Ingest",
       "description": "Load a sheet from an Excel workbook into a pandas DataFrame.",
       "family": "data",
+      "keywords": [],
       "label": "Load Excel",
       "paradigm": "functional",
       "params": [
@@ -5056,6 +5096,7 @@
       "category": "Ingest",
       "description": "Load a Google Sheets tab into a pandas DataFrame over the HTTP client seam.",
       "family": "data",
+      "keywords": [],
       "label": "Load Google Sheet",
       "paradigm": "functional",
       "params": [
@@ -5212,6 +5253,7 @@
       "category": "Ingest",
       "description": "Load a JSON or JSON Lines (.jsonl) file into a pandas DataFrame.",
       "family": "data",
+      "keywords": [],
       "label": "Load JSON",
       "paradigm": "functional",
       "params": [
@@ -5348,6 +5390,7 @@
       "category": "Ingest",
       "description": "Load a Parquet file into a pandas DataFrame.",
       "family": "data",
+      "keywords": [],
       "label": "Load Parquet",
       "paradigm": "functional",
       "params": [
@@ -5475,6 +5518,7 @@
       "category": "Ingest",
       "description": "Load a small bundled sample dataset (zero filesystem setup): the sklearn classification/regression toy sets (iris, wine, diabetes), a daily web-traffic time series, a product-review text corpus, and a retail transactions table.",
       "family": "data",
+      "keywords": [],
       "label": "Load Sample",
       "paradigm": "functional",
       "params": [
@@ -5524,6 +5568,7 @@
       "category": "Ingest",
       "description": "Build a SQL query from a structured spec (source, select, where, join, group_by, order_by) and return a DataFrame.",
       "family": "data",
+      "keywords": [],
       "label": "Query Builder",
       "paradigm": "functional",
       "params": [
@@ -5808,6 +5853,7 @@
       "category": "Ingest",
       "description": "Run a raw SQL query against a warehouse connection and return a DataFrame.",
       "family": "data",
+      "keywords": [],
       "label": "SQL Query",
       "paradigm": "functional",
       "params": [
@@ -5940,6 +5986,7 @@
       "category": "Embeddings",
       "description": "Embed a text column in a DataFrame using an API provider (OpenAI, Anthropic, Gemini, etc.) or a local sentence-transformers model.",
       "family": "embed",
+      "keywords": [],
       "label": "Embed Text",
       "paradigm": "functional",
       "params": [
@@ -6108,6 +6155,7 @@
       "category": "LLM",
       "description": "LLM-as-judge: grade an eval-run compare table's output column against a rubric.",
       "family": "eval",
+      "keywords": [],
       "label": "Eval Judge",
       "paradigm": "functional",
       "params": [
@@ -6197,6 +6245,7 @@
       "category": "LLM",
       "description": "Merge a labels table onto an eval-run compare table, keyed by (row_id, variant).",
       "family": "eval",
+      "keywords": [],
       "label": "Eval Label",
       "paradigm": "functional",
       "params": [],
@@ -6237,6 +6286,7 @@
       "category": "LLM",
       "description": "Run one prompt over N inputs x M model variants for side-by-side compare.",
       "family": "eval",
+      "keywords": [],
       "label": "Eval Run",
       "paradigm": "functional",
       "params": [
@@ -6326,6 +6376,7 @@
       "category": "LLM",
       "description": "Grade an eval-run compare table with deterministic scorers and summarize per variant.",
       "family": "eval",
+      "keywords": [],
       "label": "Eval Score",
       "paradigm": "functional",
       "params": [
@@ -6386,6 +6437,7 @@
       "category": "Model Explainability",
       "description": "Return the top-N worst-error rows for a fitted model.",
       "family": "explain",
+      "keywords": [],
       "label": "Error Table",
       "paradigm": "functional",
       "params": [
@@ -6436,6 +6488,7 @@
       "category": "Model Explainability",
       "description": "Render a reliability diagram for a fitted binary classifier.",
       "family": "explain",
+      "keywords": [],
       "label": "Plot Calibration",
       "paradigm": "functional",
       "params": [
@@ -6486,6 +6539,7 @@
       "category": "Model Explainability",
       "description": "Render a predicted-vs-actual scatter for a fitted regression model.",
       "family": "explain",
+      "keywords": [],
       "label": "Plot Predicted vs Actual",
       "paradigm": "functional",
       "params": [],
@@ -6526,6 +6580,7 @@
       "category": "Model Explainability",
       "description": "Render a predicted-vs-residual scatter for a fitted regression model.",
       "family": "explain",
+      "keywords": [],
       "label": "Plot Residuals",
       "paradigm": "functional",
       "params": [],
@@ -6566,6 +6621,7 @@
       "category": "Model Explainability",
       "description": "Render an ROC or Precision-Recall curve for a fitted binary classifier.",
       "family": "explain",
+      "keywords": [],
       "label": "Plot ROC / PR",
       "paradigm": "functional",
       "params": [
@@ -6629,6 +6685,7 @@
       "category": "Model Explainability",
       "description": "Render a jittered strip plot (beeswarm approximation) of SHAP values.",
       "family": "explain",
+      "keywords": [],
       "label": "Plot SHAP Beeswarm",
       "paradigm": "functional",
       "params": [],
@@ -6660,6 +6717,7 @@
       "category": "Model Explainability",
       "description": "Render a ranked bar chart of mean |SHAP value| per feature.",
       "family": "explain",
+      "keywords": [],
       "label": "Plot SHAP Importance",
       "paradigm": "functional",
       "params": [],
@@ -6691,6 +6749,7 @@
       "category": "Model Explainability",
       "description": "Render a waterfall chart explaining one row's prediction.",
       "family": "explain",
+      "keywords": [],
       "label": "Plot SHAP Waterfall",
       "paradigm": "functional",
       "params": [
@@ -6732,6 +6791,7 @@
       "category": "Model Explainability",
       "description": "Compute per-feature SHAP attributions for a fitted model.",
       "family": "explain",
+      "keywords": [],
       "label": "SHAP Values",
       "paradigm": "functional",
       "params": [
@@ -6791,6 +6851,7 @@
       "category": "LLM",
       "description": "Run one completion call against a provider through the unified gateway. Use for a single completion call once you already have rendered messages.",
       "family": "llm",
+      "keywords": [],
       "label": "LLM Call",
       "paradigm": "functional",
       "params": [
@@ -6969,6 +7030,7 @@
       "category": "LLM",
       "description": "Render a system + user prompt template with {{variable}} substitution. Use when you need a reusable rendered prompt to feed llm.call.",
       "family": "llm",
+      "keywords": [],
       "label": "LLM Prompt",
       "paradigm": "functional",
       "params": [
@@ -7076,6 +7138,7 @@
       "category": "LLM",
       "description": "Read a prompt template's text from a file on disk.",
       "family": "llm",
+      "keywords": [],
       "label": "Prompt From File",
       "paradigm": "functional",
       "params": [
@@ -7118,6 +7181,7 @@
       "category": "Machine Learning",
       "description": "Apply a fitted Model to data via predict or score_samples.",
       "family": "ml",
+      "keywords": [],
       "label": "Apply Estimator",
       "paradigm": "functional",
       "params": [
@@ -7181,6 +7245,7 @@
       "category": "Machine Learning",
       "description": "Fit a curated, allow-listed sklearn clustering/mixture/outlier-detection estimator.",
       "family": "ml",
+      "keywords": [],
       "label": "Cluster / Detect",
       "paradigm": "functional",
       "params": [
@@ -7283,6 +7348,7 @@
       "category": "Machine Learning",
       "description": "Cross-validate multiple curated estimators and rank them by held-out score.",
       "family": "ml",
+      "keywords": [],
       "label": "Compare Models",
       "paradigm": "functional",
       "params": [
@@ -7451,6 +7517,7 @@
       "category": "Machine Learning",
       "description": "Cross-validate a curated, fit-archetype sklearn estimator.",
       "family": "ml",
+      "keywords": [],
       "label": "Cross Validate",
       "paradigm": "functional",
       "params": [
@@ -7597,6 +7664,7 @@
       "category": "Machine Learning",
       "description": "Score a fitted model against labeled data.",
       "family": "ml",
+      "keywords": [],
       "label": "Evaluate",
       "paradigm": "functional",
       "params": [],
@@ -7637,6 +7705,7 @@
       "category": "Machine Learning",
       "description": "Fit a curated, allow-listed sklearn classifier or regressor.",
       "family": "ml",
+      "keywords": [],
       "label": "Fit Estimator",
       "paradigm": "functional",
       "params": [
@@ -7765,6 +7834,7 @@
       "category": "Machine Learning",
       "description": "Fit a curated, allow-listed sklearn unsupervised transformer.",
       "family": "ml",
+      "keywords": [],
       "label": "Fit Transform",
       "paradigm": "functional",
       "params": [
@@ -7896,6 +7966,7 @@
       "category": "Machine Learning",
       "description": "Search a hyperparameter grid for a curated, fit-archetype sklearn estimator.",
       "family": "ml",
+      "keywords": [],
       "label": "Grid Search",
       "paradigm": "functional",
       "params": [
@@ -8051,6 +8122,7 @@
       "category": "Machine Learning",
       "description": "Fit an ordered chain of curated estimators as one sklearn Pipeline.",
       "family": "ml",
+      "keywords": [],
       "label": "Pipeline",
       "paradigm": "functional",
       "params": [
@@ -8130,6 +8202,7 @@
       "category": "Machine Learning",
       "description": "Apply a fitted model to data, producing predictions.",
       "family": "ml",
+      "keywords": [],
       "label": "Predict",
       "paradigm": "functional",
       "params": [],
@@ -8170,6 +8243,7 @@
       "category": "Machine Learning",
       "description": "Reduce numeric columns to N coordinate columns via PCA/t-SNE/UMAP.",
       "family": "ml",
+      "keywords": [],
       "label": "Reduce Dimensions",
       "paradigm": "functional",
       "params": [
@@ -8282,6 +8356,7 @@
       "category": "Machine Learning",
       "description": "Fit a curated feature-selector estimator and keep only the selected features.",
       "family": "ml",
+      "keywords": [],
       "label": "Select Features",
       "paradigm": "functional",
       "params": [
@@ -8403,6 +8478,7 @@
       "category": "Machine Learning",
       "description": "Return a structural, inspectable summary of a fitted model.",
       "family": "ml",
+      "keywords": [],
       "label": "Summarize",
       "paradigm": "functional",
       "params": [],
@@ -8434,6 +8510,7 @@
       "category": "Machine Learning",
       "description": "Train a logistic-regression classifier and report evaluation metrics.",
       "family": "ml",
+      "keywords": [],
       "label": "Train Classifier",
       "paradigm": "functional",
       "params": [
@@ -8542,6 +8619,7 @@
       "category": "Machine Learning",
       "description": "Fit a random-forest classifier or regressor.",
       "family": "ml",
+      "keywords": [],
       "label": "Train Random Forest",
       "paradigm": "functional",
       "params": [
@@ -8672,6 +8750,7 @@
       "category": "Machine Learning",
       "description": "Fit a linear-regression model.",
       "family": "ml",
+      "keywords": [],
       "label": "Train Regressor",
       "paradigm": "functional",
       "params": [
@@ -8742,6 +8821,7 @@
       "category": "Machine Learning",
       "description": "Split a DataFrame into train and test sets.",
       "family": "ml",
+      "keywords": [],
       "label": "Train/Test Split",
       "paradigm": "functional",
       "params": [
@@ -8821,6 +8901,7 @@
       "category": "Machine Learning",
       "description": "Apply a fitted Transformer to data via transform or score_samples.",
       "family": "ml",
+      "keywords": [],
       "label": "Transform",
       "paradigm": "functional",
       "params": [
@@ -8884,6 +8965,7 @@
       "category": "Neural Network",
       "description": "A linear (fully-connected) layer.",
       "family": "nn",
+      "keywords": [],
       "label": "Linear",
       "paradigm": "declarative",
       "params": [
@@ -8934,6 +9016,7 @@
       "category": "Neural Network",
       "description": "An nn.Module that owns a subgraph of layers.",
       "family": "nn",
+      "keywords": [],
       "label": "Module",
       "paradigm": "declarative",
       "params": [],
@@ -8946,6 +9029,7 @@
       "category": "Neural Network",
       "description": "A ReLU activation layer.",
       "family": "nn",
+      "keywords": [],
       "label": "ReLU",
       "paradigm": "declarative",
       "params": [],
@@ -8977,6 +9061,7 @@
       "category": "Annotation",
       "description": "A markdown note for narrating the pipeline; no data flows through it.",
       "family": "notes",
+      "keywords": [],
       "label": "Note",
       "paradigm": "functional",
       "params": [
@@ -9043,6 +9128,7 @@
       "category": "Recommenders",
       "description": "Evaluate multiple fitted recommenders and rank them by NDCG@k.",
       "family": "recommend",
+      "keywords": [],
       "label": "Compare",
       "paradigm": "functional",
       "params": [
@@ -9093,6 +9179,7 @@
       "category": "Recommenders",
       "description": "Score a fitted recommender against held-out interactions.",
       "family": "recommend",
+      "keywords": [],
       "label": "Evaluate",
       "paradigm": "functional",
       "params": [
@@ -9152,6 +9239,7 @@
       "category": "Recommenders",
       "description": "Fit a curated, allow-listed recommender algorithm.",
       "family": "recommend",
+      "keywords": [],
       "label": "Fit Recommender",
       "paradigm": "functional",
       "params": [
@@ -9237,6 +9325,7 @@
       "category": "Recommenders",
       "description": "Fit a two-tower retrieval model. Optionally consumes an item-features frame (one row per item, keyed by an 'item_id' column plus numeric columns) and a user-features frame (one row per user, keyed by 'user_id' plus numeric columns).",
       "family": "recommend",
+      "keywords": [],
       "label": "Fit Two-Tower Recommender",
       "paradigm": "functional",
       "params": [
@@ -9296,6 +9385,7 @@
       "category": "Recommenders",
       "description": "Route cold-start users to one recommender and warm users to another, based on known-interaction count.",
       "family": "recommend",
+      "keywords": [],
       "label": "Hybrid (Switching)",
       "paradigm": "functional",
       "params": [
@@ -9373,6 +9463,7 @@
       "category": "Recommenders",
       "description": "Blend two or more fitted recommenders' recommendations by weighted score.",
       "family": "recommend",
+      "keywords": [],
       "label": "Hybrid (Weighted)",
       "paradigm": "functional",
       "params": [
@@ -9464,6 +9555,7 @@
       "category": "Recommenders",
       "description": "Validate and deduplicate raw user-item interaction data into a sparse InteractionMatrix.",
       "family": "recommend",
+      "keywords": [],
       "label": "Prepare Interactions",
       "paradigm": "functional",
       "params": [
@@ -9647,6 +9739,7 @@
       "category": "Recommenders",
       "description": "Generate top-N recommendations from a fitted recommender.",
       "family": "recommend",
+      "keywords": [],
       "label": "Recommend",
       "paradigm": "functional",
       "params": [
@@ -9706,6 +9799,7 @@
       "category": "Recommenders",
       "description": "Content-based filtering via dense embedding similarity \u2014 fits a NearestNeighbors index on a pre-computed embedding column.",
       "family": "recommend",
+      "keywords": [],
       "label": "Recommend by Embedding Similarity",
       "paradigm": "functional",
       "params": [
@@ -9787,6 +9881,7 @@
       "category": "Recommenders",
       "description": "Find the N most similar items to each given item.",
       "family": "recommend",
+      "keywords": [],
       "label": "Similar Items",
       "paradigm": "functional",
       "params": [
@@ -9837,6 +9932,7 @@
       "category": "Recommenders",
       "description": "Split events into train/test InteractionMatrix pairs by per-user recency.",
       "family": "recommend",
+      "keywords": [],
       "label": "Temporal Split",
       "paradigm": "functional",
       "params": [
@@ -9932,6 +10028,7 @@
       "category": "Reporting",
       "description": "Generate an HTML profiling report summarising a DataFrame.",
       "family": "reports",
+      "keywords": [],
       "label": "HTML Summary",
       "paradigm": "functional",
       "params": [
@@ -9983,6 +10080,7 @@
       "category": "Reporting",
       "description": "Run declarative data-quality expectations (non-null, range, uniqueness, allowed-values, regex-match, row-count, schema) against a DataFrame; passes it through unchanged on success, raises a typed error with a violations frame on failure.",
       "family": "research",
+      "keywords": [],
       "label": "Assert Data",
       "paradigm": "functional",
       "params": [
@@ -10034,6 +10132,7 @@
       "category": "Reporting",
       "description": "Compose upstream artifacts (tables, figures, model summaries, markdown/HTML text) into one multi-section report.",
       "family": "research",
+      "keywords": [],
       "label": "Build Report",
       "paradigm": "functional",
       "params": [
@@ -10179,6 +10278,7 @@
       "category": "Custom Code",
       "description": "Run a user-authored Python transform() function against an input value.",
       "family": "script",
+      "keywords": [],
       "label": "Custom Code",
       "paradigm": "functional",
       "params": [
@@ -10230,6 +10330,7 @@
       "category": "Statistics",
       "description": "One-way ANOVA testing a numeric column across groups.",
       "family": "stats",
+      "keywords": [],
       "label": "ANOVA",
       "paradigm": "functional",
       "params": [
@@ -10319,6 +10420,7 @@
       "category": "Statistics",
       "description": "One-shot exploratory data analysis: summary frames + curated plots.",
       "family": "stats",
+      "keywords": [],
       "label": "Auto EDA",
       "paradigm": "functional",
       "params": [
@@ -10424,6 +10526,7 @@
       "category": "Statistics",
       "description": "Chi-square test of independence on a contingency table.",
       "family": "stats",
+      "keywords": [],
       "label": "Chi-Square Test",
       "paradigm": "functional",
       "params": [
@@ -10513,6 +10616,7 @@
       "category": "Statistics",
       "description": "Cohort retention analysis over a user activity log.",
       "family": "stats",
+      "keywords": [],
       "label": "Cohort Retention",
       "paradigm": "functional",
       "params": [
@@ -10606,6 +10710,7 @@
       "category": "Statistics",
       "description": "Apply a multiple-comparison correction (Bonferroni / Benjamini-Hochberg).",
       "family": "stats",
+      "keywords": [],
       "label": "Correct P-Values",
       "paradigm": "functional",
       "params": [
@@ -10698,6 +10803,7 @@
       "category": "Statistics",
       "description": "Compute a pairwise correlation matrix.",
       "family": "stats",
+      "keywords": [],
       "label": "Correlation",
       "paradigm": "functional",
       "params": [
@@ -10772,6 +10878,7 @@
       "category": "Statistics",
       "description": "Cross-tabulation of two categorical columns with chi-square test.",
       "family": "stats",
+      "keywords": [],
       "label": "Crosstab",
       "paradigm": "functional",
       "params": [
@@ -10885,6 +10992,7 @@
       "category": "Statistics",
       "description": "Auto-emit a documented schema per column: type, null rate, cardinality, range/top-values, and optional user notes.",
       "family": "stats",
+      "keywords": [],
       "label": "Data Dictionary",
       "paradigm": "functional",
       "params": [
@@ -10974,6 +11082,7 @@
       "category": "Statistics",
       "description": "Compute summary statistics for numeric columns.",
       "family": "stats",
+      "keywords": [],
       "label": "Describe",
       "paradigm": "functional",
       "params": [
@@ -11025,6 +11134,7 @@
       "category": "Statistics",
       "description": "Run a curated diagnostic that operates on a raw DataFrame (e.g. VIF).",
       "family": "stats",
+      "keywords": [],
       "label": "Diagnostic (DataFrame)",
       "paradigm": "functional",
       "params": [
@@ -11087,6 +11197,7 @@
       "category": "Statistics",
       "description": "Run a curated diagnostic on a fitted StatsModel's residuals.",
       "family": "stats",
+      "keywords": [],
       "label": "Diagnostic (Model)",
       "paradigm": "functional",
       "params": [
@@ -11151,6 +11262,7 @@
       "category": "Statistics",
       "description": "Per-numeric-column quantiles and spread (min/p05/p25/p50/p75/p95/max/IQR).",
       "family": "stats",
+      "keywords": [],
       "label": "Distribution Summary",
       "paradigm": "functional",
       "params": [
@@ -11202,6 +11314,7 @@
       "category": "Statistics",
       "description": "Per-column profile: dtype, missingness, cardinality, skew/kurtosis.",
       "family": "stats",
+      "keywords": [],
       "label": "Profile",
       "paradigm": "functional",
       "params": [
@@ -11253,6 +11366,7 @@
       "category": "Statistics",
       "description": "Fit a Bayesian GLM (optionally hierarchical), via bambi/PyMC, summarized with ArviZ.",
       "family": "stats",
+      "keywords": [],
       "label": "Fit Bayesian Model",
       "paradigm": "functional",
       "params": [
@@ -11422,6 +11536,7 @@
       "category": "Statistics",
       "description": "Fit a generalized additive model: linear terms + B-spline smooth terms (statsmodels GLMGam, unpenalized).",
       "family": "stats",
+      "keywords": [],
       "label": "Fit GAM",
       "paradigm": "functional",
       "params": [
@@ -11535,6 +11650,7 @@
       "category": "Statistics",
       "description": "Fit a generalized linear model (Gaussian/Binomial/Poisson/NegativeBinomial/Gamma, statsmodels).",
       "family": "stats",
+      "keywords": [],
       "label": "Fit GLM",
       "paradigm": "functional",
       "params": [
@@ -11658,6 +11774,7 @@
       "category": "Statistics",
       "description": "Fit OLS/WLS/GLS linear regression (statsmodels).",
       "family": "stats",
+      "keywords": [],
       "label": "Fit Linear Regression",
       "paradigm": "functional",
       "params": [
@@ -11770,6 +11887,7 @@
       "category": "Statistics",
       "description": "Fit a linear mixed-effects / hierarchical model with random intercepts and slopes, grouped (statsmodels MixedLM).",
       "family": "stats",
+      "keywords": [],
       "label": "Fit Mixed Model",
       "paradigm": "functional",
       "params": [
@@ -11878,6 +11996,7 @@
       "category": "Statistics",
       "description": "Per-step conversion and drop-off funnel over an event log.",
       "family": "stats",
+      "keywords": [],
       "label": "Funnel",
       "paradigm": "functional",
       "params": [
@@ -11957,6 +12076,7 @@
       "category": "Statistics",
       "description": "Split-apply-combine: group by column(s) and aggregate.",
       "family": "stats",
+      "keywords": [],
       "label": "Group By Aggregate",
       "paradigm": "functional",
       "params": [
@@ -12054,6 +12174,7 @@
       "category": "Statistics",
       "description": "Kruskal-Wallis H-test across two or more groups.",
       "family": "stats",
+      "keywords": [],
       "label": "Kruskal-Wallis",
       "paradigm": "functional",
       "params": [
@@ -12124,6 +12245,7 @@
       "category": "Statistics",
       "description": "Mann-Whitney U rank-sum test between two groups.",
       "family": "stats",
+      "keywords": [],
       "label": "Mann-Whitney U",
       "paradigm": "functional",
       "params": [
@@ -12217,6 +12339,7 @@
       "category": "Statistics",
       "description": "Per-column null counts and percentages.",
       "family": "stats",
+      "keywords": [],
       "label": "Missingness",
       "paradigm": "functional",
       "params": [
@@ -12268,6 +12391,7 @@
       "category": "Statistics",
       "description": "Solve a power equation for effect size, sample size, or power.",
       "family": "stats",
+      "keywords": [],
       "label": "Power Analysis",
       "paradigm": "functional",
       "params": [
@@ -12369,6 +12493,7 @@
       "category": "Statistics",
       "description": "Two-proportion z-test comparing a binary outcome across two groups.",
       "family": "stats",
+      "keywords": [],
       "label": "Test Proportions",
       "paradigm": "functional",
       "params": [
@@ -12458,6 +12583,7 @@
       "category": "Statistics",
       "description": "Two-sample t-test between two groups.",
       "family": "stats",
+      "keywords": [],
       "label": "T-Test",
       "paradigm": "functional",
       "params": [
@@ -12566,6 +12692,7 @@
       "category": "Statistics",
       "description": "Wilcoxon signed-rank test for paired samples in two columns.",
       "family": "stats",
+      "keywords": [],
       "label": "Wilcoxon Signed-Rank",
       "paradigm": "functional",
       "params": [
@@ -12659,6 +12786,7 @@
       "category": "Time Series",
       "description": "Append first-difference and optional seasonal-difference columns.",
       "family": "timeseries",
+      "keywords": [],
       "label": "Difference",
       "paradigm": "functional",
       "params": [
@@ -12748,6 +12876,7 @@
       "category": "Time Series",
       "description": "Append exponentially-weighted moving-average columns.",
       "family": "timeseries",
+      "keywords": [],
       "label": "EWMA",
       "paradigm": "functional",
       "params": [
@@ -12865,6 +12994,7 @@
       "category": "Time Series",
       "description": "Fit a SARIMAX model and forecast future values (statsmodels).",
       "family": "timeseries",
+      "keywords": [],
       "label": "Forecast ARIMA",
       "paradigm": "functional",
       "params": [
@@ -12981,6 +13111,7 @@
       "category": "Time Series",
       "description": "Fit a Holt-Winters exponential smoothing model and forecast (statsmodels).",
       "family": "timeseries",
+      "keywords": [],
       "label": "Forecast ETS",
       "paradigm": "functional",
       "params": [
@@ -13135,6 +13266,7 @@
       "category": "Time Series",
       "description": "Create lagged feature columns for time series data.",
       "family": "timeseries",
+      "keywords": [],
       "label": "Lag Features",
       "paradigm": "functional",
       "params": [
@@ -13195,6 +13327,7 @@
       "category": "Time Series",
       "description": "Append rolling-window aggregate columns (mean, sum, std, min, max).",
       "family": "timeseries",
+      "keywords": [],
       "label": "Rolling Aggregate",
       "paradigm": "functional",
       "params": [
@@ -13309,6 +13442,7 @@
       "category": "Time Series",
       "description": "Decompose a time series into trend, seasonal, and residual components.",
       "family": "timeseries",
+      "keywords": [],
       "label": "Seasonal Decompose",
       "paradigm": "functional",
       "params": [
@@ -13420,6 +13554,7 @@
       "category": "Time Series",
       "description": "Append recency-weighted aggregate columns (linear or exponential decay).",
       "family": "timeseries",
+      "keywords": [],
       "label": "Time-Weighted Aggregate",
       "paradigm": "functional",
       "params": [
@@ -13531,6 +13666,7 @@
       "category": "Feature Transform",
       "description": "Discretize continuous features using a curated sklearn discretizer (KBinsDiscretizer or Binarizer).",
       "family": "transform",
+      "keywords": [],
       "label": "Discretize",
       "paradigm": "functional",
       "params": [
@@ -13622,6 +13758,7 @@
       "category": "Feature Transform",
       "description": "Encode categorical features using a curated sklearn encoder (OneHotEncoder, OrdinalEncoder, or TargetEncoder).",
       "family": "transform",
+      "keywords": [],
       "label": "Encode Categorical",
       "paradigm": "functional",
       "params": [
@@ -13733,6 +13870,7 @@
       "category": "Feature Transform",
       "description": "Generate new features from existing ones using a curated sklearn feature generator (PolynomialFeatures).",
       "family": "transform",
+      "keywords": [],
       "label": "Generate Features",
       "paradigm": "functional",
       "params": [
@@ -13823,6 +13961,7 @@
       "category": "Feature Transform",
       "description": "Scale numeric features using a curated sklearn scaler (StandardScaler, MinMaxScaler, RobustScaler, MaxAbsScaler, Normalizer, or PowerTransformer).",
       "family": "transform",
+      "keywords": [],
       "label": "Scale Features",
       "paradigm": "functional",
       "params": [
@@ -13918,6 +14057,7 @@
       "category": "Visualization",
       "description": "Render a curated, allow-listed chart (plotly.express) from a DataFrame.",
       "family": "viz",
+      "keywords": [],
       "label": "Plot",
       "paradigm": "functional",
       "params": [
@@ -13999,6 +14139,7 @@
       "category": "Visualization",
       "description": "Render an ACF or PACF bar plot of a fitted StatsModel's residuals.",
       "family": "viz",
+      "keywords": [],
       "label": "Plot ACF/PACF",
       "paradigm": "functional",
       "params": [
@@ -14062,6 +14203,7 @@
       "category": "Visualization",
       "description": "Render a coefficient / forest plot from a fitted StatsModel.",
       "family": "viz",
+      "keywords": [],
       "label": "Plot Coefficients",
       "paradigm": "functional",
       "params": [],
@@ -14093,6 +14235,7 @@
       "category": "Visualization",
       "description": "Render a confusion-matrix heatmap for a fitted classifier.",
       "family": "viz",
+      "keywords": [],
       "label": "Plot Confusion Matrix",
       "paradigm": "functional",
       "params": [],
@@ -14133,6 +14276,7 @@
       "category": "Visualization",
       "description": "Render a heatmap from a tidy correlation matrix (stats.correlation's output).",
       "family": "viz",
+      "keywords": [],
       "label": "Plot Correlation Heatmap",
       "paradigm": "functional",
       "params": [],
@@ -14164,6 +14308,7 @@
       "category": "Visualization",
       "description": "Render coverage vs. accuracy scatter to surface the accuracy/diversity trade-off.",
       "family": "viz",
+      "keywords": [],
       "label": "Plot Coverage vs. Accuracy",
       "paradigm": "functional",
       "params": [
@@ -14205,6 +14350,7 @@
       "category": "Visualization",
       "description": "Render a grouped bar chart comparing multiple recommenders across metrics.",
       "family": "viz",
+      "keywords": [],
       "label": "Plot Metric Comparison",
       "paradigm": "functional",
       "params": [
@@ -14246,6 +14392,7 @@
       "category": "Visualization",
       "description": "Render recommendation frequency vs. item popularity rank (log scale).",
       "family": "viz",
+      "keywords": [],
       "label": "Plot Popularity Distribution",
       "paradigm": "functional",
       "params": [
@@ -14296,6 +14443,7 @@
       "category": "Visualization",
       "description": "Render the precision@k/recall@k trade-off curve for a fitted recommender.",
       "family": "viz",
+      "keywords": [],
       "label": "Plot Precision-Recall Curve",
       "paradigm": "functional",
       "params": [
@@ -14346,6 +14494,7 @@
       "category": "Visualization",
       "description": "Render a 2-D dimensionality-reduction projection as a scatter plot.",
       "family": "viz",
+      "keywords": [],
       "label": "Plot Projection",
       "paradigm": "functional",
       "params": [
@@ -14405,6 +14554,7 @@
       "category": "Visualization",
       "description": "Render a Q-Q plot of a fitted StatsModel's residuals against a normal.",
       "family": "viz",
+      "keywords": [],
       "label": "Plot Q-Q",
       "paradigm": "functional",
       "params": [],
@@ -14436,6 +14586,7 @@
       "category": "Visualization",
       "description": "Render a fitted-values-vs-residuals scatter plot from a fitted StatsModel.",
       "family": "viz",
+      "keywords": [],
       "label": "Plot Residuals",
       "paradigm": "functional",
       "params": [],

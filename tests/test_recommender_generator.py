@@ -240,7 +240,7 @@ def test_als_requires_extra_surfaced():
 def test_export_catalog_includes_recommenders():
     artifact = export_catalog()
     assert artifact["catalog_version"] == CATALOG_VERSION
-    assert CATALOG_VERSION == 5
+    assert CATALOG_VERSION == 6
     recommenders = artifact["recommenders"]
     assert len(recommenders) == 15
     keys = [e["key"] for e in recommenders]

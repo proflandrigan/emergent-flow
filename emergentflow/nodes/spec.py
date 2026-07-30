@@ -229,6 +229,13 @@ class NodeSpec(IRModel):
         Human-friendly palette grouping, e.g. "Ingest", "Transform".
     description:
         One-line description shown in the palette / tooltips.
+    keywords:
+        Optional discoverability aliases for palette search (e.g.
+        ``["melt", "pivot", "unpivot"]``). The palette matches ``label``,
+        ``type``, ``description``, and these keywords, so listing the verbs a
+        user would type (which often differ from the node's label) makes a node
+        findable even when its label names the *category* of operation rather
+        than the verb (see issue #99). Empty by default; never ``None``.
     paradigm:
         Which execution paradigm this node belongs to (ADR 0003).
     advisor_persona:
@@ -248,6 +255,7 @@ class NodeSpec(IRModel):
     label: str
     category: str = ""
     description: str = ""
+    keywords: list[str] = Field(default_factory=list)
     paradigm: Paradigm = Paradigm.FUNCTIONAL
     advisor_persona: str | None = None
     ports: list[PortSpec] = Field(default_factory=list)

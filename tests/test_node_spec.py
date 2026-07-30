@@ -93,6 +93,7 @@ class TestNodeSpec:
         assert spec.paradigm == Paradigm.FUNCTIONAL
         assert spec.ports == []
         assert spec.params == []
+        assert spec.keywords == []
 
     def test_empty_type_raises(self):
         with pytest.raises(ValidationError):
@@ -101,6 +102,15 @@ class TestNodeSpec:
     def test_zero_version_raises(self):
         with pytest.raises(ValidationError):
             NodeSpec(type="t", family="data", label="x", version=0)
+
+    def test_keywords_round_trip(self):
+        spec = NodeSpec(
+            type="clean.reshape",
+            family="clean",
+            label="Reshape",
+            keywords=["melt", "pivot", "unpivot"],
+        )
+        assert NodeSpec.model_validate_json(spec.model_dump_json()) == spec
 
     def test_round_trip(self):
         spec = NodeSpec(
