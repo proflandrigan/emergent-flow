@@ -23,7 +23,7 @@ Approved direction from the interview:
 | **Ambition** | **Full overhaul in one pass** — replace inline styles everywhere with a token system |
 | **Panel model** | **Floating glass panels** over a full-bleed canvas |
 | **Color strategy** | **Per-function color coding** — each node family gets its own hue; base stays simple/clean |
-| **Sidebar structure** | **3 super-sections** (Data & Prep / Analysis / Modeling) with per-family sub-groups |
+| **Sidebar structure** | Super-sections (originally 3: Data & Prep / Analysis / Modeling; superseded by issue #104 / PR #110, which grew this to 9 ML-workflow sections — see `ui/src/palette/Palette.tsx`'s `SECTIONS`) with per-family sub-groups |
 | **Family palette** | **Warm-spectrum spread** (blue/teal/violet/amber/rose/green) |
 | **Node cards** | **Solid card + family color accent** (glass reserved for chrome, for legibility) |
 | **Icons** | **Add `lucide-react`** for family + action icons |
@@ -303,8 +303,16 @@ viewport edges.
 
 ### 6.1 Palette (grouped, collapsible) — `src/palette/Palette.tsx`
 
-The headline UX change. Replace the flat list with **3 collapsible super-sections**, each
+The headline UX change. Replace the flat list with **collapsible super-sections**, each
 containing **family sub-groups**, each listing its nodes.
+
+> **Update (issue #104 / PR #110):** the catalog grew from 6 to 17 families, and the original
+> 3-section model below left 11 families dumped into "More". `SECTIONS` now has 9 sections
+> tracing an ML workflow (Data → Prepare → Explore → Analyze → Model → Explain →
+> LLM & Embeddings → Report → Utility) that claim all 17 families — see the live definition
+> and comments in `ui/src/palette/Palette.tsx`. The shape below (family sub-groups as the
+> collapsible unit, search/collapse behavior, the "More" fallback for unknown families) is
+> otherwise still accurate.
 
 ```
 ┌ Palette ─────────────────────────┐
@@ -326,7 +334,8 @@ containing **family sub-groups**, each listing its nodes.
 └──────────────────────────────────┘
 ```
 
-**Section model** (static config; families come from the catalog):
+**Section model** (original 3-section version shown for the historical shape; static config,
+families come from the catalog):
 
 ```ts
 const SECTIONS = [
