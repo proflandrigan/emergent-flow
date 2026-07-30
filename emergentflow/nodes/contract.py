@@ -110,6 +110,12 @@ class NodeDefinition(ABC):
         Human-friendly palette grouping, e.g. ``"Ingest"``, ``"Transform"``.
     description:
         One-line description shown in the palette / tooltips.
+    keywords:
+        Optional discoverability aliases for palette search — the verbs a user
+        would type to find this node (e.g. ``["melt", "pivot", "unpivot"]`` on
+        ``clean.reshape``). Surfaced through ``to_spec()`` → ``/catalog`` and
+        matched by the canvas palette's search box alongside ``label``,
+        ``type``, and ``description`` (issue #99). Empty by default.
     paradigm:
         Execution paradigm (ADR 0003); default FUNCTIONAL.
     cacheable:
@@ -154,6 +160,7 @@ class NodeDefinition(ABC):
     label: ClassVar[str]
     category: ClassVar[str] = ""
     description: ClassVar[str] = ""
+    keywords: ClassVar[list[str]] = []
     paradigm: ClassVar[Paradigm] = Paradigm.FUNCTIONAL
     cacheable: ClassVar[bool] = True
     requires_client: ClassVar[bool] = False
@@ -270,6 +277,7 @@ class NodeDefinition(ABC):
             label=cls.label,
             category=cls.category,
             description=cls.description,
+            keywords=list(cls.keywords),
             paradigm=cls.paradigm,
             advisor_persona=cls.advisor_persona,
             ports=list(cls.ports),

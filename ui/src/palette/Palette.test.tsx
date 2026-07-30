@@ -28,6 +28,43 @@ test("search filters the list to matching entries", () => {
   expect(screen.getByText(/ANOVA/)).toBeInTheDocument();
 });
 
+test("search finds Reshape by the verb 'melt' (issue #99)", () => {
+  render(<Palette />);
+  fireEvent.change(screen.getByTestId("palette-search"), {
+    target: { value: "melt" },
+  });
+  expect(screen.getByText("Reshape")).toBeInTheDocument();
+  expect(screen.queryByText(/Load CSV/)).not.toBeInTheDocument();
+});
+
+test("search finds Reshape via a keyword not in its description (issue #99)", () => {
+  // 'transpose' appears only in clean.reshape's keywords, not label/type/description.
+  render(<Palette />);
+  fireEvent.change(screen.getByTestId("palette-search"), {
+    target: { value: "transpose" },
+  });
+  expect(screen.getByText("Reshape")).toBeInTheDocument();
+});
+
+test("search finds Explode Lists via a keyword not in its description (issue #99)", () => {
+  // 'unnest' appears only in clean.explode_lists's keywords.
+  render(<Palette />);
+  fireEvent.change(screen.getByTestId("palette-search"), {
+    target: { value: "unnest" },
+  });
+  expect(screen.getByText("Explode Lists")).toBeInTheDocument();
+});
+
+test("search finds a node via a term in its description only (issue #99)", () => {
+  // 'index-aligned' appears only in clean.explode_lists's description, not its
+  // label/type/keywords -- isolates the description-match path of the filter.
+  render(<Palette />);
+  fireEvent.change(screen.getByTestId("palette-search"), {
+    target: { value: "index-aligned" },
+  });
+  expect(screen.getByText("Explode Lists")).toBeInTheDocument();
+});
+
 test("clicking an entry adds a node to the store", () => {
   render(<Palette />);
   fireEvent.click(screen.getByText(/Load CSV/));

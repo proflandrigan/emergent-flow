@@ -44,6 +44,7 @@ export interface CatalogNode {
   label: string;
   category?: string;
   description?: string;
+  keywords?: string[];
   paradigm: string;
   ports: CatalogPort[];
   params: CatalogParam[];

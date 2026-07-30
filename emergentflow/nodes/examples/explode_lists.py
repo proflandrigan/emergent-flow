@@ -36,6 +36,7 @@ class ExplodeLists(NodeDefinition):
     description = (
         "Explode one or more index-aligned list columns into long rows (like pandas explode)."
     )
+    keywords = ["explode", "unnest", "flatten", "expand", "list"]
 
     ports = [
         PortSpec(

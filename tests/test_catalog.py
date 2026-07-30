@@ -77,6 +77,7 @@ _NODE_KEYS = {
     "label",
     "category",
     "description",
+    "keywords",
     "paradigm",
     "advisor_persona",
     "ports",
@@ -95,7 +96,7 @@ def ref_registry() -> NodeRegistry:
 
 
 def test_catalog_version_constant():
-    assert CATALOG_VERSION == 5
+    assert CATALOG_VERSION == 6
 
 
 def test_top_level_keys(ref_registry: NodeRegistry):
@@ -202,3 +203,20 @@ def test_export_catalog_uses_default_registry():
     assert artifact["nodes"]
     types = [node["type"] for node in artifact["nodes"]]
     assert "data.load_csv" in types
+
+
+def test_every_node_has_a_keywords_list():
+    for node in export_catalog()["nodes"]:
+        assert "keywords" in node
+        assert isinstance(node["keywords"], list)
+
+
+def test_keywords_surface_on_reshape_and_explode_nodes():
+    """issue #99: the reshape verbs (melt/pivot/...) must be findable in the catalog."""
+    by_type = {node["type"]: node for node in export_catalog()["nodes"]}
+    reshape = by_type["clean.reshape"]
+    assert "melt" in reshape["keywords"]
+    assert "pivot" in reshape["keywords"]
+    explode = by_type["clean.explode_lists"]
+    assert "explode" in explode["keywords"]
+    assert "unnest" in explode["keywords"]
