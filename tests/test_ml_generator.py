@@ -67,6 +67,12 @@ def test_node_type_cluster_detect_archetype():
     assert entries[0]["node_type"] == "ml.cluster_detect"
 
 
+def test_node_type_outlier_detect_archetype():
+    specs = [_make_spec(archetype="outlier_detect")]
+    entries = generate_estimator_catalog_entries(specs)
+    assert entries[0]["node_type"] == "ml.outlier_detect"
+
+
 # ---------------------------------------------------------------------------
 # sorting
 # ---------------------------------------------------------------------------

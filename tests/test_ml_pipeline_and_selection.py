@@ -200,6 +200,32 @@ def test_pipeline_equivalence_cluster_detect_final_step() -> None:
     )
 
 
+@pytest.mark.equivalence
+def test_pipeline_equivalence_outlier_detect_final_step() -> None:
+    """execute == running the emitted code, for a pipeline ending in an outlier_detect step."""
+    df = _classification_df()  # label column is unused
+    steps = [
+        {"estimator": "StandardScaler", "params": {}},
+        {"estimator": "IsolationForest", "params": {"random_state": 0}},
+    ]
+
+    defn = Pipeline()
+    node = defn.instantiate(steps=steps, features=["x1", "x2"])
+    executed_model = defn.execute(node, inputs={"frame": df.copy()})["model"]
+    scope = _run_codegen(defn, node, {"frame": df.copy()})
+    codegen_model = scope["model"]
+
+    assert executed_model.estimator_type == codegen_model.estimator_type == "Pipeline"
+    assert executed_model.task == codegen_model.task == "outlier_detection"
+    assert executed_model.target is None
+    assert codegen_model.target is None
+    assert executed_model.feature_names == codegen_model.feature_names
+    assert (
+        executed_model.estimator.predict(df[executed_model.feature_names]).tolist()
+        == codegen_model.estimator.predict(df[codegen_model.feature_names]).tolist()
+    )
+
+
 def test_pipeline_allows_repeated_estimator_key_across_steps() -> None:
     """Pipeline step names must be unique even when two steps share an estimator key.
 

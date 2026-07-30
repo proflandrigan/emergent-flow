@@ -20,14 +20,12 @@ from typing import Any
 from emergentflow.ml.registry import Archetype, EstimatorSpec
 
 #: Maps each fixed adapter archetype (ADR 0016 subsection 3) to the node ``type`` that
-#: consumes estimators of that archetype. Only "fit" has a node file today
-#: (``ml.fit_estimator``); "fit_transform"/"cluster_detect" node types are separate,
-#: later tasks (Story 5/6) -- their catalog entries are still generated here (the
-#: generator is archetype-agnostic data plumbing) even though no node consumes them yet.
+#: consumes estimators of that archetype.
 _ARCHETYPE_NODE_TYPE: dict[Archetype, str] = {
     "fit": "ml.fit_estimator",
     "fit_transform": "ml.fit_transform",
     "cluster_detect": "ml.cluster_detect",
+    "outlier_detect": "ml.outlier_detect",
 }
 
 #: Splits before a lowercase/digit -> uppercase transition (``"Logistic|Regression"``) and

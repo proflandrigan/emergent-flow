@@ -25,6 +25,7 @@ import sys
 from dataclasses import dataclass
 from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -60,6 +61,7 @@ __all__ = [
     "compare_models",
     "cross_validate",
     "evaluate",
+    "fit_and_detect",
     "fit_and_label",
     "fit_estimator",
     "fit_pipeline",
@@ -116,12 +118,13 @@ class FittedModel:
     ``@public_op`` contract; when surfaced to the result-payload contract the ``estimator`` field
     simply degrades to ``{"kind": "unsupported"}`` (it is never meant to be rendered).
 
-    ``target`` is ``None`` for the ``cluster_detect`` archetype (Epic 8, Story 2), which has no
-    target column; every other producer of ``FittedModel`` sets it to the trained target column.
+    ``target`` is ``None`` for the ``cluster_detect`` and ``outlier_detect`` archetypes
+    (Epic 8, Story 2), which have no target column; every other producer of ``FittedModel``
+    sets it to the trained target column.
     """
 
     estimator_type: str  # e.g. "LinearRegression", "RandomForestClassifier"
-    task: str  # "classification" | "regression" | "clustering"
+    task: str  # "classification" | "regression" | "clustering" | "outlier_detection"
     feature_names: list[str]
     target: str | None
     estimator: Any  # live sklearn estimator; not JSON-serialized
@@ -473,6 +476,8 @@ def fit_estimator(
       ``task`` taken from the registry entry (``"classification"`` or ``"regression"``).
     * ``"cluster_detect"`` (unsupervised label/score) ignores ``target`` and returns a
       :class:`FittedModel` with ``task="clustering"`` and ``target=None``.
+    * ``"outlier_detect"`` (unsupervised outlier/novelty detection) ignores ``target`` and
+      returns a :class:`FittedModel` with ``task="outlier_detection"`` and ``target=None``.
     * ``"fit_transform"`` (unsupervised transformer) returns a :class:`FittedTransformer`.
       ``target`` is optional here: most transformers (scalers, decomposition, manifold) fit
       unsupervised on features alone, but a curated few (e.g. ``SelectKBest``, ``RFE``,
@@ -508,6 +513,17 @@ def fit_estimator(
         return FittedModel(
             estimator_type=spec.key,
             task=spec.task or "clustering",
+            feature_names=list(feature_names),
+            target=None,
+            estimator=est,
+        )
+
+    if spec.archetype == "outlier_detect":
+        feature_names = _resolve_features_for_fit(df, features, target=None)
+        est = spec.sklearn_class(**kwargs).fit(df[feature_names])
+        return FittedModel(
+            estimator_type=spec.key,
+            task=spec.task or "outlier_detection",
             feature_names=list(feature_names),
             target=None,
             estimator=est,
@@ -668,8 +684,9 @@ def fit_pipeline(
 
     The ``ml.pipeline`` node's backend (Epic 8, Story 8 / ADR 0016). Every step but the last
     must be a ``fit_transform``-archetype estimator (a scaler, encoder, decomposition, ...);
-    the final step must be a ``fit`` (supervised classifier/regressor) or ``cluster_detect``
-    (unsupervised label/score) archetype estimator. Composing the whole chain into ONE
+    the final step must be a ``fit`` (supervised classifier/regressor), ``cluster_detect``
+    (unsupervised label/score), or ``outlier_detect`` (unsupervised outlier/novelty detection)
+    archetype estimator. Composing the whole chain into ONE
     ``sklearn.pipeline.Pipeline`` object -- rather than requiring N separate
     ``ml.apply_estimator`` nodes wired in sequence at inference time -- is the distinct
     graph-shape pipelines solve (Epic 8, Story 8): the fitted ``Pipeline`` rides inside a
@@ -684,9 +701,9 @@ def fit_pipeline(
     :class:`~emergentflow.ml.errors.UnknownEstimatorError` /
     :class:`~emergentflow.ml.errors.InvalidEstimatorParamsError`). Raises ``ValueError`` if
     ``steps`` is empty, if any non-final step is not a ``fit_transform``-archetype estimator,
-    or if the final step is not a ``fit``/``cluster_detect``-archetype estimator. A ``fit``
-    final step also requires ``target`` (mirroring :func:`fit_estimator`); a ``cluster_detect``
-    final step ignores ``target`` entirely.
+    or if the final step is not a ``fit``/``cluster_detect``/``outlier_detect``-archetype
+    estimator. A ``fit`` final step requires ``target`` (mirroring :func:`fit_estimator`);
+    ``cluster_detect`` and ``outlier_detect`` final steps ignore ``target`` entirely.
 
     Deterministic given a ``random_state`` kwarg where the underlying estimators accept one.
     Never mutates ``df``.
@@ -708,10 +725,10 @@ def fit_pipeline(
     final_spec, final_kwargs = _resolve_estimator_and_kwargs(
         final_step["estimator"], final_step.get("params")
     )
-    if final_spec.archetype not in ("fit", "cluster_detect"):
+    if final_spec.archetype not in ("fit", "cluster_detect", "outlier_detect"):
         raise ValueError(
-            f"pipeline's final step {final_step['estimator']!r} must be a fit or "
-            "cluster_detect-archetype estimator."
+            f"pipeline's final step {final_step['estimator']!r} must be a fit, "
+            "cluster_detect, or outlier_detect-archetype estimator."
         )
     sk_steps.append(
         (
@@ -738,12 +755,13 @@ def fit_pipeline(
             estimator=pipe,
         )
 
-    # final_spec.archetype == "cluster_detect"
+    # final_spec.archetype in ("cluster_detect", "outlier_detect")
     feature_names = _resolve_features_for_fit(df, features, target=None)
     pipe.fit(df[feature_names])
     return FittedModel(
         estimator_type="Pipeline",
-        task=final_spec.task or "clustering",
+        task=final_spec.task
+        or ("outlier_detection" if final_spec.archetype == "outlier_detect" else "clustering"),
         feature_names=list(feature_names),
         target=None,
         estimator=pipe,
@@ -1042,8 +1060,9 @@ def apply_estimator(
     fitted Model/Transformer + a DataFrame" step routes through this one function, covering
     three ops:
 
-    * ``"predict"`` requires a :class:`FittedModel` (``fit`` or ``cluster_detect`` archetype)
-      and adds a ``prediction`` column, mirroring :func:`predict`.
+    * ``"predict"`` requires a :class:`FittedModel` (``fit``, ``cluster_detect``, or
+      ``outlier_detect`` archetype) and adds a ``prediction`` column, mirroring :func:`predict`.
+      For ``outlier_detect`` models this produces ``-1``/``1`` outlier labels.
     * ``"transform"`` requires a :class:`FittedTransformer` (``fit_transform`` archetype) and
       adds ``component_0``, ``component_1``, ... columns, one per output column of
       ``transformer.transform(...)``.
@@ -1156,6 +1175,65 @@ def fit_and_label(
         raise ValueError(f"{model.estimator_type} exposes neither labels_ nor predict.")
     result = df.copy()
     result["cluster"] = labels
+    return model, result
+
+
+@public_op(name="ef.ml.fit_and_detect")
+def fit_and_detect(
+    df: pd.DataFrame,
+    *,
+    estimator: str,
+    features: list[str] | None = None,
+    params: dict[str, Any] | None = None,
+) -> tuple[FittedModel, pd.DataFrame]:
+    """Fit a curated ``outlier_detect``-archetype estimator and label the SAME frame it fit on.
+
+    The ``ml.outlier_detect`` archetype's backend (Epic 8, Story 6 / ADR 0016). Outlier and
+    novelty detectors produce their labels as part of fitting itself. This function fits via
+    :func:`fit_estimator` and immediately labels the *same* input frame, which constrains how
+    the labels may be obtained -- in priority order:
+
+    * ``LocalOutlierFactor`` is read from its fit-time ``negative_outlier_factor_`` /
+      ``offset_`` attributes. sklearn documents that with ``novelty=True`` (the curated
+      default, needed so a later ``ml.apply_estimator`` can predict on a *different* frame)
+      you "should only use predict, decision_function and score_samples on new unseen data
+      and not on the training set" -- self-scoring finds each point as its own nearest
+      neighbor at distance 0 and inflates its local density, silently misclassifying points
+      near the boundary. The fit-time attributes ARE the standard LOF labels for the fitted
+      frame, so this path is both correct and independent of ``novelty``.
+    * Otherwise ``.predict(X)`` when available (``IsolationForest``, ``OneClassSVM``,
+      ``EllipticEnvelope``, whose training-set predictions are well-defined).
+    * Otherwise ``.fit_predict(X)``.
+
+    Returns ``(model, labeled_df)`` where ``labeled_df`` is a NEW frame (``df`` is never
+    mutated) with an added ``"outlier"`` column following sklearn's convention (``-1`` for
+    outliers, ``1`` for inliers). Raises ``ValueError`` if *estimator* is not an
+    ``outlier_detect``-archetype estimator, if ``df`` already has an ``"outlier"`` column, or
+    if the fitted estimator exposes neither ``.predict`` nor ``.fit_predict``.
+    """
+    spec = get_estimator_spec(estimator)
+    if spec.archetype != "outlier_detect":
+        raise ValueError(f"{estimator!r} is not an outlier_detect-archetype estimator.")
+    if "outlier" in df.columns:
+        raise ValueError("df already has an 'outlier' column; rename it before detecting.")
+    # spec.archetype == "outlier_detect" guarantees fit_estimator returns a FittedModel.
+    fitted = fit_estimator(df, estimator=estimator, features=features, params=params)
+    model = cast(FittedModel, fitted)
+    est = model.estimator
+    X = df[model.feature_names]
+    negative_outlier_factor = getattr(est, "negative_outlier_factor_", None)
+    if negative_outlier_factor is not None:
+        # LocalOutlierFactor -- see the docstring: .predict() on the fitted frame is the one
+        # usage sklearn rules out, and these attributes give the standard LOF labels instead.
+        labels = np.where(negative_outlier_factor < est.offset_, -1, 1)
+    elif hasattr(est, "predict"):
+        labels = est.predict(X)
+    elif hasattr(est, "fit_predict"):
+        labels = est.fit_predict(X)
+    else:
+        raise ValueError(f"{model.estimator_type} exposes neither predict nor fit_predict.")
+    result = df.copy()
+    result["outlier"] = labels
     return model, result
 
 

@@ -694,13 +694,13 @@
         'task': 'regression',
       }),
       dict({
-        'archetype': 'cluster_detect',
+        'archetype': 'outlier_detect',
         'category': 'Covariance',
         'description': 'Detects anomalies by fitting a robust covariance ellipse to normal data.',
         'import_path': 'sklearn.covariance.EllipticEnvelope',
         'key': 'EllipticEnvelope',
         'label': 'Elliptic Envelope',
-        'node_type': 'ml.cluster_detect',
+        'node_type': 'ml.outlier_detect',
         'params': list([
           dict({
             'choices': None,
@@ -1029,13 +1029,13 @@
         'task': 'regression',
       }),
       dict({
-        'archetype': 'cluster_detect',
+        'archetype': 'outlier_detect',
         'category': 'Ensemble',
         'description': 'Detects anomalies by isolating observations via random recursive partitioning.',
         'import_path': 'sklearn.ensemble.IsolationForest',
         'key': 'IsolationForest',
         'label': 'Isolation Forest',
-        'node_type': 'ml.cluster_detect',
+        'node_type': 'ml.outlier_detect',
         'params': list([
           dict({
             'choices': None,
@@ -1291,13 +1291,13 @@
         'task': 'classification',
       }),
       dict({
-        'archetype': 'cluster_detect',
+        'archetype': 'outlier_detect',
         'category': 'Neighbors',
         'description': "Detects anomalies by comparing a sample's local density to that of its neighbors.",
         'import_path': 'sklearn.neighbors.LocalOutlierFactor',
         'key': 'LocalOutlierFactor',
         'label': 'Local Outlier Factor',
-        'node_type': 'ml.cluster_detect',
+        'node_type': 'ml.outlier_detect',
         'params': list([
           dict({
             'choices': None,
@@ -1521,13 +1521,13 @@
         'task': None,
       }),
       dict({
-        'archetype': 'cluster_detect',
+        'archetype': 'outlier_detect',
         'category': 'SVM',
         'description': 'Detects anomalies by learning a boundary that encloses the bulk of normal data.',
         'import_path': 'sklearn.svm.OneClassSVM',
         'key': 'OneClassSVM',
         'label': 'One Class SVM',
-        'node_type': 'ml.cluster_detect',
+        'node_type': 'ml.outlier_detect',
         'params': list([
           dict({
             'choices': None,

@@ -45,6 +45,7 @@ const CURATED_PARAM_NODES: Record<string, CuratedParamConfig> = {
   "ml.fit_estimator": { choiceParam: "estimator", dictParam: "params", source: "estimators" },
   "ml.fit_transform": { choiceParam: "estimator", dictParam: "params", source: "estimators" },
   "ml.cluster_detect": { choiceParam: "estimator", dictParam: "params", source: "estimators" },
+  "ml.outlier_detect": { choiceParam: "estimator", dictParam: "params", source: "estimators" },
   "ml.cross_validate": { choiceParam: "estimator", dictParam: "params", source: "estimators" },
   "transform.scale_features": {
     choiceParam: "estimator",

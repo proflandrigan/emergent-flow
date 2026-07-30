@@ -20,6 +20,7 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
 from emergentflow.api import public_op
+from emergentflow.clean.outliers import check_outlier_rule, is_outlier_eligible, outlier_bounds
 
 # ``PlotSpec`` (emergentflow.viz.models) is a standalone dataclass that imports nothing from
 # ``emergentflow.stats``, so importing it here is cycle-free -- unlike ``emergentflow.viz`` itself
@@ -181,6 +182,70 @@ def distribution_summary(df: pd.DataFrame, *, columns: list[str] | None = None) 
                 "p95": p95,
                 "max": float(series.max()),
                 "iqr": p75 - p25,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+@public_op(name="ef.stats.outlier_summary")
+def outlier_summary(
+    df: pd.DataFrame,
+    *,
+    columns: list[str] | None = None,
+    method: str = "zscore",
+    threshold: float = 3.0,
+) -> pd.DataFrame:
+    """Report the outlier bounds a rule would apply, one row per numeric column.
+
+    The auditable companion to ``ef.clean.detect_outliers``: same ``columns``/
+    ``method``/``threshold`` contract, but returns the thresholds and hit counts
+    instead of a flagged frame. Columns:
+    ``column``/``method``/``threshold``/``lower``/``upper``/``n``/``n_outliers``/
+    ``pct_outliers``.
+
+    Shares the detector's ``check_outlier_rule``/``outlier_bounds``/``is_outlier_eligible``
+    seam and applies the identical ``value < lower or value > upper`` test, so
+    ``n_outliers`` always equals the number of rows ``detect_outliers`` flags for that
+    column under the same arguments — the reported cut cannot drift from the applied cut.
+    ``n`` counts non-missing values, and missing values are never counted as outliers.
+
+    Where the two ops deliberately differ: a named column that is non-numeric (or boolean)
+    is silently omitted here, mirroring ``distribution_summary``, where ``detect_outliers``
+    raises. Raises ``ValueError`` for an unknown ``method`` or a ``threshold`` outside the
+    method's domain. Never mutates ``df``.
+    """
+    problem = check_outlier_rule(method, threshold)
+    if problem is not None:
+        raise ValueError(problem)
+
+    if columns is not None:
+        unknown = [c for c in columns if c not in df.columns]
+        if unknown:
+            raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+        target = df[columns]
+    else:
+        target = df
+
+    rows: list[dict[str, Any]] = []
+    for col in target.columns:
+        series = target[col]
+        if not is_outlier_eligible(series):
+            continue
+        values = series.astype("float64")
+        lower, upper = outlier_bounds(values, method=method, threshold=threshold)
+        n = int(values.count())
+        n_outliers = int(((values < lower) | (values > upper)).sum())
+        pct_outliers = round(float(n_outliers / n * 100) if n else 0.0, 4)
+        rows.append(
+            {
+                "column": col,
+                "method": method,
+                "threshold": float(threshold),
+                "lower": lower,
+                "upper": upper,
+                "n": n,
+                "n_outliers": n_outliers,
+                "pct_outliers": pct_outliers,
             }
         )
     return pd.DataFrame(rows)

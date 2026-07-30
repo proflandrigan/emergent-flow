@@ -34,12 +34,13 @@ __all__ = [
     "known_estimator_keys",
     "keys_for_archetype",
     "feature_selector_keys",
+    "outlier_detector_keys",
 ]
 
-#: The three fixed adapter shapes locked by ADR 0016 subsection 3. ("apply" is not an
+#: The four fixed adapter shapes locked by ADR 0016 subsection 3. ("apply" is not an
 #: archetype an estimator is *registered under* -- it is the shared consumer side, backed
 #: by ``ef.ml.apply_estimator`` for every archetype below.)
-Archetype = Literal["fit", "fit_transform", "cluster_detect"]
+Archetype = Literal["fit", "fit_transform", "cluster_detect", "outlier_detect"]
 
 
 @dataclass(frozen=True)
@@ -95,6 +96,9 @@ class EstimatorSpec:
     is_feature_selector: whether this estimator is curated for feature selection (surfaced
         via ``feature_selector_keys()`` for the ``ml.select_features`` node's dropdown);
         default ``False``.
+    detects_outliers: whether this estimator is an outlier/novelty detector (surfaced
+        via ``outlier_detector_keys()`` for the ``ml.outlier_detect`` node's dropdown);
+        default ``False``.
     """
 
     key: str
@@ -106,6 +110,7 @@ class EstimatorSpec:
     accepted_kwargs: dict[str, KwargSpec] = field(default_factory=dict)
     summary_builder: Callable[[Any], dict[str, Any]] | None = None
     is_feature_selector: bool = False
+    detects_outliers: bool = False
 
 
 _REGISTRY: dict[str, EstimatorSpec] = {}
@@ -158,3 +163,11 @@ def feature_selector_keys() -> list[str]:
     Shared by the ``ml.select_features`` node's ``selector`` dropdown (``choices=`` hint).
     """
     return sorted(k for k, spec in _REGISTRY.items() if spec.is_feature_selector)
+
+
+def outlier_detector_keys() -> list[str]:
+    """Every registered estimator key flagged as an outlier detector, sorted.
+
+    Shared by the ``ml.outlier_detect`` node's ``estimator`` dropdown (``choices=`` hint).
+    """
+    return sorted(k for k, spec in _REGISTRY.items() if spec.detects_outliers)

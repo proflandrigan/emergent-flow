@@ -1206,7 +1206,8 @@ register_estimator(
         "partitioning.",
         import_path="sklearn.ensemble.IsolationForest",
         sklearn_class=IsolationForest,
-        archetype="cluster_detect",
+        archetype="outlier_detect",
+        detects_outliers=True,
         accepted_kwargs={
             "n_estimators": KwargSpec(default=100, help="Number of base estimators."),
             "contamination": KwargSpec(
@@ -1225,7 +1226,8 @@ register_estimator(
         "its neighbors.",
         import_path="sklearn.neighbors.LocalOutlierFactor",
         sklearn_class=LocalOutlierFactor,
-        archetype="cluster_detect",
+        archetype="outlier_detect",
+        detects_outliers=True,
         accepted_kwargs={
             "n_neighbors": KwargSpec(default=20, help="Number of neighbors to use."),
             "contamination": KwargSpec(
@@ -1247,7 +1249,8 @@ register_estimator(
         "normal data.",
         import_path="sklearn.svm.OneClassSVM",
         sklearn_class=OneClassSVM,
-        archetype="cluster_detect",
+        archetype="outlier_detect",
+        detects_outliers=True,
         accepted_kwargs={
             "kernel": KwargSpec(
                 default="rbf", help="Kernel type ('linear'/'poly'/'rbf'/'sigmoid')."
@@ -1264,7 +1267,8 @@ register_estimator(
         description="Detects anomalies by fitting a robust covariance ellipse to normal data.",
         import_path="sklearn.covariance.EllipticEnvelope",
         sklearn_class=EllipticEnvelope,
-        archetype="cluster_detect",
+        archetype="outlier_detect",
+        detects_outliers=True,
         accepted_kwargs={
             "contamination": KwargSpec(
                 default=0.1, help="Expected proportion of outliers in the data."

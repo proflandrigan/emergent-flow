@@ -382,6 +382,30 @@ class NodeDefinition(ABC):
 
         return errors
 
+    def validate_param_values(self, node: Node) -> list[str]:
+        """Validate only the *values* of params this node actually carries.
+
+        The subset of :meth:`validate_node` that ``ef.validate`` gates a whole graph on:
+        every :class:`ValidationHints` constraint (choices, numeric min/max, string/list
+        length, regex) applied to params that are present and non-None.
+
+        Deliberately omits :meth:`validate_node`'s missing-required-param and
+        undeclared-param checks. A node dropped from the palette and not yet configured is
+        the normal transient state on the canvas, and graph validation "must NOT block
+        building exploratory, half-wired graphs" (see ``emergentflow.codegen.validation``);
+        a missing required param already fails loudly at execute time. A param whose value
+        the contract forbids is different in kind -- it is stale or wrong rather than
+        unfinished, and it is what the author needs told about before running.
+        """
+        specs = {ps.name: ps for ps in type(self).params}
+        errors: list[str] = []
+        for param in node.params:
+            ps = specs.get(param.name)
+            if ps is None or param.value is None:
+                continue
+            errors.extend(_check_hints(param.name, param.value, ps))
+        return errors
+
 
 # ---------------------------------------------------------------------------
 # Validation-hint checking
@@ -396,8 +420,19 @@ def _check_hints(name: str, value: Any, ps: ParamSpec) -> list[str]:
 
     errors: list[str] = []
 
-    if hints.choices is not None and value not in hints.choices:
-        errors.append(f"param {name!r} value {value!r} is not one of {hints.choices!r}.")
+    if hints.choices is not None:
+        # For a list-typed param (e.g. ml.compare_models' `estimators`) the choices
+        # enumerate the valid *elements*, not valid whole-list values -- a multi-select,
+        # not a select. Comparing the list itself against the choices would reject every
+        # non-empty selection.
+        if isinstance(value, list):
+            unknown = [v for v in value if v not in hints.choices]
+            if unknown:
+                errors.append(
+                    f"param {name!r} value(s) {unknown!r} are not among {hints.choices!r}."
+                )
+        elif value not in hints.choices:
+            errors.append(f"param {name!r} value {value!r} is not one of {hints.choices!r}.")
 
     if isinstance(value, bool):
         # bool is a subclass of int; never treat it as a numeric for min/max.

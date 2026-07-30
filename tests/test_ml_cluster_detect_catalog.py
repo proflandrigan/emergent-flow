@@ -7,7 +7,7 @@ Three things this file proves, per Story 6's own checklist and the Story 9 harne
    ``compile_to_code`` output (LoadSample -> ClusterDetect) is syntactically valid Python and
    passes ``ruff check`` (mirrors ``tests/test_ml_supervised_catalog.py``'s idiom).
 2. ADR-0002 equivalence at scale: for EVERY estimator registered with archetype="cluster_detect"
-   (the entire clustering/mixture/outlier allow-list, computed dynamically so this test grows
+   (the entire clustering/mixture allow-list, computed dynamically so this test grows
    automatically as the allow-list widens), ``execute()`` and running the code ``codegen()``
    emits produce the same fitted-model metadata and the same "cluster" column.
 3. The labels_-only estimators (DBSCAN, AgglomerativeClustering, SpectralClustering) correctly
@@ -31,6 +31,7 @@ import pandas as pd
 import pytest
 
 from emergentflow.codegen.compiler import compile_to_code
+from emergentflow.codegen.validation import validate
 from emergentflow.ir.common import Direction
 from emergentflow.ir.edge import Edge, PortRef
 from emergentflow.ir.graph import Graph
@@ -100,7 +101,6 @@ _KEY_OVERRIDES: dict[str, dict] = {
     "Birch": {"n_clusters": 2, "threshold": 0.5},
     "GaussianMixture": {"n_components": 2},
     "BayesianGaussianMixture": {"n_components": 2},
-    "LocalOutlierFactor": {"n_neighbors": 5},
 }
 
 
@@ -115,7 +115,6 @@ def _params_for(estimator_key: str) -> dict:
 _REPRESENTATIVE_ESTIMATORS = [
     "KMeans",  # clustering (seed)
     "GaussianMixture",  # mixture (seed)
-    "IsolationForest",  # outlier/novelty
 ]
 
 
@@ -222,7 +221,7 @@ def test_labels_only_estimator_rejects_predict_on_new_data(estimator_key: str) -
 
 
 # ---------------------------------------------------------------------------
-# 4. ``ef.ml.fit_and_label`` archetype validation and the LocalOutlierFactor(novelty=False) path.
+# 4. ``ef.ml.fit_and_label`` archetype validation.
 # ---------------------------------------------------------------------------
 
 
@@ -235,13 +234,47 @@ def test_fit_and_label_rejects_fit_archetype_estimator_up_front() -> None:
         fit_and_label(df, estimator="LogisticRegression", features=_FEATURES)
 
 
-def test_fit_and_label_local_outlier_factor_novelty_false() -> None:
-    """LocalOutlierFactor with ``novelty=False`` has neither ``.labels_`` nor ``.predict``
-    (sklearn only exposes ``.predict`` when ``novelty=True``) -- ``fit_and_label`` must fall
-    back to ``.fit_predict()`` instead of raising."""
-    df = _blob_df()
-    model, result = fit_and_label(
-        df, estimator="LocalOutlierFactor", features=_FEATURES, params={"novelty": False}
-    )
-    assert "cluster" in result.columns
-    assert set(result["cluster"].unique()).issubset({-1, 1})
+# ---------------------------------------------------------------------------
+# 5. Migration: the four detectors that moved to the outlier_detect archetype.
+# ---------------------------------------------------------------------------
+
+
+_MOVED_TO_OUTLIER_DETECT = [
+    "IsolationForest",
+    "LocalOutlierFactor",
+    "OneClassSVM",
+    "EllipticEnvelope",
+]
+
+
+@pytest.mark.parametrize("estimator_key", _MOVED_TO_OUTLIER_DETECT)
+def test_moved_detectors_are_gone_from_cluster_detect_choices(estimator_key: str) -> None:
+    """The node must not advertise estimators ``fit_and_label`` can no longer fit."""
+    estimator_param = next(p for p in ClusterDetect.params if p.name == "estimator")
+    assert estimator_param.hints is not None
+    assert estimator_key not in (estimator_param.hints.choices or [])
+
+
+@pytest.mark.parametrize("estimator_key", _MOVED_TO_OUTLIER_DETECT)
+def test_stale_cluster_detect_estimator_is_a_validate_time_error(estimator_key: str) -> None:
+    """A graph saved before the archetype move must fail at *validate* time, not execute.
+
+    These four estimators moved to ``ml.outlier_detect``, so an ``ml.cluster_detect`` node
+    still naming one is stale. Before ``validate`` checked param values it sailed through
+    unflagged and only blew up inside ``fit_and_label`` at run time -- and an exported
+    script blew up later still, at *its* run time, with no compile-time signal.
+    """
+    node = ClusterDetect().instantiate(estimator=estimator_key, features=_FEATURES)
+    graph = Graph(nodes={node.id: node}, edges={})
+
+    diagnostics = validate(graph)
+
+    stale = [d for d in diagnostics.errors if d.code == "param_invalid"]
+    assert len(stale) == 1, diagnostics.errors
+    assert stale[0].node_id == node.id
+    assert estimator_key in stale[0].message
+
+
+def test_cluster_detect_version_reflects_the_narrowed_choices() -> None:
+    """Dropping four entries from ``estimator``'s choices is a param-contract change."""
+    assert ClusterDetect.version == 2

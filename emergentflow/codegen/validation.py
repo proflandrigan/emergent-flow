@@ -190,6 +190,50 @@ def _collect_structural_diagnostics(
     return diagnostics
 
 
+def _collect_param_diagnostics(
+    graph: Graph,
+    node_registry: NodeRegistry,
+) -> list[Diagnostic]:
+    """Collect per-node param-value diagnostics from each node definition's own contract.
+
+    Delegates to `NodeDefinition.validate_param_values`, which applies every
+    `ValidationHints` constraint (choices, numeric min/max, string/list length, regex) to
+    the params a node actually carries. Those checks already existed but had no caller
+    outside tests, so a param value that a node's contract forbids -- most visibly a
+    `choices` entry that a node version has since dropped, e.g. an `ml.cluster_detect` node
+    still naming an estimator that moved to the `ml.outlier_detect` archetype -- reached
+    `execute` and failed there instead of surfacing on the canvas as a diagnostic on the
+    offending node.
+
+    Scoped to param *values* on purpose: a missing required param means "not configured
+    yet", which must stay valid so half-built graphs remain inspectable (see this module's
+    docstring). See `validate_param_values` for that split.
+
+    A node whose type is not registered contributes nothing (its contract is unknown),
+    mirroring `required_in_port_names`.
+
+    Deterministic: nodes are visited in ascending node-id order, and messages come back in
+    the node's own param order, so the same graph always yields the same diagnostics order.
+    """
+    diagnostics: list[Diagnostic] = []
+
+    for node in sorted(graph.nodes.values(), key=lambda n: n.id):
+        definition_cls = node_registry.try_get(node.type)
+        if definition_cls is None:
+            continue
+        for message in definition_cls().validate_param_values(node):
+            diagnostics.append(
+                Diagnostic(
+                    severity=Severity.ERROR,
+                    code="param_invalid",
+                    message=f"node {node.id!r} ({node.type}): {message}",
+                    node_id=node.id,
+                )
+            )
+
+    return diagnostics
+
+
 def _collect_type_diagnostics(
     graph: Graph,
     node_registry: NodeRegistry,
@@ -276,7 +320,9 @@ def validate(
 
     Runs whole-graph type inference (Story 4) then checks every edge with the
     rules engine (Story 3), and adds the structural checks (cardinality, required
-    IN ports). The result is JSON-native so the canvas renders it directly.
+    IN ports) plus each node's own param contract (required/undeclared params and
+    every `ValidationHints` constraint, via `NodeDefinition.validate_node`). The
+    result is JSON-native so the canvas renders it directly.
 
     This is deliberately a *separate* call from `Graph`'s construction-time
     structural validation: type/cardinality validation must NOT block building
@@ -298,11 +344,12 @@ def validate(
         A `Diagnostics` with every finding plus the per-edge compatibility map.
     """
     structural = _collect_structural_diagnostics(graph, node_registry)
+    params = _collect_param_diagnostics(graph, node_registry)
     type_diagnostics, edge_compatibility = _collect_type_diagnostics(
         graph, node_registry, type_registry
     )
     diagnostics = [
-        d.model_copy(update={"source": "validator"}) for d in structural + type_diagnostics
+        d.model_copy(update={"source": "validator"}) for d in structural + params + type_diagnostics
     ]
     return Diagnostics(
         diagnostics=diagnostics,
