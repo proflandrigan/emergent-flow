@@ -76,6 +76,24 @@
   --fam-transform-soft: rgba(249, 115, 22, 0.14);
   --fam-notes: #eab308;
   --fam-notes-soft: rgba(234, 179, 8, 0.14);
+  --fam-viz: #06b6d4;
+  --fam-viz-soft: rgba(6, 182, 212, 0.14);
+  --fam-timeseries: #0ea5e9;
+  --fam-timeseries-soft: rgba(14, 165, 233, 0.14);
+  --fam-recommend: #d946ef;
+  --fam-recommend-soft: rgba(217, 70, 239, 0.14);
+  --fam-explain: #f43f5e;
+  --fam-explain-soft: rgba(244, 63, 94, 0.14);
+  --fam-llm: #818cf8;
+  --fam-llm-soft: rgba(129, 140, 248, 0.14);
+  --fam-eval: #84cc16;
+  --fam-eval-soft: rgba(132, 204, 22, 0.14);
+  --fam-embed: #2dd4bf;
+  --fam-embed-soft: rgba(45, 212, 191, 0.14);
+  --fam-research: #64748b;
+  --fam-research-soft: rgba(100, 116, 139, 0.14);
+  --fam-script: #94a3b8;
+  --fam-script-soft: rgba(148, 163, 184, 0.14);
 
   /* Product accent (distinct from family hues) */
   --accent: #6366f1;

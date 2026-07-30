@@ -11,10 +11,22 @@ import { useGraphStore } from "../store/graphStore";
 import { familyMeta } from "../theme/family";
 import { Input } from "../ui/Input";
 
-const SECTIONS = [
-  { id: "data-prep", label: "Data & Prep", families: ["data", "clean"] },
-  { id: "analysis", label: "Analysis", families: ["stats", "reports"] },
-  { id: "modeling", label: "Modeling", families: ["ml", "nn"] },
+// Ordered as an ML workflow: acquire -> prepare -> explore -> analyze -> model ->
+// explain -> report, so the sidebar reads top-to-bottom as the shape of a pipeline.
+// Every family in the shipped catalog must appear here; groupNodesBySection.test.ts
+// fails the build if one is missing (an unclaimed family silently lands in "More").
+export const SECTIONS = [
+  { id: "data", label: "Data", families: ["data"] },
+  { id: "prepare", label: "Prepare", families: ["clean", "transform"] },
+  { id: "explore", label: "Explore", families: ["viz"] },
+  { id: "analyze", label: "Analyze", families: ["stats", "timeseries"] },
+  { id: "model", label: "Model", families: ["ml", "nn", "recommend"] },
+  { id: "explain", label: "Explain", families: ["explain"] },
+  // `eval` sits with `llm` rather than with `explain`: its nodes score prompt-variant
+  // compare tables (category "LLM"), they do not attribute a fitted model.
+  { id: "ai", label: "LLM & Embeddings", families: ["llm", "embed", "eval"] },
+  { id: "report", label: "Report", families: ["reports", "research"] },
+  { id: "utility", label: "Utility", families: ["script", "notes"] },
 ] as const;
 
 export interface FamilyGroup {
@@ -65,6 +77,12 @@ export function groupNodesBySection(nodes: CatalogNode[]): SectionGroup[] {
     }
   }
   if (leftoverFamilies.length > 0) {
+    // "More" is the safety net for plugin-contributed families. Sort by display label
+    // so its order is stable -- iterating familyMap would let a renamed or newly added
+    // node reshuffle the sidebar, since that map follows the caller's sort order.
+    leftoverFamilies.sort((a, b) =>
+      familyMeta(a.family).label.localeCompare(familyMeta(b.family).label),
+    );
     sections.push({ id: "more", label: "More", families: leftoverFamilies });
   }
 
@@ -159,6 +177,7 @@ export function Palette(): JSX.Element {
           .map((section) => (
           <div key={section.id}>
             <div
+              data-testid={`palette-section-${section.id}`}
               style={{
                 padding: "var(--space-2) var(--space-3) var(--space-1)",
                 fontSize: "0.7rem",
@@ -179,6 +198,7 @@ export function Palette(): JSX.Element {
                 <div key={fg.family}>
                   <button
                     type="button"
+                    data-testid={`palette-family-${fg.family}`}
                     onClick={() => toggleFamily(fg.family)}
                     aria-expanded={!collapsed}
                     style={{
