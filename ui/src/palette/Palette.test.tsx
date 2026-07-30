@@ -55,6 +55,16 @@ test("search finds Explode Lists via a keyword not in its description (issue #99
   expect(screen.getByText("Explode Lists")).toBeInTheDocument();
 });
 
+test("search finds a node via a term in its description only (issue #99)", () => {
+  // 'index-aligned' appears only in clean.explode_lists's description, not its
+  // label/type/keywords -- isolates the description-match path of the filter.
+  render(<Palette />);
+  fireEvent.change(screen.getByTestId("palette-search"), {
+    target: { value: "index-aligned" },
+  });
+  expect(screen.getByText("Explode Lists")).toBeInTheDocument();
+});
+
 test("clicking an entry adds a node to the store", () => {
   render(<Palette />);
   fireEvent.click(screen.getByText(/Load CSV/));
