@@ -280,3 +280,93 @@ describe("pasteNodes", () => {
     expect(useGraphStore.getState().canUndo()).toBe(beforeUndo);
   });
 });
+
+describe("groupSelection / ungroupSelection", () => {
+  test("grouping 2+ nodes creates a layout.group node and sets groupId on all members", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const n2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+
+    const groupId = useGraphStore.getState().groupSelection([n1, n2]);
+
+    expect(groupId).not.toBeNull();
+    const { nodes } = useGraphStore.getState();
+    expect(Object.keys(nodes)).toHaveLength(3); // 2 members + 1 group
+    expect(nodes[groupId!].type).toBe("layout.group");
+    expect(nodes[n1].groupId).toBe(groupId);
+    expect(nodes[n2].groupId).toBe(groupId);
+  });
+
+  test("grouping fewer than 2 ids is a no-op and returns null", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const beforeUndo = useGraphStore.getState().canUndo();
+
+    const groupId = useGraphStore.getState().groupSelection([n1]);
+
+    expect(groupId).toBeNull();
+    expect(Object.keys(useGraphStore.getState().nodes)).toHaveLength(1);
+    expect(useGraphStore.getState().canUndo()).toBe(beforeUndo);
+  });
+
+  test("grouping with empty array is a no-op and returns null", () => {
+    useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const beforeUndo = useGraphStore.getState().canUndo();
+
+    const groupId = useGraphStore.getState().groupSelection([]);
+
+    expect(groupId).toBeNull();
+    expect(useGraphStore.getState().canUndo()).toBe(beforeUndo);
+  });
+
+  test("ungrouping via a member's id clears groupId on all members and removes the group node", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const n2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+    const groupId = useGraphStore.getState().groupSelection([n1, n2])!;
+
+    useGraphStore.getState().ungroupSelection([n1]);
+
+    const { nodes } = useGraphStore.getState();
+    expect(Object.keys(nodes)).toHaveLength(2); // group node deleted
+    expect(nodes[n1].groupId).toBeNull();
+    expect(nodes[n2].groupId).toBeNull();
+    expect(nodes[groupId]).toBeUndefined();
+  });
+
+  test("ungrouping via the group node's own id has the same effect", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const n2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+    const groupId = useGraphStore.getState().groupSelection([n1, n2])!;
+
+    useGraphStore.getState().ungroupSelection([groupId]);
+
+    const { nodes } = useGraphStore.getState();
+    expect(Object.keys(nodes)).toHaveLength(2); // group node deleted
+    expect(nodes[n1].groupId).toBeNull();
+    expect(nodes[n2].groupId).toBeNull();
+    expect(nodes[groupId]).toBeUndefined();
+  });
+
+  test("ungrouping when nothing is grouped is a no-op with no history entry", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const beforeUndo = useGraphStore.getState().canUndo();
+
+    useGraphStore.getState().ungroupSelection([n1]);
+
+    expect(useGraphStore.getState().canUndo()).toBe(beforeUndo);
+  });
+
+  test("grouping pushes exactly one history entry", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const n2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+
+    useGraphStore.getState().groupSelection([n1, n2]);
+
+    expect(useGraphStore.getState().canUndo()).toBe(true);
+    // Undo should restore the pre-group state
+    useGraphStore.getState().undo();
+    const { nodes } = useGraphStore.getState();
+    expect(Object.keys(nodes)).toHaveLength(2);
+    for (const node of Object.values(nodes)) {
+      expect(node.groupId).toBeNull();
+    }
+  });
+});

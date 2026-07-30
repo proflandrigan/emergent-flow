@@ -394,4 +394,35 @@ describe("Canvas", () => {
 
     expect(Object.keys(useGraphStore.getState().nodes)).toHaveLength(1);
   });
+
+  test("selecting 2+ nodes and clicking Group creates a layout.group node with groupId pointing at it", async () => {
+    useSelectionStore.getState().clear();
+
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, {
+      x: 0,
+      y: 0,
+    });
+    const n2 = useGraphStore.getState().addNodeFromSpec(loadCsv, {
+      x: 100,
+      y: 0,
+    });
+
+    useSelectionStore.getState().setNodeSelected(n1, true);
+    useSelectionStore.getState().setNodeSelected(n2, true);
+
+    render(<Canvas />);
+
+    expect(screen.getByTestId("selection-toolbar")).toBeInTheDocument();
+    expect(screen.getByTestId("group-selection")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("group-selection"));
+
+    await waitFor(() => {
+      const nodes = useGraphStore.getState().nodes;
+      const groupNode = Object.values(nodes).find((n) => n.type === "layout.group");
+      expect(groupNode).toBeDefined();
+      expect(nodes[n1].groupId).toBe(groupNode!.id);
+      expect(nodes[n2].groupId).toBe(groupNode!.id);
+    });
+  });
 });

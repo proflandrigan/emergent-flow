@@ -53,6 +53,8 @@ export function Canvas(): JSX.Element {
   const removeEdge = useGraphStore((s) => s.removeEdge);
   const connect = useGraphStore((s) => s.connect);
   const pasteNodes = useGraphStore((s) => s.pasteNodes);
+  const groupSelection = useGraphStore((s) => s.groupSelection);
+  const ungroupSelection = useGraphStore((s) => s.ungroupSelection);
 
   const selNodes = useSelectionStore((s) => s.nodes);
   const selEdges = useSelectionStore((s) => s.edges);
@@ -111,6 +113,16 @@ export function Canvas(): JSX.Element {
   const selectedNodeIds = useMemo(
     () => Object.keys(selNodes).filter((id) => selNodes[id]),
     [selNodes],
+  );
+
+  const canGroup = selectedNodeIds.length > 1;
+  const canUngroup = useMemo(
+    () =>
+      selectedNodeIds.some((id) => {
+        const node = nodes[id];
+        return node && (node.type === "layout.group" || !!node.groupId);
+      }),
+    [selectedNodeIds, nodes],
   );
 
   const onNodesChange = useCallback(
@@ -287,7 +299,7 @@ export function Canvas(): JSX.Element {
           }
         />
       </ReactFlow>
-      {selectedNodeIds.length > 1 && (
+      {(selectedNodeIds.length > 1 || canUngroup) && (
         <SelectionToolbar
           count={selectedNodeIds.length}
           onRunSelectedOnly={() => {
@@ -296,6 +308,8 @@ export function Canvas(): JSX.Element {
           onRunToSelected={() => {
             void runGraph({ runTo: selectedNodeIds });
           }}
+          onGroup={canGroup ? () => groupSelection(selectedNodeIds) : undefined}
+          onUngroup={canUngroup ? () => ungroupSelection(selectedNodeIds) : undefined}
         />
       )}
       {contextMenu && (

@@ -76,6 +76,8 @@ export interface GraphStore extends CanvasModel {
     target: { node_id: string; port_id: string },
   ) => string | null;
   pasteNodes: (models: NodeModel[]) => string[];
+  groupSelection: (nodeIds: string[]) => string | null;
+  ungroupSelection: (nodeIds: string[]) => void;
   removeEdge: (edgeId: string) => void;
   toIR: () => Graph;
   loadIR: (graph: Graph) => void;
@@ -258,6 +260,74 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       return { nodes: separateOverlappingNodes(nodes) };
     });
     return cloned.map((n) => n.id);
+  },
+
+  groupSelection(nodeIds) {
+    const ids = nodeIds.filter((id) => get().nodes[id]);
+    if (ids.length < 2) {
+      return null; // grouping requires at least two real nodes -- no-op, no history entry
+    }
+    get().pushHistory("groupSelection");
+    const groupId = newId("node");
+    const members = ids.map((id) => get().nodes[id]);
+    const minX = Math.min(...members.map((n) => n.position.x));
+    const minY = Math.min(...members.map((n) => n.position.y));
+    const groupNode: NodeModel = {
+      id: groupId,
+      type: "layout.group",
+      label: "Group",
+      paradigm: "functional",
+      params: [
+        { name: "label", typeToken: "str", value: "Group", default: "Group" },
+        { name: "color", typeToken: "str", value: "slate", default: "slate" },
+      ],
+      ports: [],
+      position: { x: minX - 40, y: minY - 40 },
+      groupId: null,
+    };
+    set((state) => {
+      const nodes = { ...state.nodes, [groupId]: groupNode };
+      for (const id of ids) {
+        const existing = nodes[id];
+        if (existing) {
+          nodes[id] = { ...existing, groupId };
+        }
+      }
+      return { nodes };
+    });
+    return groupId;
+  },
+
+  ungroupSelection(nodeIds) {
+    const state = get();
+    const groupIds = new Set<string>();
+    for (const id of nodeIds) {
+      const node = state.nodes[id];
+      if (!node) {
+        continue;
+      }
+      if (node.type === "layout.group") {
+        groupIds.add(node.id);
+      } else if (node.groupId) {
+        groupIds.add(node.groupId);
+      }
+    }
+    if (groupIds.size === 0) {
+      return; // nothing to ungroup -- no-op, no history entry
+    }
+    get().pushHistory("ungroupSelection");
+    set((state) => {
+      const nodes = { ...state.nodes };
+      for (const [id, node] of Object.entries(nodes)) {
+        if (node.groupId && groupIds.has(node.groupId)) {
+          nodes[id] = { ...node, groupId: null };
+        }
+      }
+      for (const gid of groupIds) {
+        delete nodes[gid];
+      }
+      return { nodes };
+    });
   },
 
   removeEdge(edgeId) {

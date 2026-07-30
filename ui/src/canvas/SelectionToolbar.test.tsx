@@ -57,4 +57,46 @@ describe("SelectionToolbar", () => {
 
     expect(onRunToSelected).toHaveBeenCalledTimes(1);
   });
+
+  test("passing onGroup renders a Group button and clicking it calls onGroup once", () => {
+    const onGroup = vi.fn();
+
+    render(
+      <SelectionToolbar
+        count={2}
+        onRunSelectedOnly={vi.fn()}
+        onRunToSelected={vi.fn()}
+        onGroup={onGroup}
+      />,
+    );
+
+    const groupBtn = screen.getByTestId("group-selection");
+    expect(groupBtn).toBeInTheDocument();
+    expect(groupBtn).toHaveTextContent("Group");
+
+    fireEvent.click(groupBtn);
+
+    expect(onGroup).toHaveBeenCalledTimes(1);
+  });
+
+  test("passing onUngroup renders an Ungroup button and clicking it calls onUngroup once", () => {
+    const onUngroup = vi.fn();
+
+    render(
+      <SelectionToolbar
+        count={2}
+        onRunSelectedOnly={vi.fn()}
+        onRunToSelected={vi.fn()}
+        onUngroup={onUngroup}
+      />,
+    );
+
+    const ungroupBtn = screen.getByTestId("ungroup-selection");
+    expect(ungroupBtn).toBeInTheDocument();
+    expect(ungroupBtn).toHaveTextContent("Ungroup");
+
+    fireEvent.click(ungroupBtn);
+
+    expect(onUngroup).toHaveBeenCalledTimes(1);
+  });
 });

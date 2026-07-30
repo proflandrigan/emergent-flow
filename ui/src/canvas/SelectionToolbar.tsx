@@ -4,12 +4,16 @@ export interface SelectionToolbarProps {
   count: number;
   onRunSelectedOnly: () => void;
   onRunToSelected: () => void;
+  onGroup?: () => void;
+  onUngroup?: () => void;
 }
 
 export function SelectionToolbar({
   count,
   onRunSelectedOnly,
   onRunToSelected,
+  onGroup,
+  onUngroup,
 }: SelectionToolbarProps): JSX.Element {
   return (
     <div
@@ -46,6 +50,16 @@ export function SelectionToolbar({
       >
         Run to selected
       </Button>
+      {onGroup && (
+        <Button variant="secondary" data-testid="group-selection" onClick={onGroup}>
+          Group
+        </Button>
+      )}
+      {onUngroup && (
+        <Button variant="secondary" data-testid="ungroup-selection" onClick={onUngroup}>
+          Ungroup
+        </Button>
+      )}
     </div>
   );
 }
