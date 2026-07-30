@@ -158,7 +158,13 @@ export function IRToolbar(): JSX.Element {
   async function handleOpenFlow(slug: string) {
     try {
       const graph = await useFlowStore.getState().loadFlow(slug);
+      // loadFlow() already set isDirty: false, but loadIR() below replaces
+      // graphStore's nodes/edges/name -- startDirtyTracking's subscriber (App.tsx) sees
+      // those refs change and flips isDirty back to true, which would show the "unsaved
+      // changes" indicator on a freshly-opened, unmodified flow. Reassert clean afterward,
+      // the same way handleNew() does after reset().
       useGraphStore.getState().loadIR(graph as Graph);
+      useFlowStore.getState().setDirty(false);
       setOpenPanelOpen(false);
     } catch {
       // Surfaced via flowStore.error -- nothing else to do here.
@@ -210,8 +216,22 @@ export function IRToolbar(): JSX.Element {
       return;
     }
     const trimmed = input.trim();
-    await useFlowStore.getState().renameFlow(slug, slugify(trimmed));
+    const newSlug = slugify(trimmed);
+    try {
+      await useFlowStore.getState().renameFlow(slug, newSlug);
+    } catch {
+      // Surfaced via flowStore.error. Renaming failed server-side (e.g. a slug conflict) --
+      // don't rename the in-memory graph, that would desync the displayed name from what's
+      // actually saved under the old slug.
+      return;
+    }
     useGraphStore.getState().setName(trimmed);
+    // The server's rename() only moves the file (old slug -> new slug); it never rewrites the
+    // "name" field inside the graph JSON. Without this save, the flow list (which reads `name`
+    // straight from each file) would keep showing the pre-rename name forever. Persist the
+    // updated name under the new slug so the on-disk copy and the in-memory graph agree.
+    const graph = useGraphStore.getState().toIR();
+    await useFlowStore.getState().saveFlow(newSlug, graph);
   }
 
   function startEditingName() {

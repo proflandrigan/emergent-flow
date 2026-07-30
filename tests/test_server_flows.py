@@ -24,6 +24,7 @@ from emergentflow.server.app import app
 from emergentflow.server.flows import (
     FlowAlreadyExistsError,
     FlowStore,
+    InvalidSlugError,
     UnknownFlowError,
     slugify,
 )
@@ -149,6 +150,51 @@ class TestFlowStore:
         FlowStore(sub)
         assert sub.is_dir()
 
+    # Regression tests for a path-traversal fix: every FlowStore method resolves a slug to a
+    # path via `_path()`. Before the fix, `rename()` had no such guard -- proven concretely:
+    # `store.rename("legit", "../evil")` moved the flow file to
+    # `root.parent / "evil.ef.json"`, i.e. outside the store entirely, via the underlying
+    # `os.replace()`. `save()` happened to be accidentally shielded (its atomic-write temp
+    # file is created with a `.{slug}-` prefix, which breaks a leading ".." into an inert
+    # "..."), but that was luck, not a guarantee -- `_path()` now rejects any slug that isn't
+    # shaped like `slugify()`'s own output, closing the hole for every method uniformly.
+    @pytest.mark.parametrize(
+        "evil_slug",
+        [
+            "../evil",
+            "../../../../tmp/evil",
+            "a/b",
+            "a/../../evil",
+            "",
+            "UPPER",
+            "has spaces",
+            ".",
+            "..",
+        ],
+    )
+    def test_path_rejects_traversal_and_malformed_slugs(self, tmp_path, evil_slug) -> None:
+        store = FlowStore(tmp_path)
+        with pytest.raises(InvalidSlugError):
+            store.get(evil_slug)
+        with pytest.raises(InvalidSlugError):
+            store.save(evil_slug, {"name": "x", "nodes": {}, "edges": {}})
+        with pytest.raises(InvalidSlugError):
+            store.delete(evil_slug)
+
+    def test_rename_rejects_traversal_in_new_slug(self, tmp_path) -> None:
+        store = FlowStore(tmp_path)
+        store.save("legit", {"name": "Legit", "nodes": {}, "edges": {}})
+        with pytest.raises(InvalidSlugError):
+            store.rename("legit", "../evil")
+        # The flow must be untouched -- the rejected rename must not have partially applied.
+        assert store.get("legit")["name"] == "Legit"
+        assert not (tmp_path.parent / "evil.ef.json").exists()
+
+    def test_rename_rejects_traversal_in_old_slug(self, tmp_path) -> None:
+        store = FlowStore(tmp_path)
+        with pytest.raises(InvalidSlugError):
+            store.rename("../whatever", "new")
+
 
 @pytest.fixture
 def flow_client(tmp_path, monkeypatch) -> TestClient:
@@ -185,6 +231,25 @@ class TestFlowRoutes:
         r = flow_client.post("/flows", json={"graph": graph})
         assert r.status_code == 200
         assert r.json()["slug"] == "my-cool-flow"
+
+    # Regression test: `graph["name"]` is client-controlled, untyped JSON. A non-string,
+    # truthy value (a number, a list, `true`) used to reach `slugify()` unguarded --
+    # `slugify()` calls `.strip()` on it, which raised an uncaught `AttributeError` and made
+    # this route return a bare 500 instead of a handled error response.
+    @pytest.mark.parametrize("bad_name", [123, True, ["a", "list"], {"nested": "dict"}])
+    def test_create_with_non_string_name_falls_back_to_untitled(
+        self, flow_client: TestClient, bad_name
+    ) -> None:
+        graph = {"name": bad_name, "nodes": {}, "edges": {}}
+        r = flow_client.post("/flows", json={"graph": graph})
+        assert r.status_code == 200
+        assert r.json()["slug"] == "untitled"
+
+    def test_create_with_null_name_falls_back_to_untitled(self, flow_client: TestClient) -> None:
+        graph = {"name": None, "nodes": {}, "edges": {}}
+        r = flow_client.post("/flows", json={"graph": graph})
+        assert r.status_code == 200
+        assert r.json()["slug"] == "untitled"
 
     def test_update(self, flow_client: TestClient) -> None:
         graph = {"name": "v1", "nodes": {}, "edges": {}}
@@ -243,6 +308,27 @@ class TestFlowRoutes:
         r = flow_client.post("/flows/a/rename", json={"new_slug": "b"})
         assert r.status_code == 409
 
+    # Regression test for a path-traversal fix (see TestFlowStore's traversal tests): a
+    # request-body `new_slug` reaches FlowStore.rename() unvalidated by this route, so the
+    # store itself must be the thing that rejects it. Before the fix this call moved the
+    # saved flow file to a directory outside the flow store's root via `os.replace()`.
+    def test_rename_rejects_path_traversal_returns_400(self, flow_client: TestClient) -> None:
+        graph = {"name": "Legit", "nodes": {}, "edges": {}}
+        flow_client.post("/flows", json={"graph": graph, "slug": "legit"})
+        r = flow_client.post("/flows/legit/rename", json={"new_slug": "../evil"})
+        assert r.status_code == 400
+        # The original flow must still be there, untouched, under its original slug.
+        assert flow_client.get("/flows/legit").status_code == 200
+
+    def test_create_rejects_path_traversal_slug_returns_400(self, flow_client: TestClient) -> None:
+        graph = {"name": "Test", "nodes": {}, "edges": {}}
+        r = flow_client.post("/flows", json={"graph": graph, "slug": "../../etc/evil"})
+        assert r.status_code == 400
+
+    def test_get_rejects_malformed_slug_returns_400(self, flow_client: TestClient) -> None:
+        r = flow_client.get("/flows/Not%20A%20Slug")
+        assert r.status_code == 400
+
     def test_list_reflects_created_flows(self, flow_client: TestClient) -> None:
         graph = {"name": "A", "nodes": {}, "edges": {}}
         flow_client.post("/flows", json={"graph": graph, "slug": "a"})
@@ -277,3 +363,22 @@ class TestExamplesRoute:
         client = TestClient(app)
         r = client.get("/examples/does-not-exist.json")
         assert r.status_code == 404
+
+    # The traversal guard in get_example() (`target.is_relative_to(_EXAMPLES_DIR)`) was
+    # already correct pre-fix; this test just closes the coverage gap the task flagged
+    # ("directory traversal on /examples is guarded -- verify it's correct"). A *literal*
+    # "../pyproject.toml" gets collapsed by the HTTP client before the request is even sent
+    # (so it never reaches `_EXAMPLES_DIR`'s handler at all -- it'd hit the unrelated
+    # catch-all static route instead), so this uses a percent-encoded ".." to exercise the
+    # handler's own `resolve()` + `is_relative_to()` check directly.
+    def test_get_example_rejects_path_traversal(self) -> None:
+        client = TestClient(app)
+        r = client.get("/examples/%2e%2e/pyproject.toml")
+        assert r.status_code == 404
+        assert "example not found" in r.json()["error"]
+
+    def test_get_example_rejects_absolute_path_escape(self) -> None:
+        client = TestClient(app)
+        r = client.get("/examples/foo/%2e%2e/%2e%2e/pyproject.toml")
+        assert r.status_code == 404
+        assert "example not found" in r.json()["error"]

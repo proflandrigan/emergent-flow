@@ -173,13 +173,22 @@ export const useFlowStore = create<FlowStore>((set, get) => ({
       get().fetchFlows();
     } catch (e) {
       set({ error: (e as Error).message, loading: false });
+      // Rethrow (matches saveNewFlow/loadFlow) -- callers such as IRToolbar's Rename… flow
+      // must not treat a failed server-side rename as if it had succeeded (e.g. by renaming
+      // the in-memory graph locally when the slug was never actually renamed on disk).
+      throw e;
     }
   },
 
   async loadExample(path) {
     set({ loading: true, error: null });
     try {
-      const res = await fetch(`/examples/${path}`);
+      // encodeURI (not encodeURIComponent): `path` is a server-relative example path that may
+      // contain subdirectory separators (matches GET /examples/{path:path} on the server,
+      // which accepts slashes) -- encodeURIComponent would also escape "/" and break routing,
+      // while a raw template literal breaks on a path containing spaces or other reserved
+      // characters.
+      const res = await fetch(`/examples/${encodeURI(path)}`);
       if (!res.ok) throw new Error(`Failed to load example: ${res.status}`);
       const graph = await res.json();
       // Examples open as unsaved copies -- no currentSlug, marked dirty

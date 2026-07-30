@@ -265,6 +265,25 @@ describe("flowStore", () => {
       await useFlowStore.getState().renameFlow("old-slug", "new-slug");
       expect(useFlowStore.getState().currentSlug).toBe("new-slug");
     });
+
+    // Regression test: renameFlow used to swallow a failed rename (catch without rethrow),
+    // matching every OTHER mutating action except saveFlow/deleteFlow -- but unlike those,
+    // IRToolbar's Rename… flow does more work after awaiting renameFlow (it renames the
+    // in-memory graph too), so a caller must be able to tell success from failure.
+    test("rejects and sets error on failure, matching saveNewFlow/loadFlow", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 409,
+          json: () => Promise.resolve({ error: "slug taken" }),
+        }),
+      );
+      await expect(
+        useFlowStore.getState().renameFlow("old-slug", "new-slug"),
+      ).rejects.toThrow("slug taken");
+      expect(useFlowStore.getState().error).toBe("slug taken");
+    });
   });
 
   describe("loadExample", () => {

@@ -67,8 +67,9 @@ export function recoverSession(): RecoveredSession | null {
   }
 }
 
-// React hook: subscribes to graphStore changes and debounce-saves to localStorage. Call it once
-// from App. Not wired here (Task 7) -- this module only owns the persistence primitives.
+// React hook: subscribes to graphStore changes and debounce-saves to localStorage. Called once
+// from App (App.tsx's `useSessionAutoSave()`) -- this module only owns the persistence
+// primitives, App owns wiring them into the component tree.
 export function useSessionAutoSave(): void {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;

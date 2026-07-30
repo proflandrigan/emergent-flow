@@ -22,6 +22,16 @@ from typing import Any
 
 DEFAULT_FLOW_DIRNAME = ".ef-flows"
 
+# Every slug this store will accept must look like `slugify()`'s own output: lowercase
+# alphanumeric runs separated by single hyphens, no leading/trailing hyphen. This is the sole
+# choke point (`_path()`) that keeps a slug from ever containing a path separator or a ".."
+# component -- callers such as POST /flows and POST /flows/{slug}/rename pass request-body
+# strings (``slug``, ``new_slug``) straight through without re-slugifying them server-side, so
+# without this check a value like ``"../../../../tmp/evil"`` would resolve outside ``root``
+# (proven: an unvalidated ``new_slug`` lets `rename()` `os.replace()` a flow file to an
+# arbitrary writable path on disk).
+_SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
 
 class UnknownFlowError(KeyError):
     """Raised when a flow slug is not found in the store."""
@@ -29,6 +39,15 @@ class UnknownFlowError(KeyError):
 
 class FlowAlreadyExistsError(ValueError):
     """Raised when a rename target slug already exists."""
+
+
+class InvalidSlugError(ValueError):
+    """Raised when a slug doesn't match ``slugify()``'s output shape.
+
+    This is a security boundary, not just input hygiene: every store method resolves a slug to
+    a filesystem path via ``_path()``, so an unvalidated slug containing ``/`` or ``..`` could
+    otherwise be used to read, write, or move files outside ``root``.
+    """
 
 
 def slugify(name: str) -> str:
@@ -63,6 +82,8 @@ class FlowStore:
         return self._root
 
     def _path(self, slug: str) -> Path:
+        if not _SLUG_RE.match(slug):
+            raise InvalidSlugError(f"invalid flow slug: {slug!r}")
         return self._root / f"{slug}.ef.json"
 
     def list(self) -> list[dict[str, Any]]:

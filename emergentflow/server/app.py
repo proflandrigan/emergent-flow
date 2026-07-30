@@ -99,6 +99,7 @@ from emergentflow.server.cache import DEFAULT_CACHE_DIRNAME, DEFAULT_CACHE_MAX_M
 from emergentflow.server.flows import (
     DEFAULT_FLOW_DIRNAME,
     FlowAlreadyExistsError,
+    InvalidSlugError,
     UnknownFlowError,
     configure_flows,
     get_default_flows,
@@ -144,8 +145,15 @@ from emergentflow.server.service import (
 # app.py lives at emergentflow/server/app.py; parents[1] is the emergentflow/ package root.
 _STATIC_DIR = pathlib.Path(__file__).resolve().parents[1] / "_static"
 
-# The examples ship in the sdist alongside the package (see MANIFEST.in). parents[2]
-# from emergentflow/server/app.py is the repo/package-install root, sibling to examples/.
+# parents[2] from emergentflow/server/app.py is the repo root, sibling to examples/ -- this
+# only resolves to a real directory in a source checkout (an editable install or `emergentflow
+# serve` run from the monorepo). Despite the original intent, neither MANIFEST.in nor
+# [tool.setuptools.package-data] in pyproject.toml actually ships examples/ into the sdist or
+# wheel (top-level examples/ isn't part of the `emergentflow*` package tree setuptools
+# discovers), so for a real `pip install emergentflow[server]` end user this path won't exist
+# on disk. `list_examples()` below degrades gracefully (empty list, ExampleGallery renders
+# nothing) rather than crashing, but the starter-gallery feature is effectively dev-checkout-
+# only until examples/ is packaged as installed data -- see issue #114 follow-up.
 _EXAMPLES_DIR = pathlib.Path(__file__).resolve().parents[2] / "examples"
 
 
@@ -964,6 +972,8 @@ def create_app() -> FastAPI:
             graph = await _run_sync(lambda: get_default_flows().get(slug))
         except UnknownFlowError as exc:
             return _error_json(404, str(exc))
+        except InvalidSlugError as exc:
+            return _error_json(400, str(exc))
         except Exception as exc:  # noqa: BLE001 - never crash the server on a store failure
             return _error_json(422, f"{type(exc).__name__}: {exc}")
         return JSONResponse(content=graph)
@@ -977,10 +987,22 @@ def create_app() -> FastAPI:
         graph = body.get("graph")
         if not isinstance(graph, dict):
             return _error_json(400, "POST /flows requires a 'graph' object in the body")
-        name = graph.get("name") or "Untitled"
+        # `graph["name"]` is client-controlled and untyped JSON -- slugify() assumes a str
+        # (calls .strip()/.lower() on it) and raises AttributeError on anything else (e.g. a
+        # number, list, or bool), which would otherwise propagate out of this route as an
+        # unhandled 500 instead of a clean error response. Guard the type here, not just
+        # emptiness.
+        raw_name = graph.get("name")
+        name = raw_name if isinstance(raw_name, str) and raw_name.strip() else "Untitled"
+        # `slug`, if given, is a raw request-body string, not something we ran through
+        # `slugify()` ourselves -- FlowStore.save()/`_path()` is what actually rejects a
+        # malformed or path-escaping value (InvalidSlugError below), so this route must never
+        # assume a client-supplied slug is already safe.
         slug = body.get("slug") or slugify(name)
         try:
             result = await _run_sync(lambda: get_default_flows().save(slug, graph))
+        except InvalidSlugError as exc:
+            return _error_json(400, str(exc))
         except Exception as exc:  # noqa: BLE001 - never crash the server on a store failure
             return _error_json(422, f"{type(exc).__name__}: {exc}")
         return JSONResponse(content=result)
@@ -996,6 +1018,8 @@ def create_app() -> FastAPI:
             return _error_json(400, "PUT /flows/{slug} requires a 'graph' object in the body")
         try:
             result = await _run_sync(lambda: get_default_flows().save(slug, graph))
+        except InvalidSlugError as exc:
+            return _error_json(400, str(exc))
         except Exception as exc:  # noqa: BLE001 - never crash the server on a store failure
             return _error_json(422, f"{type(exc).__name__}: {exc}")
         return JSONResponse(content=result)
@@ -1006,6 +1030,8 @@ def create_app() -> FastAPI:
             await _run_sync(lambda: get_default_flows().delete(slug))
         except UnknownFlowError as exc:
             return _error_json(404, str(exc))
+        except InvalidSlugError as exc:
+            return _error_json(400, str(exc))
         except Exception as exc:  # noqa: BLE001 - never crash the server on a store failure
             return _error_json(422, f"{type(exc).__name__}: {exc}")
         return JSONResponse(content={"status": "ok"})
@@ -1021,12 +1047,19 @@ def create_app() -> FastAPI:
             return _error_json(
                 400, "POST /flows/{slug}/rename requires a non-empty 'new_slug' string"
             )
+        # `new_slug` is an unvalidated request-body string (the client slugifies before
+        # sending, but the server must not trust that) -- FlowStore.rename() -> `_path()`
+        # rejects anything that isn't a plain `slugify()`-shaped slug, closing off a path-
+        # traversal write (e.g. `new_slug: "../../../../tmp/evil"` moving a flow file outside
+        # the flow store's root via the underlying `os.replace()`).
         try:
             result = await _run_sync(lambda: get_default_flows().rename(slug, new_slug))
         except UnknownFlowError as exc:
             return _error_json(404, str(exc))
         except FlowAlreadyExistsError as exc:
             return _error_json(409, str(exc))
+        except InvalidSlugError as exc:
+            return _error_json(400, str(exc))
         except Exception as exc:  # noqa: BLE001 - never crash the server on a store failure
             return _error_json(422, f"{type(exc).__name__}: {exc}")
         return JSONResponse(content=result)
