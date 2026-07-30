@@ -4,7 +4,7 @@
 // node; selection is read from `selectionStore`, never the IR.
 
 import { Maximize2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { useCatalog } from "../catalog/useCatalog";
 import { ConsultAffordance } from "../session/ConsultAffordance";
@@ -15,6 +15,7 @@ import { selectedNodeId, useSelectionStore } from "../store/selectionStore";
 import { IconButton } from "../ui/IconButton";
 import { OverlayModal } from "../ui/OverlayModal";
 import { Segmented } from "../ui/Segmented";
+import { Tooltip } from "../ui/Tooltip";
 import { CodePanel } from "./CodePanel";
 import { ConfigForm } from "./ConfigForm";
 import { LineagePanel } from "./LineagePanel";
@@ -22,6 +23,12 @@ import { PayloadView } from "./PayloadView";
 import { StepsPanel } from "./StepsPanel";
 
 type InspectorTab = "config" | "code" | "results" | "steps" | "lineage";
+
+export interface InspectorProps {
+  // Panel-level chrome (App's collapse toggle) rendered alongside the expand button, so the
+  // dock has one control row in its top-right corner instead of two stacked ones.
+  chrome?: ReactNode;
+}
 
 function formatAgo(ms: number): string {
   const secs = Math.max(0, Math.round((Date.now() - ms) / 1000));
@@ -31,7 +38,7 @@ function formatAgo(ms: number): string {
   return `${Math.round(mins / 60)}h ago`;
 }
 
-export function Inspector(): JSX.Element {
+export function Inspector({ chrome }: InspectorProps): JSX.Element {
   const [tab, setTab] = useState<InspectorTab>("config");
   const [expanded, setExpanded] = useState(false);
   const [highlightVarName, setHighlightVarName] = useState<string | null>(null);
@@ -219,23 +226,41 @@ export function Inspector(): JSX.Element {
           height: "100%",
         }}
       >
-        {renderHeader()}
         <div
+          data-testid="inspector-controls"
           style={{
-            padding: "var(--space-2) var(--space-3)",
             display: "flex",
             alignItems: "center",
-            gap: "var(--space-2)",
+            justifyContent: "flex-end",
+            gap: "var(--space-1)",
+            padding: "var(--space-1)",
+          }}
+        >
+          <Tooltip label="Expand inspector">
+            <IconButton
+              aria-label="Expand inspector"
+              data-testid="inspector-expand-btn"
+              onClick={() => setExpanded(true)}
+            >
+              <Maximize2 size={16} />
+            </IconButton>
+          </Tooltip>
+          {chrome}
+        </div>
+        {renderHeader()}
+        {/* The tab strip's five nowrap options have a ~312px min-content width, which is
+            already wider than the dock's content box -- it needs its own scroll container
+            (with `minWidth: 0`, or flex refuses to shrink it) so it can never push
+            sibling controls out past the panel edge. */}
+        <div
+          data-testid="inspector-tabstrip"
+          style={{
+            padding: "var(--space-2) var(--space-3)",
+            minWidth: 0,
+            overflowX: "auto",
           }}
         >
           {renderTabs()}
-          <IconButton
-            aria-label="Expand inspector"
-            data-testid="inspector-expand-btn"
-            onClick={() => setExpanded(true)}
-          >
-            <Maximize2 size={14} />
-          </IconButton>
         </div>
         <div
           style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0.5rem" }}

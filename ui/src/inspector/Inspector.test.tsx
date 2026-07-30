@@ -190,6 +190,28 @@ test("Clicking the X button in expanded modal closes it", () => {
   expect(screen.queryByTestId("overlay-modal-close")).not.toBeInTheDocument();
 });
 
+test("the expand button lives in the control row, not the tab strip", () => {
+  render(<Inspector />);
+  const controls = screen.getByTestId("inspector-controls");
+  const tabstrip = screen.getByTestId("inspector-tabstrip");
+  const expandBtn = screen.getByTestId("inspector-expand-btn");
+  expect(controls).toContainElement(expandBtn);
+  expect(tabstrip).not.toContainElement(expandBtn);
+});
+
+test("panel chrome renders in the control row beside the expand button", () => {
+  render(
+    <Inspector
+      chrome={
+        <button data-testid="inspector-collapse-toggle">Hide inspector</button>
+      }
+    />,
+  );
+  const controls = screen.getByTestId("inspector-controls");
+  const toggle = screen.getByTestId("inspector-collapse-toggle");
+  expect(controls).toContainElement(toggle);
+});
+
 test("clicking the Lineage tab shows the no-selection empty state", () => {
   render(<Inspector />);
   fireEvent.click(screen.getByTestId("inspector-tab-lineage"));

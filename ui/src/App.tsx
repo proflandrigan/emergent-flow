@@ -23,6 +23,7 @@ import { useTheme } from "./theme/useTheme";
 import { IconButton } from "./ui/IconButton";
 import { Menu, type MenuItem } from "./ui/Menu";
 import { OverlayModal } from "./ui/OverlayModal";
+import { ResizeHandle } from "./ui/ResizeHandle";
 import { Tooltip } from "./ui/Tooltip";
 
 // Lazy: nothing under ui/src/session/ is imported until the user opens this modal (Epic 14
@@ -48,6 +49,20 @@ const STATUS_COLOR: Record<ServerStatus, string> = {
 // vertical padding on each side); panels below it use this to clear the bar with a gutter
 // gap, per spec `calc(100vh - 2*gutter - commandbar)`.
 export const COMMAND_BAR_CLEARANCE = "calc(var(--space-4) * 2 + 56px)";
+
+// Inspector dock sizing. The floor keeps the Config form's labelled fields legible; the
+// ceiling keeps the canvas usable on a laptop display. DEFAULT is the width the dock
+// shipped with, and is what double-click / Home on the drag handle restores.
+const MIN_INSPECTOR_WIDTH = 280;
+const MAX_INSPECTOR_WIDTH = 720;
+const DEFAULT_INSPECTOR_WIDTH = 320;
+
+function clampInspectorWidth(width: number): number {
+  return Math.min(
+    MAX_INSPECTOR_WIDTH,
+    Math.max(MIN_INSPECTOR_WIDTH, Math.round(width)),
+  );
+}
 
 function Divider(): JSX.Element {
   return (
@@ -90,6 +105,21 @@ export function App(): JSX.Element {
     }
   });
 
+  const [inspectorWidth, setInspectorWidth] = useState<number>(() => {
+    try {
+      const stored = Number(
+        localStorage.getItem("ef-panel-inspector-width") ?? "",
+      );
+      return Number.isFinite(stored) && stored > 0
+        ? clampInspectorWidth(stored)
+        : DEFAULT_INSPECTOR_WIDTH;
+    } catch {
+      return DEFAULT_INSPECTOR_WIDTH;
+    }
+  });
+
+  const [resizingInspector, setResizingInspector] = useState(false);
+
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -111,6 +141,14 @@ export function App(): JSX.Element {
       // ignore write errors
     }
   }, [inspectorCollapsed]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("ef-panel-inspector-width", String(inspectorWidth));
+    } catch {
+      // ignore write errors
+    }
+  }, [inspectorWidth]);
 
   useEffect(() => {
     if (!menuOpen && !connectionsOpen && !schemaBrowserOpen) return undefined;
@@ -236,6 +274,23 @@ export function App(): JSX.Element {
       },
     })),
   ];
+
+  // Rendered either inside the Inspector's control row (open) or in the collapsed rail.
+  const inspectorCollapseToggle = (
+    <Tooltip label={inspectorCollapsed ? "Show inspector" : "Hide inspector"}>
+      <IconButton
+        aria-label={inspectorCollapsed ? "Show inspector" : "Hide inspector"}
+        data-testid="inspector-collapse-toggle"
+        onClick={() => setInspectorCollapsed((c) => !c)}
+      >
+        {inspectorCollapsed ? (
+          <PanelRightOpen size={16} />
+        ) : (
+          <PanelRightClose size={16} />
+        )}
+      </IconButton>
+    </Tooltip>
+  );
 
   return (
     <div style={{ position: "relative", height: "100vh", overflow: "hidden" }}>
@@ -388,47 +443,61 @@ export function App(): JSX.Element {
         {!paletteCollapsed && <Palette />}
       </div>
 
+      {!inspectorCollapsed && (
+        <ResizeHandle
+          dock="right"
+          width={inspectorWidth}
+          min={MIN_INSPECTOR_WIDTH}
+          max={MAX_INSPECTOR_WIDTH}
+          resetWidth={DEFAULT_INSPECTOR_WIDTH}
+          onWidthChange={setInspectorWidth}
+          onResizingChange={setResizingInspector}
+          label="Resize inspector"
+          testId="inspector-resize-handle"
+          // Sibling of the dock rather than a child: the dock is `overflow: auto`, which
+          // would clip a handle straddling its left edge.
+          style={{
+            top: COMMAND_BAR_CLEARANCE,
+            bottom: "var(--space-4)",
+            right: `calc(var(--space-4) + ${inspectorWidth}px - 4px)`,
+            zIndex: 11,
+          }}
+        />
+      )}
+
       <div
         className="glass"
+        data-testid="inspector-dock"
         style={{
           position: "absolute",
           top: COMMAND_BAR_CLEARANCE,
           bottom: "var(--space-4)",
           right: "var(--space-4)",
-          width: inspectorCollapsed ? 48 : 320,
+          width: inspectorCollapsed ? 48 : inspectorWidth,
           zIndex: 10,
           overflow: "auto",
-          transition: "width var(--motion-fast) var(--motion-ease)",
+          // Animating width would make the dock lag a pointer drag, so the transition is
+          // only in play for the collapse/expand toggle.
+          transition: resizingInspector
+            ? "none"
+            : "width var(--motion-fast) var(--motion-ease)",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            padding: "var(--space-1)",
-          }}
-        >
-          <Tooltip
-            label={
-              inspectorCollapsed ? "Expand inspector" : "Collapse inspector"
-            }
+        {inspectorCollapsed ? (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              padding: "var(--space-1)",
+            }}
           >
-            <IconButton
-              aria-label={
-                inspectorCollapsed ? "Expand inspector" : "Collapse inspector"
-              }
-              data-testid="inspector-collapse-toggle"
-              onClick={() => setInspectorCollapsed((c) => !c)}
-            >
-              {inspectorCollapsed ? (
-                <PanelRightOpen size={16} />
-              ) : (
-                <PanelRightClose size={16} />
-              )}
-            </IconButton>
-          </Tooltip>
-        </div>
-        {!inspectorCollapsed && <Inspector />}
+            {inspectorCollapseToggle}
+          </div>
+        ) : (
+          // The toggle is handed to the Inspector so the dock has one control row in its
+          // top-right corner (expand + hide) instead of two stacked icon rows.
+          <Inspector chrome={inspectorCollapseToggle} />
+        )}
       </div>
 
       {connectionsOpen && (

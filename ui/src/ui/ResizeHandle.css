@@ -1,0 +1,35 @@
+.ef-resize-handle {
+  position: absolute;
+  width: 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: col-resize;
+  /* Stops the browser from turning a drag into a scroll/pan gesture on touch. */
+  touch-action: none;
+}
+
+/* Hairline indicator, centered in the (wider) hit area so the grab target stays
+   comfortable without a heavy 8px line sitting next to the panel. */
+.ef-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: transparent;
+  transition: background var(--motion-fast) var(--motion-ease);
+}
+
+.ef-resize-handle:hover::after,
+.ef-resize-handle:focus-visible::after,
+.ef-resize-handle[data-resizing="true"]::after {
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.ef-resize-handle:focus-visible {
+  outline: none;
+}
