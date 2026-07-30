@@ -37,12 +37,25 @@ export async function runGraph(options: RunGraphOptions = {}): Promise<void> {
 
   const { runTo, runFrom, runOnly, onError } = options;
   const graph = useGraphStore.getState().toIR();
-  const hasScope =
-    (typeof runTo === "string" || (Array.isArray(runTo) && runTo.length > 0)) ||
-    (typeof runFrom === "string" || (Array.isArray(runFrom) && runFrom.length > 0)) ||
-    typeof runOnly === "string" || (Array.isArray(runOnly) && runOnly.length > 0);
+  // Only include a scope key when it is a non-empty string or a non-empty
+  // array. Using `!== undefined` would send `run_to: []` alongside another
+  // scope key, triggering a multi-scope 422 on the server.
+  const scopeEntries = [
+    ...(typeof runTo === "string" || (Array.isArray(runTo) && runTo.length > 0)
+      ? [["run_to", runTo]]
+      : []),
+    ...(typeof runFrom === "string" ||
+    (Array.isArray(runFrom) && runFrom.length > 0)
+      ? [["run_from", runFrom]]
+      : []),
+    ...(typeof runOnly === "string" ||
+      (Array.isArray(runOnly) && runOnly.length > 0)
+      ? [["run_only", runOnly]]
+      : []),
+  ];
+  const hasScope = scopeEntries.length > 0;
   const body = hasScope
-    ? { graph, ...(runTo !== undefined ? { run_to: runTo } : {}), ...(runFrom !== undefined ? { run_from: runFrom } : {}), ...(runOnly !== undefined ? { run_only: runOnly } : {}) }
+    ? { graph, ...Object.fromEntries(scopeEntries) }
     : graph;
 
   function fail(message: string) {

@@ -429,7 +429,7 @@ def _resolve_upstream_value(
     In-scope upstream (already walked this run) -> its live result.
     Out-of-scope upstream (excluded by ``only``) -> the previous run's artifact.
     Neither -> ``_MISSING``, which the caller reports as a skip with a reason
-    ("upstream has not been run yet"), never a ``KeyError``.
+    (see :func:`_skip_reason`), never a ``KeyError``.
 
     This is the fix for issue #105 Gap 1: an arbitrary ``only`` set no longer
     crashes when it excludes a node that feeds an in-scope node's IN port.
@@ -446,6 +446,21 @@ def _resolve_upstream_value(
         if stored is not None and src_port_name in stored:
             return stored[src_port_name]
     return _MISSING
+
+
+def _skip_reason(src: PortRef, node_status: dict[str, str]) -> str:
+    """Human-readable reason for why *src*'s output is unavailable.
+
+    Distinguishes the three failure modes so the user sees the *immediate*
+    cause rather than a generic message: an upstream that errored should say
+    "errored", not "not been run yet".
+    """
+    status = node_status.get(src.node_id)
+    if status == _STATUS_ERROR:
+        return "upstream node errored"
+    if status == _STATUS_SKIPPED:
+        return "upstream node was skipped"
+    return "upstream has not been run yet"
 
 
 def _execute_functional_stream(
@@ -536,7 +551,7 @@ def _execute_functional_stream(
                     upstream_hashes.append(node_hashes.get(src.node_id))
                 if any_upstream_missing:
                     skipped = True
-                    skip_reason = "upstream has not been run yet"
+                    skip_reason = _skip_reason(src, node_status)
                     break
                 inputs[port.name] = values
                 continue
@@ -557,7 +572,7 @@ def _execute_functional_stream(
             )
             if value is _MISSING:
                 skipped = True
-                skip_reason = "upstream has not been run yet"
+                skip_reason = _skip_reason(src, node_status)
                 break
             inputs[port.name] = value
             upstream_hashes.append(node_hashes.get(src.node_id))

@@ -82,6 +82,11 @@ from emergentflow.ir.graph import Graph
 from emergentflow.ir.mutation import GraphMutation
 from emergentflow.ir.serialize import deserialize_graph
 from emergentflow.llm.gateway import GatewayClient
+from emergentflow.server.artifacts import (
+    DEFAULT_ARTIFACT_DIRNAME,
+    DEFAULT_ARTIFACT_MAX_MB,
+    configure_artifacts,
+)
 from emergentflow.server.cache import DEFAULT_CACHE_DIRNAME, DEFAULT_CACHE_MAX_MB, configure_cache
 from emergentflow.server.reports import get_default_store
 from emergentflow.server.service import (
@@ -1025,6 +1030,12 @@ def serve(
     )
     resolved_max_mb = cache_max_mb if cache_max_mb is not None else DEFAULT_CACHE_MAX_MB
     configure_cache(cache_root, max_mb=resolved_max_mb)
+
+    # Configure the artifact store (partial runs, issue #105) alongside the
+    # cache, in a sibling directory under the same parent. Same "must run before
+    # the first request" contract as configure_cache.
+    artifact_root = cache_root.parent / DEFAULT_ARTIFACT_DIRNAME
+    configure_artifacts(artifact_root, max_mb=DEFAULT_ARTIFACT_MAX_MB)
 
     if host == "127.0.0.1":
         configure_session_auth(required=False)

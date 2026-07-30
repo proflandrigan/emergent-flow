@@ -449,8 +449,43 @@ def test_execute_functional_stream_with_arbitrary_only_does_not_crash() -> None:
 
 def test_execute_graph_skip_status_carries_reason_on_upstream_error() -> None:
     # The existing skip-on-upstream-error path must also carry a reason now.
+    # n-load errors (file not found); n-impute is skipped because its upstream
+    # errored -- the reason must say "errored", not the misleading "not been
+    # run yet" (the upstream DID run, it just failed).
     out = execute_graph(_chain_graph(path="/no/such/file.csv"))
     assert out["statuses"]["n-impute"]["status"] == "skipped"
+    assert "reason" in out["statuses"]["n-impute"]
+    assert "errored" in out["statuses"]["n-impute"]["reason"]
+
+
+def test_execute_graph_run_only_on_source_node_succeeds() -> None:
+    # A source node (no IN ports) has no upstream to resolve -- run_only must
+    # succeed without needing any stored artifacts.
+    out = execute_graph({"graph": _load_csv_graph(), "run_only": "n-load"})
+    assert set(out["statuses"]) == {"n-load"}
+    assert out["statuses"]["n-load"]["status"] == "ok"
+    assert "n-load" in out["results"]
+
+
+def test_execute_graph_run_from_on_leaf_node_runs_only_leaf() -> None:
+    # run_from a leaf node (no downstream consumers): _descendants returns just
+    # the leaf itself.
+    execute_graph({"graph": _chain_graph()})  # populate the artifact store
+    out = execute_graph({"graph": _chain_graph(), "run_from": "n-impute"})
+    assert set(out["statuses"]) == {"n-impute"}
+    assert out["statuses"]["n-impute"]["status"] == "ok"
+
+
+def test_execute_graph_declarative_rejects_scope_keys() -> None:
+    # A DECLARATIVE graph must reject run_from / run_only (only run_to was
+    # rejected before; the guard now covers all three scope keys).
+    graph = _load_csv_graph()
+    graph["paradigm"] = "declarative"
+    graph["nodes"]["n-load"]["paradigm"] = "declarative"
+    with pytest.raises(Exception):  # noqa: B017,PT011
+        execute_graph({"graph": graph, "run_from": "n-load"})
+    with pytest.raises(Exception):  # noqa: B017,PT011
+        execute_graph({"graph": graph, "run_only": "n-load"})
 
 
 def test_execute_functional_stream_emits_start_then_ok_for_two_node_chain() -> None:
@@ -704,6 +739,7 @@ def test_serve_configures_cache_before_starting_uvicorn(monkeypatch) -> None:
         calls["ran"] = True
 
     monkeypatch.setattr(app_mod, "configure_cache", fake_configure_cache)
+    monkeypatch.setattr(app_mod, "configure_artifacts", lambda root, max_mb=500.0: None)
     monkeypatch.setattr("uvicorn.run", fake_uvicorn_run)
     app_mod.serve(open_browser=False, cache_dir="/tmp/xyz", cache_max_mb=42.0)
     assert calls == {"root": pathlib.Path("/tmp/xyz"), "max_mb": 42.0, "ran": True}
@@ -722,6 +758,7 @@ def test_serve_defaults_cache_dir_to_cwd_ef_cache(monkeypatch, tmp_path) -> None
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(app_mod, "configure_cache", fake_configure_cache)
+    monkeypatch.setattr(app_mod, "configure_artifacts", lambda root, max_mb=500.0: None)
     monkeypatch.setattr("uvicorn.run", fake_uvicorn_run)
     app_mod.serve(open_browser=False)
     assert calls["root"] == tmp_path / ".ef-cache"
