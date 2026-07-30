@@ -77,7 +77,7 @@ test("clicking an entry adds a node to the store", () => {
 
 test("family sub-group header renders with correct node count", () => {
   render(<Palette />);
-  const dataToggle = screen.getByText("Data").closest("button")!;
+  const dataToggle = screen.getByTestId("palette-family-data");
   // Bump this count whenever a data.* node is added to the catalog.
   // Epic 16 Story group A added http_fetch, load_excel, and load_google_sheet (7 -> 10).
   // Epic 16 Story group D added load_documents (10 -> 11).
@@ -87,14 +87,14 @@ test("family sub-group header renders with correct node count", () => {
 test("clicking a family sub-group header hides its node rows", () => {
   render(<Palette />);
   expect(screen.getByText(/Load CSV/)).toBeInTheDocument();
-  const dataToggle = screen.getByText("Data").closest("button")!;
+  const dataToggle = screen.getByTestId("palette-family-data");
   fireEvent.click(dataToggle);
   expect(screen.queryByText(/Load CSV/)).not.toBeInTheDocument();
 });
 
 test("collapse state persists to localStorage", () => {
   render(<Palette />);
-  const dataToggle = screen.getByText("Data").closest("button")!;
+  const dataToggle = screen.getByTestId("palette-family-data");
   fireEvent.click(dataToggle);
   expect(localStorage.getItem("ef-palette-collapsed-families")).toBe(
     JSON.stringify(["data"]),
@@ -119,15 +119,45 @@ test("searching for a term matching only one family hides other section headers"
   fireEvent.change(screen.getByTestId("palette-search"), {
     target: { value: "anova" },
   });
-  expect(screen.queryByText("Modeling")).not.toBeInTheDocument();
-  expect(screen.queryByText("Data & Prep")).not.toBeInTheDocument();
-  expect(screen.getByText("Analysis")).toBeInTheDocument();
+  expect(screen.queryByTestId("palette-section-model")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("palette-section-data")).not.toBeInTheDocument();
+  expect(screen.getByTestId("palette-section-analyze")).toBeInTheDocument();
   expect(screen.getByText("ANOVA")).toBeInTheDocument();
+});
+
+test("every section header the catalog fills renders in ML-workflow order", () => {
+  render(<Palette />);
+  const headers = screen
+    .getAllByTestId(/^palette-section-/)
+    .map((el) => el.textContent);
+  expect(headers).toEqual([
+    "Data",
+    "Prepare",
+    "Explore",
+    "Analyze",
+    "Model",
+    "Explain",
+    "LLM & Embeddings",
+    "Report",
+    "Utility",
+  ]);
+});
+
+test("families that used to land in 'More' now render under a named section", () => {
+  render(<Palette />);
+  expect(screen.queryByTestId("palette-section-more")).not.toBeInTheDocument();
+  // Regression for ADR 0020: explainability must read as one discoverable group.
+  expect(screen.getByTestId("palette-family-explain")).toHaveTextContent(
+    "Model Explainability",
+  );
+  expect(screen.getByTestId("palette-family-viz")).toHaveTextContent(
+    "Visualization",
+  );
 });
 
 test("auto-expands a previously collapsed family when searching", () => {
   render(<Palette />);
-  const dataToggle = screen.getByText("Data").closest("button")!;
+  const dataToggle = screen.getByTestId("palette-family-data");
   fireEvent.click(dataToggle);
   expect(screen.queryByText(/Load CSV/)).not.toBeInTheDocument();
   fireEvent.change(screen.getByTestId("palette-search"), {
@@ -138,7 +168,7 @@ test("auto-expands a previously collapsed family when searching", () => {
 
 test("clearing search query restores collapsed state after auto-expand", () => {
   render(<Palette />);
-  const dataToggle = screen.getByText("Data").closest("button")!;
+  const dataToggle = screen.getByTestId("palette-family-data");
   fireEvent.click(dataToggle);
   expect(screen.queryByText(/Load CSV/)).not.toBeInTheDocument();
   fireEvent.change(screen.getByTestId("palette-search"), {
