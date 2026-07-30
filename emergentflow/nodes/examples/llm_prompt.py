@@ -117,8 +117,8 @@ class LlmPrompt(NodeDefinition):
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         system, user = self._args(node)
-        system_wired = ctx.in_var("system_template")
-        user_wired = ctx.in_var("user_template")
+        system_wired = ctx.in_var_or_none("system_template")
+        user_wired = ctx.in_var_or_none("user_template")
         system_expr = f"({system_wired} if {system_wired} is not None else {system!r})"
         user_expr = f"({user_wired} if {user_wired} is not None else {user!r})"
         return CodeFragment(

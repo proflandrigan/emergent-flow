@@ -107,8 +107,8 @@ class RecommendFitTwoTower(NodeDefinition):
             body=(
                 f"{ctx.out_var('recommender')} = ef.recommend.fit_two_tower("
                 f"{ctx.in_var('interactions')}, "
-                f"item_features={ctx.in_var('item_features')}, "
-                f"user_features={ctx.in_var('user_features')}, "
+                f"item_features={ctx.in_var_or_none('item_features')}, "
+                f"user_features={ctx.in_var_or_none('user_features')}, "
                 f"params={params!r})"
             ),
         )
