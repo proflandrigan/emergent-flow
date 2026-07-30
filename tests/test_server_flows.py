@@ -137,6 +137,16 @@ class TestFlowStore:
         with pytest.raises(FlowAlreadyExistsError):
             store.rename("a", "b")
 
+    def test_rename_to_same_slug_is_a_no_op_not_a_conflict(self, tmp_path) -> None:
+        # A display-name-only edit that slugifies to the same slug (e.g. "my flow" ->
+        # "My Flow", both -> "my-flow") must not be reported as a conflict against itself --
+        # the "already exists" file IS the source file.
+        store = FlowStore(tmp_path)
+        store.save("my-flow", {"name": "my flow", "nodes": {}, "edges": {}})
+        result = store.rename("my-flow", "my-flow")
+        assert result == {"slug": "my-flow", "status": "ok"}
+        assert store.get("my-flow")["name"] == "my flow"
+
     def test_list_skips_corrupt_json(self, tmp_path) -> None:
         store = FlowStore(tmp_path)
         store.save("good", {"name": "Good", "nodes": {}, "edges": {}})
@@ -307,6 +317,17 @@ class TestFlowRoutes:
         flow_client.post("/flows", json={"graph": graph, "slug": "b"})
         r = flow_client.post("/flows/a/rename", json={"new_slug": "b"})
         assert r.status_code == 409
+
+    # Regression test: renaming a slug to itself (the case a display-name-only edit that
+    # happens to slugify identically produces, e.g. "my flow" -> "My Flow") must succeed as
+    # a no-op, not report a false 409 conflict against its own file.
+    def test_rename_to_same_slug_returns_200(self, flow_client: TestClient) -> None:
+        graph = {"name": "my flow", "nodes": {}, "edges": {}}
+        flow_client.post("/flows", json={"graph": graph, "slug": "my-flow"})
+        r = flow_client.post("/flows/my-flow/rename", json={"new_slug": "my-flow"})
+        assert r.status_code == 200
+        assert r.json()["slug"] == "my-flow"
+        assert flow_client.get("/flows/my-flow").status_code == 200
 
     # Regression test for a path-traversal fix (see TestFlowStore's traversal tests): a
     # request-body `new_slug` reaches FlowStore.rename() unvalidated by this route, so the

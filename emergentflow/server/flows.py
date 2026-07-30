@@ -155,13 +155,18 @@ class FlowStore:
         """Rename a flow's file from ``old_slug`` to ``new_slug``.
 
         Raise ``UnknownFlowError`` if ``old_slug`` doesn't exist, or
-        ``FlowAlreadyExistsError`` if ``new_slug`` already does.
+        ``FlowAlreadyExistsError`` if ``new_slug`` already does. Renaming a slug to itself
+        (e.g. the UI re-slugifying a display-name-only edit like "my flow" -> "My Flow", both
+        of which slugify to "my-flow") is a no-op success rather than a false conflict -- the
+        "already exists" file IS the source file, not a collision.
         """
         old_path = self._path(old_slug)
         new_path = self._path(new_slug)
         with self._lock:
             if not old_path.is_file():
                 raise UnknownFlowError(old_slug)
+            if new_path == old_path:
+                return {"slug": new_slug, "status": "ok"}
             if new_path.is_file():
                 raise FlowAlreadyExistsError(new_slug)
             os.replace(old_path, new_path)
