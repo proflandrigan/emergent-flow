@@ -30,6 +30,7 @@ from emergentflow.codegen.wiring import WiringMap, build_wiring_map
 from emergentflow.ir.common import Cardinality, Direction
 from emergentflow.ir.graph import Graph
 from emergentflow.ir.node import Node
+from emergentflow.nodes import registry as default_node_registry
 from emergentflow.server.payload import to_payload
 
 
@@ -127,7 +128,7 @@ def build_step_traces(
     traces: list[StepTrace] = []
     for step, node_id in enumerate(topo_order):
         node = graph.nodes[node_id]
-        ctx = build_codegen_context(node, name_map, wiring_map)
+        ctx = build_codegen_context(node, name_map, wiring_map, default_node_registry)
 
         inputs: list[VarBinding] = []
         outputs: list[VarBinding] = []

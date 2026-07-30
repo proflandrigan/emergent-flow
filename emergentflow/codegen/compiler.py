@@ -206,7 +206,7 @@ def _assemble(graph: Graph) -> _AssembledModule:
             needs_warehouse = True
         if ClientKind.HTTP in kinds:
             needs_http = True
-        ctx = build_codegen_context(node, name_map, wiring_map)
+        ctx = build_codegen_context(node, name_map, wiring_map, default_node_registry)
         fragment = definition.codegen(node, ctx)
         code_fragments.append(fragment)
         for note_content in note_comments_by_target.get(node_id, []):

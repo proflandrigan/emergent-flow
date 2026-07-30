@@ -28,7 +28,7 @@ from emergentflow.clients import ClientKind, Clients
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
 from emergentflow.codegen.inspect import build_step_traces
 from emergentflow.codegen.traversal import topological_sort
-from emergentflow.codegen.validation import enforce_validation_gate
+from emergentflow.codegen.validation import enforce_validation_gate, required_in_port_names
 from emergentflow.codegen.wiring import WiringMap, build_wiring_map
 from emergentflow.eval import label as eval_label
 from emergentflow.eval.export import build_eval_set_rows, build_finetune_rows, rows_to_jsonl_bytes
@@ -39,6 +39,7 @@ from emergentflow.ir.serialize import deserialize_graph
 from emergentflow.llm.gateway import GatewayClient
 from emergentflow.llm.secrets import validate_api_keys_present
 from emergentflow.nodes import get as get_node_definition
+from emergentflow.nodes import registry as default_node_registry
 from emergentflow.research.lineage import trace_lineage
 from emergentflow.server.artifacts import get_default_artifacts
 from emergentflow.server.cache import get_default_cache
@@ -358,6 +359,16 @@ def _descendants(graph: Graph, targets: set[str], wiring_map: WiringMap) -> set[
     return seen
 
 
+def _tagged_hash(port_name: str, upstream_hash: str | None) -> str | None:
+    """Tag one upstream node hash with the IN port it feeds, for `_node_hash`.
+
+    Propagates ``None`` unchanged so the caller's "every upstream hash is
+    defined" check (which suppresses caching for a node with a non-cacheable
+    ancestor) still sees the undefined entry as undefined.
+    """
+    return None if upstream_hash is None else f"{port_name}={upstream_hash}"
+
+
 def _node_hash(node: Node, upstream_hashes: list[str]) -> str:
     """This node's cache key: sha256(node type + canonical params + upstream hashes + sdk version).
 
@@ -373,10 +384,20 @@ def _node_hash(node: Node, upstream_hashes: list[str]) -> str:
 
     ``node.type`` is included so two different node types with coincidentally
     identical params/upstream hashes never collide on the same key, and
-    *upstream_hashes* is folded in caller-supplied order (one hash per IN
-    port, in port-declaration order) rather than sorted, so a node whose
+    *upstream_hashes* is folded in caller-supplied order (one entry per wired
+    upstream, in IN-port-declaration order) rather than sorted, so a node whose
     upstream wiring is swapped across two non-commutative ports produces a
     different key even though the *set* of upstream hashes is unchanged.
+
+    Each entry must be tagged with the name of the IN port it feeds (the caller
+    does this: ``"{port.name}={hash}"``). Position alone is not enough to
+    identify which port an entry belongs to, because an *unwired optional* IN
+    port contributes no entry at all -- so without the tag, wiring one upstream
+    into ``item_features`` and wiring the same upstream into ``user_features``
+    instead would fold to an identical payload and collide on one cache key
+    (issue #111). Tagging also makes the two spellings of an unfed optional port
+    -- declared-but-unwired and omitted from the instance -- hash identically,
+    which is correct: they mean the same thing.
     """
     params_json_safe = {p.name: p.model_dump(mode="json")["value"] for p in node.params}
     canonical_params = json.dumps(params_json_safe, sort_keys=True, separators=(",", ":"))
@@ -508,11 +529,19 @@ def _execute_functional_stream(
         topo_order_ids = [nid for nid in topo_order_ids if nid in only]
     if wiring_map is None:
         wiring_map = build_wiring_map(graph)
-    # Dangling-input guard (raises UnboundInputError -> 422), same as before.
+    # Dangling-input guard (raises UnboundInputError -> 422): *required* IN ports
+    # only. An optional IN port (PortSpec.required=False) may legitimately be
+    # unconnected -- the binding walk below passes `None` for those. This mirrors
+    # `codegen/executor.py`'s guard and `codegen/validation.py`'s structural
+    # diagnostics, so the server, `ef.execute`, `compile_to_code` and `/validate`
+    # all accept and reject exactly the same graphs (issue #111).
     for node_id in topo_order_ids:
         node = graph.nodes[node_id]
+        required_in_names = required_in_port_names(node.type, default_node_registry)
         for port in node.ports:
             if port.direction != Direction.IN:
+                continue
+            if port.name not in required_in_names:
                 continue
             if not wiring_map.upstream(node.id, port.id):
                 raise UnboundInputError(f"{node.id}.{port.id} has no upstream source")
@@ -526,6 +555,10 @@ def _execute_functional_stream(
     for index, node_id in enumerate(topo_order_ids, start=1):
         node = graph.nodes[node_id]
         inputs: dict[str, Any] = {}
+        # One entry per *wired* upstream, tagged with the IN port it feeds --
+        # see `_node_hash` for why the tag is load-bearing. A `None` entry means
+        # the upstream's own hash is undefined (non-cacheable ancestor), which
+        # suppresses caching for this node entirely.
         upstream_hashes: list[str | None] = []
         skipped = False
         skip_reason: str | None = None
@@ -548,7 +581,7 @@ def _execute_functional_stream(
                         any_upstream_missing = True
                         break
                     values.append(value)
-                    upstream_hashes.append(node_hashes.get(src.node_id))
+                    upstream_hashes.append(_tagged_hash(port.name, node_hashes.get(src.node_id)))
                 if any_upstream_missing:
                     skipped = True
                     skip_reason = _skip_reason(src, node_status)
@@ -562,6 +595,16 @@ def _execute_functional_stream(
                     "should be unreachable -- build_wiring_map raises CardinalityError "
                     "for this case first."
                 )
+            if not sources:
+                # The guard above only rejects unconnected *required* ports, so a
+                # zero-source port reaching here is a genuinely optional one
+                # (PortSpec.required=False) -- bind `None`, mirroring
+                # `codegen/executor.py` and `build_codegen_context`'s "None"
+                # literal (ADR 0002 equivalence). No upstream hash is folded in:
+                # an unwired port contributes no upstream, exactly as the
+                # executor's input walk sees it.
+                inputs[port.name] = None
+                continue
             src = sources[0]
             value = _resolve_upstream_value(
                 src,
@@ -575,7 +618,7 @@ def _execute_functional_stream(
                 skip_reason = _skip_reason(src, node_status)
                 break
             inputs[port.name] = value
-            upstream_hashes.append(node_hashes.get(src.node_id))
+            upstream_hashes.append(_tagged_hash(port.name, node_hashes.get(src.node_id)))
         if skipped:
             node_status[node_id] = _STATUS_SKIPPED
             yield _NodeEvent(

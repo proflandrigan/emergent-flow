@@ -18,11 +18,19 @@ an OUT port both named ``"frame"`` (the impute node does). This is why
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from emergentflow.codegen.naming import NameMap
 from emergentflow.codegen.wiring import WiringMap
 from emergentflow.ir.common import Cardinality, Direction
 from emergentflow.ir.node import Node
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    # Import-cycle guard: every node module imports `CodegenContext` from here, and
+    # `emergentflow.nodes` imports every node module, so this module must never
+    # import the registry at runtime -- `build_codegen_context` takes it as a
+    # parameter instead (both call sites already hold one).
+    from emergentflow.nodes.registry import NodeRegistry
 
 
 @dataclass(frozen=True)
@@ -46,6 +54,27 @@ class CodegenContext:
         if port_name not in self.in_vars:
             raise KeyError(f"No IN port {port_name!r} in this codegen context.")
         return self.in_vars[port_name]
+
+    def in_var_or_none(self, port_name: str) -> str:
+        """Return the variable feeding an *optional* IN port, or the ``"None"`` literal.
+
+        A node type's `PortSpec` may mark an IN port ``required=False``; a node
+        *instance* is then free to omit that port entirely (the canvas does this
+        when the user removes an unused optional input). Such a port has no entry
+        in `in_vars`, and `in_var` would raise. Codegen for an optional port must
+        degrade to ``None`` instead -- mirroring what the same node's `execute`
+        already does with ``inputs.get(port_name)`` (ADR 0002 equivalence).
+
+        Use this for every ``required=False`` IN port of ``Cardinality.ONE``;
+        keep `in_var` for required ones, where a missing entry is a genuine bug
+        worth raising on. The fallback is always the ``"None"`` literal -- this
+        accessor cannot see the port's cardinality, so an optional
+        ``Cardinality.MANY`` port must NOT use it (it would splice ``None`` where
+        the emitted call expects a list). Such a port is covered instead by
+        `build_codegen_context`'s registry backfill, which knows the cardinality
+        and binds ``"[]"``.
+        """
+        return self.in_vars.get(port_name, "None")
 
     def out_var(self, port_name: str) -> str:
         """Return the variable name allocated to the named OUT port.
@@ -71,7 +100,12 @@ class CodegenContext:
         return cls(in_vars=in_vars, out_vars=out_vars)
 
 
-def build_codegen_context(node: Node, name_map: NameMap, wiring_map: WiringMap) -> CodegenContext:
+def build_codegen_context(
+    node: Node,
+    name_map: NameMap,
+    wiring_map: WiringMap,
+    node_registry: NodeRegistry | None = None,
+) -> CodegenContext:
     """Compose the Stories 2-3 maps into one node's CodegenContext.
 
     OUT ports: each OUT port's variable is ``name_map.var_for(node.id, port.id)``.
@@ -93,6 +127,17 @@ def build_codegen_context(node: Node, name_map: NameMap, wiring_map: WiringMap) 
         it directly into an emitted call as a list argument. Zero sources
         binds to "[]" (distinct from a dangling Cardinality.ONE optional
         port, which binds to the "None" literal).
+
+    A node instance may also *omit* an optional IN port altogether rather than
+    declaring it unwired -- the two states are equivalent for a
+    ``PortSpec.required=False`` port, and `execute` already treats them alike via
+    ``inputs.get(name)``. When *node_registry* is supplied, any optional IN port
+    the node type declares but this instance lacks is backfilled with the same
+    literal a declared-but-dangling port would get ("None", or "[]" for a MANY
+    port), so codegen never depends on which of the two states the canvas
+    happens to have produced (issue #111). Passing no registry keeps the
+    instance-only behaviour -- callers that hold a registry (the compiler,
+    `inspect.build_step_traces`) should pass it.
     """
     in_vars: dict[str, str] = {}
     out_vars: dict[str, str] = {}
@@ -117,5 +162,16 @@ def build_codegen_context(node: Node, name_map: NameMap, wiring_map: WiringMap) 
                     "should be unreachable -- build_wiring_map raises CardinalityError "
                     "for this case first."
                 )
+
+    if node_registry is not None:
+        definition_cls = node_registry.try_get(node.type)
+        if definition_cls is not None:
+            for spec in definition_cls.ports:
+                if spec.direction != Direction.IN or spec.required or spec.name in in_vars:
+                    # Only optional ports are backfilled: an absent *required* port
+                    # is a malformed node, and `in_var`'s KeyError (matching
+                    # `execute`'s `inputs[name]` KeyError) is the right outcome.
+                    continue
+                in_vars[spec.name] = "[]" if spec.cardinality == Cardinality.MANY else "None"
 
     return CodegenContext(in_vars=in_vars, out_vars=out_vars)

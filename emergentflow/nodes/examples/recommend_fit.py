@@ -96,7 +96,7 @@ class RecommendFit(NodeDefinition):
             body=(
                 f"{ctx.out_var('recommender')} = ef.recommend.fit("
                 f"{ctx.in_var('interactions')}, algorithm={algorithm!r}, "
-                f"item_features={ctx.in_var('item_features')}, params={params!r})"
+                f"item_features={ctx.in_var_or_none('item_features')}, params={params!r})"
             ),
         )
 
