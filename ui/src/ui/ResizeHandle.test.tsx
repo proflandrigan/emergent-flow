@@ -78,6 +78,23 @@ test("onResizingChange brackets the drag with true then false", () => {
   expect(onResizingChange).toHaveBeenLastCalledWith(false);
 });
 
+test("pointercancel abandons the drag and signals resize end", () => {
+  const { handle, onWidthChange, onResizingChange } = renderHandle();
+  fireEvent.pointerDown(handle, { clientX: 500, pointerId: 1 });
+  fireEvent.pointerMove(handle, { clientX: 480, pointerId: 1 });
+  expect(onWidthChange).toHaveBeenCalledTimes(1);
+
+  // The OS can hijack the pointer mid-drag (e.g. a system gesture) and fire
+  // pointercancel instead of pointerup -- the handle must drop the drag and
+  // signal resize-end so the dock's width transition isn't left suppressed.
+  fireEvent.pointerCancel(handle, { pointerId: 1 });
+  expect(onResizingChange).toHaveBeenLastCalledWith(false);
+
+  // A stray pointermove after cancel must not resume the abandoned drag.
+  fireEvent.pointerMove(handle, { clientX: 400, pointerId: 1 });
+  expect(onWidthChange).toHaveBeenCalledTimes(1);
+});
+
 test("double-click restores the reset width", () => {
   const { handle, onWidthChange } = renderHandle({ width: 400, resetWidth: 320 });
   fireEvent.doubleClick(handle);
