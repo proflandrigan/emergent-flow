@@ -1,25 +1,22 @@
 """
-emergentflow.nodes.examples.cluster_detect
+emergentflow.nodes.examples.outlier_detect
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Reference node: ``ml.cluster_detect`` — the "cluster_detect" archetype node (Epic 8, ADR 0016).
+Reference node: ``ml.outlier_detect`` — the "outlier_detect" archetype node (Epic 8, ADR 0016).
 
-Fits a curated, allow-listed sklearn clustering/mixture estimator (any estimator registered
-with ``archetype="cluster_detect"`` in ``emergentflow.ml.registry``) and immediately labels
-the SAME input frame, returning both a fitted ``Model`` and the labeled ``DataFrame`` (a
-``cluster`` column added). The ``estimator`` choice list is computed at import time from the
-live registry, so it grows automatically as more estimators are curated into the allow-list
-(no edits needed here). ``execute`` calls ``emergentflow.ml.fit_and_label`` directly and the
-code emitted by ``codegen`` calls the same wrapper via the ``ef.`` alias, so the two paths are
-equivalent by construction (ADR 0002).
+Fits a curated, allow-listed sklearn outlier/novelty-detection estimator (any estimator
+registered with ``archetype="outlier_detect"`` in ``emergentflow.ml.registry``) and
+immediately labels the SAME input frame, returning both a fitted ``Model`` and the labeled
+``DataFrame`` (an ``outlier`` column added, with sklearn's ``-1``/``1`` convention).
+The ``estimator`` choice list is computed at import time from the live registry, so it grows
+automatically as more estimators are curated into the allow-list. ``execute`` calls
+``emergentflow.ml.fit_and_detect`` directly and the code emitted by ``codegen`` calls the
+same wrapper via the ``ef.`` alias, so the two paths are equivalent by construction
+(ADR 0002).
 
 Unlike ``ml.fit_estimator`` (fit now, predict on new data later via a separate
-``ml.apply_estimator`` node), some cluster_detect estimators (``DBSCAN``,
-``AgglomerativeClustering``, ``SpectralClustering``) never support predicting on new data at
-all -- sklearn only ever gives you ``.labels_`` computed at fit time for those. So this node
-has no ``target`` param and produces its labeled frame in the SAME step as fitting; a later
-``ml.apply_estimator`` call on the resulting ``Model`` against a DIFFERENT frame correctly
-raises for those estimators (see ``ef.ml.apply_estimator``'s existing ``"predict"`` op), rather
-than silently replaying stale training-time labels.
+``ml.apply_estimator`` node), this node produces its labeled frame in the SAME step as
+fitting; a later ``ml.apply_estimator`` call on the resulting ``Model`` against a DIFFERENT
+frame can predict outlier labels when the underlying estimator supports ``.predict``.
 """
 
 from __future__ import annotations
@@ -29,8 +26,8 @@ from typing import TYPE_CHECKING, Any, cast
 from emergentflow.ir.common import Direction
 from emergentflow.ir.node import Node
 from emergentflow.ir.params import ParamValue
-from emergentflow.ml import fit_and_label
-from emergentflow.ml.registry import keys_for_archetype
+from emergentflow.ml import fit_and_detect
+from emergentflow.ml.registry import outlier_detector_keys
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
@@ -41,15 +38,15 @@ if TYPE_CHECKING:
 
 
 @register
-class ClusterDetect(NodeDefinition):
-    """Fit a curated, allow-listed sklearn clustering/mixture estimator."""
+class OutlierDetect(NodeDefinition):
+    """Fit a curated, allow-listed sklearn outlier/novelty-detection estimator."""
 
-    type = "ml.cluster_detect"
+    type = "ml.outlier_detect"
     version = 1
     family = "ml"
-    label = "Cluster / Detect"
+    label = "Outlier Detect"
     category = "Machine Learning"
-    description = "Fit a curated, allow-listed sklearn clustering/mixture estimator."
+    description = "Fit a curated, allow-listed sklearn outlier/novelty-detection estimator."
 
     ports = [
         PortSpec(
@@ -69,7 +66,7 @@ class ClusterDetect(NodeDefinition):
             name="result",
             direction=Direction.OUT,
             data_type="DataFrame",
-            help="The input frame with an added 'cluster' column.",
+            help="The input frame with an added 'outlier' column (-1=outlier, 1=inlier).",
         ),
     ]
     params = [
@@ -78,9 +75,9 @@ class ClusterDetect(NodeDefinition):
             type_token="str",
             required=True,
             label="Estimator",
-            help="Which allow-listed sklearn clustering/mixture estimator to fit.",
+            help="Which allow-listed sklearn outlier/novelty-detection estimator to fit.",
             hints=ValidationHints(
-                choices=cast("list[ParamValue]", keys_for_archetype("cluster_detect")),
+                choices=cast("list[ParamValue]", outlier_detector_keys()),
                 widget="select",
             ),
         ),
@@ -117,7 +114,7 @@ class ClusterDetect(NodeDefinition):
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
-                f"{ctx.out_var('model')}, {ctx.out_var('result')} = ef.ml.fit_and_label("
+                f"{ctx.out_var('model')}, {ctx.out_var('result')} = ef.ml.fit_and_detect("
                 f"{ctx.in_var('frame')}, estimator={estimator!r}, "
                 f"features={features!r}, params={params!r})"
             ),
@@ -125,7 +122,7 @@ class ClusterDetect(NodeDefinition):
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
         estimator, features, params = self._args(node)
-        model, result = fit_and_label(
+        model, result = fit_and_detect(
             inputs["frame"],
             estimator=estimator,
             features=features,

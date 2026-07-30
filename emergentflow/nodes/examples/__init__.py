@@ -36,6 +36,7 @@ from .deduplicate import Deduplicate
 from .derive_column import DeriveColumn
 from .describe import Describe
 from .describe_relation import DescribeRelation
+from .detect_outliers import DetectOutliers
 from .diagnostic_frame import DiagnosticFrame
 from .diagnostic_model import DiagnosticModel
 from .discretize import Discretize
@@ -95,6 +96,8 @@ from .missingness import Missingness
 from .nn_linear import NnLinear
 from .nn_module import NnModule
 from .nn_relu import NnReLU
+from .outlier_detect import OutlierDetect
+from .outlier_summary import OutlierSummary
 from .parse_dates import ParseDates
 from .pipeline import Pipeline
 from .power_analysis import PowerAnalysis
@@ -171,6 +174,7 @@ __all__ = [
     "DataDictionary",
     "Deduplicate",
     "DeriveColumn",
+    "DetectOutliers",
     "Describe",
     "DescribeRelation",
     "DiagnosticFrame",
@@ -235,6 +239,8 @@ __all__ = [
     "NnLinear",
     "NnModule",
     "NnReLU",
+    "OutlierDetect",
+    "OutlierSummary",
     "ParseDates",
     "Pipeline",
     "PowerAnalysis",

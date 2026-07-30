@@ -16,6 +16,7 @@ from emergentflow.ml import (
     FittedModel,
     FittedTransformer,
     apply_estimator,
+    fit_and_detect,
     fit_estimator,
     summarize,
 )
@@ -370,8 +371,26 @@ def test_fit_estimator_cluster_detect_deterministic_given_random_state() -> None
 
 
 # ---------------------------------------------------------------------------
-# apply_estimator -- predict
+# fit_estimator -- outlier_detect archetype
 # ---------------------------------------------------------------------------
+
+
+def test_fit_estimator_outlier_detect_archetype_returns_fitted_model() -> None:
+    df = _make_unsupervised_df()
+    model = fit_estimator(df, estimator="IsolationForest", params={"random_state": 0})
+    assert isinstance(model, FittedModel)
+    assert model.estimator_type == "IsolationForest"
+    assert model.task == "outlier_detection"
+    assert model.target is None
+
+
+def test_fit_and_detect_labels_frame() -> None:
+    df = _make_unsupervised_df()
+    model, result = fit_and_detect(df, estimator="IsolationForest", params={"random_state": 0})
+    assert isinstance(model, FittedModel)
+    assert model.task == "outlier_detection"
+    assert "outlier" in result.columns
+    assert set(result["outlier"].unique()).issubset({-1, 1})
 
 
 def test_apply_estimator_predict_adds_prediction_column() -> None:

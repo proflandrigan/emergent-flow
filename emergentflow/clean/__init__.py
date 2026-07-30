@@ -30,6 +30,7 @@ from .errors import (
     MissingOptionalDependencyError,
     UnknownColumnError,
 )
+from .outliers import detect_outliers
 from .pii import DEFAULT_MASK, PII_CATEGORIES, PRESIDIO_ENTITY_MAP, REDACT_ENGINES, redact_pii
 from .reshaping import PIVOT_AGGFUNCS, RESHAPE_MODES, reshape
 from .sampling import FUZZY_HOWS, FUZZY_SCORERS, SAMPLE_MODES, fuzzy_join, sample_rows
@@ -54,6 +55,7 @@ __all__ = [
     "select_columns",
     "cast_types",
     "filter_rows",
+    "detect_outliers",
     "explode_lists",
     "encode_lists",
     "merge",

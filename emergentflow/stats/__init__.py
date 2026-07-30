@@ -51,6 +51,7 @@ from emergentflow.stats.eda import (
     distribution_summary,
     group_by_aggregate,
     missingness,
+    outlier_summary,
     profile,
 )
 from emergentflow.stats.errors import (
@@ -88,6 +89,7 @@ __all__ = [
     "kruskal",
     "mann_whitney",
     "missingness",
+    "outlier_summary",
     "power_analysis",
     "profile",
     "test_proportions",

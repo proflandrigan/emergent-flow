@@ -20,6 +20,7 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
 from emergentflow.api import public_op
+from emergentflow.clean.outliers import _bounds
 
 # ``PlotSpec`` (emergentflow.viz.models) is a standalone dataclass that imports nothing from
 # ``emergentflow.stats``, so importing it here is cycle-free -- unlike ``emergentflow.viz`` itself
@@ -181,6 +182,58 @@ def distribution_summary(df: pd.DataFrame, *, columns: list[str] | None = None) 
                 "p95": p95,
                 "max": float(series.max()),
                 "iqr": p75 - p25,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+@public_op(name="ef.stats.outlier_summary")
+def outlier_summary(
+    df: pd.DataFrame,
+    *,
+    columns: list[str] | None = None,
+    method: str = "zscore",
+    threshold: float = 3.0,
+) -> pd.DataFrame:
+    """Report the outlier bounds a rule would apply, one row per numeric column.
+
+    The auditable companion to ``ef.clean.detect_outliers``: same ``columns``/
+    ``method``/``threshold`` contract, but returns the thresholds and hit counts
+    instead of a flagged frame. Columns:
+    ``column``/``method``/``threshold``/``lower``/``upper``/``n``/``n_outliers``/
+    ``pct_outliers``.
+
+    Shares ``detect_outliers``' private ``_bounds`` helper so the reported cut can
+    never drift from the applied cut. Non-numeric named columns are silently
+    omitted (mirroring ``distribution_summary``). Never mutates ``df``.
+    """
+    if columns is not None:
+        unknown = [c for c in columns if c not in df.columns]
+        if unknown:
+            raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+        target = df[columns]
+    else:
+        target = df
+
+    rows: list[dict[str, Any]] = []
+    for col in target.columns:
+        series = target[col]
+        if not is_numeric_dtype(series):
+            continue
+        lower, upper = _bounds(series, method=method, threshold=threshold)
+        n = int(series.count())
+        n_outliers = int(((series < lower) | (series > upper)).sum())
+        pct_outliers = round(float(n_outliers / n * 100) if n else 0.0, 4)
+        rows.append(
+            {
+                "column": col,
+                "method": method,
+                "threshold": float(threshold),
+                "lower": lower,
+                "upper": upper,
+                "n": n,
+                "n_outliers": n_outliers,
+                "pct_outliers": pct_outliers,
             }
         )
     return pd.DataFrame(rows)

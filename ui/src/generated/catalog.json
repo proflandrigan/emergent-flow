@@ -692,13 +692,13 @@
       "task": "regression"
     },
     {
-      "archetype": "cluster_detect",
+      "archetype": "outlier_detect",
       "category": "Covariance",
       "description": "Detects anomalies by fitting a robust covariance ellipse to normal data.",
       "import_path": "sklearn.covariance.EllipticEnvelope",
       "key": "EllipticEnvelope",
       "label": "Elliptic Envelope",
-      "node_type": "ml.cluster_detect",
+      "node_type": "ml.outlier_detect",
       "params": [
         {
           "choices": null,
@@ -1027,13 +1027,13 @@
       "task": "regression"
     },
     {
-      "archetype": "cluster_detect",
+      "archetype": "outlier_detect",
       "category": "Ensemble",
       "description": "Detects anomalies by isolating observations via random recursive partitioning.",
       "import_path": "sklearn.ensemble.IsolationForest",
       "key": "IsolationForest",
       "label": "Isolation Forest",
-      "node_type": "ml.cluster_detect",
+      "node_type": "ml.outlier_detect",
       "params": [
         {
           "choices": null,
@@ -1289,13 +1289,13 @@
       "task": "classification"
     },
     {
-      "archetype": "cluster_detect",
+      "archetype": "outlier_detect",
       "category": "Neighbors",
       "description": "Detects anomalies by comparing a sample's local density to that of its neighbors.",
       "import_path": "sklearn.neighbors.LocalOutlierFactor",
       "key": "LocalOutlierFactor",
       "label": "Local Outlier Factor",
-      "node_type": "ml.cluster_detect",
+      "node_type": "ml.outlier_detect",
       "params": [
         {
           "choices": null,
@@ -1518,13 +1518,13 @@
       "task": null
     },
     {
-      "archetype": "cluster_detect",
+      "archetype": "outlier_detect",
       "category": "SVM",
       "description": "Detects anomalies by learning a boundary that encloses the bulk of normal data.",
       "import_path": "sklearn.svm.OneClassSVM",
       "key": "OneClassSVM",
       "label": "One Class SVM",
-      "node_type": "ml.cluster_detect",
+      "node_type": "ml.outlier_detect",
       "params": [
         {
           "choices": null,
@@ -2553,6 +2553,143 @@
         }
       ],
       "type": "clean.derive_column",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Transform",
+      "description": "Flag outlying rows using z-score, modified z-score, IQR, quantile, or percent thresholds. Adds boolean 'is_outlier' and 'outlier_score' columns.",
+      "family": "clean",
+      "keywords": [],
+      "label": "Detect Outliers",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Columns to scan; empty/unset scans all numeric columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "zscore",
+          "help": "Which outlier rule to apply.",
+          "hints": {
+            "choices": [
+              "zscore",
+              "modified_zscore",
+              "iqr",
+              "quantile",
+              "percent"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Method",
+          "name": "method",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 3.0,
+          "help": "Rule cutoff: SDs for zscore, k for IQR, tail quantile for quantile/percent.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Threshold",
+          "name": "threshold",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": "any",
+          "help": "Flag a row when ANY or ALL target columns flag it.",
+          "hints": {
+            "choices": [
+              "any",
+              "all"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Combine",
+          "name": "combine",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": false,
+          "help": "If true, return only inlier rows and omit the added columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "checkbox"
+          },
+          "label": "Drop outliers",
+          "name": "drop",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame whose numeric columns should be scanned for outliers.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "A NEW frame with added 'is_outlier' and 'outlier_score' columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "clean.detect_outliers",
       "version": 1
     },
     {
@@ -7243,7 +7380,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
-      "description": "Fit a curated, allow-listed sklearn clustering/mixture/outlier-detection estimator.",
+      "description": "Fit a curated, allow-listed sklearn clustering/mixture estimator.",
       "family": "ml",
       "keywords": [],
       "label": "Cluster / Detect",
@@ -7251,21 +7388,17 @@
       "params": [
         {
           "default": null,
-          "help": "Which allow-listed sklearn clustering/mixture/outlier-detection estimator to fit.",
+          "help": "Which allow-listed sklearn clustering/mixture estimator to fit.",
           "hints": {
             "choices": [
               "AgglomerativeClustering",
               "BayesianGaussianMixture",
               "Birch",
               "DBSCAN",
-              "EllipticEnvelope",
               "GaussianMixture",
-              "IsolationForest",
               "KMeans",
-              "LocalOutlierFactor",
               "MeanShift",
               "MiniBatchKMeans",
-              "OneClassSVM",
               "SpectralClustering"
             ],
             "connection_kind": null,
@@ -8115,6 +8248,100 @@
         }
       ],
       "type": "ml.grid_search",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Machine Learning",
+      "description": "Fit a curated, allow-listed sklearn outlier/novelty-detection estimator.",
+      "family": "ml",
+      "keywords": [],
+      "label": "Outlier Detect",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which allow-listed sklearn outlier/novelty-detection estimator to fit.",
+          "hints": {
+            "choices": [
+              "EllipticEnvelope",
+              "IsolationForest",
+              "LocalOutlierFactor",
+              "OneClassSVM"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Estimator",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to use as features; empty/unset uses every column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": {},
+          "help": "Constructor kwargs for the chosen estimator (allow-listed per estimator).",
+          "hints": null,
+          "label": "Estimator params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing features.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "out",
+          "help": "The fitted model.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input frame with an added 'outlier' column (-1=outlier, 1=inlier).",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "ml.outlier_detect",
       "version": 1
     },
     {
@@ -12384,6 +12611,102 @@
         }
       ],
       "type": "stats.missingness",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "description": "Report the outlier bounds actually applied by Detect Outliers, one row per numeric column.",
+      "family": "stats",
+      "keywords": [],
+      "label": "Outlier Summary",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Columns to summarize; empty/unset summarizes all numeric columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Columns",
+          "name": "columns",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "zscore",
+          "help": "Which outlier rule to report bounds for.",
+          "hints": {
+            "choices": [
+              "zscore",
+              "modified_zscore",
+              "iqr",
+              "quantile",
+              "percent"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Method",
+          "name": "method",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 3.0,
+          "help": "Rule cutoff: SDs for zscore, k for IQR, tail quantile for quantile/percent.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Threshold",
+          "name": "threshold",
+          "required": false,
+          "type_token": "float"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame whose numeric columns should be summarized.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Per-column outlier bounds and hit counts as a tidy DataFrame.",
+          "label": null,
+          "name": "summary",
+          "required": true
+        }
+      ],
+      "type": "stats.outlier_summary",
       "version": 1
     },
     {

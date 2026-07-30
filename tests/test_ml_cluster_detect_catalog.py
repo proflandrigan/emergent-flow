@@ -7,7 +7,7 @@ Three things this file proves, per Story 6's own checklist and the Story 9 harne
    ``compile_to_code`` output (LoadSample -> ClusterDetect) is syntactically valid Python and
    passes ``ruff check`` (mirrors ``tests/test_ml_supervised_catalog.py``'s idiom).
 2. ADR-0002 equivalence at scale: for EVERY estimator registered with archetype="cluster_detect"
-   (the entire clustering/mixture/outlier allow-list, computed dynamically so this test grows
+   (the entire clustering/mixture allow-list, computed dynamically so this test grows
    automatically as the allow-list widens), ``execute()`` and running the code ``codegen()``
    emits produce the same fitted-model metadata and the same "cluster" column.
 3. The labels_-only estimators (DBSCAN, AgglomerativeClustering, SpectralClustering) correctly
@@ -100,7 +100,6 @@ _KEY_OVERRIDES: dict[str, dict] = {
     "Birch": {"n_clusters": 2, "threshold": 0.5},
     "GaussianMixture": {"n_components": 2},
     "BayesianGaussianMixture": {"n_components": 2},
-    "LocalOutlierFactor": {"n_neighbors": 5},
 }
 
 
@@ -115,7 +114,6 @@ def _params_for(estimator_key: str) -> dict:
 _REPRESENTATIVE_ESTIMATORS = [
     "KMeans",  # clustering (seed)
     "GaussianMixture",  # mixture (seed)
-    "IsolationForest",  # outlier/novelty
 ]
 
 
@@ -222,7 +220,7 @@ def test_labels_only_estimator_rejects_predict_on_new_data(estimator_key: str) -
 
 
 # ---------------------------------------------------------------------------
-# 4. ``ef.ml.fit_and_label`` archetype validation and the LocalOutlierFactor(novelty=False) path.
+# 4. ``ef.ml.fit_and_label`` archetype validation.
 # ---------------------------------------------------------------------------
 
 
@@ -233,15 +231,3 @@ def test_fit_and_label_rejects_fit_archetype_estimator_up_front() -> None:
     df = _blob_df()
     with pytest.raises(ValueError, match="not a cluster_detect-archetype estimator"):
         fit_and_label(df, estimator="LogisticRegression", features=_FEATURES)
-
-
-def test_fit_and_label_local_outlier_factor_novelty_false() -> None:
-    """LocalOutlierFactor with ``novelty=False`` has neither ``.labels_`` nor ``.predict``
-    (sklearn only exposes ``.predict`` when ``novelty=True``) -- ``fit_and_label`` must fall
-    back to ``.fit_predict()`` instead of raising."""
-    df = _blob_df()
-    model, result = fit_and_label(
-        df, estimator="LocalOutlierFactor", features=_FEATURES, params={"novelty": False}
-    )
-    assert "cluster" in result.columns
-    assert set(result["cluster"].unique()).issubset({-1, 1})
