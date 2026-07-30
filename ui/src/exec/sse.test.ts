@@ -116,4 +116,17 @@ describe("sse", () => {
     expect(events).toHaveLength(1);
     expect(events[0]).toEqual({ type: "node_skip", node_id: "n2" });
   });
+
+  test("parses a node_skip frame with a reason", async () => {
+    const stream = streamOf([
+      'data: {"type":"node_skip","node_id":"n2","reason":"upstream has not been run yet"}\n\n',
+    ]);
+    const events = await collect(stream);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({
+      type: "node_skip",
+      node_id: "n2",
+      reason: "upstream has not been run yet",
+    });
+  });
 });

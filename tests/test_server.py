@@ -53,14 +53,18 @@ from emergentflow.server.service import (
 
 @pytest.fixture(autouse=True)
 def _fresh_default_cache(tmp_path: pathlib.Path) -> Iterator[None]:
-    """Isolate the on-disk execution cache per test so cached outputs from one
-    test don't produce false cache hits in another."""
+    """Isolate the on-disk execution cache and artifact store per test so cached
+    outputs from one test don't produce false hits in another."""
+    from emergentflow.server import artifacts as artifacts_mod
     from emergentflow.server.cache import ExecutionCache
 
-    old = cache_mod._default_cache
+    old_cache = cache_mod._default_cache
     cache_mod._default_cache = ExecutionCache(root=tmp_path / ".ef-cache")
+    old_artifacts = artifacts_mod._default_artifacts
+    artifacts_mod._default_artifacts = artifacts_mod.ArtifactStore(root=tmp_path / ".ef-artifacts")
     yield
-    cache_mod._default_cache = old
+    cache_mod._default_cache = old_cache
+    artifacts_mod._default_artifacts = old_artifacts
 
 
 SAMPLE_CSV = (
@@ -190,6 +194,62 @@ def _fanout_graph(path: str | None = None) -> dict:
     return json.loads(serialize_graph(graph))
 
 
+def _three_node_chain_graph(path: str | None = None) -> dict:
+    """A linear three-node functional chain: load_csv -> impute_a -> impute_b (frame -> frame)."""
+    load = Node(
+        id="n-load",
+        type="data.load_csv",
+        label="Load CSV",
+        paradigm=Paradigm.FUNCTIONAL,
+        params=[Param(name="path", type_token="str", value=path or str(SAMPLE_CSV))],
+        ports=[
+            Port(id="p-load-frame", name="frame", direction=Direction.OUT, data_type="DataFrame"),
+        ],
+        position=Position(x=0.0, y=0.0),
+    )
+    impute_a = Node(
+        id="n-impute-a",
+        type="clean.impute_missing",
+        label="Impute A",
+        paradigm=Paradigm.FUNCTIONAL,
+        params=[Param(name="strategy", type_token="str", value="mean")],
+        ports=[
+            Port(id="p-impa-in", name="frame", direction=Direction.IN, data_type="DataFrame"),
+            Port(id="p-impa-out", name="frame", direction=Direction.OUT, data_type="DataFrame"),
+        ],
+        position=Position(x=1.0, y=0.0),
+    )
+    impute_b = Node(
+        id="n-impute-b",
+        type="clean.impute_missing",
+        label="Impute B",
+        paradigm=Paradigm.FUNCTIONAL,
+        params=[Param(name="strategy", type_token="str", value="median")],
+        ports=[
+            Port(id="p-impb-in", name="frame", direction=Direction.IN, data_type="DataFrame"),
+            Port(id="p-impb-out", name="frame", direction=Direction.OUT, data_type="DataFrame"),
+        ],
+        position=Position(x=2.0, y=0.0),
+    )
+    edge_a = Edge(
+        id="e-load-impute-a",
+        source=PortRef(node_id="n-load", port_id="p-load-frame"),
+        target=PortRef(node_id="n-impute-a", port_id="p-impa-in"),
+    )
+    edge_b = Edge(
+        id="e-impute-a-b",
+        source=PortRef(node_id="n-impute-a", port_id="p-impa-out"),
+        target=PortRef(node_id="n-impute-b", port_id="p-impb-in"),
+    )
+    graph = Graph(
+        paradigm=Paradigm.FUNCTIONAL,
+        name="server-test-three-chain",
+        nodes={load.id: load, impute_a.id: impute_a, impute_b.id: impute_b},
+        edges={edge_a.id: edge_a, edge_b.id: edge_b},
+    )
+    return json.loads(serialize_graph(graph))
+
+
 def _llm_call_graph(provider: str = "anthropic") -> dict:
     """A minimal one-node functional graph with an `llm.call` node (requires_client)."""
     node = Node(
@@ -306,6 +366,91 @@ def test_execute_graph_bare_body_still_runs_whole_graph() -> None:
 def test_execute_graph_run_to_unknown_target_raises() -> None:
     with pytest.raises(Exception):  # noqa: B017,PT011
         execute_graph({"graph": _fanout_graph(), "run_to": "n-nope"})
+
+
+def test_execute_graph_run_only_single_node_reuses_prior_output() -> None:
+    # Full run first so the artifact store has every node's output.
+    execute_graph({"graph": _three_node_chain_graph()})
+    # run_only the last node: it should reuse n-impute-a's stored output
+    # without re-running n-load or n-impute-a.
+    out = execute_graph({"graph": _three_node_chain_graph(), "run_only": "n-impute-b"})
+    assert set(out["statuses"]) == {"n-impute-b"}
+    assert out["statuses"]["n-impute-b"]["status"] == "ok"
+    assert "n-impute-b" in out["results"]
+
+
+def test_execute_graph_run_only_single_node_without_prior_run_skips_with_reason() -> None:
+    # No prior run: the artifact store is empty, so the node's upstream can't
+    # be resolved -> it must skip with a reason, not crash (Gap 1).
+    out = execute_graph({"graph": _three_node_chain_graph(), "run_only": "n-impute-b"})
+    assert out["statuses"]["n-impute-b"]["status"] == "skipped"
+    assert "reason" in out["statuses"]["n-impute-b"]
+    assert "not been run" in out["statuses"]["n-impute-b"]["reason"]
+
+
+def test_execute_graph_run_only_multiple_nodes_reuses_prior_output() -> None:
+    execute_graph({"graph": _three_node_chain_graph()})
+    # Run just the two impute nodes; n-impute-a reuses n-load's stored output.
+    out = execute_graph(
+        {"graph": _three_node_chain_graph(), "run_only": ["n-impute-a", "n-impute-b"]}
+    )
+    assert set(out["statuses"]) == {"n-impute-a", "n-impute-b"}
+    assert out["statuses"]["n-impute-a"]["status"] == "ok"
+    assert out["statuses"]["n-impute-b"]["status"] == "ok"
+
+
+def test_execute_graph_run_from_runs_target_and_descendants() -> None:
+    execute_graph({"graph": _three_node_chain_graph()})
+    # run_from the middle node: runs n-impute-a and n-impute-b, reuses n-load's
+    # stored output. n-load itself is NOT in the run.
+    out = execute_graph({"graph": _three_node_chain_graph(), "run_from": "n-impute-a"})
+    assert set(out["statuses"]) == {"n-impute-a", "n-impute-b"}
+    assert "n-load" not in out["statuses"]
+    assert out["statuses"]["n-impute-a"]["status"] == "ok"
+    assert out["statuses"]["n-impute-b"]["status"] == "ok"
+
+
+def test_execute_graph_run_from_without_prior_run_skips_with_reason() -> None:
+    out = execute_graph({"graph": _three_node_chain_graph(), "run_from": "n-impute-a"})
+    # n-impute-a can't get n-load's output -> skipped; n-impute-b skipped (upstream).
+    assert out["statuses"]["n-impute-a"]["status"] == "skipped"
+    assert "reason" in out["statuses"]["n-impute-a"]
+
+
+def test_execute_graph_multiple_scope_keys_raise() -> None:
+    with pytest.raises(Exception):  # noqa: B017,PT011
+        execute_graph({"graph": _chain_graph(), "run_to": "n-impute", "run_only": "n-impute"})
+
+
+def test_execute_graph_run_only_unknown_target_raises() -> None:
+    with pytest.raises(Exception):  # noqa: B017,PT011
+        execute_graph({"graph": _chain_graph(), "run_only": "n-nope"})
+
+
+def test_execute_graph_run_from_unknown_target_raises() -> None:
+    with pytest.raises(Exception):  # noqa: B017,PT011
+        execute_graph({"graph": _chain_graph(), "run_from": "n-nope"})
+
+
+def test_execute_functional_stream_with_arbitrary_only_does_not_crash() -> None:
+    # Gap 1 regression: a non-ancestor-closed `only` set must not raise
+    # KeyError. Without a prior run the downstream node skips; with a prior
+    # run it succeeds from the stored artifact.
+    g = _to_graph(_three_node_chain_graph())
+    events = list(_execute_functional_stream(g, only={"n-impute-b"}))
+    # Only n-impute-b in scope; upstream (n-impute-a) not walked -> skip.
+    assert any(e.phase == "skip" and e.node_id == "n-impute-b" for e in events)
+
+    # After a full run the artifact store has n-impute-a's output.
+    list(_execute_functional_stream(_to_graph(_three_node_chain_graph())))
+    events = list(_execute_functional_stream(g, only={"n-impute-b"}))
+    assert any(e.phase == "ok" and e.node_id == "n-impute-b" for e in events)
+
+
+def test_execute_graph_skip_status_carries_reason_on_upstream_error() -> None:
+    # The existing skip-on-upstream-error path must also carry a reason now.
+    out = execute_graph(_chain_graph(path="/no/such/file.csv"))
+    assert out["statuses"]["n-impute"]["status"] == "skipped"
 
 
 def test_execute_functional_stream_emits_start_then_ok_for_two_node_chain() -> None:
@@ -752,6 +897,37 @@ def test_http_execute_stream_run_to_unknown_target_is_422(client: TestClient) ->
     resp = client.post("/execute/stream", json={"graph": _fanout_graph(), "run_to": "n-nope"})
     assert resp.status_code == 422
     assert "error" in resp.json()
+
+
+def test_http_execute_stream_run_only_skip_carries_reason(client: TestClient) -> None:
+    # No prior run: run_only a downstream node -> skip with reason.
+    resp = client.post(
+        "/execute/stream",
+        json={"graph": _three_node_chain_graph(), "run_only": "n-impute-b"},
+    )
+    assert resp.status_code == 200
+    events = _parse_sse_events(resp.text)
+    skip_events = [e for e in events if e.get("type") == "node_skip"]
+    assert len(skip_events) == 1
+    assert skip_events[0]["node_id"] == "n-impute-b"
+    assert "reason" in skip_events[0]
+    assert "not been run" in skip_events[0]["reason"]
+
+
+def test_http_execute_stream_run_from_prunes_upstream(client: TestClient) -> None:
+    # Full run first so the artifact store has outputs.
+    client.post("/execute/stream", json={"graph": _three_node_chain_graph()})
+    # run_from the middle node: n-load not in scope, n-impute-a and n-impute-b run.
+    resp = client.post(
+        "/execute/stream",
+        json={"graph": _three_node_chain_graph(), "run_from": "n-impute-a"},
+    )
+    assert resp.status_code == 200
+    events = _parse_sse_events(resp.text)
+    all_ids = {e["node_id"] for e in events if "node_id" in e}
+    assert "n-load" not in all_ids
+    assert "n-impute-a" in all_ids
+    assert "n-impute-b" in all_ids
 
 
 def test_http_execute_stream_bad_json_is_400(client: TestClient) -> None:

@@ -206,6 +206,52 @@ test("runGraph with runTo as an array sends run_to as an array in the POST body"
   });
 });
 
+test("runGraph with runOnly sends run_only in the POST body", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    sseResponse([{ type: "run_complete", total_ms: 0 }]),
+  );
+
+  await runGraph({ runOnly: "n1" });
+
+  const callArgs = (vi.mocked(fetch).mock.calls as [[string, RequestInit]])[0];
+  const parsedBody = JSON.parse(callArgs[1].body as string);
+  expect(parsedBody).toEqual({
+    graph: expect.anything(),
+    run_only: "n1",
+  });
+});
+
+test("runGraph with runFrom sends run_from in the POST body", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    sseResponse([{ type: "run_complete", total_ms: 0 }]),
+  );
+
+  await runGraph({ runFrom: ["n1", "n2"] });
+
+  const callArgs = (vi.mocked(fetch).mock.calls as [[string, RequestInit]])[0];
+  const parsedBody = JSON.parse(callArgs[1].body as string);
+  expect(parsedBody).toEqual({
+    graph: expect.anything(),
+    run_from: ["n1", "n2"],
+  });
+});
+
+test("a node_skip event with a reason stores it in the node's status", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    sseResponse([
+      { type: "node_skip", node_id: "n1", reason: "upstream has not been run yet" },
+      { type: "run_complete", total_ms: 0 },
+    ]),
+  );
+
+  await runGraph({ runOnly: "n1" });
+
+  expect(useExecutionStore.getState().statuses.n1).toEqual({
+    status: "skipped",
+    reason: "upstream has not been run yet",
+  });
+});
+
 test("runGraph with an empty array runTo sends the bare graph without run_to", async () => {
   vi.spyOn(globalThis, "fetch").mockResolvedValue(
     sseResponse([{ type: "run_complete", total_ms: 0 }]),

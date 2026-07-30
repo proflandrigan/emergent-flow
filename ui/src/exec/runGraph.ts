@@ -1,8 +1,9 @@
-// The shared streaming-execute call: POSTs the current graph (optionally pruned to a single
-// node's ancestor chain via `run_to`) to `/execute/stream` and applies each SSE event to
-// `executionStore` incrementally as it arrives. Used by both ExecutionToolbar's "Execute" button
-// (whole graph) and the canvas node context menu's "Run to here" action (pruned subgraph),
-// Epic 7 Stories 4-5, so the two triggers share one implementation.
+// The shared streaming-execute call: POSTs the current graph (optionally pruned to a
+// subgraph via `run_to` / `run_from` / `run_only`) to `/execute/stream` and applies each
+// SSE event to `executionStore` incrementally as it arrives. Used by the ExecutionToolbar's
+// "Execute" button (whole graph), the canvas node context menu's "Run to here" / "Run this
+// node" / "Run from here" actions, and the selection toolbar, so every trigger shares one
+// implementation. See issue #105 for the partial-run semantics.
 
 import { EXPECTED_PAYLOAD_VERSION } from "../store/execution";
 import { useExecutionStore } from "../store/executionStore";
@@ -11,8 +12,14 @@ import { readSSEEvents } from "./sse";
 
 export interface RunGraphOptions {
   /** If set, only the ancestor-closed subgraph of this node (or these nodes) runs
-   *  ("run to here" for a single id, "run selected" for an array). */
+   *  ("run to here" for a single id, "run to selected" for an array). */
   runTo?: string | string[];
+  /** If set, the target(s) and every node downstream run, reusing prior run's
+   *  stored outputs for the targets' own IN ports ("run from here"). */
+  runFrom?: string | string[];
+  /** If set, exactly the listed nodes run, reusing prior run's stored outputs
+   *  where available ("run this node" / "run selected only"). */
+  runOnly?: string | string[];
   /** Called with a human-readable message whenever the run fails (in addition to
    *  `executionStore.error` always being set). Callers that render their own error
    *  banner (e.g. `ExecutionToolbar`) pass this; callers that don't need a local
@@ -28,11 +35,15 @@ export async function runGraph(options: RunGraphOptions = {}): Promise<void> {
     return;
   }
 
-  const { runTo, onError } = options;
+  const { runTo, runFrom, runOnly, onError } = options;
   const graph = useGraphStore.getState().toIR();
-  const hasRunTo =
-    typeof runTo === "string" || (Array.isArray(runTo) && runTo.length > 0);
-  const body = hasRunTo ? { graph, run_to: runTo } : graph;
+  const hasScope =
+    (typeof runTo === "string" || (Array.isArray(runTo) && runTo.length > 0)) ||
+    (typeof runFrom === "string" || (Array.isArray(runFrom) && runFrom.length > 0)) ||
+    typeof runOnly === "string" || (Array.isArray(runOnly) && runOnly.length > 0);
+  const body = hasScope
+    ? { graph, ...(runTo !== undefined ? { run_to: runTo } : {}), ...(runFrom !== undefined ? { run_from: runFrom } : {}), ...(runOnly !== undefined ? { run_only: runOnly } : {}) }
+    : graph;
 
   function fail(message: string) {
     useExecutionStore.getState().setError(message);
@@ -91,7 +102,7 @@ export async function runGraph(options: RunGraphOptions = {}): Promise<void> {
           useExecutionStore.getState().setNodeError(event.node_id, event.error);
           break;
         case "node_skip":
-          useExecutionStore.getState().setNodeSkipped(event.node_id);
+          useExecutionStore.getState().setNodeSkipped(event.node_id, event.reason);
           break;
         case "run_complete":
           settled = true;

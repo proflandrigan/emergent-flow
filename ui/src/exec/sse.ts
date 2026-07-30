@@ -32,7 +32,7 @@ export type StreamEvent =
       error: string;
       payload_version?: number;
     }
-  | { type: "node_skip"; node_id: string; payload_version?: number }
+  | { type: "node_skip"; node_id: string; reason?: string; payload_version?: number }
   | { type: "run_complete"; total_ms: number; payload_version?: number }
   | { type: "run_error"; error: string; payload_version?: number };
 

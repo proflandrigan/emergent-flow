@@ -114,6 +114,104 @@ describe("Canvas", () => {
     });
   });
 
+  test("clicking Run this node posts run_only with the right-clicked node's id", async () => {
+    const nodeId = useGraphStore.getState().addNodeFromSpec(loadCsv, {
+      x: 0,
+      y: 0,
+    });
+
+    function sseResponse(status = 200): Response {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode('data: {"type":"run_complete","total_ms":0}\n\n'));
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        status,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    }
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      sseResponse(),
+    );
+
+    const { container } = render(<Canvas />);
+
+    const nodeElement = container.querySelector(".react-flow__node");
+    expect(nodeElement).not.toBeNull();
+
+    fireEvent.contextMenu(nodeElement!, { clientX: 50, clientY: 60 });
+
+    fireEvent.click(screen.getByTestId("node-context-menu-run-this-node"));
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/execute/stream",
+        expect.anything(),
+      );
+    });
+
+    const callArgs = fetchSpy.mock.calls.find((call) => call[0] === "/execute/stream")!;
+    const init = callArgs[1] as { body: string };
+    const parsedBody = JSON.parse(init.body);
+    expect(parsedBody).toEqual({
+      graph: expect.anything(),
+      run_only: nodeId,
+    });
+  });
+
+  test("clicking Run from here posts run_from with the right-clicked node's id", async () => {
+    const nodeId = useGraphStore.getState().addNodeFromSpec(loadCsv, {
+      x: 0,
+      y: 0,
+    });
+
+    function sseResponse(status = 200): Response {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode('data: {"type":"run_complete","total_ms":0}\n\n'));
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        status,
+        headers: { "Content-Type": "text/event-stream" },
+      });
+    }
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      sseResponse(),
+    );
+
+    const { container } = render(<Canvas />);
+
+    const nodeElement = container.querySelector(".react-flow__node");
+    expect(nodeElement).not.toBeNull();
+
+    fireEvent.contextMenu(nodeElement!, { clientX: 50, clientY: 60 });
+
+    fireEvent.click(screen.getByTestId("node-context-menu-run-from-here"));
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/execute/stream",
+        expect.anything(),
+      );
+    });
+
+    const callArgs = fetchSpy.mock.calls.find((call) => call[0] === "/execute/stream")!;
+    const init = callArgs[1] as { body: string };
+    const parsedBody = JSON.parse(init.body);
+    expect(parsedBody).toEqual({
+      graph: expect.anything(),
+      run_from: nodeId,
+    });
+  });
+
   test("pressing Escape closes the context menu", () => {
     useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
 
@@ -172,7 +270,7 @@ describe("Canvas", () => {
     expect(Object.keys(useGraphStore.getState().nodes)).toHaveLength(1);
   });
 
-  test("shows the selection toolbar when 2+ nodes are selected and runs them on click", async () => {
+  test("shows the selection toolbar when 2+ nodes are selected and runs-to-selected on click", async () => {
     useSelectionStore.getState().clear();
 
     const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, {
@@ -204,7 +302,7 @@ describe("Canvas", () => {
 
     expect(screen.getByTestId("selection-toolbar")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId("run-selected"));
+    fireEvent.click(screen.getByTestId("run-to-selected"));
 
     await waitFor(() => {
       expect(fetchSpy).toHaveBeenCalledWith(
@@ -220,6 +318,54 @@ describe("Canvas", () => {
     const parsedBody = JSON.parse(init.body);
     expect(parsedBody.run_to).toEqual(expect.arrayContaining([n1, n2]));
     expect(parsedBody.run_to).toHaveLength(2);
+  });
+
+  test("Run selected only sends run_only with the selected node ids", async () => {
+    useSelectionStore.getState().clear();
+
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, {
+      x: 0,
+      y: 0,
+    });
+    const n2 = useGraphStore.getState().addNodeFromSpec(loadCsv, {
+      x: 100,
+      y: 0,
+    });
+
+    useSelectionStore.getState().setNodeSelected(n1, true);
+    useSelectionStore.getState().setNodeSelected(n2, true);
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            const encoder = new TextEncoder();
+            controller.enqueue(encoder.encode('data: {"type":"run_complete","total_ms":0}\n\n'));
+            controller.close();
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "text/event-stream" } },
+      ),
+    );
+
+    render(<Canvas />);
+
+    fireEvent.click(screen.getByTestId("run-selected-only"));
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/execute/stream",
+        expect.anything(),
+      );
+    });
+
+    const callArgs = fetchSpy.mock.calls.find(
+      (call) => call[0] === "/execute/stream",
+    )!;
+    const init = callArgs[1] as { body: string };
+    const parsedBody = JSON.parse(init.body);
+    expect(parsedBody.run_only).toEqual(expect.arrayContaining([n1, n2]));
+    expect(parsedBody.run_only).toHaveLength(2);
   });
 
   test("selection toolbar is absent when only one node is selected", () => {

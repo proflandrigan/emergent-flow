@@ -27,7 +27,7 @@ export interface ExecutionStore {
   setNodeResult: (nodeId: string, results: Record<string, Payload>) => void;
   setNodeCached: (nodeId: string, results: Record<string, Payload>) => void;
   setNodeError: (nodeId: string, error: string) => void;
-  setNodeSkipped: (nodeId: string) => void;
+  setNodeSkipped: (nodeId: string, reason?: string) => void;
   setRunComplete: () => void;
   setError: (message: string) => void;
   clear: () => void;
@@ -69,10 +69,16 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
     }));
   },
 
-  setNodeSkipped(nodeId) {
-    set((state) => ({
-      statuses: { ...state.statuses, [nodeId]: { status: "skipped" } },
-    }));
+  setNodeSkipped(nodeId, reason) {
+    set((state) => {
+      const status: NodeRunStatus = { status: "skipped" };
+      if (reason) {
+        status.reason = reason;
+      }
+      return {
+        statuses: { ...state.statuses, [nodeId]: status },
+      };
+    });
   },
 
   setRunComplete() {

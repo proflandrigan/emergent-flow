@@ -289,7 +289,10 @@ export function Canvas(): JSX.Element {
       {selectedNodeIds.length > 1 && (
         <SelectionToolbar
           count={selectedNodeIds.length}
-          onRunSelected={() => {
+          onRunSelectedOnly={() => {
+            void runGraph({ runOnly: selectedNodeIds });
+          }}
+          onRunToSelected={() => {
             void runGraph({ runTo: selectedNodeIds });
           }}
         />
@@ -300,6 +303,12 @@ export function Canvas(): JSX.Element {
           y={contextMenu.y}
           onRunToHere={() => {
             void runGraph({ runTo: contextMenu.nodeId });
+          }}
+          onRunThisNode={() => {
+            void runGraph({ runOnly: contextMenu.nodeId });
+          }}
+          onRunFromHere={() => {
+            void runGraph({ runFrom: contextMenu.nodeId });
           }}
           onNodeInfo={() => setInfoNodeId(contextMenu.nodeId)}
           onClose={closeContextMenu}
