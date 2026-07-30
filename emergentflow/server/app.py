@@ -29,6 +29,14 @@ Routes:
 - ``POST /connections/{name}/test`` -- probe one connection profile
 - ``GET  /connections/{name}/schema`` -- browse a connection's relations/columns
 - ``POST /compile-spec``     -- {"spec": {...}, "dialect": ...} -> {"sql": ...}
+- ``GET  /flows``             -- list saved flows
+- ``GET  /flows/{slug}``      -- get a saved flow's graph JSON
+- ``POST /flows``             -- save a new flow
+- ``PUT  /flows/{slug}``      -- update an existing flow
+- ``DELETE /flows/{slug}``    -- delete a saved flow
+- ``POST /flows/{slug}/rename`` -- rename a flow
+- ``GET  /examples``          -- list bundled example graphs
+- ``GET  /examples/{path}``   -- get a bundled example graph
 """
 
 from __future__ import annotations
@@ -88,6 +96,15 @@ from emergentflow.server.artifacts import (
     configure_artifacts,
 )
 from emergentflow.server.cache import DEFAULT_CACHE_DIRNAME, DEFAULT_CACHE_MAX_MB, configure_cache
+from emergentflow.server.flows import (
+    DEFAULT_FLOW_DIRNAME,
+    FlowAlreadyExistsError,
+    InvalidSlugError,
+    UnknownFlowError,
+    configure_flows,
+    get_default_flows,
+    slugify,
+)
 from emergentflow.server.reports import get_default_store
 from emergentflow.server.service import (
     clear_cache,
@@ -127,6 +144,17 @@ from emergentflow.server.service import (
 # so every read is guarded and the server falls back to the v0 demo page.
 # app.py lives at emergentflow/server/app.py; parents[1] is the emergentflow/ package root.
 _STATIC_DIR = pathlib.Path(__file__).resolve().parents[1] / "_static"
+
+# parents[2] from emergentflow/server/app.py is the repo root, sibling to examples/ -- this
+# only resolves to a real directory in a source checkout (an editable install or `emergentflow
+# serve` run from the monorepo). Despite the original intent, neither MANIFEST.in nor
+# [tool.setuptools.package-data] in pyproject.toml actually ships examples/ into the sdist or
+# wheel (top-level examples/ isn't part of the `emergentflow*` package tree setuptools
+# discovers), so for a real `pip install emergentflow[server]` end user this path won't exist
+# on disk. `list_examples()` below degrades gracefully (empty list, ExampleGallery renders
+# nothing) rather than crashing, but the starter-gallery feature is effectively dev-checkout-
+# only until examples/ is packaged as installed data -- see issue #114 follow-up.
+_EXAMPLES_DIR = pathlib.Path(__file__).resolve().parents[2] / "examples"
 
 
 def _static_file(url_path: str) -> pathlib.Path | None:
@@ -932,6 +960,148 @@ def create_app() -> FastAPI:
 
         return await _session_json(_end)
 
+    # -- Flow store routes (issue #114) ------------------------------------------
+
+    @application.get("/flows")
+    async def list_flows() -> Response:
+        return await _safe_json(lambda: {"flows": get_default_flows().list()})
+
+    @application.get("/flows/{slug}")
+    async def get_flow(slug: str) -> Response:
+        try:
+            graph = await _run_sync(lambda: get_default_flows().get(slug))
+        except UnknownFlowError as exc:
+            return _error_json(404, str(exc))
+        except InvalidSlugError as exc:
+            return _error_json(400, str(exc))
+        except Exception as exc:  # noqa: BLE001 - never crash the server on a store failure
+            return _error_json(422, f"{type(exc).__name__}: {exc}")
+        return JSONResponse(content=graph)
+
+    @application.post("/flows")
+    async def create_flow(request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+        graph = body.get("graph")
+        if not isinstance(graph, dict):
+            return _error_json(400, "POST /flows requires a 'graph' object in the body")
+        # `graph["name"]` is client-controlled and untyped JSON -- slugify() assumes a str
+        # (calls .strip()/.lower() on it) and raises AttributeError on anything else (e.g. a
+        # number, list, or bool), which would otherwise propagate out of this route as an
+        # unhandled 500 instead of a clean error response. Guard the type here, not just
+        # emptiness.
+        raw_name = graph.get("name")
+        name = raw_name if isinstance(raw_name, str) and raw_name.strip() else "Untitled"
+        # `slug`, if given, is a raw request-body string, not something we ran through
+        # `slugify()` ourselves -- FlowStore.save()/`_path()` is what actually rejects a
+        # malformed or path-escaping value (InvalidSlugError below), so this route must never
+        # assume a client-supplied slug is already safe.
+        slug = body.get("slug") or slugify(name)
+        try:
+            result = await _run_sync(lambda: get_default_flows().save(slug, graph))
+        except InvalidSlugError as exc:
+            return _error_json(400, str(exc))
+        except Exception as exc:  # noqa: BLE001 - never crash the server on a store failure
+            return _error_json(422, f"{type(exc).__name__}: {exc}")
+        return JSONResponse(content=result)
+
+    @application.put("/flows/{slug}")
+    async def update_flow(slug: str, request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+        graph = body.get("graph")
+        if not isinstance(graph, dict):
+            return _error_json(400, "PUT /flows/{slug} requires a 'graph' object in the body")
+        try:
+            result = await _run_sync(lambda: get_default_flows().save(slug, graph))
+        except InvalidSlugError as exc:
+            return _error_json(400, str(exc))
+        except Exception as exc:  # noqa: BLE001 - never crash the server on a store failure
+            return _error_json(422, f"{type(exc).__name__}: {exc}")
+        return JSONResponse(content=result)
+
+    @application.delete("/flows/{slug}")
+    async def delete_flow(slug: str) -> Response:
+        try:
+            await _run_sync(lambda: get_default_flows().delete(slug))
+        except UnknownFlowError as exc:
+            return _error_json(404, str(exc))
+        except InvalidSlugError as exc:
+            return _error_json(400, str(exc))
+        except Exception as exc:  # noqa: BLE001 - never crash the server on a store failure
+            return _error_json(422, f"{type(exc).__name__}: {exc}")
+        return JSONResponse(content={"status": "ok"})
+
+    @application.post("/flows/{slug}/rename")
+    async def rename_flow(slug: str, request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+        new_slug = body.get("new_slug")
+        if not isinstance(new_slug, str) or not new_slug:
+            return _error_json(
+                400, "POST /flows/{slug}/rename requires a non-empty 'new_slug' string"
+            )
+        # `new_slug` is an unvalidated request-body string (the client slugifies before
+        # sending, but the server must not trust that) -- FlowStore.rename() -> `_path()`
+        # rejects anything that isn't a plain `slugify()`-shaped slug, closing off a path-
+        # traversal write (e.g. `new_slug: "../../../../tmp/evil"` moving a flow file outside
+        # the flow store's root via the underlying `os.replace()`).
+        try:
+            result = await _run_sync(lambda: get_default_flows().rename(slug, new_slug))
+        except UnknownFlowError as exc:
+            return _error_json(404, str(exc))
+        except FlowAlreadyExistsError as exc:
+            return _error_json(409, str(exc))
+        except InvalidSlugError as exc:
+            return _error_json(400, str(exc))
+        except Exception as exc:  # noqa: BLE001 - never crash the server on a store failure
+            return _error_json(422, f"{type(exc).__name__}: {exc}")
+        return JSONResponse(content=result)
+
+    # -- Examples endpoint (issue #114) ------------------------------------------
+
+    @application.get("/examples")
+    async def list_examples() -> Response:
+        def _list() -> dict[str, Any]:
+            examples: list[dict[str, str]] = []
+            if not _EXAMPLES_DIR.is_dir():
+                return {"examples": examples}
+            for json_path in sorted(_EXAMPLES_DIR.rglob("*.json")):
+                try:
+                    data = json.loads(json_path.read_text(encoding="utf-8"))
+                except Exception:  # noqa: BLE001 - skip a malformed example, never crash the list
+                    continue
+                if not isinstance(data, dict) or "nodes" not in data:
+                    continue
+                name = data.get("name") or json_path.stem
+                rel = str(json_path.relative_to(_EXAMPLES_DIR))
+                examples.append({"name": name, "path": rel, "slug": slugify(name)})
+            return {"examples": examples}
+
+        return await _safe_json(_list)
+
+    @application.get("/examples/{path:path}")
+    async def get_example(path: str) -> Response:
+        def _get() -> dict[str, Any]:
+            target = (_EXAMPLES_DIR / path).resolve()
+            if not target.is_relative_to(_EXAMPLES_DIR) or not target.is_file():
+                raise FileNotFoundError(f"example not found: {path}")
+            return json.loads(target.read_text(encoding="utf-8"))
+
+        try:
+            result = await _run_sync(_get)
+        except FileNotFoundError as exc:
+            return _error_json(404, str(exc))
+        except Exception as exc:  # noqa: BLE001 - never crash the server on a store failure
+            return _error_json(422, f"{type(exc).__name__}: {exc}")
+        return JSONResponse(content=result)
+
     # Catch-all GET: serves static asset -> demo page (for "/" and "/index.html") -> 404.
     # Declared last so the explicit GET routes above take precedence.
     @application.get("/{full_path:path}")
@@ -1036,6 +1206,12 @@ def serve(
     # the first request" contract as configure_cache.
     artifact_root = cache_root.parent / DEFAULT_ARTIFACT_DIRNAME
     configure_artifacts(artifact_root, max_mb=DEFAULT_ARTIFACT_MAX_MB)
+
+    # Configure the flow store (saved user graphs, issue #114) alongside the cache
+    # and artifacts, in a sibling directory under the same parent. Same "must run
+    # before the first request" contract as configure_cache/configure_artifacts.
+    flow_root = cache_root.parent / DEFAULT_FLOW_DIRNAME
+    configure_flows(flow_root)
 
     if host == "127.0.0.1":
         configure_session_auth(required=False)
