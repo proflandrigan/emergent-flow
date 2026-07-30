@@ -26,7 +26,7 @@ export const SECTIONS = [
   // compare tables (category "LLM"), they do not attribute a fitted model.
   { id: "ai", label: "LLM & Embeddings", families: ["llm", "embed", "eval"] },
   { id: "report", label: "Report", families: ["reports", "research"] },
-  { id: "utility", label: "Utility", families: ["script", "notes"] },
+  { id: "utility", label: "Utility", families: ["script", "notes", "layout"] },
 ] as const;
 
 export interface FamilyGroup {

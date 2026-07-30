@@ -132,3 +132,89 @@ describe("toRFNode (notes.markdown)", () => {
     expect(rf.selected).toBe(true);
   });
 });
+
+function groupModel(overrides?: Partial<NodeModel>): NodeModel {
+  return {
+    id: "g1",
+    type: "layout.group",
+    label: undefined,
+    paradigm: "functional",
+    params: [
+      { name: "label", typeToken: "str", value: "My Group" },
+      { name: "color", typeToken: "str", value: "blue" },
+    ],
+    ports: [],
+    position: { x: 100, y: 200 },
+    ...overrides,
+  };
+}
+
+describe("toRFNode (layout.group)", () => {
+  test("produces a groupNode with label / color from params", () => {
+    const rf = toRFNode(groupModel(), false, null, null, null, null) as ReturnType<typeof toRFNode>;
+
+    expect(rf.type).toBe("groupNode");
+    if (rf.type === "groupNode") {
+      expect(rf.data.label).toBe("My Group");
+      expect(rf.data.color).toBe("blue");
+    }
+  });
+
+  test("missing color param falls back to slate", () => {
+    const rf = toRFNode(
+      groupModel({ params: [{ name: "label", typeToken: "str", value: "Test" }] }),
+      false, null, null, null, null,
+    ) as ReturnType<typeof toRFNode>;
+
+    if (rf.type === "groupNode") {
+      expect(rf.data.color).toBe("slate");
+    }
+  });
+
+  test("non-string color value falls back to slate", () => {
+    const rf = toRFNode(
+      groupModel({ params: [
+        { name: "label", typeToken: "str", value: "Test" },
+        { name: "color", typeToken: "str", value: 42 },
+      ] }),
+      false, null, null, null, null,
+    ) as ReturnType<typeof toRFNode>;
+
+    if (rf.type === "groupNode") {
+      expect(rf.data.color).toBe("slate");
+    }
+  });
+
+  test("missing label param falls back to Group", () => {
+    const rf = toRFNode(
+      groupModel({ params: [{ name: "color", typeToken: "str", value: "green" }] }),
+      false, null, null, null, null,
+    ) as ReturnType<typeof toRFNode>;
+
+    if (rf.type === "groupNode") {
+      expect(rf.data.label).toBe("Group");
+    }
+  });
+
+  test("non-string label value falls back to Group", () => {
+    const rf = toRFNode(
+      groupModel({ params: [
+        { name: "label", typeToken: "str", value: 42 },
+        { name: "color", typeToken: "str", value: "green" },
+      ] }),
+      false, null, null, null, null,
+    ) as ReturnType<typeof toRFNode>;
+
+    if (rf.type === "groupNode") {
+      expect(rf.data.label).toBe("Group");
+    }
+  });
+
+  test("groupNode passes id / position / selected through", () => {
+    const rf = toRFNode(groupModel(), true, null, null, null, null) as ReturnType<typeof toRFNode>;
+
+    expect(rf.id).toBe("g1");
+    expect(rf.position).toEqual({ x: 100, y: 200 });
+    expect(rf.selected).toBe(true);
+  });
+});

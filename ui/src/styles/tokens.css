@@ -94,6 +94,8 @@
   --fam-research-soft: rgba(100, 116, 139, 0.14);
   --fam-script: #94a3b8;
   --fam-script-soft: rgba(148, 163, 184, 0.14);
+  --fam-layout: #64748b;
+  --fam-layout-soft: rgba(100, 116, 139, 0.14);
 
   /* Product accent (distinct from family hues) */
   --accent: #6366f1;

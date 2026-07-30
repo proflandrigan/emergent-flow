@@ -9,8 +9,10 @@ import type { NodeStatus, Payload } from "../store/execution";
 import type { EfEdgeData } from "./edges/EfEdge";
 import type { EfNodeData } from "./nodes/EfNode";
 import type { NoteNodeData } from "./nodes/NoteNode";
+import type { GroupNodeData } from "./nodes/GroupNode";
 
 const NOTE_NODE_TYPE = "notes.markdown";
+const GROUP_NODE_TYPE = "layout.group";
 
 export function toRFNode(
   node: NodeModel,
@@ -19,7 +21,23 @@ export function toRFNode(
   results: Record<string, Payload> | null | undefined,
   family: string | null | undefined,
   description: string | null | undefined,
-): RFNode<EfNodeData> | RFNode<NoteNodeData> {
+): RFNode<EfNodeData> | RFNode<NoteNodeData> | RFNode<GroupNodeData> {
+  if (node.type === GROUP_NODE_TYPE) {
+    const paramValue = (name: string): unknown =>
+      node.params.find((p) => p.name === name)?.value;
+    const label = paramValue("label");
+    const color = paramValue("color");
+    return {
+      id: node.id,
+      type: "groupNode",
+      position: node.position,
+      selected,
+      data: {
+        label: typeof label === "string" ? label : "Group",
+        color: typeof color === "string" ? color : "slate",
+      },
+    };
+  }
   if (node.type === NOTE_NODE_TYPE) {
     const paramValue = (name: string): unknown =>
       node.params.find((p) => p.name === name)?.value;

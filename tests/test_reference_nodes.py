@@ -42,6 +42,7 @@ from emergentflow.nodes.examples import (
     FitEstimator,
     Funnel,
     GenerateHtmlSummary,
+    GroupContainer,
     ImputeMissing,
     Kruskal,
     LoadCsv,
@@ -1585,6 +1586,51 @@ class TestMarkdownNote:
         # A true no-op: nothing bound in scope, empty dict returned by execute.
         assert executed == {}
         # exec adds __builtins__; no user variables should be set.
+        user_keys = {k for k in scope if not k.startswith("__")}
+        assert user_keys == set()
+
+
+# ---------------------------------------------------------------------------
+# layout.group
+# ---------------------------------------------------------------------------
+
+
+class TestGroupContainer:
+    def test_to_spec(self):
+        defn = GroupContainer()
+        spec = defn.to_spec()
+        assert spec.type == "layout.group"
+        assert spec.ports == []
+        assert {p.name for p in spec.params} == {"label", "color"}
+
+    def test_instantiate_defaults(self):
+        defn = GroupContainer()
+        node = defn.instantiate()
+        assert node.ports == []
+        values = {p.name: p.value for p in node.params}
+        assert values["label"] == "Group"
+        assert values["color"] == "slate"
+
+    def test_codegen_is_true_noop(self):
+        defn = GroupContainer()
+        node = defn.instantiate(label="Feature engineering")
+        frag = defn.preview(node)
+        assert frag.imports == []
+        assert frag.body == ""
+
+    def test_execute_returns_empty_dict(self):
+        defn = GroupContainer()
+        node = defn.instantiate(label="Feature engineering")
+        assert defn.execute(node, inputs={}) == {}
+
+    def test_codegen_matches_execute(self):
+        """ADR 0002: execute == result of running the emitted code (both no-ops)."""
+        defn = GroupContainer()
+        node = defn.instantiate(label="anything")
+        executed = defn.execute(node, inputs={})
+        scope: dict[str, object] = {}
+        _run_codegen(defn, node, scope)
+        assert executed == {}
         user_keys = {k for k in scope if not k.startswith("__")}
         assert user_keys == set()
 

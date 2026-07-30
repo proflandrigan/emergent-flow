@@ -76,6 +76,7 @@ from .fuzzy_join import FuzzyJoin
 from .generate_features import GenerateFeatures
 from .grid_search import GridSearch
 from .group_by_aggregate import GroupByAggregate
+from .group_container import GroupContainer
 from .http_fetch import HttpFetch
 from .impute import ImputeMissing
 from .kruskal import Kruskal
@@ -217,6 +218,7 @@ __all__ = [
     "GenerateHtmlSummary",
     "GridSearch",
     "GroupByAggregate",
+    "GroupContainer",
     "HttpFetch",
     "HybridSwitching",
     "HybridWeighted",

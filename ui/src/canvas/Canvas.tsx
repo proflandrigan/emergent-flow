@@ -29,6 +29,7 @@ import { useValidationStore } from "../store/validationStore";
 import { runGraph } from "../exec/runGraph";
 import { EfEdge } from "./edges/EfEdge";
 import { EfNode } from "./nodes/EfNode";
+import { GroupNode } from "./nodes/GroupNode";
 import { NoteNode } from "./nodes/NoteNode";
 import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeInfoPanel } from "./NodeInfoPanel";
@@ -37,7 +38,7 @@ import { SelectionToolbar } from "./SelectionToolbar";
 import { OverlayModal } from "../ui/OverlayModal";
 import { toRFEdge, toRFNode } from "./toReactFlow";
 
-const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode };
+const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode };
 const edgeTypes: EdgeTypes = { efEdge: EfEdge };
 
 export function Canvas(): JSX.Element {
