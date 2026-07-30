@@ -33,12 +33,14 @@ from emergentflow.codegen.wiring import WiringMap, build_wiring_map
 from emergentflow.eval import label as eval_label
 from emergentflow.eval.export import build_eval_set_rows, build_finetune_rows, rows_to_jsonl_bytes
 from emergentflow.ir import Cardinality, Direction, Graph, Node, Paradigm
+from emergentflow.ir.edge import PortRef
 from emergentflow.ir.schema import ir_json_schema
 from emergentflow.ir.serialize import deserialize_graph
 from emergentflow.llm.gateway import GatewayClient
 from emergentflow.llm.secrets import validate_api_keys_present
 from emergentflow.nodes import get as get_node_definition
 from emergentflow.research.lineage import trace_lineage
+from emergentflow.server.artifacts import get_default_artifacts
 from emergentflow.server.cache import get_default_cache
 from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
 from emergentflow.server.reports import get_default_store
@@ -330,6 +332,32 @@ def _ancestors(graph: Graph, targets: set[str], wiring_map: WiringMap) -> set[st
     return seen
 
 
+def _descendants(graph: Graph, targets: set[str], wiring_map: WiringMap) -> set[str]:
+    """Return *targets* plus every node transitively fed BY their OUT ports.
+
+    The mirror of :func:`_ancestors`: descendant-closed rather than
+    ancestor-closed. This is the selection for "run from here to the end" -- the
+    caller pairs it with the run-artifact store so the targets' own IN ports
+    resolve from the previous run instead of re-running their whole upstream
+    chain.
+    """
+    seen: set[str] = set()
+    stack = list(targets)
+    while stack:
+        node_id = stack.pop()
+        if node_id in seen:
+            continue
+        seen.add(node_id)
+        node = graph.nodes[node_id]
+        for port in node.ports:
+            if port.direction != Direction.OUT:
+                continue
+            for dst in wiring_map.consumers(node.id, port.id):
+                if dst.node_id not in seen:
+                    stack.append(dst.node_id)
+    return seen
+
+
 def _node_hash(node: Node, upstream_hashes: list[str]) -> str:
     """This node's cache key: sha256(node type + canonical params + upstream hashes + sdk version).
 
@@ -378,6 +406,61 @@ class _NodeEvent:
     results: dict[str, Any] | None = None  # raw OUT-port artifacts, "ok" only
     cached: bool = False  # "ok" only; True when served from the execution cache
     error: str | None = None  # "error" only
+    reason: str | None = None  # "skip" only; why the node was skipped (e.g. upstream not run)
+
+
+# Sentinel for "no value available" from :func:`_resolve_upstream_value`. A bare
+# ``None`` is ambiguous (an OUT port can legitimately produce ``None``); this
+# object is unique and identity-comparable so the caller can distinguish a
+# genuine miss from a ``None`` value.
+_MISSING = object()
+
+
+def _resolve_upstream_value(
+    src: PortRef,
+    *,
+    graph: Graph,
+    node_status: dict[str, str],
+    node_results: dict[str, dict[str, Any]],
+    artifacts: Any,
+) -> Any:
+    """The value feeding one IN port, or :data:`_MISSING`.
+
+    In-scope upstream (already walked this run) -> its live result.
+    Out-of-scope upstream (excluded by ``only``) -> the previous run's artifact.
+    Neither -> ``_MISSING``, which the caller reports as a skip with a reason
+    (see :func:`_skip_reason`), never a ``KeyError``.
+
+    This is the fix for issue #105 Gap 1: an arbitrary ``only`` set no longer
+    crashes when it excludes a node that feeds an in-scope node's IN port.
+    """
+    status = node_status.get(src.node_id)
+    if status in (_STATUS_OK, _STATUS_CACHED):
+        src_node = graph.nodes[src.node_id]
+        src_port_name = next(p.name for p in src_node.ports if p.id == src.port_id)
+        return node_results[src.node_id][src_port_name]
+    if status is None:  # never walked this run => out of scope
+        src_node = graph.nodes[src.node_id]
+        src_port_name = next(p.name for p in src_node.ports if p.id == src.port_id)
+        stored = artifacts.get(src.node_id)
+        if stored is not None and src_port_name in stored:
+            return stored[src_port_name]
+    return _MISSING
+
+
+def _skip_reason(src: PortRef, node_status: dict[str, str]) -> str:
+    """Human-readable reason for why *src*'s output is unavailable.
+
+    Distinguishes the three failure modes so the user sees the *immediate*
+    cause rather than a generic message: an upstream that errored should say
+    "errored", not "not been run yet".
+    """
+    status = node_status.get(src.node_id)
+    if status == _STATUS_ERROR:
+        return "upstream node errored"
+    if status == _STATUS_SKIPPED:
+        return "upstream node was skipped"
+    return "upstream has not been run yet"
 
 
 def _execute_functional_stream(
@@ -404,6 +487,15 @@ def _execute_functional_stream(
     with a non-cacheable ancestor never gets a defined hash (``None``) and is
     never looked up or written to the cache -- see ``_node_hash``'s docstring
     for the hash/propagation rule.
+
+    Partial runs (issue #105): when *only* excludes a node that feeds an
+    in-scope node's IN port (``run_only`` / ``run_from``), the upstream value
+    is resolved from the ``ArtifactStore`` -- the last successful output for
+    that node id, written on every prior run regardless of ``cacheable``.
+    If no stored output exists, the downstream node is skipped with a reason
+    rather than crashing with ``KeyError`` (Gap 1). Every successful node --
+    cache hit or fresh run -- also writes to the artifact store so a later
+    partial run can reuse it (Gap 3).
     """
     enforce_validation_gate(graph)
     if graph.paradigm is not Paradigm.FUNCTIONAL:
@@ -430,28 +522,36 @@ def _execute_functional_stream(
     node_results: dict[str, dict[str, Any]] = {}
     node_hashes: dict[str, str | None] = {}
     cache = get_default_cache()
+    artifacts = get_default_artifacts()
     for index, node_id in enumerate(topo_order_ids, start=1):
         node = graph.nodes[node_id]
         inputs: dict[str, Any] = {}
         upstream_hashes: list[str | None] = []
         skipped = False
+        skip_reason: str | None = None
         for port in node.ports:
             if port.direction != Direction.IN:
                 continue
             sources = wiring_map.upstream(node.id, port.id)
             if port.cardinality == Cardinality.MANY:
                 values: list[Any] = []
-                any_upstream_skipped = False
+                any_upstream_missing = False
                 for src in sources:
-                    if node_status[src.node_id] not in (_STATUS_OK, _STATUS_CACHED):
-                        any_upstream_skipped = True
+                    value = _resolve_upstream_value(
+                        src,
+                        graph=graph,
+                        node_status=node_status,
+                        node_results=node_results,
+                        artifacts=artifacts,
+                    )
+                    if value is _MISSING:
+                        any_upstream_missing = True
                         break
-                    src_node = graph.nodes[src.node_id]
-                    src_port_name = next(p.name for p in src_node.ports if p.id == src.port_id)
-                    values.append(node_results[src.node_id][src_port_name])
-                    upstream_hashes.append(node_hashes[src.node_id])
-                if any_upstream_skipped:
+                    values.append(value)
+                    upstream_hashes.append(node_hashes.get(src.node_id))
+                if any_upstream_missing:
                     skipped = True
+                    skip_reason = _skip_reason(src, node_status)
                     break
                 inputs[port.name] = values
                 continue
@@ -463,16 +563,24 @@ def _execute_functional_stream(
                     "for this case first."
                 )
             src = sources[0]
-            if node_status[src.node_id] not in (_STATUS_OK, _STATUS_CACHED):
+            value = _resolve_upstream_value(
+                src,
+                graph=graph,
+                node_status=node_status,
+                node_results=node_results,
+                artifacts=artifacts,
+            )
+            if value is _MISSING:
                 skipped = True
+                skip_reason = _skip_reason(src, node_status)
                 break
-            src_node = graph.nodes[src.node_id]
-            src_port_name = next(p.name for p in src_node.ports if p.id == src.port_id)
-            inputs[port.name] = node_results[src.node_id][src_port_name]
-            upstream_hashes.append(node_hashes[src.node_id])
+            inputs[port.name] = value
+            upstream_hashes.append(node_hashes.get(src.node_id))
         if skipped:
             node_status[node_id] = _STATUS_SKIPPED
-            yield _NodeEvent(phase="skip", node_id=node_id, label=node.label or "")
+            yield _NodeEvent(
+                phase="skip", node_id=node_id, label=node.label or "", reason=skip_reason
+            )
             continue
         yield _NodeEvent(
             phase="start", node_id=node_id, label=node.label or "", current=index, total=total
@@ -501,6 +609,13 @@ def _execute_functional_stream(
             node_results[node_id] = outputs
             node_status[node_id] = _STATUS_CACHED if is_cache_hit else _STATUS_OK
             node_hashes[node_id] = cache_hash
+            # Persist the last successful output for this node id regardless of
+            # cacheability, so a later explicit partial run (run_only / run_from)
+            # can reuse it even when the content-hash cache never stored it
+            # (issue #105 Gap 3). Same suppress-exception contract as the cache
+            # write: a failed persistence must not turn a success into an error.
+            with contextlib.suppress(Exception):
+                artifacts.put(node_id, outputs, label=node.label or "")
             yield _NodeEvent(
                 phase="ok",
                 node_id=node_id,
@@ -548,7 +663,10 @@ def _execute_functional_with_status(
     statuses: dict[str, dict[str, Any]] = {}
     for event in _execute_functional_stream(graph, only=only, wiring_map=wiring_map):
         if event.phase == "skip":
-            statuses[event.node_id] = {"status": _STATUS_SKIPPED}
+            skip_status: dict[str, Any] = {"status": _STATUS_SKIPPED}
+            if event.reason is not None:
+                skip_status["reason"] = event.reason
+            statuses[event.node_id] = skip_status
         elif event.phase == "ok":
             results[event.node_id] = event.results or {}
             statuses[event.node_id] = {"status": _STATUS_CACHED if event.cached else _STATUS_OK}
@@ -583,35 +701,62 @@ def _results_to_payloads(
     }
 
 
-def _split_request(payload: dict[str, Any]) -> tuple[dict[str, Any], Any]:
-    """Split an /execute body into (graph_dict, run_to).
+_SCOPE_KEYS = ("run_to", "run_from", "run_only")
 
-    Backward compatible: a bare IR graph (no ``"graph"`` key) yields ``run_to=None``.
-    An envelope ``{"graph": ..., "run_to": ...}`` selects the "run to here" subgraph.
+
+def _split_request(payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Split an /execute body into ``(graph_dict, scope)``.
+
+    *scope* is a dict carrying at most one of ``run_to`` / ``run_from`` /
+    ``run_only`` (whichever the request supplied). A bare IR graph (no
+    ``"graph"`` key) yields an empty scope (run everything). Backward
+    compatible with the pre-issue-105 ``run_to`` envelope.
     """
     if isinstance(payload.get("graph"), dict):
-        return payload["graph"], payload.get("run_to")
-    return payload, None
+        scope: dict[str, Any] = {}
+        for key in _SCOPE_KEYS:
+            if payload.get(key) is not None:
+                scope[key] = payload[key]
+        return payload["graph"], scope
+    return payload, {}
 
 
-def _resolve_run_to(graph: Graph, run_to: Any) -> tuple[set[str] | None, WiringMap | None]:
-    """Resolve a request's ``run_to`` value into ``(only, wiring_map)`` for a FUNCTIONAL walk.
+# Maps a scope key to the set-expansion function that turns the targets into
+# the ``only`` set for ``_execute_functional_stream``. ``run_to`` is
+# ancestor-closed (up to and including the targets); ``run_from`` is
+# descendant-closed (the targets and everything downstream); ``run_only`` is
+# exactly the targets (issue #105).
+_SCOPES: dict[str, Any] = {
+    "run_to": _ancestors,
+    "run_from": _descendants,
+    "run_only": lambda graph, targets, wiring_map: set(targets),
+}
 
-    Shared by ``execute_graph`` and ``execute_graph_stream`` so the "run to here"
-    target-resolution logic (Epic 4 Story 6 / Epic 7 Story 5) exists in exactly
-    one place. ``run_to is None`` means "run everything" -- returns ``(None,
-    None)``, and the caller builds its own wiring map lazily only if it needs
-    one. An unknown target id raises ``CodegenError`` (-> 422).
+
+def _resolve_run_scope(
+    graph: Graph, scope: dict[str, Any]
+) -> tuple[set[str] | None, WiringMap | None]:
+    """Resolve at most one of ``run_to`` / ``run_from`` / ``run_only`` into ``(only, wiring_map)``.
+
+    Shared by ``execute_graph`` and ``execute_graph_stream`` so the
+    target-resolution logic exists in exactly one place. An empty scope means
+    "run everything" -- returns ``(None, None)``, and the caller builds its own
+    wiring map lazily only if it needs one. Passing more than one scope key
+    raises ``CodegenError`` (-> 422); an unknown target id likewise.
     """
-    if run_to is None:
+    present = [k for k in _SCOPE_KEYS if k in scope]
+    if not present:
         return None, None
-    targets = {run_to} if isinstance(run_to, str) else set(run_to)
+    if len(present) > 1:
+        raise CodegenError(f"pass at most one of {sorted(_SCOPE_KEYS)}, got {sorted(present)}")
+    key = present[0]
+    raw = scope[key]
+    targets = {raw} if isinstance(raw, str) else set(raw)
     missing = targets - set(graph.nodes)
     if missing:
-        raise CodegenError(f"run_to targets not in graph: {sorted(missing)}")
+        raise CodegenError(f"{key} targets not in graph: {sorted(missing)}")
     wiring_map = build_wiring_map(graph)
-    only = _ancestors(graph, targets, wiring_map)
-    return only, wiring_map
+    return _SCOPES[key](graph, targets, wiring_map), wiring_map
 
 
 def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
@@ -631,20 +776,23 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     When the body is an envelope with ``run_to`` (a node id or list of ids), only the
     subgraph up to and including those nodes runs ("run to here", Epic 4 Story 6),
     reusing the Epic 2 traversal + wiring; the rest of the graph is left unrun.
+    ``run_from`` (issue #105) runs the targets and everything downstream, reusing
+    the previous run's stored outputs for the targets' own IN ports. ``run_only``
+    runs exactly the listed nodes, likewise reusing stored outputs where available.
     """
-    graph_payload, run_to = _split_request(payload)
+    graph_payload, scope = _split_request(payload)
     graph = _to_graph(graph_payload)
     validate_api_keys_present(graph)
     if graph.paradigm is Paradigm.FUNCTIONAL:
-        only, wiring_map = _resolve_run_to(graph, run_to)
+        only, wiring_map = _resolve_run_scope(graph, scope)
         results, statuses = _execute_functional_with_status(graph, only=only, wiring_map=wiring_map)
         return {
             "payload_version": PAYLOAD_CONTRACT_VERSION,
             "results": _results_to_payloads(results),
             "statuses": statuses,
         }
-    if run_to is not None:
-        raise CodegenError("run_to (run-to-here) is only supported for FUNCTIONAL graphs")
+    if scope:
+        raise CodegenError("partial-run scopes are only supported for FUNCTIONAL graphs")
     # DECLARATIVE (and any future paradigm): delegate to the reference executor,
     # which is all-or-nothing. On success the single nn.module node is "ok"; its
     # rejections raise (CodegenError) -> 422.
@@ -699,8 +847,9 @@ def execute_session(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     """POST /sessions/{id}/execute: execute the session's CURRENT graph.
 
     409s (via OpenGatesError) while any gate is OPEN. *payload* may optionally carry
-    {"run_to": ...} (same "run to here" envelope execute_graph already supports) -- the
-    graph itself always comes from the session, never from the request body.
+    one of ``run_to`` / ``run_from`` / ``run_only`` (the same partial-run scopes
+    ``execute_graph`` already supports) -- the graph itself always comes from
+    the session, never from the request body.
     """
     from emergentflow.collab.session import get_default_store as get_default_session_store
 
@@ -708,14 +857,15 @@ def execute_session(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     session = store.get(session_id)
     store.assert_no_open_gates(session_id)
     graph_dict = session.graph.model_dump(mode="json")
-    return execute_graph({"graph": graph_dict, "run_to": payload.get("run_to")})
+    scope = {k: payload[k] for k in _SCOPE_KEYS if payload.get(k) is not None}
+    return execute_graph({"graph": graph_dict, **scope})
 
 
 def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], None, None]:
     """IR graph (as a dict) -> a stream of SSE-ready event dicts (Story 4).
 
     Mirrors ``execute_graph``'s validation and dispatch (same ``_split_request``
-    envelope, same ``run_to`` ancestor resolution, same DECLARATIVE fallback)
+    envelope, same scope resolution, same DECLARATIVE fallback)
     but yields one JSON-safe event dict per step instead of collecting a final
     ``{"results", "statuses"}`` response -- the HTTP layer (``app.py``) formats
     each as a ``text/event-stream`` frame. Every event dict has a ``"type"``
@@ -725,7 +875,7 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
     talking to an incompatible server on the very first event, the same
     contract ``execute_graph`` stamps once at the top level. All graph-level
     validation (``enforce_validation_gate``, paradigm/cycle/unbound-input
-    checks, unknown ``run_to`` targets) happens eagerly on the FIRST iteration
+    checks, unknown scope targets) happens eagerly on the FIRST iteration
     step, before any event is yielded, so the caller can still raise straight
     through and map it to a real HTTP 4xx if it chooses to peek the first item
     before committing to a streaming response. A node-runtime failure
@@ -735,13 +885,13 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
     per-node granularity to report, so it becomes a terminal ``"run_error"``
     event instead.
     """
-    graph_payload, run_to = _split_request(payload)
+    graph_payload, scope = _split_request(payload)
     graph = _to_graph(graph_payload)
     validate_api_keys_present(graph)
     start_time = time.monotonic()
     try:
         if graph.paradigm is Paradigm.FUNCTIONAL:
-            only, wiring_map = _resolve_run_to(graph, run_to)
+            only, wiring_map = _resolve_run_scope(graph, scope)
             for event in _execute_functional_stream(graph, only=only, wiring_map=wiring_map):
                 if event.phase == "start":
                     yield {
@@ -773,13 +923,16 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
                         "payload_version": PAYLOAD_CONTRACT_VERSION,
                     }
                 elif event.phase == "skip":
-                    yield {
+                    skip_event: dict[str, Any] = {
                         "type": "node_skip",
                         "node_id": event.node_id,
                         "payload_version": PAYLOAD_CONTRACT_VERSION,
                     }
-        elif run_to is not None:
-            raise CodegenError("run_to (run-to-here) is only supported for FUNCTIONAL graphs")
+                    if event.reason is not None:
+                        skip_event["reason"] = event.reason
+                    yield skip_event
+        elif scope:
+            raise CodegenError("partial-run scopes are only supported for FUNCTIONAL graphs")
         else:
             # DECLARATIVE (and any future paradigm): the reference executor is
             # all-or-nothing and has no per-node granularity to stream, so emit

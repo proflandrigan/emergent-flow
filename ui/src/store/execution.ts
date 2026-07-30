@@ -20,6 +20,7 @@ export type NodeStatus = "ok" | "error" | "skipped" | "cached" | "running";
 export interface NodeRunStatus {
   status: NodeStatus;
   error?: string;
+  reason?: string;
 }
 
 export const EXPECTED_PAYLOAD_VERSION = 2;

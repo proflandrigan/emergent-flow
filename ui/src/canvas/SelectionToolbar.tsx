@@ -2,12 +2,14 @@ import { Button } from "../ui/Button";
 
 export interface SelectionToolbarProps {
   count: number;
-  onRunSelected: () => void;
+  onRunSelectedOnly: () => void;
+  onRunToSelected: () => void;
 }
 
 export function SelectionToolbar({
   count,
-  onRunSelected,
+  onRunSelectedOnly,
+  onRunToSelected,
 }: SelectionToolbarProps): JSX.Element {
   return (
     <div
@@ -32,10 +34,17 @@ export function SelectionToolbar({
       </span>
       <Button
         variant="secondary"
-        data-testid="run-selected"
-        onClick={onRunSelected}
+        data-testid="run-selected-only"
+        onClick={onRunSelectedOnly}
       >
-        Run selected
+        Run selected only
+      </Button>
+      <Button
+        variant="secondary"
+        data-testid="run-to-selected"
+        onClick={onRunToSelected}
+      >
+        Run to selected
       </Button>
     </div>
   );

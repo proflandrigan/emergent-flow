@@ -170,3 +170,5 @@ temp/
 
 # On-disk DAG execution cache (emergentflow serve, Epic 7 Story 6)
 /.ef-cache/
+# On-disk node artifact store (partial runs, issue #105)
+/.ef-artifacts/
