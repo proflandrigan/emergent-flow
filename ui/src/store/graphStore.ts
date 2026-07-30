@@ -9,6 +9,7 @@ import type { CatalogNode } from "../catalog/types";
 import type { Graph } from "../generated/ir";
 import { useExecutionStore } from "./executionStore";
 import { layeredLayout, separateOverlappingNodes } from "../canvas/layout";
+import { computeGroupBounds } from "../canvas/toReactFlow";
 import { newId } from "./ids";
 import { fromIR, toIR } from "./ir";
 import { useValidationStore } from "./validationStore";
@@ -78,6 +79,7 @@ export interface GraphStore extends CanvasModel {
   pasteNodes: (models: NodeModel[]) => string[];
   groupSelection: (nodeIds: string[]) => string | null;
   ungroupSelection: (nodeIds: string[]) => void;
+  moveGroup: (groupId: string, position: { x: number; y: number }) => void;
   removeEdge: (edgeId: string) => void;
   toIR: () => Graph;
   loadIR: (graph: Graph) => void;
@@ -327,6 +329,35 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         delete nodes[gid];
       }
       return { nodes };
+    });
+  },
+
+  moveGroup(groupId, position) {
+    if (!get().nodes[groupId]) {
+      return; // unknown group -- don't push a no-op history entry
+    }
+    const txn = `move-group:${groupId}`;
+    if (get()._lastTxn !== txn) {
+      get().pushHistory(txn); // captures pre-drag state once; coalesces the rest of the drag
+    }
+    set((state) => {
+      const members = Object.values(state.nodes).filter((n) => n.groupId === groupId);
+      const nodes = { ...state.nodes };
+      if (members.length === 0) {
+        nodes[groupId] = { ...state.nodes[groupId], position };
+        return { nodes, _lastTxn: txn };
+      }
+      const bounds = computeGroupBounds(members);
+      const dx = position.x - bounds.x;
+      const dy = position.y - bounds.y;
+      for (const member of members) {
+        nodes[member.id] = {
+          ...member,
+          position: { x: member.position.x + dx, y: member.position.y + dy },
+        };
+      }
+      nodes[groupId] = { ...state.nodes[groupId], position };
+      return { nodes, _lastTxn: txn };
     });
   },
 

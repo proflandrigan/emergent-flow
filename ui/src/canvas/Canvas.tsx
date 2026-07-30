@@ -36,7 +36,7 @@ import { NodeInfoPanel } from "./NodeInfoPanel";
 import { NoteAnchorOverlay } from "./NoteAnchorOverlay";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { OverlayModal } from "../ui/OverlayModal";
-import { toRFEdge, toRFNode } from "./toReactFlow";
+import { applyGroupNesting, toAbsolutePosition, toRFEdge, toRFNode } from "./toReactFlow";
 
 const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode };
 const edgeTypes: EdgeTypes = { efEdge: EfEdge };
@@ -48,6 +48,7 @@ export function Canvas(): JSX.Element {
   const nodes = useGraphStore((s) => s.nodes);
   const edges = useGraphStore((s) => s.edges);
   const moveNode = useGraphStore((s) => s.moveNode);
+  const moveGroup = useGraphStore((s) => s.moveGroup);
   const endNodeDrag = useGraphStore((s) => s.endNodeDrag);
   const removeNode = useGraphStore((s) => s.removeNode);
   const removeEdge = useGraphStore((s) => s.removeEdge);
@@ -88,20 +89,20 @@ export function Canvas(): JSX.Element {
     return m;
   }, [diagnostics]);
 
-  const rfNodes = useMemo(
-    () =>
-      Object.values(nodes).map((n) =>
-        toRFNode(
-          n,
-          !!selNodes[n.id],
-          statuses[n.id]?.status,
-          results[n.id],
-          familyByType[n.type] ?? null,
-          descriptionByType[n.type] ?? null,
-        ),
+  const rfNodes = useMemo(() => {
+    const nodeModels = Object.values(nodes);
+    const base = nodeModels.map((n) =>
+      toRFNode(
+        n,
+        !!selNodes[n.id],
+        statuses[n.id]?.status,
+        results[n.id],
+        familyByType[n.type] ?? null,
+        descriptionByType[n.type] ?? null,
       ),
-    [nodes, selNodes, statuses, results, familyByType, descriptionByType],
-  );
+    );
+    return applyGroupNesting(nodeModels, base);
+  }, [nodes, selNodes, statuses, results, familyByType, descriptionByType]);
   const rfEdges = useMemo(
     () =>
       Object.values(edges).map((e) =>
@@ -129,7 +130,12 @@ export function Canvas(): JSX.Element {
     (changes: NodeChange[]) => {
       for (const change of changes) {
         if (change.type === "position" && change.position) {
-          moveNode(change.id, change.position);
+          const model = nodes[change.id];
+          if (model?.type === "layout.group") {
+            moveGroup(change.id, change.position);
+          } else {
+            moveNode(change.id, toAbsolutePosition(Object.values(nodes), change.id, change.position));
+          }
         } else if (change.type === "remove") {
           // Clear any lingering selection flag so a deleted node can't masquerade as a second
           // selection and make selectedNodeId() report "multiple selected".
@@ -140,7 +146,7 @@ export function Canvas(): JSX.Element {
         }
       }
     },
-    [moveNode, removeNode, setNodeSelected],
+    [moveNode, moveGroup, removeNode, setNodeSelected, nodes],
   );
 
   const onEdgesChange = useCallback(

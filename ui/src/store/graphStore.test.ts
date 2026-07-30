@@ -370,3 +370,77 @@ describe("groupSelection / ungroupSelection", () => {
     }
   });
 });
+
+describe("moveGroup", () => {
+  test("moving a group with 2 members translates both members by the same delta and updates the group's own stored position", () => {
+    const m1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const m2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+    const groupId = useGraphStore.getState().groupSelection([m1, m2])!;
+
+    const groupBefore = useGraphStore.getState().nodes[groupId];
+    const m1Before = useGraphStore.getState().nodes[m1];
+    const m2Before = useGraphStore.getState().nodes[m2];
+
+    useGraphStore.getState().moveGroup(groupId, { x: 50, y: 60 });
+
+    const groupAfter = useGraphStore.getState().nodes[groupId];
+    const m1After = useGraphStore.getState().nodes[m1];
+    const m2After = useGraphStore.getState().nodes[m2];
+
+    // Delta = new group position - old group position
+    const dx = 50 - groupBefore.position.x;
+    const dy = 60 - groupBefore.position.y;
+
+    expect(groupAfter.position).toEqual({ x: 50, y: 60 });
+    expect(m1After.position).toEqual({
+      x: m1Before.position.x + dx,
+      y: m1Before.position.y + dy,
+    });
+    expect(m2After.position).toEqual({
+      x: m2Before.position.x + dx,
+      y: m2Before.position.y + dy,
+    });
+  });
+
+  test("moving a group with zero members just updates its own position (no crash)", () => {
+    const m1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const m2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+    const groupId = useGraphStore.getState().groupSelection([m1, m2])!;
+
+    // Remove members so group has no members anymore
+    useGraphStore.getState().removeNode(m1);
+    useGraphStore.getState().removeNode(m2);
+
+    // moveGroup should not crash
+    useGraphStore.getState().moveGroup(groupId, { x: 200, y: 300 });
+
+    const group = useGraphStore.getState().nodes[groupId];
+    expect(group.position).toEqual({ x: 200, y: 300 });
+  });
+
+  test("moving an unknown group id is a no-op (no history entry)", () => {
+    const beforeUndo = useGraphStore.getState().canUndo();
+
+    useGraphStore.getState().moveGroup("nonexistent", { x: 50, y: 60 });
+
+    expect(useGraphStore.getState().canUndo()).toBe(beforeUndo);
+  });
+
+  test("repeated moveGroup calls for the SAME group id coalesce into a single history entry", () => {
+    const m1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const m2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+    const groupId = useGraphStore.getState().groupSelection([m1, m2])!;
+
+    // First moveGroup starts a new history entry
+    useGraphStore.getState().moveGroup(groupId, { x: 50, y: 60 });
+
+    // Second moveGroup (same group, no endNodeDrag in between) coalesces
+    useGraphStore.getState().moveGroup(groupId, { x: 100, y: 120 });
+
+    // Should be able to undo back to before the first moveGroup
+    useGraphStore.getState().undo();
+
+    const m1After = useGraphStore.getState().nodes[m1];
+    expect(m1After.position).toEqual({ x: 0, y: 0 });
+  });
+});

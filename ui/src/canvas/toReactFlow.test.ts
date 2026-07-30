@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { EdgeModel, NodeModel } from "../store/model";
-import { toRFEdge, toRFNode } from "./toReactFlow";
+import { applyGroupNesting, computeGroupBounds, toAbsolutePosition, toRFEdge, toRFNode } from "./toReactFlow";
 
 const edge: EdgeModel = {
   id: "e1",
@@ -216,5 +216,283 @@ describe("toRFNode (layout.group)", () => {
     expect(rf.id).toBe("g1");
     expect(rf.position).toEqual({ x: 100, y: 200 });
     expect(rf.selected).toBe(true);
+  });
+});
+
+describe("computeGroupBounds", () => {
+  test("two members at known positions produce the expected {x, y, width, height} with padding applied", () => {
+    const members: NodeModel[] = [
+      {
+        id: "m1",
+        type: "data.load_csv",
+        label: "CSV 1",
+        paradigm: "functional",
+        params: [],
+        ports: [],
+        position: { x: 100, y: 100 },
+        groupId: "g1",
+      },
+      {
+        id: "m2",
+        type: "data.load_csv",
+        label: "CSV 2",
+        paradigm: "functional",
+        params: [],
+        ports: [],
+        position: { x: 350, y: 250 },
+        groupId: "g1",
+      },
+    ];
+
+    const bounds = computeGroupBounds(members);
+
+    // minX = 100, minY = 100, maxX = 350 + 200 = 550, maxY = 250 + 100 = 350
+    // x = 100 - 40 = 60, y = 100 - 40 = 60
+    // width = max(240, 550 - 100 + 80) = max(240, 530) = 530
+    // height = max(160, 350 - 100 + 80) = max(160, 330) = 330
+    expect(bounds).toEqual({
+      x: 60,
+      y: 60,
+      width: 530,
+      height: 330,
+    });
+  });
+
+  test("a single member still respects the MIN_GROUP_WIDTH/MIN_GROUP_HEIGHT floor", () => {
+    const members: NodeModel[] = [
+      {
+        id: "m1",
+        type: "data.load_csv",
+        label: "CSV 1",
+        paradigm: "functional",
+        params: [],
+        ports: [],
+        position: { x: 0, y: 0 },
+        groupId: "g1",
+      },
+    ];
+
+    const bounds = computeGroupBounds(members);
+
+    // minX = 0, minY = 0, maxX = 200, maxY = 100
+    // x = 0 - 40 = -40, y = 0 - 40 = -40
+    // width = max(240, 200 - 0 + 80) = max(240, 280) = 280
+    // height = max(160, 100 - 0 + 80) = max(160, 180) = 180
+    expect(bounds.width).toBeGreaterThanOrEqual(240);
+    expect(bounds.height).toBeGreaterThanOrEqual(160);
+  });
+
+  test("an empty array returns a zero-origin default without throwing", () => {
+    const bounds = computeGroupBounds([]);
+
+    expect(bounds).toEqual({
+      x: 0,
+      y: 0,
+      width: 240,
+      height: 160,
+    });
+  });
+});
+
+describe("applyGroupNesting", () => {
+  test("a group with members gets its position/size from computeGroupBounds and zIndex -1", () => {
+    const member1: NodeModel = {
+      id: "m1",
+      type: "data.load_csv",
+      label: "CSV 1",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 100, y: 100 },
+      groupId: "g1",
+    };
+    const member2: NodeModel = {
+      id: "m2",
+      type: "data.load_csv",
+      label: "CSV 2",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 350, y: 250 },
+      groupId: "g1",
+    };
+    const group: NodeModel = groupModel({ id: "g1" });
+    const nodeModels = [member1, member2, group];
+
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const result = applyGroupNesting(nodeModels, rfNodes);
+
+    const groupRf = result.find((n) => n.id === "g1");
+    expect(groupRf).toBeDefined();
+    expect(groupRf?.zIndex).toBe(-1);
+    expect(groupRf?.style).toBeDefined();
+    expect(typeof groupRf?.style?.width).toBe("number");
+    expect(typeof groupRf?.style?.height).toBe("number");
+  });
+
+  test("each member gets parentId, extent: parent, and position relative to group bounds", () => {
+    const member1: NodeModel = {
+      id: "m1",
+      type: "data.load_csv",
+      label: "CSV 1",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 100, y: 100 },
+      groupId: "g1",
+    };
+    const member2: NodeModel = {
+      id: "m2",
+      type: "data.load_csv",
+      label: "CSV 2",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 350, y: 250 },
+      groupId: "g1",
+    };
+    const group: NodeModel = groupModel({ id: "g1" });
+    const nodeModels = [member1, member2, group];
+
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const result = applyGroupNesting(nodeModels, rfNodes);
+
+    const m1Rf = result.find((n) => n.id === "m1");
+    expect(m1Rf?.parentId).toBe("g1");
+    expect(m1Rf?.extent).toBe("parent");
+    expect(m1Rf?.position).toBeDefined();
+    // position should be member.position - bounds.x/y
+    const bounds = computeGroupBounds([member1, member2]);
+    expect(m1Rf?.position).toEqual({
+      x: member1.position.x - bounds.x,
+      y: member1.position.y - bounds.y,
+    });
+  });
+
+  test("an ungrouped node passes through unchanged", () => {
+    const ungrouped: NodeModel = {
+      id: "n1",
+      type: "data.load_csv",
+      label: "CSV",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 0, y: 0 },
+      groupId: null,
+    };
+    const nodeModels = [ungrouped];
+
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const result = applyGroupNesting(nodeModels, rfNodes);
+
+    const resultNode = result.find((n) => n.id === "n1");
+    expect(resultNode).toBe(rfNodes[0]); // exact same object
+  });
+
+  test("a node whose groupId points at a non-existent id passes through unchanged", () => {
+    const member: NodeModel = {
+      id: "m1",
+      type: "data.load_csv",
+      label: "CSV",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 100, y: 100 },
+      groupId: "nonexistent",
+    };
+    const nodeModels = [member];
+
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const result = applyGroupNesting(nodeModels, rfNodes);
+
+    const resultNode = result.find((n) => n.id === "m1");
+    expect(resultNode?.parentId).toBeUndefined();
+  });
+
+  test("a group with zero current members passes through unchanged", () => {
+    const group: NodeModel = groupModel({ id: "g1" });
+    const nodeModels = [group];
+
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const result = applyGroupNesting(nodeModels, rfNodes);
+
+    const resultGroup = result.find((n) => n.id === "g1");
+    expect(resultGroup?.zIndex).toBeUndefined();
+  });
+});
+
+describe("toAbsolutePosition", () => {
+  test("a member's relative position converts back to the correct absolute position", () => {
+    const member1: NodeModel = {
+      id: "m1",
+      type: "data.load_csv",
+      label: "CSV 1",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 100, y: 100 },
+      groupId: "g1",
+    };
+    const member2: NodeModel = {
+      id: "m2",
+      type: "data.load_csv",
+      label: "CSV 2",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 350, y: 250 },
+      groupId: "g1",
+    };
+    const group: NodeModel = groupModel({ id: "g1" });
+    const nodeModels = [member1, member2, group];
+
+    const bounds = computeGroupBounds([member1, member2]);
+    const relativePosition = {
+      x: member1.position.x - bounds.x,
+      y: member1.position.y - bounds.y,
+    };
+
+    const absolutePosition = toAbsolutePosition(nodeModels, "m1", relativePosition);
+
+    expect(absolutePosition).toEqual({
+      x: member1.position.x,
+      y: member1.position.y,
+    });
+  });
+
+  test("an ungrouped node's position passes through unchanged", () => {
+    const ungrouped: NodeModel = {
+      id: "n1",
+      type: "data.load_csv",
+      label: "CSV",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 0, y: 0 },
+      groupId: null,
+    };
+    const nodeModels = [ungrouped];
+
+    const absolutePosition = toAbsolutePosition(nodeModels, "n1", { x: 50, y: 60 });
+
+    expect(absolutePosition).toEqual({ x: 50, y: 60 });
+  });
+
+  test("a node whose groupId points at a non-existent node passes through unchanged", () => {
+    const member: NodeModel = {
+      id: "m1",
+      type: "data.load_csv",
+      label: "CSV",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 100, y: 100 },
+      groupId: "nonexistent",
+    };
+    const nodeModels = [member];
+
+    const absolutePosition = toAbsolutePosition(nodeModels, "m1", { x: 50, y: 60 });
+
+    expect(absolutePosition).toEqual({ x: 50, y: 60 });
   });
 });
