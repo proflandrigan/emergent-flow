@@ -127,6 +127,144 @@ def test_detect_outliers_no_numeric_columns_returns_empty_flag() -> None:
     assert result["outlier_score"].isna().all()
 
 
+def test_detect_outliers_no_numeric_columns_with_drop_is_a_passthrough() -> None:
+    df = pd.DataFrame({"z": ["a", "b", "c"]})
+    result = detect_outliers(df, drop=True)
+    pd.testing.assert_frame_equal(result, df)
+
+
+# ---------------------------------------------------------------------------
+# threshold domain: the shared 3.0 default is invalid for quantile/percent and
+# must surface as a typed CleanError, not pandas' "percentiles should all be in
+# the interval [0, 1]".
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("method", ["quantile", "percent"])
+def test_detect_outliers_default_threshold_is_rejected_for_fraction_methods(method: str) -> None:
+    df = _make_df()
+    with pytest.raises(CleanError, match="threshold"):
+        detect_outliers(df, columns=["x"], method=method)
+
+
+@pytest.mark.parametrize(
+    ("method", "threshold"),
+    [
+        ("zscore", 0.0),
+        ("zscore", -1.0),
+        ("modified_zscore", -0.5),
+        ("iqr", 0.0),
+        ("quantile", 0.0),
+        ("quantile", 0.5),
+        ("quantile", 0.9),
+        ("percent", 0.0),
+        ("percent", 1.0),
+    ],
+)
+def test_detect_outliers_out_of_domain_threshold_raises(method: str, threshold: float) -> None:
+    df = _make_df()
+    with pytest.raises(CleanError, match="threshold"):
+        detect_outliers(df, columns=["x"], method=method, threshold=threshold)
+
+
+@pytest.mark.parametrize(
+    ("method", "threshold"),
+    [
+        ("zscore", 3.0),
+        ("modified_zscore", 3.0),
+        ("iqr", 1.5),
+        ("quantile", 0.01),
+        ("percent", 0.05),
+    ],
+)
+def test_detect_outliers_in_domain_threshold_is_accepted(method: str, threshold: float) -> None:
+    df = pd.DataFrame({"x": [float(v) for v in range(50)]})
+    result = detect_outliers(df, columns=["x"], method=method, threshold=threshold)
+    assert result["is_outlier"].dtype == bool
+
+
+# ---------------------------------------------------------------------------
+# Score semantics: one meaning for every method -- 0.0 at the fence's centre,
+# 1.0 exactly on the fence, > 1.0 outside it.
+# ---------------------------------------------------------------------------
+
+
+def test_outlier_score_is_continuous_inside_the_fence() -> None:
+    # mean 2.5 / std 5.0 at threshold 1.0 -> fence [-2.5, 7.5], half-width 5.0.
+    result = detect_outliers(
+        pd.DataFrame({"x": [0.0, 0.0, 0.0, 10.0]}), columns=["x"], method="zscore", threshold=1.0
+    )
+    # Inliers score by distance, not a flat 0.0: |0 - 2.5| / 5.0 == 0.5.
+    assert result["outlier_score"].tolist() == pytest.approx([0.5, 0.5, 0.5, 1.5])
+
+
+@pytest.mark.parametrize(
+    ("method", "threshold"),
+    [("zscore", 2.0), ("modified_zscore", 3.0), ("iqr", 1.5), ("quantile", 0.05), ("percent", 0.1)],
+)
+def test_outlier_score_above_one_iff_flagged(method: str, threshold: float) -> None:
+    df = pd.DataFrame({"x": [*[float(v) for v in range(40)], 5_000.0, -9_000.0]})
+    result = detect_outliers(df, columns=["x"], method=method, threshold=threshold)
+    scored = result["outlier_score"].notna()
+    assert ((result.loc[scored, "outlier_score"] > 1.0) == result.loc[scored, "is_outlier"]).all()
+
+
+def test_outlier_score_is_nan_when_the_fence_has_no_width() -> None:
+    # IQR is 0 here, so the fence collapses to the single point [1.0, 1.0]: 50.0 is
+    # unambiguously outside it, but its distance is not expressible in fence widths.
+    result = detect_outliers(
+        pd.DataFrame({"x": [1.0, 1.0, 1.0, 1.0, 50.0]}),
+        columns=["x"],
+        method="iqr",
+        threshold=1.5,
+    )
+    assert result["is_outlier"].tolist() == [False, False, False, False, True]
+    assert pd.isna(result["outlier_score"].iloc[-1])
+    assert result["outlier_score"].iloc[:-1].tolist() == [0.0, 0.0, 0.0, 0.0]
+
+
+def test_detect_outliers_constant_column_flags_nothing() -> None:
+    result = detect_outliers(pd.DataFrame({"x": [5.0] * 6}), columns=["x"], method="zscore")
+    assert not result["is_outlier"].any()
+
+
+# ---------------------------------------------------------------------------
+# Missing values: never an outlier, and never a misleadingly confident score.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("method", "threshold"),
+    [("zscore", 1.0), ("modified_zscore", 3.0), ("iqr", 1.5), ("quantile", 0.1), ("percent", 0.25)],
+)
+def test_missing_values_are_never_flagged_and_score_nan(method: str, threshold: float) -> None:
+    df = pd.DataFrame({"x": [1.0, 2.0, float("nan"), 100.0]})
+    result = detect_outliers(df, columns=["x"], method=method, threshold=threshold)
+    assert not bool(result["is_outlier"].iloc[2])
+    assert pd.isna(result["outlier_score"].iloc[2])
+
+
+def test_detect_outliers_handles_nullable_integer_columns() -> None:
+    df = pd.DataFrame({"x": pd.array([1, 2, None, 4, 900], dtype="Int64")})
+    result = detect_outliers(df, columns=["x"], method="zscore", threshold=1.0)
+    assert result["is_outlier"].tolist() == [False, False, False, False, True]
+
+
+# ---------------------------------------------------------------------------
+# Column eligibility: implicit and explicit selection must agree.
+# ---------------------------------------------------------------------------
+
+
+def test_boolean_columns_are_not_outlier_targets() -> None:
+    df = pd.DataFrame({"x": [1.0, 2.0, 3.0, 100.0], "flag": [True, False, True, False]})
+    # Implicit selection skips it ...
+    implicit = detect_outliers(df, method="zscore", threshold=1.0)
+    assert implicit["is_outlier"].tolist() == [False, False, False, True]
+    # ... and naming it explicitly is an error rather than a silently useless fence.
+    with pytest.raises(CleanError):
+        detect_outliers(df, columns=["flag"], method="zscore", threshold=1.0)
+
+
 # ---------------------------------------------------------------------------
 # ADR-0002 equivalence: execute() == running codegen()'s emitted code.
 # ---------------------------------------------------------------------------

@@ -20,7 +20,7 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
 from emergentflow.api import public_op
-from emergentflow.clean.outliers import _bounds
+from emergentflow.clean.outliers import check_outlier_rule, is_outlier_eligible, outlier_bounds
 
 # ``PlotSpec`` (emergentflow.viz.models) is a standalone dataclass that imports nothing from
 # ``emergentflow.stats``, so importing it here is cycle-free -- unlike ``emergentflow.viz`` itself
@@ -203,10 +203,21 @@ def outlier_summary(
     ``column``/``method``/``threshold``/``lower``/``upper``/``n``/``n_outliers``/
     ``pct_outliers``.
 
-    Shares ``detect_outliers``' private ``_bounds`` helper so the reported cut can
-    never drift from the applied cut. Non-numeric named columns are silently
-    omitted (mirroring ``distribution_summary``). Never mutates ``df``.
+    Shares the detector's ``check_outlier_rule``/``outlier_bounds``/``is_outlier_eligible``
+    seam and applies the identical ``value < lower or value > upper`` test, so
+    ``n_outliers`` always equals the number of rows ``detect_outliers`` flags for that
+    column under the same arguments — the reported cut cannot drift from the applied cut.
+    ``n`` counts non-missing values, and missing values are never counted as outliers.
+
+    Where the two ops deliberately differ: a named column that is non-numeric (or boolean)
+    is silently omitted here, mirroring ``distribution_summary``, where ``detect_outliers``
+    raises. Raises ``ValueError`` for an unknown ``method`` or a ``threshold`` outside the
+    method's domain. Never mutates ``df``.
     """
+    problem = check_outlier_rule(method, threshold)
+    if problem is not None:
+        raise ValueError(problem)
+
     if columns is not None:
         unknown = [c for c in columns if c not in df.columns]
         if unknown:
@@ -218,11 +229,12 @@ def outlier_summary(
     rows: list[dict[str, Any]] = []
     for col in target.columns:
         series = target[col]
-        if not is_numeric_dtype(series):
+        if not is_outlier_eligible(series):
             continue
-        lower, upper = _bounds(series, method=method, threshold=threshold)
-        n = int(series.count())
-        n_outliers = int(((series < lower) | (series > upper)).sum())
+        values = series.astype("float64")
+        lower, upper = outlier_bounds(values, method=method, threshold=threshold)
+        n = int(values.count())
+        n_outliers = int(((values < lower) | (values > upper)).sum())
         pct_outliers = round(float(n_outliers / n * 100) if n else 0.0, 4)
         rows.append(
             {

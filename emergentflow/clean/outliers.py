@@ -3,12 +3,18 @@ emergentflow.clean.outliers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Statistical outlier flagging. Thin wrapper over pandas' own mean/std/quantile —
 no reimplementation, no hidden transformation. Never mutates the input.
+
+Three helpers are the **shared seam** with :func:`emergentflow.stats.outlier_summary`
+(issue #102): :func:`check_outlier_rule` validates a ``(method, threshold)`` pair,
+:func:`outlier_bounds` computes the fence, and :func:`is_outlier_eligible` decides
+which columns a rule applies to. Both ops call all three, so the cut a summary
+*reports* is by construction the cut a detector *applies* — they cannot drift.
 """
 
 from __future__ import annotations
 
 import pandas as pd
-from pandas.api.types import is_numeric_dtype
+from pandas.api.types import is_bool_dtype, is_numeric_dtype
 
 from emergentflow.api import public_op
 
@@ -20,41 +26,104 @@ OUTLIER_METHODS = ("zscore", "modified_zscore", "iqr", "quantile", "percent")
 #: How per-column flags combine into the single row-level flag.
 OUTLIER_COMBINE = ("any", "all")
 
+#: Methods whose ``threshold`` is an unbounded positive multiplier rather than a fraction.
+_MULTIPLIER_METHODS = ("zscore", "modified_zscore", "iqr")
+
 #: Phi^-1(0.75); makes modified-z comparable to z.
 _MAD_SCALE = 0.6744897501960817
 
 
-def _bounds(
+def is_outlier_eligible(series: pd.Series) -> bool:
+    """Whether *series* is a valid target for an outlier rule: numeric, but not boolean.
+
+    ``bool`` counts as numeric to ``is_numeric_dtype`` yet is excluded from
+    ``select_dtypes(include="number")``. Pinning the rule in one place keeps
+    :func:`detect_outliers`' implicit column selection, its explicit ``columns=``
+    validation, and :func:`emergentflow.stats.outlier_summary`'s selection in
+    agreement — a boolean column is a flag, not a measurement, and no fence over
+    ``{0, 1}`` is meaningful.
+    """
+    return is_numeric_dtype(series) and not is_bool_dtype(series)
+
+
+def check_outlier_rule(method: str, threshold: float) -> str | None:
+    """Return why ``(method, threshold)`` is not a usable rule, or ``None`` if it is.
+
+    Returns a message rather than raising so each caller keeps its own family's error
+    type (``CleanError`` for :func:`detect_outliers`, ``ValueError`` for
+    ``ef.stats.outlier_summary``) without duplicating the validation itself.
+
+    ``threshold`` means different things per method, so its valid domain differs: an
+    unbounded positive multiplier for ``zscore``/``modified_zscore``/``iqr``, a tail
+    quantile in ``(0, 0.5)`` for ``quantile``, and a fraction in ``(0, 1)`` for
+    ``percent``. Without this check the shared default of ``3.0`` reaches
+    ``Series.quantile(3.0)`` for the latter two and surfaces as an opaque pandas
+    ``"percentiles should all be in the interval [0, 1]"``.
+    """
+    if method not in OUTLIER_METHODS:
+        return f"unknown method {method!r}; expected one of {OUTLIER_METHODS!r}."
+    if not isinstance(threshold, (int, float)) or isinstance(threshold, bool):
+        return f"threshold must be a number; got {threshold!r}."
+    if pd.isna(threshold):
+        return "threshold must be a number; got NaN."
+    if method in _MULTIPLIER_METHODS:
+        if threshold <= 0:
+            return (
+                f"threshold must be > 0 for method {method!r} (it is a multiplier: "
+                f"standard deviations for zscore/modified_zscore, k for iqr); got {threshold!r}."
+            )
+    elif method == "quantile":
+        if not 0 < threshold < 0.5:
+            return (
+                "threshold must be a tail quantile in (0, 0.5) for method 'quantile' "
+                f"(e.g. 0.01 keeps the middle 98%); got {threshold!r}."
+            )
+    elif not 0 < threshold < 1:
+        return (
+            "threshold must be a fraction in (0, 1) for method 'percent' "
+            f"(e.g. 0.05 flags the most extreme 5%); got {threshold!r}."
+        )
+    return None
+
+
+def outlier_bounds(
     series: pd.Series,
     *,
     method: str,
     threshold: float,
 ) -> tuple[float, float]:
-    """Return the (lower, upper) outlier fence for ``series`` under ``method``/``threshold``.
+    """Return the ``(lower, upper)`` outlier fence for *series* under *method*/*threshold*.
 
-    The fence is the boundary inside which values are considered inliers; values exactly on
-    the fence are NOT flagged (the flag rule uses strict ``>`` deviation). The returned
-    bounds are always JSON-native ``float`` scalars.
+    The fence is inclusive: a row is an outlier exactly when ``value < lower`` or
+    ``value > upper``, so values sitting on the fence are inliers. Both
+    :func:`detect_outliers` and ``ef.stats.outlier_summary`` derive their verdict from
+    that one comparison against these bounds, which is what makes the reported cut and
+    the applied cut the same cut. The returned bounds are always JSON-native ``float``
+    scalars. When *series* has no spread the fence collapses to a single point, which
+    is the mathematically correct fence (with ``IQR == 0`` the IQR rule fences at
+    ``[p25, p75]``) and still classifies correctly.
     """
+    values = series.astype("float64")
+
     if method == "zscore":
-        mean = float(series.mean())
-        std = float(series.std())
+        mean = float(values.mean())
+        std = float(values.std())
         if std == 0 or pd.isna(std):
             return (mean, mean)
         delta = threshold * std
         return (mean - delta, mean + delta)
 
     if method == "modified_zscore":
-        median = float(series.median())
-        mad = float((series - median).abs().median())
+        median = float(values.median())
+        mad = float((values - median).abs().median())
         if mad == 0 or pd.isna(mad):
             return (median, median)
         delta = threshold * mad / _MAD_SCALE
         return (median - delta, median + delta)
 
     if method == "iqr":
-        p25 = float(series.quantile(0.25))
-        p75 = float(series.quantile(0.75))
+        p25 = float(values.quantile(0.25))
+        p75 = float(values.quantile(0.75))
         iqr = p75 - p25
         if iqr == 0 or pd.isna(iqr):
             return (p25, p75)
@@ -62,14 +131,11 @@ def _bounds(
         return (p25 - delta, p75 + delta)
 
     if method == "quantile":
-        lower = float(series.quantile(threshold))
-        upper = float(series.quantile(1 - threshold))
-        return (lower, upper)
+        return (float(values.quantile(threshold)), float(values.quantile(1 - threshold)))
 
     if method == "percent":
-        median = float(series.median())
-        abs_dev = (series - median).abs()
-        cutoff = float(abs_dev.quantile(1 - threshold))
+        median = float(values.median())
+        cutoff = float((values - median).abs().quantile(1 - threshold))
         if cutoff == 0 or pd.isna(cutoff):
             return (median, median)
         return (median - cutoff, median + cutoff)
@@ -77,52 +143,27 @@ def _bounds(
     raise CleanError(f"unknown method {method!r}; expected one of {OUTLIER_METHODS!r}.")
 
 
-def _deviation(
-    series: pd.Series,
-    *,
-    method: str,
-    threshold: float,
-) -> pd.Series:
-    """Return a normalized deviation series where values ``> 1.0`` are past the cut.
+def _deviation(values: pd.Series, *, lower: float, upper: float) -> pd.Series:
+    """Score each value by how far it sits toward its fence, in fence half-widths.
 
-    ``0`` means well inside the fence; ``1.0`` means exactly on the fence; ``> 1.0`` means
-    outside it. Missing values in ``series`` propagate as ``NaN`` deviation.
+    ``0.0`` at the centre of the fence, ``1.0`` exactly *on* either fence, and ``> 1.0``
+    outside it — the same meaning for every method, so scores are comparable across
+    rules. Each side is normalized by its own half-width, so an asymmetric fence (the
+    IQR and quantile rules on skewed data) still reads ``1.0`` on both edges.
+
+    ``NaN`` means "no meaningful score": either the value itself is missing, or the
+    fence has zero width on that side (a constant column, or a column whose IQR is 0)
+    and the deviation is not expressible as a multiple of it. Scores never decide
+    membership — :func:`detect_outliers` flags rows from the bounds directly — so a
+    ``NaN`` score never suppresses a flag.
     """
-    lower, upper = _bounds(series, method=method, threshold=threshold)
-
-    if method in ("zscore", "modified_zscore", "iqr", "quantile"):
-        raw = pd.Series(0.0, index=series.index)
-        below = series < lower
-        above = series > upper
-        raw[below] = lower - series[below]
-        raw[above] = series[above] - upper
-
-        if method == "zscore":
-            cut_width = threshold * float(series.std())
-        elif method == "modified_zscore":
-            median = float(series.median())
-            mad = float((series - median).abs().median())
-            cut_width = threshold * mad / _MAD_SCALE
-        elif method == "iqr":
-            cut_width = threshold * (float(series.quantile(0.75)) - float(series.quantile(0.25)))
-        else:  # quantile
-            cut_width = (upper - lower) / 2.0
-
-        if cut_width == 0 or pd.isna(cut_width):
-            return pd.Series(0.0, index=series.index)
-        deviation = raw / cut_width
-        deviation[below | above] = deviation[below | above] + 1.0
-        return deviation
-
-    if method == "percent":
-        median = float(series.median())
-        abs_dev = (series - median).abs()
-        cutoff = float(abs_dev.quantile(1 - threshold))
-        if cutoff == 0 or pd.isna(cutoff):
-            return pd.Series(0.0, index=series.index)
-        return abs_dev / cutoff
-
-    raise CleanError(f"unknown method {method!r}; expected one of {OUTLIER_METHODS!r}.")
+    centre = (lower + upper) / 2.0
+    deviation = pd.Series(float("nan"), index=values.index, dtype="float64")
+    for side, width in ((values > centre, upper - centre), (values < centre, centre - lower)):
+        if width > 0:
+            deviation[side] = (values[side] - centre).abs() / width
+    deviation[values == centre] = 0.0
+    return deviation
 
 
 @public_op(name="ef.clean.detect_outliers")
@@ -140,22 +181,34 @@ def detect_outliers(
     """Flag outlying rows, returning a NEW DataFrame.
 
     Adds a boolean ``flag_column`` and a float ``score_column`` (the strongest per-column
-    normalized deviation). ``method``:
+    deviation, in fence half-widths — see :func:`_deviation`). ``method``, and what
+    ``threshold`` means for each:
 
-    * ``"zscore"`` — |x - mean| / std > ``threshold`` (threshold in SDs, e.g. 3.0)
-    * ``"modified_zscore"`` — MAD-based, robust to the outliers themselves
+    * ``"zscore"`` — outside mean ± ``threshold`` * std (``threshold`` in SDs, e.g. 3.0)
+    * ``"modified_zscore"`` — the same fence built from median/MAD, robust to the
+      outliers themselves (``threshold`` in SDs, e.g. 3.0)
     * ``"iqr"`` — outside [p25 - k*IQR, p75 + k*IQR] (``threshold`` is k, e.g. 1.5)
-    * ``"quantile"`` — outside [q, 1-q] (``threshold`` is q, e.g. 0.01)
+    * ``"quantile"`` — outside [q, 1-q] (``threshold`` is q in (0, 0.5), e.g. 0.01)
     * ``"percent"`` — the most extreme ``threshold`` fraction by |x - median|
+      (``threshold`` in (0, 1), e.g. 0.05)
 
-    When ``columns is None`` the target defaults to the numeric columns. ``combine`` decides
-    whether a row is flagged when ANY or ALL target columns flag it. ``drop=True`` returns only
-    the non-outlier rows and omits both added columns.
+    A row is an outlier for a column exactly when its value falls strictly outside that
+    column's fence, so the verdict here always matches the bounds ``ef.stats.outlier_summary``
+    reports for the same arguments. When ``columns is None`` the target defaults to every
+    numeric non-boolean column; naming a column that is missing, non-numeric, or boolean
+    raises. ``combine`` decides whether a row is flagged when ANY or ALL target columns
+    flag it; a missing value never flags, so under ``"all"`` one missing value in a target
+    column is enough to leave the row unflagged. ``drop=True`` returns only the non-outlier
+    rows and omits both added columns.
 
-    Deterministic (pure pandas aggregation, no sampling).
+    Deterministic (pure pandas aggregation, no sampling). Raises ``CleanError`` for an
+    unknown ``method``/``combine`` or a ``threshold`` outside the method's domain, and
+    ``ColumnCollisionError`` rather than overwriting an existing ``flag_column``/
+    ``score_column``.
     """
-    if method not in OUTLIER_METHODS:
-        raise CleanError(f"unknown method {method!r}; expected one of {OUTLIER_METHODS!r}.")
+    problem = check_outlier_rule(method, threshold)
+    if problem is not None:
+        raise CleanError(problem)
     if combine not in OUTLIER_COMBINE:
         raise CleanError(f"unknown combine {combine!r}; expected one of {OUTLIER_COMBINE!r}.")
 
@@ -165,15 +218,15 @@ def detect_outliers(
             raise UnknownColumnError(
                 f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}."
             )
-        non_numeric = [c for c in columns if not is_numeric_dtype(df[c])]
-        if non_numeric:
+        ineligible = [c for c in columns if not is_outlier_eligible(df[c])]
+        if ineligible:
             raise CleanError(
-                f"columns {non_numeric!r} are not numeric; every outlier rule is "
-                "undefined on non-numeric data."
+                f"columns {ineligible!r} are not numeric; every outlier rule is "
+                "undefined on non-numeric (and boolean) data."
             )
         target = list(columns)
     else:
-        target = list(df.select_dtypes(include="number").columns)
+        target = [c for c in df.columns if is_outlier_eligible(df[c])]
 
     collisions = [c for c in (flag_column, score_column) if c in df.columns]
     if collisions:
@@ -182,21 +235,28 @@ def detect_outliers(
             "choose different flag_column/score_column names."
         )
 
+    if drop and not target:
+        return df.copy()
+
     result = df.copy()
     if not target:
         result[flag_column] = False
         result[score_column] = float("nan")
-        return result.drop(columns=[flag_column, score_column]).copy() if drop else result
+        return result
 
+    flags = pd.DataFrame(index=df.index)
     scores = pd.DataFrame(index=df.index)
     for col in target:
-        scores[col] = _deviation(df[col], method=method, threshold=threshold)
+        values = df[col].astype("float64")
+        lower, upper = outlier_bounds(values, method=method, threshold=threshold)
+        flags[col] = (values < lower) | (values > upper)
+        scores[col] = _deviation(values, lower=lower, upper=upper)
 
-    flags = scores > 1.0
     is_outlier = flags.any(axis=1) if combine == "any" else flags.all(axis=1)
+
+    if drop:
+        return df.loc[~is_outlier].copy()
 
     result[flag_column] = is_outlier
     result[score_column] = scores.max(axis=1)
-    if drop:
-        return result.loc[~is_outlier].drop(columns=[flag_column, score_column]).copy()
     return result

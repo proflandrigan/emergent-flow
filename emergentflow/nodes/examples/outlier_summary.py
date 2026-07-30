@@ -80,7 +80,10 @@ class OutlierSummary(NodeDefinition):
             type_token="float",
             default=3.0,
             label="Threshold",
-            help="Rule cutoff: SDs for zscore, k for IQR, tail quantile for quantile/percent.",
+            help="Rule cutoff, per method: SDs > 0 for zscore/modified_zscore, k > 0 for "
+            "iqr, a tail quantile in (0, 0.5) for quantile, a fraction in (0, 1) for "
+            "percent. The 3.0 default suits the first three; lower it when switching "
+            "to quantile or percent.",
             hints=ValidationHints(widget="number", min=0),
         ),
     ]
