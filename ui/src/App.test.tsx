@@ -58,6 +58,10 @@ function mockHealth(status: string) {
       body = { nodes: [] };
     } else if (url.includes("/connections")) {
       body = { connections: [] };
+    } else if (url.includes("/examples")) {
+      body = { examples: [] };
+    } else if (url.includes("/flows")) {
+      body = { flows: [] };
     } else {
       body = { status };
     }

@@ -15,7 +15,14 @@ import { SchemaBrowserPanel } from "./connections/SchemaBrowserPanel";
 import { getDevMenuItems } from "./dev/DevControls";
 import { ExecutionToolbar } from "./exec/ExecutionToolbar";
 import { Inspector } from "./inspector/Inspector";
+import { ExampleGallery } from "./io/ExampleGallery";
+import { useFlowStore, startDirtyTracking } from "./io/flowStore";
 import { IRToolbar } from "./io/IRToolbar";
+import {
+  clearSession,
+  recoverSession,
+  useSessionAutoSave,
+} from "./io/sessionRecovery";
 import { Palette } from "./palette/Palette";
 import { useGraphStore } from "./store/graphStore";
 import { useSessionStore } from "./session/sessionStore";
@@ -24,6 +31,7 @@ import { IconButton } from "./ui/IconButton";
 import { Menu, type MenuItem } from "./ui/Menu";
 import { OverlayModal } from "./ui/OverlayModal";
 import { ResizeHandle } from "./ui/ResizeHandle";
+import { Toast } from "./ui/Toast";
 import { Tooltip } from "./ui/Tooltip";
 
 // Lazy: nothing under ui/src/session/ is imported until the user opens this modal (Epic 14
@@ -82,12 +90,15 @@ export function App(): JSX.Element {
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [schemaBrowserOpen, setSchemaBrowserOpen] = useState(false);
   const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [recoveryToast, setRecoveryToast] = useState<string | null>(null);
   const past = useGraphStore((s) => s.past);
   const future = useGraphStore((s) => s.future);
   const sessionId = useSessionStore((s) => s.sessionId);
   const canUndo = past.length > 0;
   const canRedo = future.length > 0;
   const { theme, toggleTheme } = useTheme();
+
+  useSessionAutoSave();
 
   const [paletteCollapsed, setPaletteCollapsed] = useState<boolean>(() => {
     try {
@@ -197,6 +208,32 @@ export function App(): JSX.Element {
     };
   }, []);
 
+  // Runs once on mount: start tracking canvas-dirty state, warm the examples list, and
+  // recover any localStorage-persisted session left behind by a refresh/crash.
+  useEffect(() => {
+    startDirtyTracking();
+    useFlowStore.getState().fetchExamples();
+    const recovered = recoverSession();
+    if (recovered) {
+      useGraphStore.getState().loadIR(recovered.graph);
+      setRecoveryToast("Recovered unsaved flow");
+      clearSession();
+    }
+  }, []);
+
+  // Warn on tab close / refresh while there are unsaved changes.
+  useEffect(() => {
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      if (useFlowStore.getState().isDirty) {
+        e.preventDefault();
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, []);
+
   useEffect(() => {
     function isTextEntryTarget(target: EventTarget | null): boolean {
       if (!(target instanceof HTMLElement)) {
@@ -228,6 +265,15 @@ export function App(): JSX.Element {
       } else if (key === "y") {
         e.preventDefault();
         useGraphStore.getState().redo();
+      } else if (key === "s") {
+        e.preventDefault();
+        const { currentSlug } = useFlowStore.getState();
+        if (currentSlug) {
+          const graph = useGraphStore.getState().toIR();
+          useFlowStore.getState().saveFlow(currentSlug, graph);
+        }
+        // No currentSlug yet: leave it to the toolbar's File > Save As, which
+        // prompts for a name -- a keyboard shortcut shouldn't pop a prompt().
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -297,6 +343,7 @@ export function App(): JSX.Element {
       <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
         <Canvas />
       </div>
+      <ExampleGallery />
 
       <div
         className="glass"
@@ -515,6 +562,23 @@ export function App(): JSX.Element {
         <Suspense fallback={<div>Loading…</div>}>
           <ChatModal onClose={() => setChatModalOpen(false)} />
         </Suspense>
+      )}
+
+      {recoveryToast && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "var(--space-4)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 100,
+          }}
+        >
+          <Toast
+            message={recoveryToast}
+            onDismiss={() => setRecoveryToast(null)}
+          />
+        </div>
       )}
     </div>
   );

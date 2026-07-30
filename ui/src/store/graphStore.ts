@@ -87,6 +87,7 @@ export interface GraphStore extends CanvasModel {
   redo: () => void;
   canUndo: () => boolean;
   canRedo: () => boolean;
+  setName: (name: string) => void;
 }
 
 export const useGraphStore = create<GraphStore>((set, get) => ({
@@ -339,5 +340,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
 
   canRedo() {
     return get().future.length > 0;
+  },
+
+  setName(name) {
+    get().pushHistory("setName");
+    set({ name });
   },
 }));
