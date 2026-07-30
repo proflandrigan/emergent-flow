@@ -1,6 +1,10 @@
-import { useState, type CSSProperties, type KeyboardEvent } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useMemo, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
 import type { Node, NodeProps } from "@xyflow/react";
 
+import { useCollapseStore } from "../../store/collapseStore";
+import type { NodeStatus } from "../../store/execution";
+import { useExecutionStore } from "../../store/executionStore";
 import { useGraphStore } from "../../store/graphStore";
 import "./GroupNode.css";
 
@@ -33,10 +37,62 @@ const containerStyleBase: CSSProperties = {
   flexDirection: "column",
 };
 
+// Priority order matches the issue's own wording: any failure wins, then any still running,
+// then "all cached" / "all ok". Anything else (an empty group, or a genuine mix like some ok
+// and some never-run) has no single meaningful aggregate -- returns null.
+export function aggregateGroupStatus(
+  statuses: Array<NodeStatus | null | undefined>,
+): NodeStatus | null {
+  if (statuses.length === 0) {
+    return null;
+  }
+  if (statuses.some((s) => s === "error")) {
+    return "error";
+  }
+  if (statuses.some((s) => s === "running")) {
+    return "running";
+  }
+  if (statuses.every((s) => s === "cached")) {
+    return "cached";
+  }
+  if (statuses.every((s) => s === "ok" || s === "cached")) {
+    return "ok";
+  }
+  return null;
+}
+
+function statusDotColor(status: NodeStatus | null): string {
+  switch (status) {
+    case "ok":
+      return "var(--success)";
+    case "cached":
+      return "var(--info)";
+    case "error":
+      return "var(--danger)";
+    case "running":
+      return "var(--warning)";
+    default:
+      return "var(--text-tertiary)";
+  }
+}
+
 export function GroupNode({ id, data }: NodeProps<GroupNodeType>): JSX.Element {
   const setParam = useGraphStore((s) => s.setParam);
+  const nodes = useGraphStore((s) => s.nodes);
+  const statuses = useExecutionStore((s) => s.statuses);
+  const collapsed = useCollapseStore((s) => !!s.collapsed[id]);
+  const toggleCollapsed = useCollapseStore((s) => s.toggleCollapsed);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(data.label);
+
+  const members = useMemo(
+    () => Object.values(nodes).filter((n) => n.groupId === id),
+    [nodes, id],
+  );
+  const aggregateStatus = useMemo(
+    () => aggregateGroupStatus(members.map((m) => statuses[m.id]?.status)),
+    [members, statuses],
+  );
 
   const swatch = GROUP_COLORS[data.color] ?? GROUP_COLORS[DEFAULT_COLOR];
   const containerStyle: CSSProperties = {
@@ -67,6 +123,11 @@ export function GroupNode({ id, data }: NodeProps<GroupNodeType>): JSX.Element {
     }
   }
 
+  function handleToggleCollapse(e: MouseEvent) {
+    e.stopPropagation();
+    toggleCollapsed(id);
+  }
+
   return (
     <div style={containerStyle} data-testid="group-node">
       <div
@@ -75,6 +136,15 @@ export function GroupNode({ id, data }: NodeProps<GroupNodeType>): JSX.Element {
         style={{ borderBottom: `1px solid ${swatch.border}` }}
         onDoubleClick={startEditing}
       >
+        <button
+          type="button"
+          className="group-node-collapse-toggle nodrag"
+          data-testid="group-node-collapse-toggle"
+          aria-label={collapsed ? "Expand group" : "Collapse group"}
+          onClick={handleToggleCollapse}
+        >
+          {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+        </button>
         {editing ? (
           <input
             data-testid="group-node-label-editor"
@@ -89,7 +159,24 @@ export function GroupNode({ id, data }: NodeProps<GroupNodeType>): JSX.Element {
           <span data-testid="group-node-label">{data.label || "Group"}</span>
         )}
       </div>
-      <div className="group-node-body" style={{ pointerEvents: "none" }} />
+      {collapsed ? (
+        <div className="group-node-summary" data-testid="group-node-summary">
+          <span
+            className="group-node-status-dot"
+            data-testid="group-node-status-dot"
+            style={{ background: statusDotColor(aggregateStatus) }}
+          />
+          <span data-testid="group-node-member-count">
+            {members.length} {members.length === 1 ? "node" : "nodes"}
+          </span>
+        </div>
+      ) : (
+        <div
+          className="group-node-body"
+          data-testid="group-node-body"
+          style={{ pointerEvents: "none" }}
+        />
+      )}
     </div>
   );
 }
