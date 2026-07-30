@@ -120,6 +120,24 @@ def test_detect_outliers_collision_raises() -> None:
         detect_outliers(df, columns=["x"])
 
 
+def test_detect_outliers_drop_does_not_collide() -> None:
+    """``drop=True`` adds neither column, so an existing one is not a collision.
+
+    This is the two-node canvas flow: flag with one ``clean.detect_outliers``, inspect
+    the scores, then cut the rows with a second one set to ``drop=True``. The second
+    call sees the first's ``is_outlier`` column and must not refuse it.
+    """
+    flagged = detect_outliers(
+        pd.DataFrame({"x": [1.0, 2.0, 3.0, 99.0]}), columns=["x"], method="zscore", threshold=1.0
+    )
+    result = detect_outliers(flagged, columns=["x"], method="zscore", threshold=1.0, drop=True)
+
+    assert result["x"].tolist() == [1.0, 2.0, 3.0]
+    # drop=True omits the columns it would have added, but passes through the ones the
+    # upstream node already put there.
+    assert list(result.columns) == ["x", "is_outlier", "outlier_score"]
+
+
 def test_detect_outliers_no_numeric_columns_returns_empty_flag() -> None:
     df = pd.DataFrame({"z": ["a", "b", "c"]})
     result = detect_outliers(df)
@@ -209,9 +227,29 @@ def test_outlier_score_above_one_iff_flagged(method: str, threshold: float) -> N
     assert ((result.loc[scored, "outlier_score"] > 1.0) == result.loc[scored, "is_outlier"]).all()
 
 
-def test_outlier_score_is_nan_when_the_fence_has_no_width() -> None:
+@pytest.mark.parametrize(
+    ("method", "threshold"),
+    [("zscore", 2.0), ("modified_zscore", 3.0), ("iqr", 1.5), ("quantile", 0.05), ("percent", 0.1)],
+)
+def test_outlier_score_above_one_iff_flagged_across_columns(method: str, threshold: float) -> None:
+    """The score invariant must survive the per-column ``max``, not just one column.
+
+    ``x`` has a collapsed fence (half its values identical, so MAD and IQR are both 0)
+    while ``y`` is a benign ramp. Scoring ``x``'s outliers ``NaN`` would let the
+    NaN-skipping ``max`` publish ``y``'s mild deviation for a row ``x`` flagged, so a
+    120x outlier would read as a sub-1.0 score -- indistinguishable from an inlier to a
+    downstream ``clean.filter_rows``.
+    """
+    df = pd.DataFrame({"x": [10.0] * 8 + [900.0, 1200.0], "y": [i / 9 for i in range(10)]})
+    result = detect_outliers(df, method=method, threshold=threshold)
+    scored = result["outlier_score"].notna()
+    assert ((result.loc[scored, "outlier_score"] > 1.0) == result.loc[scored, "is_outlier"]).all()
+
+
+def test_outlier_score_is_inf_when_the_fence_has_no_width() -> None:
     # IQR is 0 here, so the fence collapses to the single point [1.0, 1.0]: 50.0 is
-    # unambiguously outside it, but its distance is not expressible in fence widths.
+    # unambiguously outside it, and "infinitely many fence half-widths away" is the
+    # limit of the same formula -- keeping the `score > 1.0 iff flagged` contract true.
     result = detect_outliers(
         pd.DataFrame({"x": [1.0, 1.0, 1.0, 1.0, 50.0]}),
         columns=["x"],
@@ -219,8 +257,20 @@ def test_outlier_score_is_nan_when_the_fence_has_no_width() -> None:
         threshold=1.5,
     )
     assert result["is_outlier"].tolist() == [False, False, False, False, True]
-    assert pd.isna(result["outlier_score"].iloc[-1])
+    assert result["outlier_score"].iloc[-1] == float("inf")
     assert result["outlier_score"].iloc[:-1].tolist() == [0.0, 0.0, 0.0, 0.0]
+
+
+def test_outlier_score_survives_the_per_column_max_when_one_fence_collapses() -> None:
+    """Regression for the NaN-masking bug: a flagged row must not inherit y's score."""
+    df = pd.DataFrame({"x": [10.0] * 8 + [900.0, 1200.0], "y": [i / 9 for i in range(10)]})
+    result = detect_outliers(df, method="modified_zscore", threshold=3.0)
+
+    assert result["is_outlier"].tolist() == [False] * 8 + [True, True]
+    # The two flagged rows score inf (from x), not y's benign 0.39 / 0.50.
+    assert result["outlier_score"].iloc[-2:].tolist() == [float("inf"), float("inf")]
+    # ...so the advertised `filter_rows` subset reaches exactly the flagged rows.
+    assert (result["outlier_score"] > 1.0).tolist() == result["is_outlier"].tolist()
 
 
 def test_detect_outliers_constant_column_flags_nothing() -> None:

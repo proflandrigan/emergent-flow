@@ -46,6 +46,34 @@ class _Demo(NodeDefinition):
         return {"out1": inputs["in1"]}
 
 
+class _MultiSelect(NodeDefinition):
+    """A node with a list-typed param whose ``choices`` enumerate valid *elements*.
+
+    The shape ``ml.compare_models``' ``estimators`` param has: a multi-select, not a
+    select. Kept separate from ``_Demo`` so the shared fixture's param list stays stable.
+    """
+
+    type = "demo.multiselect"
+    version = 1
+    family = "demo"
+    label = "Demo Multi Select"
+    ports = [PortSpec(name="out1", direction=Direction.OUT, data_type="Frame")]
+    params = [
+        ParamSpec(
+            name="tags",
+            type_token="list[str]",
+            default=None,
+            hints=ValidationHints(choices=["x", "y", "z"]),
+        ),
+    ]
+
+    def codegen(self, node, ctx):
+        return CodeFragment(body=f"{ctx.out_var('out1')} = None")
+
+    def execute(self, node, inputs):
+        return {"out1": None}
+
+
 class TestCodeFragment:
     def test_render_combines_imports_and_body(self):
         frag = CodeFragment(imports=["import os", "import sys"], body="x = 1")
@@ -162,6 +190,38 @@ class TestValidateNode:
         node.params.append(Param(name="ghost", type_token="str", value="x"))
         errors = _Demo().validate_node(node)
         assert any("is not declared" in e for e in errors)
+
+    def test_list_param_choices_constrain_elements_not_the_whole_list(self):
+        """A multi-select param's choices enumerate valid elements.
+
+        Comparing the list itself against the choices would reject every non-empty
+        selection -- which is what ``ml.compare_models``' ``estimators`` param hits.
+        """
+        assert _MultiSelect().validate_node(_MultiSelect().instantiate(tags=["x", "z"])) == []
+
+    def test_list_param_flags_only_the_unknown_elements(self):
+        errors = _MultiSelect().validate_node(_MultiSelect().instantiate(tags=["x", "nope"]))
+        assert any("'nope'" in e and "are not among" in e for e in errors)
+
+
+class TestValidateParamValues:
+    """The narrower check ``ef.validate`` gates a whole graph on."""
+
+    def test_bad_choice_flagged(self):
+        node = _Demo().instantiate(mode="z")
+        assert any("not one of" in e for e in _Demo().validate_param_values(node))
+
+    def test_missing_required_param_is_not_flagged(self):
+        """An unconfigured node is a normal transient canvas state, not a graph error."""
+        node = _Demo().instantiate(mode=None)
+        assert _Demo().validate_param_values(node) == []
+
+    def test_undeclared_param_is_not_flagged(self):
+        from emergentflow.ir.params import Param
+
+        node = _Demo().instantiate()
+        node.params.append(Param(name="ghost", type_token="str", value="x"))
+        assert _Demo().validate_param_values(node) == []
 
 
 class TestInferTypes:

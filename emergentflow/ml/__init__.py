@@ -25,6 +25,7 @@ import sys
 from dataclasses import dataclass
 from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -1188,11 +1189,21 @@ def fit_and_detect(
     """Fit a curated ``outlier_detect``-archetype estimator and label the SAME frame it fit on.
 
     The ``ml.outlier_detect`` archetype's backend (Epic 8, Story 6 / ADR 0016). Outlier and
-    novelty detectors produce their labels as part of fitting itself; ``LocalOutlierFactor``
-    with ``novelty=False`` only exposes ``.fit_predict(X)`` rather than ``.predict(X)``. This
-    function fits via :func:`fit_estimator` and immediately labels the *same* input frame,
-    preferring ``.predict(X)`` when available (the default for the curated ``novelty=True``
-    configuration) and falling back to ``.fit_predict(X)``.
+    novelty detectors produce their labels as part of fitting itself. This function fits via
+    :func:`fit_estimator` and immediately labels the *same* input frame, which constrains how
+    the labels may be obtained -- in priority order:
+
+    * ``LocalOutlierFactor`` is read from its fit-time ``negative_outlier_factor_`` /
+      ``offset_`` attributes. sklearn documents that with ``novelty=True`` (the curated
+      default, needed so a later ``ml.apply_estimator`` can predict on a *different* frame)
+      you "should only use predict, decision_function and score_samples on new unseen data
+      and not on the training set" -- self-scoring finds each point as its own nearest
+      neighbor at distance 0 and inflates its local density, silently misclassifying points
+      near the boundary. The fit-time attributes ARE the standard LOF labels for the fitted
+      frame, so this path is both correct and independent of ``novelty``.
+    * Otherwise ``.predict(X)`` when available (``IsolationForest``, ``OneClassSVM``,
+      ``EllipticEnvelope``, whose training-set predictions are well-defined).
+    * Otherwise ``.fit_predict(X)``.
 
     Returns ``(model, labeled_df)`` where ``labeled_df`` is a NEW frame (``df`` is never
     mutated) with an added ``"outlier"`` column following sklearn's convention (``-1`` for
@@ -1210,7 +1221,12 @@ def fit_and_detect(
     model = cast(FittedModel, fitted)
     est = model.estimator
     X = df[model.feature_names]
-    if hasattr(est, "predict"):
+    negative_outlier_factor = getattr(est, "negative_outlier_factor_", None)
+    if negative_outlier_factor is not None:
+        # LocalOutlierFactor -- see the docstring: .predict() on the fitted frame is the one
+        # usage sklearn rules out, and these attributes give the standard LOF labels instead.
+        labels = np.where(negative_outlier_factor < est.offset_, -1, 1)
+    elif hasattr(est, "predict"):
         labels = est.predict(X)
     elif hasattr(est, "fit_predict"):
         labels = est.fit_predict(X)

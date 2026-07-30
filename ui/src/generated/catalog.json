@@ -7474,7 +7474,7 @@
         }
       ],
       "type": "ml.cluster_detect",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,

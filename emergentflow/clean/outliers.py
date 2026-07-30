@@ -151,10 +151,17 @@ def _deviation(values: pd.Series, *, lower: float, upper: float) -> pd.Series:
     rules. Each side is normalized by its own half-width, so an asymmetric fence (the
     IQR and quantile rules on skewed data) still reads ``1.0`` on both edges.
 
-    ``NaN`` means "no meaningful score": either the value itself is missing, or the
-    fence has zero width on that side (a constant column, or a column whose IQR is 0)
-    and the deviation is not expressible as a multiple of it. Scores never decide
-    membership — :func:`detect_outliers` flags rows from the bounds directly — so a
+    ``inf`` when the fence has zero width on that side (a constant column, a column whose
+    IQR is 0, a MAD of 0 because half the values are identical) and the value nonetheless
+    sits outside it: strictly outside a zero-width fence *is* infinitely many fence
+    half-widths away, so ``inf`` is the limit of the same formula rather than a special
+    case. Scoring it ``NaN`` instead would be actively harmful, because
+    :func:`detect_outliers` reduces the per-column scores with a NaN-skipping ``max`` —
+    an unrelated column's benign score would then be published for a row this column
+    flagged, and the ``> 1.0`` contract above would silently break on multi-column frames.
+
+    ``NaN`` therefore means exactly one thing: the value itself is missing. Scores never
+    decide membership — :func:`detect_outliers` flags rows from the bounds directly — so a
     ``NaN`` score never suppresses a flag.
     """
     centre = (lower + upper) / 2.0
@@ -162,6 +169,8 @@ def _deviation(values: pd.Series, *, lower: float, upper: float) -> pd.Series:
     for side, width in ((values > centre, upper - centre), (values < centre, centre - lower)):
         if width > 0:
             deviation[side] = (values[side] - centre).abs() / width
+        elif width == 0:
+            deviation[side] = float("inf")
     deviation[values == centre] = 0.0
     return deviation
 
@@ -204,7 +213,8 @@ def detect_outliers(
     Deterministic (pure pandas aggregation, no sampling). Raises ``CleanError`` for an
     unknown ``method``/``combine`` or a ``threshold`` outside the method's domain, and
     ``ColumnCollisionError`` rather than overwriting an existing ``flag_column``/
-    ``score_column``.
+    ``score_column`` — but only when ``drop`` is false, since ``drop=True`` adds neither
+    column and so has nothing to overwrite.
     """
     problem = check_outlier_rule(method, threshold)
     if problem is not None:
@@ -228,12 +238,17 @@ def detect_outliers(
     else:
         target = [c for c in df.columns if is_outlier_eligible(df[c])]
 
-    collisions = [c for c in (flag_column, score_column) if c in df.columns]
-    if collisions:
-        raise ColumnCollisionError(
-            f"detect_outliers would overwrite existing column(s) {collisions!r}; "
-            "choose different flag_column/score_column names."
-        )
+    # Only the non-drop path writes these columns, so only it can collide. Guarding
+    # unconditionally would reject the natural two-node flow (flag with one
+    # detect_outliers, then cut the rows with a second one set to drop=True) over
+    # columns the second call never adds.
+    if not drop:
+        collisions = [c for c in (flag_column, score_column) if c in df.columns]
+        if collisions:
+            raise ColumnCollisionError(
+                f"detect_outliers would overwrite existing column(s) {collisions!r}; "
+                "choose different flag_column/score_column names."
+            )
 
     if drop and not target:
         return df.copy()

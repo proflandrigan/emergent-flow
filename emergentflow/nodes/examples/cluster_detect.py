@@ -45,7 +45,10 @@ class ClusterDetect(NodeDefinition):
     """Fit a curated, allow-listed sklearn clustering/mixture estimator."""
 
     type = "ml.cluster_detect"
-    version = 1
+    # v2: IsolationForest/LocalOutlierFactor/OneClassSVM/EllipticEnvelope moved to the
+    # ml.outlier_detect archetype, so they left this node's `estimator` choices. A graph
+    # saved against v1 naming one of them no longer resolves here.
+    version = 2
     family = "ml"
     label = "Cluster / Detect"
     category = "Machine Learning"

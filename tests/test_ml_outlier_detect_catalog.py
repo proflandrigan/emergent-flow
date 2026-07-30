@@ -10,8 +10,10 @@ import ast
 import subprocess
 import sys
 
+import numpy as np
 import pandas as pd
 import pytest
+from sklearn.neighbors import LocalOutlierFactor
 
 from emergentflow.codegen.compiler import compile_to_code
 from emergentflow.ir.common import Direction
@@ -148,6 +150,34 @@ def test_fit_and_detect_labels_frame() -> None:
     assert model.task == "outlier_detection"
     assert "outlier" in result.columns
     assert set(result["outlier"].unique()).issubset({-1, 1})
+
+
+def test_fit_and_detect_lof_matches_standard_lof_on_the_fitted_frame() -> None:
+    """LocalOutlierFactor labels must equal sklearn's standard LOF result.
+
+    The curated spec sets ``novelty=True`` so a later ``ml.apply_estimator`` can predict on
+    a *different* frame -- but sklearn documents that ``predict`` must then NOT be used on
+    the training set. Labeling the fitted frame via ``.predict`` self-scores (each point is
+    its own nearest neighbor at distance 0), inflating local density and flipping points
+    near the boundary. ``fit_and_detect`` reads the fit-time attributes instead, which are
+    the standard LOF labels.
+    """
+    rng = np.random.default_rng(1)
+    df = pd.DataFrame(
+        np.vstack([rng.normal(size=(40, 2)), rng.normal(loc=6, scale=0.3, size=(15, 2))]),
+        columns=["x1", "x2"],
+    )
+
+    _, result = fit_and_detect(df, estimator="LocalOutlierFactor", features=["x1", "x2"])
+    standard = LocalOutlierFactor(n_neighbors=20, contamination="auto").fit_predict(df)
+
+    assert result["outlier"].tolist() == standard.tolist()
+    # Regression guard: .predict() on the fitted frame disagrees on exactly this data, so a
+    # revert to the old `hasattr(est, "predict")` ordering fails here rather than silently.
+    novelty_predict = (
+        LocalOutlierFactor(n_neighbors=20, contamination="auto", novelty=True).fit(df).predict(df)
+    )
+    assert novelty_predict.tolist() != standard.tolist()
 
 
 # ---------------------------------------------------------------------------
