@@ -11,6 +11,7 @@ import pytest
 import emergentflow as ef
 from emergentflow.api import is_inspectable
 from emergentflow.codegen.compiler import compile_to_code
+from emergentflow.codegen.composite import COMPOSITE_NODE_TYPE, resolve_composite_boundary
 from emergentflow.codegen.errors import CodegenError, GraphValidationError
 from emergentflow.codegen.executor import execute
 from emergentflow.ir import Direction, Edge, Graph, Node, Paradigm, Port, PortRef
@@ -403,3 +404,164 @@ def test_multi_source_fan_in_collects_a_list_in_deterministic_order() -> None:
     # "src_a" (value 1). build_wiring_map orders sources by (node_id, port_id);
     # "dbl" < "src_a" lexicographically, so dbl's value (2) comes first.
     assert results["fan"]["out"] == [2, 1]
+
+
+# ---------------------------------------------------------------------------
+# layout.composite (issue #117 stage 3)
+# ---------------------------------------------------------------------------
+
+
+def _composite_node(node_id: str, subgraph: Graph, *, num_in: int = 1, num_out: int = 1) -> Node:
+    ports = [
+        Port(id=f"{node_id}-in{i}", name=f"in{i}", direction=Direction.IN, data_type="int")
+        for i in range(num_in)
+    ] + [
+        Port(id=f"{node_id}-out{i}", name=f"out{i}", direction=Direction.OUT, data_type="int")
+        for i in range(num_out)
+    ]
+    return Node(
+        id=node_id, type=COMPOSITE_NODE_TYPE, label="Composite", ports=ports, subgraph=subgraph
+    )
+
+
+def test_resolve_composite_boundary_single_unwired_node():
+    """A lone, unwired Double node: its `in_` is dangling, its `out` is exposed."""
+    dbl = _double_node("dbl")
+    subgraph = _graph([dbl])
+
+    boundary = resolve_composite_boundary(subgraph)
+
+    assert boundary.dangling_in == [PortRef(node_id="dbl", port_id="dbl-in")]
+    assert boundary.exposed_out == [PortRef(node_id="dbl", port_id="dbl-out")]
+
+
+def test_resolve_composite_boundary_internal_wiring_excluded():
+    """source -> double, internal to the subgraph: double's `in_` is bound, not dangling."""
+    src = _source_node()
+    dbl = _double_node("dbl")
+    edge = _edge(src, "out", dbl, "in_")
+    subgraph = _graph([src, dbl], [edge])
+
+    boundary = resolve_composite_boundary(subgraph)
+
+    assert boundary.dangling_in == []
+    assert boundary.exposed_out == [PortRef(node_id="dbl", port_id="dbl-out")]
+
+
+def test_composite_executes_subgraph_and_binds_boundary_ports():
+    """A composite wrapping a single unwired Double node doubles its outer input."""
+    inner = _double_node("inner_dbl")
+    subgraph = _graph([inner])
+    composite = _composite_node("composite1", subgraph)
+
+    outer_src = _source_node()
+    edge = Edge(
+        source=PortRef(node_id=outer_src.id, port_id=_out_port(outer_src, "out").id),
+        target=PortRef(node_id=composite.id, port_id=_in_port(composite, "in0").id),
+    )
+    outer_graph = _graph([outer_src, composite], [edge])
+
+    results = execute(outer_graph)
+
+    assert results["src"] == {"out": 1}
+    assert results["composite1"] == {"out0": 2}
+    # The subgraph's own internal node id never leaks into the outer results -- a
+    # composite is a black box from the outside.
+    assert "inner_dbl" not in results
+
+
+def test_composite_with_no_subgraph_raises():
+    composite = Node(
+        id="composite1",
+        type=COMPOSITE_NODE_TYPE,
+        label="Composite",
+        ports=[Port(id="composite1-out0", name="out0", direction=Direction.OUT, data_type="int")],
+    )
+    graph = _graph([composite])
+
+    with pytest.raises(CodegenError, match="no subgraph"):
+        execute(graph)
+
+
+def test_composite_port_count_mismatch_raises():
+    """Declaring 2 IN ports for a subgraph with only 1 dangling IN port is rejected."""
+    inner = _double_node("inner_dbl")
+    subgraph = _graph([inner])
+    composite = _composite_node("composite1", subgraph, num_in=2)
+
+    outer_src_a = _source_node()
+    outer_src_a.id = "src_a"
+    edge = Edge(
+        source=PortRef(node_id="src_a", port_id="src-out"),
+        target=PortRef(node_id=composite.id, port_id=_in_port(composite, "in0").id),
+    )
+    outer_graph = Graph(
+        nodes={"src_a": outer_src_a, composite.id: composite},
+        edges={edge.id: edge},
+    )
+
+    with pytest.raises(CodegenError, match="IN port"):
+        execute(outer_graph)
+
+
+def test_composite_compiles_and_runs():
+    """The symmetric compile_to_code path: a composite becomes a nested function.
+
+    Also cross-checks against execute() directly, reinforcing the ADR-0002
+    equivalence the formal corpus in tests/test_codegen_equivalence.py covers.
+    """
+    inner = _double_node("inner_dbl")
+    subgraph = _graph([inner])
+    composite = _composite_node("composite1", subgraph)
+
+    outer_src = _source_node()
+    edge = Edge(
+        source=PortRef(node_id=outer_src.id, port_id=_out_port(outer_src, "out").id),
+        target=PortRef(node_id=composite.id, port_id=_in_port(composite, "in0").id),
+    )
+    outer_graph = _graph([outer_src, composite], [edge])
+
+    code = compile_to_code(outer_graph)
+    assert "def _composite_" in code
+
+    namespace: dict[str, Any] = {}
+    exec(compile(code, "<generated>", "exec"), namespace)
+    results = namespace["main"]()
+
+    assert len(results) == 1
+    compiled_value = next(iter(results.values()))
+    assert compiled_value == 2
+    assert execute(outer_graph)["composite1"]["out0"] == compiled_value
+
+
+def test_composite_codegen_no_subgraph_raises():
+    composite = Node(
+        id="composite1",
+        type=COMPOSITE_NODE_TYPE,
+        label="Composite",
+        ports=[Port(id="composite1-out0", name="out0", direction=Direction.OUT, data_type="int")],
+    )
+    graph = _graph([composite])
+
+    with pytest.raises(CodegenError, match="no subgraph"):
+        compile_to_code(graph)
+
+
+def test_composite_codegen_port_count_mismatch_raises():
+    inner = _double_node("inner_dbl")
+    subgraph = _graph([inner])
+    composite = _composite_node("composite1", subgraph, num_in=2)
+
+    outer_src_a = _source_node()
+    outer_src_a.id = "src_a"
+    edge = Edge(
+        source=PortRef(node_id="src_a", port_id="src-out"),
+        target=PortRef(node_id=composite.id, port_id=_in_port(composite, "in0").id),
+    )
+    outer_graph = Graph(
+        nodes={"src_a": outer_src_a, composite.id: composite},
+        edges={edge.id: edge},
+    )
+
+    with pytest.raises(CodegenError, match="IN port"):
+        compile_to_code(outer_graph)

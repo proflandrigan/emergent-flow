@@ -6,6 +6,7 @@ import catalog from "../generated/catalog.json";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
+import { useSubgraphStore } from "../store/subgraphStore";
 import { Canvas } from "./Canvas";
 
 const catalogNodes = (catalog as unknown as { nodes: CatalogNode[] }).nodes;
@@ -27,6 +28,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  useSubgraphStore.getState().clear();
 });
 
 describe("Canvas", () => {
@@ -393,5 +395,136 @@ describe("Canvas", () => {
     fireEvent.keyDown(document, { key: "v", ctrlKey: true });
 
     expect(Object.keys(useGraphStore.getState().nodes)).toHaveLength(1);
+  });
+
+  test("selecting 2+ nodes and clicking Group creates a layout.group node with groupId pointing at it", async () => {
+    useSelectionStore.getState().clear();
+
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, {
+      x: 0,
+      y: 0,
+    });
+    const n2 = useGraphStore.getState().addNodeFromSpec(loadCsv, {
+      x: 100,
+      y: 0,
+    });
+
+    useSelectionStore.getState().setNodeSelected(n1, true);
+    useSelectionStore.getState().setNodeSelected(n2, true);
+
+    render(<Canvas />);
+
+    expect(screen.getByTestId("selection-toolbar")).toBeInTheDocument();
+    expect(screen.getByTestId("group-selection")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("group-selection"));
+
+    await waitFor(() => {
+      const nodes = useGraphStore.getState().nodes;
+      const groupNode = Object.values(nodes).find((n) => n.type === "layout.group");
+      expect(groupNode).toBeDefined();
+      expect(nodes[n1].groupId).toBe(groupNode!.id);
+      expect(nodes[n2].groupId).toBe(groupNode!.id);
+    });
+  });
+
+  test("double-clicking a composite node opens its subgraph (breadcrumb appears)", async () => {
+    useSelectionStore.getState().clear();
+
+    // Create a composite node in the store directly (extractToComposite is already tested
+    // in graphStore tests).
+    useGraphStore.getState().pushHistory("test");
+    useGraphStore.getState().loadModel({
+      paradigm: "functional",
+      nodes: {
+        comp1: {
+          id: "comp1",
+          type: "layout.composite",
+          label: "My Composite",
+          paradigm: "functional",
+          params: [{ name: "label", typeToken: "str", value: "My Composite", default: "Composite" }],
+          ports: [
+            { id: "p1", name: "in0", direction: "in", dataType: "any", cardinality: "one", label: null },
+            { id: "p2", name: "out0", direction: "out", dataType: "any", cardinality: "one", label: null },
+          ],
+          position: { x: 0, y: 0 },
+          groupId: null,
+          subgraph: {
+            paradigm: "functional",
+            nodes: {
+              n1: { id: "n1", type: "data.load_csv", label: null, paradigm: "functional", position: { x: 0, y: 0 }, params: [], ports: [], group_id: null },
+              n2: { id: "n2", type: "transform.filter_rows", label: null, paradigm: "functional", position: { x: 200, y: 0 }, params: [], ports: [], group_id: null },
+            },
+            edges: {},
+          },
+        },
+      },
+      edges: {},
+    });
+
+    const { container } = render(<Canvas />);
+
+    const compositeNodeElement = container.querySelector('[data-testid="composite-node"]');
+    expect(compositeNodeElement).not.toBeNull();
+
+    // React Flow's onNodeDoubleClick is triggered via the node element
+    fireEvent.dblClick(compositeNodeElement!);
+
+    await waitFor(() => {
+      const state = useSubgraphStore.getState();
+      expect(state.breadcrumbs).toHaveLength(1);
+      expect(state.breadcrumbs[0].label).toBe("My Composite");
+    });
+  });
+
+  test("breadcrumb appears when in subgraph view and clicking a crumb navigates back", async () => {
+    useSelectionStore.getState().clear();
+
+    // Load a graph with a composite and enter its subgraph
+    useGraphStore.getState().pushHistory("test");
+    useGraphStore.getState().loadModel({
+      paradigm: "functional",
+      nodes: {
+        comp1: {
+          id: "comp1",
+          type: "layout.composite",
+          label: "Nested",
+          paradigm: "functional",
+          params: [{ name: "label", typeToken: "str", value: "Nested", default: "Composite" }],
+          ports: [],
+          position: { x: 0, y: 0 },
+          groupId: null,
+          subgraph: {
+            paradigm: "functional",
+            nodes: {
+              n1: { id: "n1", type: "data.load_csv", label: null, paradigm: "functional", position: { x: 0, y: 0 }, params: [], ports: [], group_id: null },
+            },
+            edges: {},
+          },
+        },
+      },
+      edges: {},
+    });
+
+    const { container } = render(<Canvas />);
+
+    const compositeNodeElement = container.querySelector('[data-testid="composite-node"]');
+    expect(compositeNodeElement).not.toBeNull();
+
+    fireEvent.dblClick(compositeNodeElement!);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("subgraph-breadcrumb")).toBeInTheDocument();
+    });
+
+    // breadcrumb-0 is "Top-level" -- clicking it should pop back
+    fireEvent.click(screen.getByTestId("breadcrumb-0"));
+
+    await waitFor(() => {
+      expect(useSubgraphStore.getState().breadcrumbs).toHaveLength(0);
+    });
+
+    // Breadcrumb bar hides when back at top level
+    expect(screen.queryByTestId("subgraph-breadcrumb")).toBeNull();
   });
 });

@@ -16,6 +16,7 @@ import {
   Binary,
   FlaskConical,
   Code2,
+  LayoutGrid,
   type LucideIcon,
 } from "lucide-react";
 
@@ -128,6 +129,12 @@ export const FAMILY: Record<string, FamilyMeta> = {
     color: "var(--fam-script)",
     soft: "var(--fam-script-soft)",
     Icon: Code2,
+  },
+  layout: {
+    label: "Layout",
+    color: "var(--fam-layout)",
+    soft: "var(--fam-layout-soft)",
+    Icon: LayoutGrid,
   },
 };
 

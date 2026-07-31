@@ -32,6 +32,7 @@ from typing import Any, cast
 
 from emergentflow.api import public_op
 from emergentflow.clients import Clients
+from emergentflow.codegen.composite import COMPOSITE_NODE_TYPE, resolve_composite_boundary
 from emergentflow.codegen.declarative import _prepare_declarative
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
 from emergentflow.codegen.traversal import topological_sort
@@ -106,9 +107,28 @@ def execute(
 
     # Story 6: gate the FUNCTIONAL path on validation before running any node, so
     # execute and compile_to_code reject identical graphs for identical reasons
-    # (ADR 0002 equivalence extends to rejection). Warnings pass through.
+    # (ADR 0002 equivalence extends to rejection). Warnings pass through. Only the
+    # top-level graph is gated this way -- a composite node's subgraph is not
+    # (see `_execute_functional`), mirroring how `_prepare_declarative` never
+    # re-runs this gate on an `nn.module`'s subgraph either.
     enforce_validation_gate(graph)
 
+    return _execute_functional(graph, clients)
+
+
+def _execute_functional(
+    graph: Graph,
+    clients: Clients,
+    *,
+    seed_inputs: dict[tuple[str, str], Any] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Run a `Paradigm.FUNCTIONAL` graph (or a composite node's subgraph) node by node.
+
+    `seed_inputs`, when given, pre-binds specific `(node_id, port_name)` dangling IN ports to
+    a caller-supplied value instead of `None` — used exactly once, by `_execute_composite`, to
+    thread a composite node's own resolved inputs onto its subgraph's boundary (issue #117
+    stage 3). `execute()`'s top-level call always passes `seed_inputs=None`.
+    """
     # Step 1: Paradigm guard
     if graph.paradigm is not Paradigm.FUNCTIONAL:
         raise CodegenError(
@@ -129,7 +149,9 @@ def execute(
     topo_order_ids = topological_sort(graph)
 
     # Step 3: Dangling-input guard (required IN ports only -- optional IN ports
-    # may legitimately be unconnected; Step 4 below passes `None` for those).
+    # may legitimately be unconnected; Step 4 below passes `None` for those). A
+    # port present in `seed_inputs` is bound by the enclosing composite, not
+    # genuinely dangling.
     wiring_map = build_wiring_map(graph)
     for node_id in topo_order_ids:
         node = graph.nodes[node_id]
@@ -138,6 +160,8 @@ def execute(
             if port.direction != Direction.IN:
                 continue
             if port.name not in required_in_names:
+                continue
+            if seed_inputs is not None and (node.id, port.name) in seed_inputs:
                 continue
             if not wiring_map.upstream(node.id, port.id):
                 raise UnboundInputError(
@@ -171,17 +195,28 @@ def execute(
                     "for this case first."
                 )
             if not sources:
-                # The dangling-input guard above only rejects unconnected
-                # *required* ports, so a zero-source port reaching here is a
-                # genuinely optional one (PortSpec.required=False) -- pass
-                # `None`, mirroring `build_codegen_context`'s `None`-literal
-                # binding for the same case (ADR 0002 equivalence).
-                inputs[port.name] = None
+                seed_key = (node.id, port.name)
+                if seed_inputs is not None and seed_key in seed_inputs:
+                    inputs[port.name] = seed_inputs[seed_key]
+                else:
+                    # The dangling-input guard above only rejects unconnected
+                    # *required*, non-seeded ports, so a zero-source port reaching
+                    # here is a genuinely optional one (PortSpec.required=False) --
+                    # pass `None`, mirroring `build_codegen_context`'s `None`-literal
+                    # binding for the same case (ADR 0002 equivalence).
+                    inputs[port.name] = None
                 continue
             src = sources[0]
             src_node = graph.nodes[src.node_id]
             src_port_name = next(p.name for p in src_node.ports if p.id == src.port_id)
             inputs[port.name] = results[src.node_id][src_port_name]
+
+        if node.type == COMPOSITE_NODE_TYPE:
+            # A composite is compiled/executed recursively (see
+            # `emergentflow.codegen.composite`), never via generic per-node dispatch --
+            # its own `execute()` raises NotImplementedError on purpose.
+            results[node.id] = _execute_composite(node, inputs, clients)
+            continue
 
         definition = get_node_definition(node.type)()
         kinds = type(definition).required_client_kinds()
@@ -207,6 +242,49 @@ def execute(
 
     # Step 5: Return collected results
     return results
+
+
+def _execute_composite(node: Node, inputs: dict[str, Any], clients: Clients) -> dict[str, Any]:
+    """Recursively execute a `layout.composite` node's subgraph (issue #117 stage 3).
+
+    `inputs` is keyed by the composite's own IN-port names, resolved from the OUTER graph's
+    wiring exactly like any other node's inputs. Each is seeded onto the subgraph's
+    corresponding dangling IN port (by canonical boundary position -- see
+    `emergentflow.codegen.composite.resolve_composite_boundary`) before the subgraph runs; the
+    subgraph's exposed OUT ports, in that same canonical order, become the composite's own
+    OUT-port values.
+    """
+    if node.subgraph is None:
+        raise CodegenError(f"Composite node {_describe(node)} has no subgraph to execute.")
+
+    boundary = resolve_composite_boundary(node.subgraph)
+    in_ports = [p for p in node.ports if p.direction == Direction.IN]
+    out_ports = [p for p in node.ports if p.direction == Direction.OUT]
+    if len(in_ports) != len(boundary.dangling_in):
+        raise CodegenError(
+            f"Composite node {_describe(node)} declares {len(in_ports)} IN port(s) but its "
+            f"subgraph has {len(boundary.dangling_in)} dangling IN port(s); they must match."
+        )
+    if len(out_ports) != len(boundary.exposed_out):
+        raise CodegenError(
+            f"Composite node {_describe(node)} declares {len(out_ports)} OUT port(s) but its "
+            f"subgraph has {len(boundary.exposed_out)} exposed OUT port(s); they must match."
+        )
+
+    seed_inputs: dict[tuple[str, str], Any] = {}
+    for in_port, ref in zip(in_ports, boundary.dangling_in, strict=True):
+        owner = node.subgraph.nodes[ref.node_id]
+        port_name = next(p.name for p in owner.ports if p.id == ref.port_id)
+        seed_inputs[(ref.node_id, port_name)] = inputs[in_port.name]
+
+    subgraph_results = _execute_functional(node.subgraph, clients, seed_inputs=seed_inputs)
+
+    outputs: dict[str, Any] = {}
+    for out_port, ref in zip(out_ports, boundary.exposed_out, strict=True):
+        owner = node.subgraph.nodes[ref.node_id]
+        port_name = next(p.name for p in owner.ports if p.id == ref.port_id)
+        outputs[out_port.name] = subgraph_results[ref.node_id][port_name]
+    return outputs
 
 
 def _execute_declarative(graph: Graph) -> dict[str, dict[str, Any]]:

@@ -280,3 +280,354 @@ describe("pasteNodes", () => {
     expect(useGraphStore.getState().canUndo()).toBe(beforeUndo);
   });
 });
+
+describe("groupSelection / ungroupSelection", () => {
+  test("grouping 2+ nodes creates a layout.group node and sets groupId on all members", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const n2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+
+    const groupId = useGraphStore.getState().groupSelection([n1, n2]);
+
+    expect(groupId).not.toBeNull();
+    const { nodes } = useGraphStore.getState();
+    expect(Object.keys(nodes)).toHaveLength(3); // 2 members + 1 group
+    expect(nodes[groupId!].type).toBe("layout.group");
+    expect(nodes[n1].groupId).toBe(groupId);
+    expect(nodes[n2].groupId).toBe(groupId);
+  });
+
+  test("grouping fewer than 2 ids is a no-op and returns null", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const beforeUndo = useGraphStore.getState().canUndo();
+
+    const groupId = useGraphStore.getState().groupSelection([n1]);
+
+    expect(groupId).toBeNull();
+    expect(Object.keys(useGraphStore.getState().nodes)).toHaveLength(1);
+    expect(useGraphStore.getState().canUndo()).toBe(beforeUndo);
+  });
+
+  test("grouping with empty array is a no-op and returns null", () => {
+    useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const beforeUndo = useGraphStore.getState().canUndo();
+
+    const groupId = useGraphStore.getState().groupSelection([]);
+
+    expect(groupId).toBeNull();
+    expect(useGraphStore.getState().canUndo()).toBe(beforeUndo);
+  });
+
+  test("ungrouping via a member's id clears groupId on all members and removes the group node", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const n2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+    const groupId = useGraphStore.getState().groupSelection([n1, n2])!;
+
+    useGraphStore.getState().ungroupSelection([n1]);
+
+    const { nodes } = useGraphStore.getState();
+    expect(Object.keys(nodes)).toHaveLength(2); // group node deleted
+    expect(nodes[n1].groupId).toBeNull();
+    expect(nodes[n2].groupId).toBeNull();
+    expect(nodes[groupId]).toBeUndefined();
+  });
+
+  test("ungrouping via the group node's own id has the same effect", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const n2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+    const groupId = useGraphStore.getState().groupSelection([n1, n2])!;
+
+    useGraphStore.getState().ungroupSelection([groupId]);
+
+    const { nodes } = useGraphStore.getState();
+    expect(Object.keys(nodes)).toHaveLength(2); // group node deleted
+    expect(nodes[n1].groupId).toBeNull();
+    expect(nodes[n2].groupId).toBeNull();
+    expect(nodes[groupId]).toBeUndefined();
+  });
+
+  test("ungrouping when nothing is grouped is a no-op with no history entry", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const beforeUndo = useGraphStore.getState().canUndo();
+
+    useGraphStore.getState().ungroupSelection([n1]);
+
+    expect(useGraphStore.getState().canUndo()).toBe(beforeUndo);
+  });
+
+  test("grouping pushes exactly one history entry", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const n2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+
+    useGraphStore.getState().groupSelection([n1, n2]);
+
+    expect(useGraphStore.getState().canUndo()).toBe(true);
+    // Undo should restore the pre-group state
+    useGraphStore.getState().undo();
+    const { nodes } = useGraphStore.getState();
+    expect(Object.keys(nodes)).toHaveLength(2);
+    for (const node of Object.values(nodes)) {
+      expect(node.groupId).toBeNull();
+    }
+  });
+});
+
+describe("moveGroup", () => {
+  test("moving a group with 2 members translates both members by the same delta and updates the group's own stored position", () => {
+    const m1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const m2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+    const groupId = useGraphStore.getState().groupSelection([m1, m2])!;
+
+    const groupBefore = useGraphStore.getState().nodes[groupId];
+    const m1Before = useGraphStore.getState().nodes[m1];
+    const m2Before = useGraphStore.getState().nodes[m2];
+
+    useGraphStore.getState().moveGroup(groupId, { x: 50, y: 60 });
+
+    const groupAfter = useGraphStore.getState().nodes[groupId];
+    const m1After = useGraphStore.getState().nodes[m1];
+    const m2After = useGraphStore.getState().nodes[m2];
+
+    // Delta = new group position - old group position
+    const dx = 50 - groupBefore.position.x;
+    const dy = 60 - groupBefore.position.y;
+
+    expect(groupAfter.position).toEqual({ x: 50, y: 60 });
+    expect(m1After.position).toEqual({
+      x: m1Before.position.x + dx,
+      y: m1Before.position.y + dy,
+    });
+    expect(m2After.position).toEqual({
+      x: m2Before.position.x + dx,
+      y: m2Before.position.y + dy,
+    });
+  });
+
+  test("moving a group with zero members just updates its own position (no crash)", () => {
+    const m1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const m2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+    const groupId = useGraphStore.getState().groupSelection([m1, m2])!;
+
+    // Remove members so group has no members anymore
+    useGraphStore.getState().removeNode(m1);
+    useGraphStore.getState().removeNode(m2);
+
+    // moveGroup should not crash
+    useGraphStore.getState().moveGroup(groupId, { x: 200, y: 300 });
+
+    const group = useGraphStore.getState().nodes[groupId];
+    expect(group.position).toEqual({ x: 200, y: 300 });
+  });
+
+  test("moving an unknown group id is a no-op (no history entry)", () => {
+    const beforeUndo = useGraphStore.getState().canUndo();
+
+    useGraphStore.getState().moveGroup("nonexistent", { x: 50, y: 60 });
+
+    expect(useGraphStore.getState().canUndo()).toBe(beforeUndo);
+  });
+
+  test("repeated moveGroup calls for the SAME group id coalesce into a single history entry", () => {
+    const m1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const m2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+    const groupId = useGraphStore.getState().groupSelection([m1, m2])!;
+
+    // First moveGroup starts a new history entry
+    useGraphStore.getState().moveGroup(groupId, { x: 50, y: 60 });
+
+    // Second moveGroup (same group, no endNodeDrag in between) coalesces
+    useGraphStore.getState().moveGroup(groupId, { x: 100, y: 120 });
+
+    // Should be able to undo back to before the first moveGroup
+    useGraphStore.getState().undo();
+
+    const m1After = useGraphStore.getState().nodes[m1];
+    expect(m1After.position).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe("extractToComposite", () => {
+  test("two connected nodes, no crossing edges: result has 1 composite node with 0 in-ports, member edges in subgraph, outer edges empty", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const n2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+    const sourcePort = useGraphStore.getState().nodes[n1].ports[0];
+    const targetPort = useGraphStore.getState().nodes[n2].ports[0];
+
+    useGraphStore
+      .getState()
+      .connect(
+        { node_id: n1, port_id: sourcePort.id },
+        { node_id: n2, port_id: targetPort.id },
+      );
+
+    const compositeId = useGraphStore.getState().extractToComposite([n1, n2]);
+
+    expect(compositeId).not.toBeNull();
+    const { nodes, edges } = useGraphStore.getState();
+    expect(Object.keys(nodes)).toHaveLength(1); // only composite, no members
+    expect(nodes[compositeId!].type).toBe("layout.composite");
+
+    const composite = nodes[compositeId!];
+    const inPorts = composite.ports.filter((p) => p.direction === "in");
+    const outPorts = composite.ports.filter((p) => p.direction === "out");
+    expect(inPorts).toHaveLength(0); // n1's first port is output, so 0 dangling ins
+    expect(outPorts.length).toBeGreaterThan(0); // n2 has unconsumed out ports
+
+    expect(Object.keys(edges)).toHaveLength(0); // outer edges are empty
+    expect(Object.keys(composite.subgraph!.nodes!)).toHaveLength(2);
+    expect(Object.keys(composite.subgraph!.edges!)).toHaveLength(1); // the internal edge
+  });
+
+  test("crossing edge on each side: outsideA -> memberA -> memberB -> outsideB", () => {
+    const outsideA = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const memberA = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+    const memberB = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 200, y: 0 });
+    const outsideB = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 300, y: 0 });
+
+    const aOutPort = useGraphStore.getState().nodes[outsideA].ports[0];
+    const aInPort = useGraphStore.getState().nodes[memberA].ports[0];
+    const aMidOutPort = useGraphStore.getState().nodes[memberA].ports[0];
+    const bInPort = useGraphStore.getState().nodes[memberB].ports[0];
+    const bOutPort = useGraphStore.getState().nodes[memberB].ports[0];
+    const bFinalInPort = useGraphStore.getState().nodes[outsideB].ports[0];
+
+    // Connect: outsideA -> memberA
+    useGraphStore
+      .getState()
+      .connect(
+        { node_id: outsideA, port_id: aOutPort.id },
+        { node_id: memberA, port_id: aInPort.id },
+      );
+
+    // Connect: memberA -> memberB
+    useGraphStore
+      .getState()
+      .connect(
+        { node_id: memberA, port_id: aMidOutPort.id },
+        { node_id: memberB, port_id: bInPort.id },
+      );
+
+    // Connect: memberB -> outsideB
+    useGraphStore
+      .getState()
+      .connect(
+        { node_id: memberB, port_id: bOutPort.id },
+        { node_id: outsideB, port_id: bFinalInPort.id },
+      );
+
+    const compositeId = useGraphStore.getState().extractToComposite([memberA, memberB]);
+
+    expect(compositeId).not.toBeNull();
+    const { nodes, edges } = useGraphStore.getState();
+
+    // Outer nodes: outsideA, outsideB, composite (not memberA/memberB)
+    expect(Object.keys(nodes)).toHaveLength(3);
+    expect(nodes[outsideA]).toBeDefined();
+    expect(nodes[outsideB]).toBeDefined();
+    expect(nodes[compositeId!]).toBeDefined();
+    expect(nodes[memberA]).toBeUndefined();
+    expect(nodes[memberB]).toBeUndefined();
+
+    // Outer edges: exactly 2 (outsideA->composite, composite->outsideB)
+    expect(Object.keys(edges)).toHaveLength(2);
+    const edgesArray = Object.values(edges);
+    const firstEdge = edgesArray.find((e) => e.source.node_id === outsideA);
+    const secondEdge = edgesArray.find((e) => e.target.node_id === outsideB);
+    expect(firstEdge).toBeDefined();
+    expect(firstEdge!.target.node_id).toBe(compositeId);
+    expect(secondEdge).toBeDefined();
+    expect(secondEdge!.source.node_id).toBe(compositeId);
+
+    // Subgraph edges: exactly the memberA -> memberB internal edge
+    const composite = nodes[compositeId!];
+    expect(Object.keys(composite.subgraph!.edges!)).toHaveLength(1);
+  });
+
+  test("fan-in: multiple crossing edges into different dangling IN ports", () => {
+    const source1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const source2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 50, y: 0 });
+    const target = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 200, y: 0 });
+
+    const s1Port = useGraphStore.getState().nodes[source1].ports[0];
+    const s2Port = useGraphStore.getState().nodes[source2].ports[0];
+    const t1Port = useGraphStore.getState().nodes[target].ports[0];
+    const t2Port = useGraphStore.getState().nodes[target].ports[1] || t1Port; // fallback if only 1 port
+
+    // source1 -> target and source2 -> target (two crossing edges into target)
+    useGraphStore
+      .getState()
+      .connect(
+        { node_id: source1, port_id: s1Port.id },
+        { node_id: target, port_id: t1Port.id },
+      );
+    useGraphStore
+      .getState()
+      .connect(
+        { node_id: source2, port_id: s2Port.id },
+        { node_id: target, port_id: t2Port.id },
+      );
+
+    // Extract only target (need at least 2 nodes to extract, so add dummy internal)
+    const dummy = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 210, y: 0 });
+
+    const compositeId = useGraphStore.getState().extractToComposite([target, dummy]);
+
+    expect(compositeId).not.toBeNull();
+    const { edges: outerEdges } = useGraphStore.getState();
+
+    // Should have 2 crossing edges now pointing at composite
+    const crossingEdges = Object.values(outerEdges);
+    const edgesPointingToComposite = crossingEdges.filter(
+      (e) => e.target.node_id === compositeId,
+    );
+    expect(edgesPointingToComposite.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("no-op below minimum: extractToComposite([oneId]) returns null and changes nothing", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const beforeUndo = useGraphStore.getState().canUndo();
+    const nodeCountBefore = Object.keys(useGraphStore.getState().nodes).length;
+
+    const result = useGraphStore.getState().extractToComposite([n1]);
+
+    expect(result).toBeNull();
+    expect(Object.keys(useGraphStore.getState().nodes).length).toBe(nodeCountBefore);
+    expect(useGraphStore.getState().canUndo()).toBe(beforeUndo);
+  });
+
+  test("group_id is cleared on extraction: member with external group reference keeps groupId in outer but has null in subgraph IR", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const n2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+    const externalGroupNode = useGraphStore.getState().addNodeFromSpec(loadCsv, {
+      x: 200,
+      y: 0,
+    });
+
+    // Create a group from n1 and the external group node (not n2)
+    const groupId = useGraphStore.getState().groupSelection([n1, externalGroupNode]);
+    expect(groupId).not.toBeNull();
+
+    // n1 is now in a group, but when we extract n1 + n2, the group reference should be cleared
+    const compositeId = useGraphStore.getState().extractToComposite([n1, n2]);
+
+    expect(compositeId).not.toBeNull();
+    const composite = useGraphStore.getState().nodes[compositeId!];
+    const n1SubgraphNode = composite.subgraph!.nodes![n1];
+    expect(n1SubgraphNode).toBeDefined();
+    expect(n1SubgraphNode.group_id).toBeNull(); // should be null in the subgraph IR
+  });
+
+  test("extractToComposite pushes exactly one history entry", () => {
+    const n1 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const n2 = useGraphStore.getState().addNodeFromSpec(loadCsv, { x: 100, y: 0 });
+
+    useGraphStore.getState().extractToComposite([n1, n2]);
+
+    expect(useGraphStore.getState().canUndo()).toBe(true);
+    // Undo should restore the pre-extract state
+    useGraphStore.getState().undo();
+    const { nodes } = useGraphStore.getState();
+    expect(Object.keys(nodes)).toHaveLength(2); // back to n1 and n2
+    expect(nodes[n1]).toBeDefined();
+    expect(nodes[n2]).toBeDefined();
+  });
+});

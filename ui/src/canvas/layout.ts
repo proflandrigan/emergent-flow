@@ -72,6 +72,12 @@ export function separateOverlappingNodes(
 const COLUMN_WIDTH = 260;
 const ROW_HEIGHT = 140;
 
+const GROUP_NODE_TYPE = "layout.group";
+const GROUP_MEMBER_COLUMNS = 2;
+export const GROUP_MEMBER_COLUMN_WIDTH = 220;
+export const GROUP_MEMBER_ROW_HEIGHT = 100;
+const GROUP_PADDING = 40;
+
 export function layeredLayout(
   nodes: Record<string, NodeModel>,
   edges: Record<string, EdgeModel>,
@@ -111,5 +117,51 @@ export function layeredLayout(
       position: { x: l * COLUMN_WIDTH, y: row * ROW_HEIGHT },
     };
   }
+
+  // A group is a layout unit (#117 stage 1): re-pack each group's members into a compact
+  // cluster anchored at the centroid of their individually-computed positions above, rather
+  // than leaving them scattered across whichever columns their own edges happened to place
+  // them in. A node whose `groupId` doesn't resolve to a real `layout.group` node in this
+  // graph (stale/dangling) is left at its individually-computed position.
+  const membersByGroup = new Map<string, string[]>();
+  for (const id of ids) {
+    const groupId = nodes[id].groupId;
+    if (!groupId) {
+      continue;
+    }
+    const bucket = membersByGroup.get(groupId);
+    if (bucket) {
+      bucket.push(id);
+    } else {
+      membersByGroup.set(groupId, [id]);
+    }
+  }
+
+  for (const [groupId, memberIds] of membersByGroup) {
+    const groupNode = result[groupId];
+    if (!groupNode || groupNode.type !== GROUP_NODE_TYPE) {
+      continue;
+    }
+    const centroidX =
+      memberIds.reduce((sum, id) => sum + result[id].position.x, 0) / memberIds.length;
+    const centroidY =
+      memberIds.reduce((sum, id) => sum + result[id].position.y, 0) / memberIds.length;
+    memberIds.forEach((id, index) => {
+      const col = index % GROUP_MEMBER_COLUMNS;
+      const row = Math.floor(index / GROUP_MEMBER_COLUMNS);
+      result[id] = {
+        ...result[id],
+        position: {
+          x: centroidX + col * GROUP_MEMBER_COLUMN_WIDTH,
+          y: centroidY + row * GROUP_MEMBER_ROW_HEIGHT,
+        },
+      };
+    });
+    result[groupId] = {
+      ...groupNode,
+      position: { x: centroidX - GROUP_PADDING, y: centroidY - GROUP_PADDING },
+    };
+  }
+
   return result;
 }
