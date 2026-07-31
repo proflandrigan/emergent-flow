@@ -64,6 +64,7 @@ export function Canvas(): JSX.Element {
   const pasteNodes = useGraphStore((s) => s.pasteNodes);
   const groupSelection = useGraphStore((s) => s.groupSelection);
   const ungroupSelection = useGraphStore((s) => s.ungroupSelection);
+  const extractToComposite = useGraphStore((s) => s.extractToComposite);
 
   const selNodes = useSelectionStore((s) => s.nodes);
   const selEdges = useSelectionStore((s) => s.edges);
@@ -330,6 +331,7 @@ export function Canvas(): JSX.Element {
           }}
           onGroup={canGroup ? () => groupSelection(selectedNodeIds) : undefined}
           onUngroup={canUngroup ? () => ungroupSelection(selectedNodeIds) : undefined}
+          onExtractToComposite={canGroup ? () => extractToComposite(selectedNodeIds) : undefined}
         />
       )}
       {contextMenu && (

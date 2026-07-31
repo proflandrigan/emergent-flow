@@ -53,7 +53,7 @@ function portFromIR(port: Port): PortModel {
   };
 }
 
-function nodeToIR(node: NodeModel): Node {
+export function nodeToIR(node: NodeModel): Node {
   const ir: Node = {
     id: node.id,
     type: node.type,
@@ -94,7 +94,7 @@ export function nodeFromIR(node: Node): NodeModel {
   return model;
 }
 
-function edgeToIR(edge: EdgeModel): Edge {
+export function edgeToIR(edge: EdgeModel): Edge {
   return {
     id: edge.id,
     source: edge.source,

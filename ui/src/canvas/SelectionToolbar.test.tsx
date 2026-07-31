@@ -99,4 +99,25 @@ describe("SelectionToolbar", () => {
 
     expect(onUngroup).toHaveBeenCalledTimes(1);
   });
+
+  test("passing onExtractToComposite renders an Extract to composite button and clicking it calls onExtractToComposite once", () => {
+    const onExtractToComposite = vi.fn();
+
+    render(
+      <SelectionToolbar
+        count={2}
+        onRunSelectedOnly={vi.fn()}
+        onRunToSelected={vi.fn()}
+        onExtractToComposite={onExtractToComposite}
+      />,
+    );
+
+    const extractBtn = screen.getByTestId("extract-to-composite");
+    expect(extractBtn).toBeInTheDocument();
+    expect(extractBtn).toHaveTextContent("Extract to composite");
+
+    fireEvent.click(extractBtn);
+
+    expect(onExtractToComposite).toHaveBeenCalledTimes(1);
+  });
 });
