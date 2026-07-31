@@ -12,6 +12,7 @@ import {
 import { Canvas } from "./canvas/Canvas";
 import { ConnectionManagerPanel } from "./connections/ConnectionManagerPanel";
 import { SchemaBrowserPanel } from "./connections/SchemaBrowserPanel";
+import { RunsPanel } from "./execution/RunsPanel";
 import { getDevMenuItems } from "./dev/DevControls";
 import { ExecutionToolbar } from "./exec/ExecutionToolbar";
 import { Inspector } from "./inspector/Inspector";
@@ -89,6 +90,7 @@ export function App(): JSX.Element {
   const [menuOpen, setMenuOpen] = useState(false);
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [schemaBrowserOpen, setSchemaBrowserOpen] = useState(false);
+  const [runsOpen, setRunsOpen] = useState(false);
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [recoveryToast, setRecoveryToast] = useState<string | null>(null);
   const past = useGraphStore((s) => s.past);
@@ -162,12 +164,13 @@ export function App(): JSX.Element {
   }, [inspectorWidth]);
 
   useEffect(() => {
-    if (!menuOpen && !connectionsOpen && !schemaBrowserOpen) return undefined;
+    if (!menuOpen && !connectionsOpen && !schemaBrowserOpen && !runsOpen) return undefined;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setMenuOpen(false);
         setConnectionsOpen(false);
         setSchemaBrowserOpen(false);
+        setRunsOpen(false);
       }
     }
     function onClick() {
@@ -187,7 +190,7 @@ export function App(): JSX.Element {
       window.clearTimeout(timer);
       document.removeEventListener("click", onClick);
     };
-  }, [menuOpen, connectionsOpen, schemaBrowserOpen]);
+  }, [menuOpen, connectionsOpen, schemaBrowserOpen, runsOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -302,6 +305,13 @@ export function App(): JSX.Element {
       label: "Browse schema",
       onSelect: () => {
         setSchemaBrowserOpen(true);
+        setMenuOpen(false);
+      },
+    },
+    {
+      label: "Run history",
+      onSelect: () => {
+        setRunsOpen(true);
         setMenuOpen(false);
       },
     },
@@ -556,6 +566,11 @@ export function App(): JSX.Element {
       {schemaBrowserOpen && (
         <OverlayModal width={560} onClose={() => setSchemaBrowserOpen(false)}>
           <SchemaBrowserPanel />
+        </OverlayModal>
+      )}
+      {runsOpen && (
+        <OverlayModal width={600} onClose={() => setRunsOpen(false)}>
+          <RunsPanel onClose={() => setRunsOpen(false)} />
         </OverlayModal>
       )}
       {chatModalOpen && (
