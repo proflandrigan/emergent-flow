@@ -307,7 +307,7 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
         />
         <input
           type="file"
-          id={`filepicker-${param.name}`}
+          id={`filepicker-${node.id}-${param.name}`}
           style={{ display: "none" }}
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -320,7 +320,7 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
           type="button"
           data-testid={`${testId}-browse`}
           onClick={() => {
-            document.getElementById(`filepicker-${param.name}`)?.click();
+            document.getElementById(`filepicker-${node.id}-${param.name}`)?.click();
           }}
           style={{
             padding: "var(--space-1) var(--space-2)",
@@ -335,6 +335,7 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
         </button>
       </div>
     );
+  } else if (kind === "connection") {
     widget = (
       <ConnectionSelect
         testId={testId}
