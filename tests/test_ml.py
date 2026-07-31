@@ -13,6 +13,7 @@ import pathlib
 import pandas as pd
 import pytest
 
+import emergentflow
 import emergentflow.types.catalog  # noqa: F401  (triggers token registration)
 from emergentflow.api import PUBLIC_OPS, is_inspectable
 from emergentflow.ml import (
@@ -539,7 +540,7 @@ def test_save_model_writes_meta_sidecar(tmp_path: pathlib.Path) -> None:
     meta_path = path.with_suffix(path.suffix + ".meta.json")
     assert meta_path.is_file()
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    assert meta["sdk_version"] == "0.3.3"
+    assert meta["sdk_version"] == emergentflow.__version__
     assert meta["sklearn_version"] is not None
     assert meta["estimator_type"] == "LinearRegression"
     assert meta["task"] == "regression"

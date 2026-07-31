@@ -20,6 +20,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import math
+import time
 from pathlib import Path
 from typing import Any
 
@@ -29,8 +30,8 @@ import pandas as pd
 
 from emergentflow import __version__
 from emergentflow.api import public_op
+from emergentflow.errors import ModelPersistenceError
 from emergentflow.ir.common import ArtifactRef
-from emergentflow.ml.errors import ModelPersistenceError
 from emergentflow.recommend.errors import (
     InvalidRecommenderParamsError,
     MissingOptionalDependencyError,
@@ -792,7 +793,17 @@ def save_model(
     -------
     ArtifactRef
         A reference to the saved artifact.
+
+    Raises
+    ------
+    ModelPersistenceError
+        If *model* is not a :class:`FittedRecommender`.
     """
+    if not isinstance(model, FittedRecommender):
+        raise ModelPersistenceError(
+            f"save_model expects a FittedRecommender; got {type(model).__name__}."
+        )
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -808,7 +819,7 @@ def save_model(
         "n_users": model.n_users,
         "n_items": model.n_items,
         "fit_stats": model.fit_stats,
-        "timestamp": __import__("time").time(),
+        "timestamp": time.time(),
     }
     meta_path = path.with_suffix(path.suffix + ".meta.json")
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")

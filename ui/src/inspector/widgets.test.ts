@@ -59,6 +59,14 @@ describe("widgetForParam", () => {
     expect(widgetForParam(p)).toBe("connection");
   });
 
+  test("explicit widget hint filepath wins over choices", () => {
+    const p = param({
+      type_token: "str",
+      hints: { widget: "filepath", choices: ["a", "b"] },
+    });
+    expect(widgetForParam(p)).toBe("filepath");
+  });
+
   test("choices win over type_token", () => {
     const p = param({
       type_token: "str",

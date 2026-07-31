@@ -1,7 +1,7 @@
 """
 emergentflow.nodes.examples.save_model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Reference node: ``ml.save_model`` — a terminal node (1 in, 1 out).
+Reference node: ``ml.save_model`` — persists a fitted model (1 in, 1 out).
 
 Persists a fitted model or transformer to disk via ``ef.ml.save_model`` and
 returns an ``ArtifactRef``. ``execute`` calls ``emergentflow.ml.save_model``

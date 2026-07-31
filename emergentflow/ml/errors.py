@@ -10,6 +10,11 @@ staying compatible with existing ``pytest.raises(ValueError)``-style tests.
 
 from __future__ import annotations
 
+# ModelPersistenceError is shared with the recommend family (which must not import
+# this package), so it lives in the neutral ``emergentflow.errors`` module and is
+# re-exported here for discoverability from the ml family.
+from emergentflow.errors import ModelPersistenceError as ModelPersistenceError
+
 __all__ = [
     "MLAdapterError",
     "MissingOptionalDependencyError",
@@ -40,10 +45,3 @@ class MissingOptionalDependencyError(MLAdapterError):
             f"this feature requires the optional dependency group {extra!r}; "
             f"install it with `pip install {extra}`."
         )
-
-
-class ModelPersistenceError(MLAdapterError):
-    """Raised when a saved model cannot be loaded due to version mismatch or corruption."""
-
-    def __init__(self, message: str) -> None:
-        super().__init__(message)

@@ -23,6 +23,8 @@ import contextlib
 import importlib.util
 import json
 import sys
+import time
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -1375,7 +1377,17 @@ def save_model(
     ArtifactRef
         A reference to the saved artifact with ``uri=str(path)`` and
         ``media_type="application/octet-stream"``.
+
+    Raises
+    ------
+    ModelPersistenceError
+        If *model* is not a :class:`FittedModel` or :class:`FittedTransformer`.
     """
+    if not isinstance(model, (FittedModel, FittedTransformer)):
+        raise ModelPersistenceError(
+            f"save_model expects a FittedModel or FittedTransformer; got {type(model).__name__}."
+        )
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -1390,7 +1402,7 @@ def save_model(
         "task": getattr(model, "task", None),
         "feature_names": model.feature_names,
         "target": getattr(model, "target", None),
-        "timestamp": __import__("time").time(),
+        "timestamp": time.time(),
     }
     meta_path = path.with_suffix(path.suffix + ".meta.json")
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
@@ -1423,10 +1435,10 @@ def load_model(
     ------
     ModelPersistenceError
         If the sidecar's sklearn version does not match the current
-        environment's sklearn version, or if the file does not exist.
+        environment's sklearn version, or if the loaded object is not a
+        FittedModel / FittedTransformer.
     FileNotFoundError
-        If the model file does not exist (raised when no sidecar exists
-        either, so the error is more specific).
+        If the model file does not exist.
     """
     import sklearn
 
@@ -1446,8 +1458,14 @@ def load_model(
                 f"environment has sklearn v{current_sklearn_version}. "
                 f"Install the matching version: `pip install scikit-learn=={saved_sklearn_version}`"
             )
-    # else: no sidecar — allow loading for backward compatibility with
-    # models saved before the sidecar was introduced, but log a warning.
+    else:
+        # No sidecar: allow loading for backward compatibility with models saved
+        # before the sidecar was introduced, but warn that no version check ran.
+        warnings.warn(
+            f"Model at {path} has no {path.name}.meta.json sidecar; "
+            "skipping the sklearn version check.",
+            stacklevel=2,
+        )
 
     model = joblib.load(path)
     if not isinstance(model, (FittedModel, FittedTransformer)):

@@ -1,7 +1,7 @@
 """
 emergentflow.nodes.examples.recommend_save_model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Reference node: ``recommend.save_model`` — a terminal node (1 in, 1 out).
+Reference node: ``recommend.save_model`` — persists a recommender (1 in, 1 out).
 
 Persists a fitted recommender to disk via ``ef.recommend.save_model`` and
 returns an ``ArtifactRef``. ``execute`` calls ``emergentflow.recommend.save_model``
