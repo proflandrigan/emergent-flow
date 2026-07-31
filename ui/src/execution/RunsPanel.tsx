@@ -4,7 +4,8 @@ import { useRunsStore } from "./runsStore";
 import { useGraphStore } from "../store/graphStore";
 import { useFlowStore } from "../io/flowStore";
 import { getRunGraph } from "./runsClient";
-import { computeRunGraphDiff, computeRunMetricDiff, type RunMetricDiff } from "./runCompare";
+import { computeRunGraphDiff } from "./runCompare";
+import type { Graph } from "../generated/ir";
 import "./RunsPanel.css";
 
 export interface RunsPanelProps {
@@ -23,12 +24,10 @@ export function RunsPanel({ onClose }: RunsPanelProps): JSX.Element {
   const selectRun = useRunsStore((s) => s.selectRun);
   const selectCompareRun = useRunsStore((s) => s.selectCompareRun);
   const deleteRun = useRunsStore((s) => s.deleteRun);
-  const clearSelection = useRunsStore((s) => s.clearSelection);
 
   const [restoreConfirm, setRestoreConfirm] = useState<string | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [graphDiff, setGraphDiff] = useState<ReturnType<typeof computeRunGraphDiff> | null>(null);
-  const [metricDiffs, setMetricDiffs] = useState<RunMetricDiff[]>([]);
 
   useEffect(() => {
     fetchRuns();
@@ -37,7 +36,6 @@ export function RunsPanel({ onClose }: RunsPanelProps): JSX.Element {
   useEffect(() => {
     if (!selectedRunDetail || !compareRunDetail) {
       setGraphDiff(null);
-      setMetricDiffs([]);
       return;
     }
     const detailA = selectedRunDetail;
@@ -49,7 +47,6 @@ export function RunsPanel({ onClose }: RunsPanelProps): JSX.Element {
           getRunGraph(detailB.run_id),
         ]);
         setGraphDiff(computeRunGraphDiff(graphA, graphB));
-        setMetricDiffs(computeRunMetricDiff(detailA, detailB));
       } catch {
         // ignore
       }
@@ -62,7 +59,7 @@ export function RunsPanel({ onClose }: RunsPanelProps): JSX.Element {
     setRestoreError(null);
     try {
       const graph = await getRunGraph(runId);
-      useGraphStore.getState().loadIR(graph as any);
+      useGraphStore.getState().loadIR(graph as Graph);
       useFlowStore.getState().setDirty(false);
       onClose();
     } catch (err) {

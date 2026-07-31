@@ -740,6 +740,7 @@ def test_serve_configures_cache_before_starting_uvicorn(monkeypatch) -> None:
 
     monkeypatch.setattr(app_mod, "configure_cache", fake_configure_cache)
     monkeypatch.setattr(app_mod, "configure_artifacts", lambda root, max_mb=500.0: None)
+    monkeypatch.setattr(app_mod, "configure_runs", lambda root, keep=50: None)
     monkeypatch.setattr("uvicorn.run", fake_uvicorn_run)
     app_mod.serve(open_browser=False, cache_dir="/tmp/xyz", cache_max_mb=42.0)
     assert calls == {"root": pathlib.Path("/tmp/xyz"), "max_mb": 42.0, "ran": True}
@@ -759,6 +760,7 @@ def test_serve_defaults_cache_dir_to_cwd_ef_cache(monkeypatch, tmp_path) -> None
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(app_mod, "configure_cache", fake_configure_cache)
     monkeypatch.setattr(app_mod, "configure_artifacts", lambda root, max_mb=500.0: None)
+    monkeypatch.setattr(app_mod, "configure_runs", lambda root, keep=50: None)
     monkeypatch.setattr("uvicorn.run", fake_uvicorn_run)
     app_mod.serve(open_browser=False)
     assert calls["root"] == tmp_path / ".ef-cache"

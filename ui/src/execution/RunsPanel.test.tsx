@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { RunsPanel } from "./RunsPanel";
 
@@ -39,8 +39,10 @@ function createMockStore(overrides: Record<string, unknown> = {}) {
     clearError: vi.fn(),
     ...overrides,
   };
-  (useRunsStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(
-    (selector: any) => selector ? selector(defaultStore) : defaultStore,
+  (useRunsStore as unknown as Mock).mockImplementation(
+    (selector: ((state: Record<string, unknown>) => unknown) | undefined) => {
+      return selector ? selector(defaultStore) : defaultStore;
+    },
   );
   return defaultStore;
 }
@@ -48,8 +50,8 @@ function createMockStore(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   createMockStore();
-  (useGraphStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ getState: () => ({ loadIR: vi.fn() }) });
-  (useFlowStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ getState: () => ({ isDirty: false, setDirty: vi.fn() }) });
+  (useGraphStore as unknown as Mock).mockReturnValue({ getState: () => ({ loadIR: vi.fn() }) });
+  (useFlowStore as unknown as Mock).mockReturnValue({ getState: () => ({ isDirty: false, setDirty: vi.fn() }) });
 });
 
 describe("RunsPanel", () => {

@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import tempfile
 import threading
 import time
@@ -176,9 +177,6 @@ class RunStore:
                 # Write payloads.json atomically (with size cap)
                 self._write_payloads(run_dir, payloads_data)
             except BaseException:
-                # Clean up the entire run directory on failure
-                import shutil
-
                 shutil.rmtree(run_dir, ignore_errors=True)
                 raise
 
@@ -193,8 +191,6 @@ class RunStore:
         with self._lock:
             if not run_dir.is_dir():
                 raise UnknownRunError(run_id)
-            import shutil
-
             shutil.rmtree(run_dir)
 
     # ------------------------------------------------------------------
@@ -256,8 +252,6 @@ class RunStore:
 
         while len(dirs) > self._keep:
             _, oldest_dir = dirs.pop(0)
-            import shutil
-
             shutil.rmtree(oldest_dir, ignore_errors=True)
 
 

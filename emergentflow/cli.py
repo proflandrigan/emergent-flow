@@ -12,12 +12,9 @@ inside ``main`` so ``import emergentflow.cli`` stays cheap.
 from __future__ import annotations
 
 import argparse
-import hashlib
-import json
-import pathlib
 import sys
-import time as time_mod
 from collections.abc import Sequence
+from typing import Any
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -97,6 +94,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.command == "run":
+        import hashlib
+        import json
+        import pathlib
+        import time as time_mod
+
         graph_path = pathlib.Path(args.graph_file)
         if not graph_path.is_file():
             print(f"Error: graph file not found: {graph_path}", file=sys.stderr)
@@ -145,7 +147,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         }
 
         # Build scalar payloads
-        payloads = {}
+        payloads: dict[str, dict[str, Any]] = {}
         for node_id, ports in results.items():
             payloads[node_id] = {}
             for port_name, value in ports.items():

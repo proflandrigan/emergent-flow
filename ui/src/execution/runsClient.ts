@@ -1,5 +1,3 @@
-import { postJson } from "../promptlab/httpJson";
-
 export interface RunEntry {
   run_id: string;
   timestamp: number;

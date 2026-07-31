@@ -41,7 +41,6 @@ from emergentflow.llm.secrets import validate_api_keys_present
 from emergentflow.nodes import get as get_node_definition
 from emergentflow.nodes import registry as default_node_registry
 from emergentflow.research.lineage import trace_lineage
-from emergentflow.research.reproducibility import capture_run
 from emergentflow.server.artifacts import get_default_artifacts
 from emergentflow.server.cache import get_default_cache
 from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
@@ -845,7 +844,10 @@ def _save_run_record(
 
     # Capture reproducibility
     try:
-        from emergentflow.research.reproducibility import resolve_dependency_versions
+        from emergentflow.research.reproducibility import (
+            capture_run,
+            resolve_dependency_versions,
+        )
 
         deps = resolve_dependency_versions([])
         repro = capture_run(graph, dependency_versions=deps)
