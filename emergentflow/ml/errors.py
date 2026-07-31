@@ -15,6 +15,7 @@ __all__ = [
     "MissingOptionalDependencyError",
     "UnknownEstimatorError",
     "InvalidEstimatorParamsError",
+    "ModelPersistenceError",
 ]
 
 
@@ -39,3 +40,10 @@ class MissingOptionalDependencyError(MLAdapterError):
             f"this feature requires the optional dependency group {extra!r}; "
             f"install it with `pip install {extra}`."
         )
+
+
+class ModelPersistenceError(MLAdapterError):
+    """Raised when a saved model cannot be loaded due to version mismatch or corruption."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)

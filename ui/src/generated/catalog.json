@@ -8325,6 +8325,49 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "description": "Load a fitted model or transformer from a saved artifact on disk.",
+      "family": "ml",
+      "keywords": [],
+      "label": "Load Model",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Path to the saved model file (e.g. 'models/churn_rf_v3.joblib').",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "filepath"
+          },
+          "label": "File path",
+          "name": "path",
+          "required": true,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "out",
+          "help": "The loaded fitted model or transformer.",
+          "label": null,
+          "name": "model",
+          "required": true
+        }
+      ],
+      "type": "ml.load_model",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Machine Learning",
       "description": "Fit a curated, allow-listed sklearn outlier/novelty-detection estimator.",
       "family": "ml",
       "keywords": [],
@@ -8648,6 +8691,58 @@
         }
       ],
       "type": "ml.reduce_dimensions",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Machine Learning",
+      "description": "Save a fitted model or transformer to disk as a reusable artifact.",
+      "family": "ml",
+      "keywords": [],
+      "label": "Save Model",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Destination file path (e.g. 'models/churn_rf_v3.joblib').",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "filepath"
+          },
+          "label": "File path",
+          "name": "path",
+          "required": true,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted model or transformer to save.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "ArtifactRef",
+          "direction": "out",
+          "help": "A reference to the saved artifact on disk.",
+          "label": null,
+          "name": "ref",
+          "required": true
+        }
+      ],
+      "type": "ml.save_model",
       "version": 1
     },
     {
@@ -9852,6 +9947,49 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "description": "Load a fitted recommender model from a saved artifact on disk.",
+      "family": "recommend",
+      "keywords": [],
+      "label": "Load Recommender",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Path to the saved model file (e.g. 'models/popularity_v3.joblib').",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "filepath"
+          },
+          "label": "File path",
+          "name": "path",
+          "required": true,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Recommender",
+          "direction": "out",
+          "help": "The loaded fitted recommender model.",
+          "label": null,
+          "name": "recommender",
+          "required": true
+        }
+      ],
+      "type": "recommend.load_model",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
       "description": "Validate and deduplicate raw user-item interaction data into a sparse InteractionMatrix.",
       "family": "recommend",
       "keywords": [],
@@ -10173,6 +10311,58 @@
         }
       ],
       "type": "recommend.recommend_by_embedding",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
+      "description": "Save a fitted recommender model to disk as a reusable artifact.",
+      "family": "recommend",
+      "keywords": [],
+      "label": "Save Recommender",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Destination file path (e.g. 'models/popularity_v3.joblib').",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "filepath"
+          },
+          "label": "File path",
+          "name": "path",
+          "required": true,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Recommender",
+          "direction": "in",
+          "help": "The fitted recommender model to save.",
+          "label": null,
+          "name": "recommender",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "ArtifactRef",
+          "direction": "out",
+          "help": "A reference to the saved artifact on disk.",
+          "label": null,
+          "name": "ref",
+          "required": true
+        }
+      ],
+      "type": "recommend.save_model",
       "version": 1
     },
     {

@@ -8,6 +8,8 @@ rule 4).
 
 from __future__ import annotations
 
+import pathlib
+
 import pandas as pd
 import pytest
 
@@ -19,7 +21,9 @@ from emergentflow.ml import (
     EvaluationResult,
     FittedModel,
     evaluate,
+    load_model,
     predict,
+    save_model,
     train_classifier,
     train_random_forest,
     train_regressor,
@@ -471,3 +475,84 @@ def test_evaluate_does_not_mutate_input() -> None:
     model = train_regressor(df, target="y")
     evaluate(model, df)
     assert df.equals(original)
+
+
+# ---------------------------------------------------------------------------
+# Model persistence (save_model / load_model)
+# ---------------------------------------------------------------------------
+
+
+def test_save_model_returns_artifact_ref(tmp_path: pathlib.Path) -> None:
+    """save_model returns an ArtifactRef with the correct URI."""
+    df = _make_linear_df()
+    model = train_regressor(df, target="y")
+    path = tmp_path / "model.joblib"
+    ref = save_model(model, path)
+    assert ref.uri == str(path)
+    assert ref.media_type == "application/octet-stream"
+    assert path.is_file()
+    assert path.with_suffix(path.suffix + ".meta.json").is_file()
+
+
+def test_save_load_round_trip_preserves_predict(tmp_path: pathlib.Path) -> None:
+    """fit -> save -> load -> predict produces identical results to fit -> predict."""
+    df = _make_linear_df()
+    model = train_regressor(df, target="y")
+    original_pred = predict(model, df)
+
+    path = tmp_path / "model.joblib"
+    save_model(model, path)
+    loaded = load_model(path)
+
+    reloaded_pred = predict(loaded, df)
+    assert original_pred.equals(reloaded_pred)
+
+
+def test_load_model_raises_file_not_found(tmp_path: pathlib.Path) -> None:
+    """load_model raises FileNotFoundError for a missing file."""
+    path = tmp_path / "nonexistent.joblib"
+    with pytest.raises(FileNotFoundError):
+        load_model(path)
+
+
+def test_load_model_raises_on_wrong_type(tmp_path: pathlib.Path) -> None:
+    """load_model raises ModelPersistenceError when loaded object is not FittedModel/Transformer."""
+    import joblib
+
+    path = tmp_path / "not_a_model.joblib"
+    joblib.dump("this is a string, not a model", path)
+    from emergentflow.ml.errors import ModelPersistenceError
+
+    with pytest.raises(ModelPersistenceError):
+        load_model(path)
+
+
+def test_save_model_writes_meta_sidecar(tmp_path: pathlib.Path) -> None:
+    """save_model writes a .meta.json sidecar with version and estimator info."""
+    import json
+
+    df = _make_linear_df()
+    model = train_regressor(df, target="y")
+    path = tmp_path / "model.joblib"
+    save_model(model, path)
+
+    meta_path = path.with_suffix(path.suffix + ".meta.json")
+    assert meta_path.is_file()
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    assert meta["sdk_version"] == "0.3.3"
+    assert meta["sklearn_version"] is not None
+    assert meta["estimator_type"] == "LinearRegression"
+    assert meta["task"] == "regression"
+    assert meta["feature_names"] == ["x"]
+    assert meta["target"] == "y"
+
+
+def test_save_model_with_artifact_ref_round_trip(tmp_path: pathlib.Path) -> None:
+    """load_model accepts an ArtifactRef as input."""
+    df = _make_linear_df()
+    model = train_regressor(df, target="y")
+    path = tmp_path / "model.joblib"
+    ref = save_model(model, path)
+    loaded = load_model(ref)
+    assert isinstance(loaded, FittedModel)
+    assert loaded.estimator_type == "LinearRegression"

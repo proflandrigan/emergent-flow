@@ -292,7 +292,49 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
         }
       />
     );
-  } else if (kind === "connection") {
+  } else if (kind === "filepath") {
+    widget = (
+      <div style={{ display: "flex", gap: "var(--space-1)" }}>
+        <Input
+          type="text"
+          data-testid={testId}
+          value={formatValue(catalogParam, param.value)}
+          placeholder="e.g. models/churn_rf_v3.joblib"
+          onChange={(e) =>
+            setParam(node.id, param.name, parseValue(catalogParam, e.target.value))
+          }
+          style={{ flex: 1 }}
+        />
+        <input
+          type="file"
+          id={`filepicker-${param.name}`}
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              setParam(node.id, param.name, file.name);
+            }
+          }}
+        />
+        <button
+          type="button"
+          data-testid={`${testId}-browse`}
+          onClick={() => {
+            document.getElementById(`filepicker-${param.name}`)?.click();
+          }}
+          style={{
+            padding: "var(--space-1) var(--space-2)",
+            fontSize: "var(--text-sm)",
+            cursor: "pointer",
+            borderRadius: "var(--radius-sm)",
+            border: "1px solid var(--border-color)",
+            background: "var(--bg-secondary)",
+          }}
+        >
+          Browse
+        </button>
+      </div>
+    );
     widget = (
       <ConnectionSelect
         testId={testId}

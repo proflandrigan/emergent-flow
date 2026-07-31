@@ -5,7 +5,7 @@
 
 import type { CatalogParam } from "../catalog/types";
 
-export type WidgetKind = "select" | "multiselect" | "checkbox" | "number" | "text" | "list" | "json" | "sql" | "code" | "connection" | "column" | "markdown";
+export type WidgetKind = "select" | "multiselect" | "checkbox" | "number" | "text" | "list" | "json" | "sql" | "code" | "connection" | "column" | "markdown" | "filepath";
 
 // True when the type token is a list/sequence, e.g. "list" or "list[str]".
 export function isListType(typeToken: string): boolean {
@@ -50,6 +50,9 @@ export function widgetForParam(param: CatalogParam): WidgetKind {
   }
   if (param.hints?.widget === "markdown") {
     return "markdown";
+  }
+  if (param.hints?.widget === "filepath") {
+    return "filepath";
   }
   if (param.hints?.widget === "connection") {
     return "connection";

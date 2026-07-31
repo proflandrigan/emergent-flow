@@ -66,6 +66,16 @@ register_type(
 register_type(
     TypeDef(token="Model", description="A fitted machine-learning model (estimator + metadata).")
 )
+register_type(
+    TypeDef(
+        token="ArtifactRef",
+        description=(
+            "A reference to an artifact stored outside the IR (a pointer to a file "
+            "on disk, an object-store URI, etc.). Produced by save-model nodes and "
+            "consumed by load-model nodes."
+        ),
+    )
+)
 register_type(TypeDef(token="Predictions", description="A DataFrame of model predictions."))
 register_type(
     TypeDef(token="EvaluationResult", description="Evaluation metrics for a fitted model.")
