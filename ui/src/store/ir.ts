@@ -150,10 +150,37 @@ export function fromIR(graph: Graph): CanvasModel {
     edges[id] = edgeFromIR(edge);
   }
 
+  // Auto-generate group metadata from existing group_ids
+  const groupMeta: Record<string, { label: string; color: string; position: { x: number; y: number } }> = {};
+  const groupMemberIds: Record<string, string[]> = {};
+  for (const [, node] of Object.entries(graph.nodes ?? {})) {
+    if (node.group_id) {
+      if (!groupMemberIds[node.group_id]) groupMemberIds[node.group_id] = [];
+      groupMemberIds[node.group_id].push(node.id ?? "");
+    }
+  }
+  const GROUP_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7"];
+  let groupIndex = 0;
+  for (const [gid, memberIds] of Object.entries(groupMemberIds)) {
+    if (memberIds.length < 2) continue;
+    const positions = memberIds.map((id) => nodes[id]?.position).filter(Boolean);
+    if (positions.length === 0) continue;
+    const minX = Math.min(...positions.map((p) => p.x));
+    const minY = Math.min(...positions.map((p) => p.y));
+    const maxX = Math.max(...positions.map((p) => p.x + 176));
+    const maxY = Math.max(...positions.map((p) => p.y + 60));
+    groupMeta[gid] = {
+      label: `Group ${++groupIndex}`,
+      color: GROUP_COLORS[(groupIndex - 1) % GROUP_COLORS.length],
+      position: { x: minX - 16, y: minY - 28 },
+    };
+  }
+
   const model: CanvasModel = {
     paradigm: graph.paradigm ?? "functional",
     nodes,
     edges,
+    groupMeta: Object.keys(groupMeta).length > 0 ? groupMeta : undefined,
   };
   if (graph.name !== undefined && graph.name !== null) {
     model.name = graph.name;

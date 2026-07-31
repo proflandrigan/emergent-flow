@@ -1,6 +1,6 @@
 import type { CatalogNode } from "../catalog/types";
 import { newId } from "../store/ids";
-import type { CanvasModel, NodeModel, ParamModel, PortModel } from "../store/model";
+import type { CanvasModel, EdgeModel, NodeModel, ParamModel, PortModel } from "../store/model";
 
 const COLS = 40; // grid width
 const SPACING_X = 220;
@@ -37,5 +37,43 @@ export function generateLargeGraph(spec: CatalogNode, count: number): CanvasMode
       groupId: null,
     };
   }
-  return { paradigm: "functional", nodes, edges: {} };
+
+  // Group nodes in the first 3 columns as "Stage A"
+  const stageANodes = Object.values(nodes).filter((n) => n.position.x < 3 * SPACING_X);
+  const stageAGroupId = newId("group");
+  for (const node of stageANodes) {
+    nodes[node.id] = { ...node, groupId: stageAGroupId };
+  }
+
+  // Group nodes in columns 3-5 as "Stage B"
+  const stageBNodes = Object.values(nodes).filter((n) => n.position.x >= 3 * SPACING_X && n.position.x < 6 * SPACING_X);
+  const stageBGroupId = newId("group");
+  for (const node of stageBNodes) {
+    nodes[node.id] = { ...node, groupId: stageBGroupId };
+  }
+
+  // Compute group bounding boxes
+  const stageAPositions = stageANodes.map((n) => n.position);
+  const stageBPositions = stageBNodes.map((n) => n.position);
+
+  const groupMeta: Record<string, { label: string; color: string; position: { x: number; y: number } }> = {
+    [stageAGroupId]: {
+      label: "Stage A",
+      color: "#6366f1",
+      position: {
+        x: Math.min(...stageAPositions.map((p) => p.x)) - 16,
+        y: Math.min(...stageAPositions.map((p) => p.y)) - 28,
+      },
+    },
+    [stageBGroupId]: {
+      label: "Stage B",
+      color: "#ec4899",
+      position: {
+        x: Math.min(...stageBPositions.map((p) => p.x)) - 16,
+        y: Math.min(...stageBPositions.map((p) => p.y)) - 28,
+      },
+    },
+  };
+
+  return { paradigm: "functional", nodes, edges: {}, groupMeta };
 }

@@ -35,6 +35,7 @@ import { runGraph } from "../exec/runGraph";
 import { EfEdge } from "./edges/EfEdge";
 import { EfNode } from "./nodes/EfNode";
 import { NoteNode } from "./nodes/NoteNode";
+import { GroupNode } from "./nodes/GroupNode";
 import { FindNodeModal } from "./FindNodeModal";
 import { ProblemsPanel } from "./ProblemsPanel";
 import { NodeContextMenu } from "./NodeContextMenu";
@@ -42,9 +43,9 @@ import { NodeInfoPanel } from "./NodeInfoPanel";
 import { NoteAnchorOverlay } from "./NoteAnchorOverlay";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { OverlayModal } from "../ui/OverlayModal";
-import { toRFEdge, toRFNode } from "./toReactFlow";
+import { toRFEdge, toRFNode, toRFGroupNodes, type AnyRFNode } from "./toReactFlow";
 
-const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode };
+const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode };
 const edgeTypes: EdgeTypes = { efEdge: EfEdge };
 
 export function Canvas(): JSX.Element {
@@ -59,6 +60,11 @@ export function Canvas(): JSX.Element {
   const removeEdge = useGraphStore((s) => s.removeEdge);
   const connect = useGraphStore((s) => s.connect);
   const pasteNodes = useGraphStore((s) => s.pasteNodes);
+
+  const groupMeta = useGraphStore((s) => s.groupMeta);
+  const groupNodes = useGraphStore((s) => s.groupNodes);
+  const ungroupNodes = useGraphStore((s) => s.ungroupNodes);
+  const setGroupMeta = useGraphStore((s) => s.setGroupMeta);
 
   const selNodes = useSelectionStore((s) => s.nodes);
   const selEdges = useSelectionStore((s) => s.edges);
@@ -92,9 +98,9 @@ export function Canvas(): JSX.Element {
     return m;
   }, [diagnostics]);
 
-  const rfNodes = useMemo(
-    () =>
-      Object.values(nodes).map((n) =>
+  const rfNodes: AnyRFNode[] = useMemo(
+    () => {
+      const nodeRFs = Object.values(nodes).map((n) =>
         toRFNode(
           n,
           !!selNodes[n.id],
@@ -102,16 +108,21 @@ export function Canvas(): JSX.Element {
           results[n.id],
           familyByType[n.type] ?? null,
           descriptionByType[n.type] ?? null,
+          groupMeta,
+          statuses,
         ),
-      ),
-    [nodes, selNodes, statuses, results, familyByType, descriptionByType],
+      );
+      const groupRFs = toRFGroupNodes(groupMeta, nodes, statuses);
+      return [...nodeRFs, ...groupRFs];
+    },
+    [nodes, selNodes, statuses, results, familyByType, descriptionByType, groupMeta],
   );
   const rfEdges = useMemo(
     () =>
       Object.values(edges).map((e) =>
         toRFEdge(e, !!selEdges[e.id], edgeCompatibility[e.id], reasons[e.id]),
       ),
-    [edges, selEdges, edgeCompatibility, reasons],
+    [edges, selEdges, edgeCompatibility, reasons, groupMeta],
   );
 
   const selectedNodeIds = useMemo(
@@ -119,11 +130,37 @@ export function Canvas(): JSX.Element {
     [selNodes],
   );
 
+  const canUngroup = useMemo(() => {
+    if (selectedNodeIds.length < 2) return false;
+    const firstGroup = nodes[selectedNodeIds[0]]?.groupId;
+    if (!firstGroup) return false;
+    return selectedNodeIds.every((id) => nodes[id]?.groupId === firstGroup);
+  }, [selectedNodeIds, nodes]);
+
+  const suggestedGroupName = useMemo(() => {
+    return `Group ${Object.keys(groupMeta ?? {}).length + 1}`;
+  }, [groupMeta]);
+
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       for (const change of changes) {
         if (change.type === "position" && change.position) {
-          moveNode(change.id, change.position);
+          const meta = groupMeta?.[change.id];
+          if (meta) {
+            // Group node dragged — update all members' absolute positions by the delta
+            const dx = change.position.x - meta.position.x;
+            const dy = change.position.y - meta.position.y;
+            if (dx !== 0 || dy !== 0) {
+              for (const [id, node] of Object.entries(nodes)) {
+                if (node.groupId === change.id) {
+                  moveNode(id, { x: node.position.x + dx, y: node.position.y + dy });
+                }
+              }
+              setGroupMeta(change.id, { position: change.position });
+            }
+          } else {
+            moveNode(change.id, change.position);
+          }
         } else if (change.type === "remove") {
           setNodeSelected(change.id, false);
           removeNode(change.id);
@@ -132,7 +169,7 @@ export function Canvas(): JSX.Element {
         }
       }
     },
-    [moveNode, removeNode, setNodeSelected],
+    [moveNode, removeNode, setNodeSelected, groupMeta, nodes, setGroupMeta],
   );
 
   const onEdgesChange = useCallback(
@@ -377,6 +414,14 @@ export function Canvas(): JSX.Element {
           onRunToSelected={() => {
             void runGraph({ runTo: selectedNodeIds });
           }}
+          onGroup={() => {
+            groupNodes(selectedNodeIds, suggestedGroupName);
+          }}
+          onUngroup={() => {
+            const gid = nodes[selectedNodeIds[0]]?.groupId;
+            if (gid) ungroupNodes(gid);
+          }}
+          canUngroup={canUngroup}
         />
       )}
       {contextMenu && (

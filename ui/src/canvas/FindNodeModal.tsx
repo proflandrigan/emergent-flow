@@ -46,8 +46,23 @@ export function FindNodeModal({
   const [query, setQuery] = useState("");
   const [focusedIndex, setFocusedIndex] = useState(0);
   const nodes = useGraphStore((s) => s.nodes);
+  const groupMeta = useGraphStore((s) => s.groupMeta);
 
-  const flatNodes = useMemo(() => flattenNodes(nodes), [nodes]);
+  const flatNodes = useMemo(() => {
+    const nodeEntries = flattenNodes(nodes);
+    const groupEntries: FlatNode[] = [];
+    if (groupMeta) {
+      for (const [gid, meta] of Object.entries(groupMeta)) {
+        groupEntries.push({
+          id: gid,
+          label: meta.label,
+          type: "group",
+          paramValues: [],
+        });
+      }
+    }
+    return [...nodeEntries, ...groupEntries];
+  }, [nodes, groupMeta]);
 
   const results = useMemo(() => {
     if (!query.trim()) {
@@ -170,6 +185,8 @@ export function FindNodeModal({
           ) : (
             results.map((node, i) => {
               const isFocused = i === focusedIndex;
+              const isGroup = node.type === "group";
+              const groupColor = isGroup && groupMeta ? groupMeta[node.id]?.color : undefined;
               return (
                 <button
                   key={node.id}
@@ -197,8 +214,8 @@ export function FindNodeModal({
                     style={{
                       width: 8,
                       height: 8,
-                      borderRadius: "50%",
-                      background: "var(--text-tertiary)",
+                      borderRadius: isGroup ? 2 : "50%",
+                      background: groupColor ?? "var(--text-tertiary)",
                       flexShrink: 0,
                     }}
                   />
