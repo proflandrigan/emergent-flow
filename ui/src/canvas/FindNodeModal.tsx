@@ -2,7 +2,7 @@
 // Select a result to centre the viewport on it and select it.
 
 import { Search } from "lucide-react";
-import { useState, useMemo, useCallback, useEffect, type JSX } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, type JSX } from "react";
 import { createPortal } from "react-dom";
 
 import { useGraphStore } from "../store/graphStore";
@@ -76,7 +76,10 @@ export function FindNodeModal({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === "ArrowDown") {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      } else if (e.key === "ArrowDown") {
         e.preventDefault();
         setFocusedIndex((i) => Math.min(i + 1, results.length - 1));
       } else if (e.key === "ArrowUp") {
@@ -87,13 +90,17 @@ export function FindNodeModal({
         selectNode(results[focusedIndex].id);
       }
     },
-    [results, focusedIndex, selectNode],
+    [results, focusedIndex, selectNode, onClose],
   );
 
+  const handleKeyDownRef = useRef(handleKeyDown);
+  handleKeyDownRef.current = handleKeyDown;
+
   useEffect(() => {
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handleKeyDown]);
+    const handler = (e: KeyboardEvent) => handleKeyDownRef.current(e);
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
 
   useEffect(() => {
     setFocusedIndex(0);
