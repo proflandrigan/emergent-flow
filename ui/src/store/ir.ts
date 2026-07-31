@@ -53,21 +53,22 @@ function portFromIR(port: Port): PortModel {
   };
 }
 
-function nodeToIR(node: NodeModel): Node {
+export function nodeToIR(node: NodeModel): Node {
   const ir: Node = {
     id: node.id,
     type: node.type,
-    label: node.label ?? null,
     paradigm: node.paradigm,
     position: { x: node.position.x, y: node.position.y },
     params: node.params.map(paramToIR),
     ports: node.ports.map(portToIR),
     group_id: node.groupId ?? null,
   };
+  if (node.label !== undefined) {
+    ir.label = node.label;
+  }
   // Carried through opaquely, and only when the node actually had the key: the canvas never
   // authors a subgraph, so a canvas-built node stays free of a `subgraph: null` it never had,
-  // while an imported composite/module node keeps its inner graph byte-for-byte. Assigning
-  // unconditionally would also be wrong in the other direction -- see `nodeFromIR`.
+  // while an imported composite/module node keeps its inner graph byte-for-byte.
   if (node.subgraph !== undefined) {
     ir.subgraph = node.subgraph;
   }
@@ -78,13 +79,15 @@ export function nodeFromIR(node: Node): NodeModel {
   const model: NodeModel = {
     id: node.id ?? "",
     type: node.type,
-    label: node.label ?? undefined,
     paradigm: node.paradigm ?? "functional",
     params: (node.params ?? []).map(paramFromIR),
     ports: (node.ports ?? []).map(portFromIR),
     position: { x: node.position?.x ?? 0, y: node.position?.y ?? 0 },
     groupId: node.group_id ?? null,
   };
+  if (node.label !== undefined) {
+    model.label = node.label ?? undefined;
+  }
   // Preserve `null` vs absent exactly rather than collapsing both to one of them, so a
   // round-trip through the canvas is byte-identical for graphs the SDK wrote (which set
   // `subgraph: null` on every leaf node) and for graphs the canvas built (which omit it).
@@ -94,7 +97,7 @@ export function nodeFromIR(node: Node): NodeModel {
   return model;
 }
 
-function edgeToIR(edge: EdgeModel): Edge {
+export function edgeToIR(edge: EdgeModel): Edge {
   return {
     id: edge.id,
     source: edge.source,
@@ -178,8 +181,10 @@ export function fromIR(graph: Graph): CanvasModel {
     paradigm: graph.paradigm ?? "functional",
     nodes,
     edges,
-    groupMeta,
   };
+  if (Object.keys(groupMeta).length > 0) {
+    model.groupMeta = groupMeta;
+  }
   if (graph.name !== undefined && graph.name !== null) {
     model.name = graph.name;
   }

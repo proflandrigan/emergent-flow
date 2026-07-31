@@ -9,8 +9,9 @@ import type { CatalogNode } from "../catalog/types";
 import type { Graph } from "../generated/ir";
 import { useExecutionStore } from "./executionStore";
 import { layeredLayout, separateOverlappingNodes } from "../canvas/layout";
+import { computeGroupBounds } from "../canvas/toReactFlow";
 import { newId } from "./ids";
-import { fromIR, toIR } from "./ir";
+import { edgeToIR, fromIR, nodeToIR, toIR } from "./ir";
 import { useValidationStore } from "./validationStore";
 import type {
   CanvasModel,
@@ -80,6 +81,10 @@ export interface GraphStore extends CanvasModel {
     target: { node_id: string; port_id: string },
   ) => string | null;
   pasteNodes: (models: NodeModel[]) => string[];
+  groupSelection: (nodeIds: string[]) => string | null;
+  ungroupSelection: (nodeIds: string[]) => void;
+  moveGroup: (groupId: string, position: { x: number; y: number }) => void;
+  extractToComposite: (nodeIds: string[]) => string | null;
   removeEdge: (edgeId: string) => void;
   toIR: () => Graph;
   loadIR: (graph: Graph) => void;
@@ -265,6 +270,260 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       return { nodes: separateOverlappingNodes(nodes) };
     });
     return cloned.map((n) => n.id);
+  },
+
+  groupSelection(nodeIds) {
+    const ids = nodeIds.filter((id) => get().nodes[id]);
+    if (ids.length < 2) {
+      return null; // grouping requires at least two real nodes -- no-op, no history entry
+    }
+    get().pushHistory("groupSelection");
+    const groupId = newId("node");
+    const members = ids.map((id) => get().nodes[id]);
+    const minX = Math.min(...members.map((n) => n.position.x));
+    const minY = Math.min(...members.map((n) => n.position.y));
+    const groupNode: NodeModel = {
+      id: groupId,
+      type: "layout.group",
+      label: "Group",
+      paradigm: "functional",
+      params: [
+        { name: "label", typeToken: "str", value: "Group", default: "Group" },
+        { name: "color", typeToken: "str", value: "slate", default: "slate" },
+      ],
+      ports: [],
+      position: { x: minX - 40, y: minY - 40 },
+      groupId: null,
+    };
+    set((state) => {
+      const nodes = { ...state.nodes, [groupId]: groupNode };
+      for (const id of ids) {
+        const existing = nodes[id];
+        if (existing) {
+          nodes[id] = { ...existing, groupId };
+        }
+      }
+      return { nodes };
+    });
+    return groupId;
+  },
+
+  ungroupSelection(nodeIds) {
+    const state = get();
+    const groupIds = new Set<string>();
+    for (const id of nodeIds) {
+      const node = state.nodes[id];
+      if (!node) {
+        continue;
+      }
+      if (node.type === "layout.group") {
+        groupIds.add(node.id);
+      } else if (node.groupId) {
+        groupIds.add(node.groupId);
+      }
+    }
+    if (groupIds.size === 0) {
+      return; // nothing to ungroup -- no-op, no history entry
+    }
+    get().pushHistory("ungroupSelection");
+    set((state) => {
+      const nodes = { ...state.nodes };
+      for (const [id, node] of Object.entries(nodes)) {
+        if (node.groupId && groupIds.has(node.groupId)) {
+          nodes[id] = { ...node, groupId: null };
+        }
+      }
+      for (const gid of groupIds) {
+        delete nodes[gid];
+      }
+      return { nodes };
+    });
+  },
+
+  moveGroup(groupId, position) {
+    if (!get().nodes[groupId]) {
+      return; // unknown group -- don't push a no-op history entry
+    }
+    const txn = `move-group:${groupId}`;
+    if (get()._lastTxn !== txn) {
+      get().pushHistory(txn); // captures pre-drag state once; coalesces the rest of the drag
+    }
+    set((state) => {
+      const members = Object.values(state.nodes).filter((n) => n.groupId === groupId);
+      const nodes = { ...state.nodes };
+      if (members.length === 0) {
+        nodes[groupId] = { ...state.nodes[groupId], position };
+        return { nodes, _lastTxn: txn };
+      }
+      const bounds = computeGroupBounds(members);
+      const dx = position.x - bounds.x;
+      const dy = position.y - bounds.y;
+      for (const member of members) {
+        nodes[member.id] = {
+          ...member,
+          position: { x: member.position.x + dx, y: member.position.y + dy },
+        };
+      }
+      nodes[groupId] = { ...state.nodes[groupId], position };
+      return { nodes, _lastTxn: txn };
+    });
+  },
+
+  extractToComposite(nodeIds) {
+    const ids = nodeIds.filter((id) => get().nodes[id]);
+    if (ids.length < 2) {
+      return null; // extraction requires at least two real nodes -- no-op, no history entry
+    }
+    const idSet = new Set(ids);
+    const state = get();
+
+    // Partition edges: both endpoints inside the selection -> becomes a subgraph edge;
+    // exactly one endpoint inside -> crosses the boundary and gets rewired below.
+    const internalEdges: EdgeModel[] = [];
+    const crossingEdges: EdgeModel[] = [];
+    for (const edge of Object.values(state.edges)) {
+      const sourceIn = idSet.has(edge.source.node_id);
+      const targetIn = idSet.has(edge.target.node_id);
+      if (sourceIn && targetIn) {
+        internalEdges.push(edge);
+      } else if (sourceIn || targetIn) {
+        crossingEdges.push(edge);
+      }
+    }
+
+    // A dangling IN port (no internal source) or exposed OUT port (no internal consumer) is
+    // determined purely by the INTERNAL edge set -- a port fed/consumed only by a crossing
+    // edge becomes dangling/exposed once that edge is excluded from the subgraph, exactly
+    // mirroring the Python side's `resolve_composite_boundary`.
+    const boundTargets = new Set(
+      internalEdges.map((e) => `${e.target.node_id}:${e.target.port_id}`),
+    );
+    const consumedSources = new Set(
+      internalEdges.map((e) => `${e.source.node_id}:${e.source.port_id}`),
+    );
+
+    // Canonical order: selected node ids sorted ascending, each node's ports in declared
+    // order -- MUST match resolve_composite_boundary's ordering exactly (position i on each
+    // side must refer to the same underlying port).
+    const sortedIds = [...ids].sort();
+    const danglingIn: { nodeId: string; portId: string }[] = [];
+    const exposedOut: { nodeId: string; portId: string }[] = [];
+    for (const nodeId of sortedIds) {
+      const node = state.nodes[nodeId];
+      for (const port of node.ports) {
+        const key = `${nodeId}:${port.id}`;
+        if (port.direction === "in") {
+          if (!boundTargets.has(key)) {
+            danglingIn.push({ nodeId, portId: port.id });
+          }
+        } else if (!consumedSources.has(key)) {
+          exposedOut.push({ nodeId, portId: port.id });
+        }
+      }
+    }
+
+    get().pushHistory("extractToComposite");
+
+    const compositeId = newId("node");
+    const inPortIds = danglingIn.map(() => newId("port"));
+    const outPortIds = exposedOut.map(() => newId("port"));
+    // (memberNodeId:memberPortId) -> the new composite port id that boundary position maps to.
+    const boundaryInByMember = new Map(
+      danglingIn.map((ref, i) => [`${ref.nodeId}:${ref.portId}`, inPortIds[i]]),
+    );
+    const boundaryOutByMember = new Map(
+      exposedOut.map((ref, i) => [`${ref.nodeId}:${ref.portId}`, outPortIds[i]]),
+    );
+
+    const subgraphNodes: Record<string, ReturnType<typeof nodeToIR>> = {};
+    for (const nodeId of ids) {
+      // group_id is cleared: a group membership referencing a node OUTSIDE this new subgraph
+      // would violate the IR's "group_id must reference a node in the same graph" invariant.
+      const member = { ...state.nodes[nodeId], groupId: null };
+      subgraphNodes[nodeId] = nodeToIR(member);
+    }
+    const subgraphEdges: Record<string, ReturnType<typeof edgeToIR>> = {};
+    for (const edge of internalEdges) {
+      subgraphEdges[edge.id] = edgeToIR(edge);
+    }
+
+    const members = ids.map((id) => state.nodes[id]);
+    const minX = Math.min(...members.map((n) => n.position.x));
+    const minY = Math.min(...members.map((n) => n.position.y));
+
+    function portFor(ref: { nodeId: string; portId: string }) {
+      return state.nodes[ref.nodeId].ports.find((p) => p.id === ref.portId)!;
+    }
+
+    const compositeNode: NodeModel = {
+      id: compositeId,
+      type: "layout.composite",
+      label: "Composite",
+      paradigm: "functional",
+      params: [{ name: "label", typeToken: "str", value: "Composite", default: "Composite" }],
+      ports: [
+        ...danglingIn.map((ref, i) => {
+          const original = portFor(ref);
+          return {
+            id: inPortIds[i],
+            name: `in${i}`,
+            direction: "in" as const,
+            dataType: original.dataType,
+            cardinality: original.cardinality,
+            label: null,
+          };
+        }),
+        ...exposedOut.map((ref, i) => {
+          const original = portFor(ref);
+          return {
+            id: outPortIds[i],
+            name: `out${i}`,
+            direction: "out" as const,
+            dataType: original.dataType,
+            cardinality: original.cardinality,
+            label: null,
+          };
+        }),
+      ],
+      position: { x: minX - 40, y: minY - 40 },
+      groupId: null,
+      subgraph: {
+        paradigm: "functional",
+        nodes: subgraphNodes,
+        edges: subgraphEdges,
+      },
+    };
+
+    set((state) => {
+      const nodes = { ...state.nodes };
+      for (const id of ids) {
+        delete nodes[id];
+      }
+      nodes[compositeId] = compositeNode;
+
+      const edges = { ...state.edges };
+      for (const edge of internalEdges) {
+        delete edges[edge.id];
+      }
+      for (const edge of crossingEdges) {
+        const sourceIn = idSet.has(edge.source.node_id);
+        if (sourceIn) {
+          const portId = boundaryOutByMember.get(
+            `${edge.source.node_id}:${edge.source.port_id}`,
+          )!;
+          edges[edge.id] = { ...edge, source: { node_id: compositeId, port_id: portId } };
+        } else {
+          const portId = boundaryInByMember.get(
+            `${edge.target.node_id}:${edge.target.port_id}`,
+          )!;
+          edges[edge.id] = { ...edge, target: { node_id: compositeId, port_id: portId } };
+        }
+      }
+
+      return { nodes, edges };
+    });
+
+    return compositeId;
   },
 
   removeEdge(edgeId) {

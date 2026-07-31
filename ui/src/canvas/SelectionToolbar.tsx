@@ -4,9 +4,9 @@ export interface SelectionToolbarProps {
   count: number;
   onRunSelectedOnly: () => void;
   onRunToSelected: () => void;
-  onGroup: () => void;
-  onUngroup: () => void;
-  canUngroup: boolean;
+  onGroup?: () => void;
+  onUngroup?: () => void;
+  onExtractToComposite?: () => void;
 }
 
 export function SelectionToolbar({
@@ -15,7 +15,7 @@ export function SelectionToolbar({
   onRunToSelected,
   onGroup,
   onUngroup,
-  canUngroup,
+  onExtractToComposite,
 }: SelectionToolbarProps): JSX.Element {
   return (
     <div
@@ -52,21 +52,25 @@ export function SelectionToolbar({
       >
         Run to selected
       </Button>
-      <Button
-        variant="secondary"
-        data-testid="group-nodes"
-        onClick={onGroup}
-      >
-        Group
-      </Button>
-      <Button
-        variant="secondary"
-        data-testid="ungroup-nodes"
-        onClick={onUngroup}
-        disabled={!canUngroup}
-      >
-        Ungroup
-      </Button>
+      {onGroup && (
+        <Button variant="secondary" data-testid="group-selection" onClick={onGroup}>
+          Group
+        </Button>
+      )}
+      {onUngroup && (
+        <Button variant="secondary" data-testid="ungroup-selection" onClick={onUngroup}>
+          Ungroup
+        </Button>
+      )}
+      {onExtractToComposite && (
+        <Button
+          variant="secondary"
+          data-testid="extract-to-composite"
+          onClick={onExtractToComposite}
+        >
+          Extract to composite
+        </Button>
+      )}
     </div>
   );
 }

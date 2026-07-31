@@ -6985,6 +6985,78 @@
     },
     {
       "advisor_persona": null,
+      "category": "Organization",
+      "description": "A reusable container owning an extracted subgraph.",
+      "family": "layout",
+      "keywords": [],
+      "label": "Composite",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "Composite",
+          "help": "Display name for this composite.",
+          "hints": null,
+          "label": "Label",
+          "name": "label",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [],
+      "type": "layout.composite",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Organization",
+      "description": "A visual container grouping other nodes; carries no data flow.",
+      "family": "layout",
+      "keywords": [],
+      "label": "Group",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "Group",
+          "help": "Display name for this group.",
+          "hints": null,
+          "label": "Label",
+          "name": "label",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "slate",
+          "help": "Background color swatch for the group container.",
+          "hints": {
+            "choices": [
+              "slate",
+              "blue",
+              "green",
+              "purple",
+              "amber",
+              "rose"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Color",
+          "name": "color",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [],
+      "type": "layout.group",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "LLM",
       "description": "Run one completion call against a provider through the unified gateway. Use for a single completion call once you already have rendered messages.",
       "family": "llm",

@@ -1,7 +1,12 @@
 import { describe, expect, test } from "vitest";
 
 import type { EdgeModel, NodeModel } from "../store/model";
-import { layeredLayout, separateOverlappingNodes } from "./layout";
+import {
+  layeredLayout,
+  separateOverlappingNodes,
+  GROUP_MEMBER_COLUMN_WIDTH,
+  GROUP_MEMBER_ROW_HEIGHT,
+} from "./layout";
 
 function node(id: string, x: number, y: number): NodeModel {
   return {
@@ -11,6 +16,18 @@ function node(id: string, x: number, y: number): NodeModel {
     params: [],
     ports: [],
     position: { x, y },
+  };
+}
+
+function groupNode(id: string): NodeModel {
+  return {
+    id,
+    type: "layout.group",
+    paradigm: "functional",
+    params: [],
+    ports: [],
+    position: { x: 0, y: 0 },
+    groupId: null,
   };
 }
 
@@ -122,5 +139,54 @@ describe("layeredLayout", () => {
     const result = layeredLayout(nodes, edges);
     expect(result.d.position.x).toBeGreaterThan(result.b.position.x);
     expect(result.d.position.x).toBeGreaterThan(result.c.position.x);
+  });
+
+  test("two grouped nodes that would land in different layers end up close together", () => {
+    const group1 = "group1";
+    const nodes: Record<string, NodeModel> = {
+      a: { ...node("a", 0, 0), groupId: group1 },
+      b: { ...node("b", 0, 0), groupId: group1 },
+      [group1]: groupNode(group1),
+    };
+    const edges: Record<string, EdgeModel> = {
+      ab: makeEdge("ab", "a", "b"),
+    };
+    const result = layeredLayout(nodes, edges);
+    // Nodes a and b are members of group1, so they should be within one cell
+    // width/height of each other despite a->b edge placing them in different
+    // layers
+    expect(Math.abs(result.a.position.x - result.b.position.x)).toBeLessThanOrEqual(
+      GROUP_MEMBER_COLUMN_WIDTH,
+    );
+    expect(Math.abs(result.a.position.y - result.b.position.y)).toBeLessThanOrEqual(
+      GROUP_MEMBER_ROW_HEIGHT,
+    );
+  });
+
+  test("a node whose groupId points to non-existent group stays at layered position", () => {
+    const nodes: Record<string, NodeModel> = {
+      a: { ...node("a", 0, 0), groupId: "nonexistent" },
+      b: node("b", 0, 0),
+    };
+    const edges: Record<string, EdgeModel> = {};
+    const result = layeredLayout(nodes, edges);
+    // a should stay at its individually computed layer 0 position
+    expect(result.a.position.x).toBe(0);
+  });
+
+  test("ungrouped node unaffected when other nodes form a group", () => {
+    const group1 = "group1";
+    const nodes: Record<string, NodeModel> = {
+      a: { ...node("a", 0, 0), groupId: group1 },
+      b: { ...node("b", 0, 0), groupId: group1 },
+      c: node("c", 0, 0),
+      [group1]: groupNode(group1),
+    };
+    const edges: Record<string, EdgeModel> = {};
+    const result = layeredLayout(nodes, edges);
+    // a and b should be repositioned by the group re-pack, but c should stay
+    // at its individually computed position (layer 0, row 2)
+    expect(result.c.position.x).toBe(0);
+    expect(result.c.position.y).toBeGreaterThan(0);
   });
 });

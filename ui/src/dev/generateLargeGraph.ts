@@ -44,6 +44,19 @@ export function generateLargeGraph(spec: CatalogNode, count: number): CanvasMode
   for (const node of stageANodes) {
     nodes[node.id] = { ...node, groupId: stageAGroupId };
   }
+  nodes[stageAGroupId] = {
+    id: stageAGroupId,
+    type: "layout.group",
+    label: "Stage A",
+    paradigm: "functional",
+    params: [
+      { name: "label", typeToken: "string", value: "Stage A", default: "Group" },
+      { name: "color", typeToken: "string", value: "purple", default: "slate" },
+    ],
+    ports: [],
+    position: { x: 0, y: 0 },
+    groupId: null,
+  };
 
   // Group nodes in columns 3-5 as "Stage B"
   const stageBNodes = Object.values(nodes).filter((n) => n.position.x >= 3 * SPACING_X && n.position.x < 6 * SPACING_X);
@@ -51,29 +64,19 @@ export function generateLargeGraph(spec: CatalogNode, count: number): CanvasMode
   for (const node of stageBNodes) {
     nodes[node.id] = { ...node, groupId: stageBGroupId };
   }
-
-  // Compute group bounding boxes
-  const stageAPositions = stageANodes.map((n) => n.position);
-  const stageBPositions = stageBNodes.map((n) => n.position);
-
-  const groupMeta: Record<string, { label: string; color: string; position: { x: number; y: number } }> = {
-    [stageAGroupId]: {
-      label: "Stage A",
-      color: "#6366f1",
-      position: {
-        x: Math.min(...stageAPositions.map((p) => p.x)) - 16,
-        y: Math.min(...stageAPositions.map((p) => p.y)) - 28,
-      },
-    },
-    [stageBGroupId]: {
-      label: "Stage B",
-      color: "#ec4899",
-      position: {
-        x: Math.min(...stageBPositions.map((p) => p.x)) - 16,
-        y: Math.min(...stageBPositions.map((p) => p.y)) - 28,
-      },
-    },
+  nodes[stageBGroupId] = {
+    id: stageBGroupId,
+    type: "layout.group",
+    label: "Stage B",
+    paradigm: "functional",
+    params: [
+      { name: "label", typeToken: "string", value: "Stage B", default: "Group" },
+      { name: "color", typeToken: "string", value: "rose", default: "slate" },
+    ],
+    ports: [],
+    position: { x: 0, y: 0 },
+    groupId: null,
   };
 
-  return { paradigm: "functional", nodes, edges: {}, groupMeta };
+  return { paradigm: "functional", nodes, edges: {} };
 }

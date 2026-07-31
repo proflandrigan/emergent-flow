@@ -150,10 +150,59 @@ describe("toIR", () => {
           target: { node_id: "node-2", port_id: "port-in" },
         },
       },
-      groupMeta: {},
     };
 
     expect(fromIR(toIR(model))).toEqual(model);
+  });
+
+  test("a non-null groupId survives round-trip through toIR -> fromIR", () => {
+    const model: CanvasModel = {
+      schemaVersion: 1,
+      name: "My Pipeline",
+      paradigm: "functional",
+      nodes: {
+        "group-1": {
+          id: "group-1",
+          type: "layout.group",
+          label: "My Group",
+          paradigm: "functional",
+          position: { x: 0, y: 0 },
+          groupId: null,
+          params: [
+            { name: "label", typeToken: "str", value: "My Group", default: "My Group" },
+            { name: "color", typeToken: "str", value: "slate", default: "slate" },
+          ],
+          ports: [],
+        },
+        "node-1": {
+          id: "node-1",
+          type: "data.load_csv",
+          label: "Load CSV",
+          paradigm: "functional",
+          position: { x: 10, y: 20 },
+          groupId: "group-1",
+          params: [
+            { name: "path", typeToken: "str", value: "a.csv", default: null },
+          ],
+          ports: [
+            {
+              id: "port-out",
+              name: "frame",
+              direction: "out",
+              dataType: "DataFrame",
+              cardinality: "one",
+              label: null,
+            },
+          ],
+        },
+      },
+      edges: {},
+    };
+
+    const roundTripped = fromIR(toIR(model));
+
+    expect(roundTripped.nodes["node-1"].groupId).toBe("group-1");
+    expect(roundTripped).toEqual(model);
   });
 });
 

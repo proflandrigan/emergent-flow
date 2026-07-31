@@ -20,7 +20,8 @@ describe("generateLargeGraph", () => {
 
     const model = generateLargeGraph(spec, 10);
 
-    expect(Object.keys(model.nodes)).toHaveLength(10);
+    // 10 generated nodes + 2 group containers (Stage A, Stage B)
+    expect(Object.keys(model.nodes)).toHaveLength(12);
   });
 
   test("each node has a unique id", () => {
@@ -122,6 +123,7 @@ describe("generateLargeGraph", () => {
     const model = generateLargeGraph(spec, 10);
 
     for (const node of Object.values(model.nodes)) {
+      if (node.type === "layout.group") continue;
       expect(node.ports).toHaveLength(1);
       const port = node.ports[0];
       expect(port.name).toBe("out");

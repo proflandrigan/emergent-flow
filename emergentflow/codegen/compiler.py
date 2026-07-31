@@ -22,15 +22,16 @@ from __future__ import annotations
 
 import contextlib
 import textwrap
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from emergentflow.api import public_op
 from emergentflow.clients import ClientKind
-from emergentflow.codegen.context import build_codegen_context
+from emergentflow.codegen.composite import COMPOSITE_NODE_TYPE, resolve_composite_boundary
+from emergentflow.codegen.context import CodegenContext, build_codegen_context
 from emergentflow.codegen.declarative import compile_declarative
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
 from emergentflow.codegen.formatting import format_source
-from emergentflow.codegen.naming import NameMap, build_name_map
+from emergentflow.codegen.naming import NameMap, _sanitize_identifier, _slugify, build_name_map
 from emergentflow.codegen.traversal import topological_sort
 from emergentflow.codegen.validation import enforce_validation_gate, required_in_port_names
 from emergentflow.codegen.wiring import build_wiring_map
@@ -104,12 +105,23 @@ class _AssembledModule:
     # by nodes whose credential can't be resolved to a real env var without I/O (ADR 0002)
 
 
-def _assemble(graph: Graph) -> _AssembledModule:
+def _assemble(
+    graph: Graph,
+    *,
+    param_overrides: dict[tuple[str, str], str] | None = None,
+) -> _AssembledModule:
     """Runs the per-node compilation pipeline and returns its structured result.
 
     Shared seam between `compile_to_code` and the equivalence harness so both
     can build on the same graph traversal, naming, and codegen without
     duplicating the per-node assembly logic.
+
+    `param_overrides`, when given, maps specific `(node_id, port_name)` dangling IN ports to a
+    Python expression string to bind instead of the `"None"` literal, and exempts them from the
+    dangling-*required*-input guard below — used exactly once, by `_codegen_composite`, to bind
+    a composite node's subgraph boundary ports to the enclosing nested function's own parameter
+    names (issue #117 stage 3). `compile_to_code`'s top-level call always passes
+    `param_overrides=None`.
     """
     # Step 1: Paradigm guard
     if graph.paradigm is not Paradigm.FUNCTIONAL:
@@ -141,6 +153,8 @@ def _assemble(graph: Graph) -> _AssembledModule:
             if port.direction != Direction.IN:
                 continue
             if port.name not in required_in_names:
+                continue
+            if param_overrides is not None and (node.id, port.name) in param_overrides:
                 continue
             if not wiring_map.upstream(node.id, port.id):
                 raise UnboundInputError(
@@ -183,31 +197,57 @@ def _assemble(graph: Graph) -> _AssembledModule:
 
     for node_id in topo_order_ids:
         node = graph.nodes[node_id]
-        definition_cls = get_node_definition(node.type)
-        definition = definition_cls()
-        kinds = definition_cls.required_client_kinds()
-        if ClientKind.LLM in kinds:
-            needs_llm = True
-            for provider, api_key_env, llm_connection in provider_api_key_pairs(node):
-                if llm_connection:
-                    # A profile-name reference can't be resolved to a real env-var name here
-                    # without reading connections.toml (I/O), which compile_to_code must never
-                    # do (ADR 0002 purity) -- hint at the profile name itself instead.
-                    connection_hint_set.add(llm_connection)
-                    continue
-                # Best-effort hint only -- an unresolvable provider/api_key_env pair here is a
-                # real problem for an actual run (GatewayClient/the pre-flight check in
-                # emergentflow.llm.secrets will raise clearly when it matters), but
-                # compile_to_code's docstring hint is a courtesy, not a validation gate -- skip
-                # it rather than making compilation itself fail on this.
-                with contextlib.suppress(MissingAPIKeyError):
-                    env_hint_set.add(resolve_api_key_env_name(provider, api_key_env))
-        if ClientKind.WAREHOUSE in kinds:
-            needs_warehouse = True
-        if ClientKind.HTTP in kinds:
-            needs_http = True
         ctx = build_codegen_context(node, name_map, wiring_map, default_node_registry)
-        fragment = definition.codegen(node, ctx)
+        if param_overrides is not None:
+            # A dangling boundary IN port normally binds to the "None" literal (Step 4's
+            # generic per-node context has no idea it's meant to be externally supplied) --
+            # rebind it to the enclosing composite's chosen expression instead. `CodegenContext`
+            # is frozen, so this produces a new instance rather than mutating the shared one.
+            overrides_for_node = {
+                port_name: expr
+                for (nid, port_name), expr in param_overrides.items()
+                if nid == node.id
+            }
+            if overrides_for_node:
+                ctx = replace(ctx, in_vars={**ctx.in_vars, **overrides_for_node})
+
+        if node.type == COMPOSITE_NODE_TYPE:
+            # A composite is compiled recursively (see `_codegen_composite`), never via
+            # generic per-node dispatch -- its own `codegen()` raises NotImplementedError
+            # on purpose. Its subgraph's own client/env/connection needs must still bubble
+            # up into the enclosing module's `main()` signature and docstring hints.
+            fragment, inner = _codegen_composite(node, ctx)
+            needs_llm = needs_llm or inner.needs_llm
+            needs_warehouse = needs_warehouse or inner.needs_warehouse
+            needs_http = needs_http or inner.needs_http
+            env_hint_set.update(inner.env_hints)
+            connection_hint_set.update(inner.connection_hints)
+        else:
+            definition_cls = get_node_definition(node.type)
+            definition = definition_cls()
+            kinds = definition_cls.required_client_kinds()
+            if ClientKind.LLM in kinds:
+                needs_llm = True
+                for provider, api_key_env, llm_connection in provider_api_key_pairs(node):
+                    if llm_connection:
+                        # A profile-name reference can't be resolved to a real env-var name here
+                        # without reading connections.toml (I/O), which compile_to_code must
+                        # never do (ADR 0002 purity) -- hint at the profile name itself instead.
+                        connection_hint_set.add(llm_connection)
+                        continue
+                    # Best-effort hint only -- an unresolvable provider/api_key_env pair here is
+                    # a real problem for an actual run (GatewayClient/the pre-flight check in
+                    # emergentflow.llm.secrets will raise clearly when it matters), but
+                    # compile_to_code's docstring hint is a courtesy, not a validation gate --
+                    # skip it rather than making compilation itself fail on this.
+                    with contextlib.suppress(MissingAPIKeyError):
+                        env_hint_set.add(resolve_api_key_env_name(provider, api_key_env))
+            if ClientKind.WAREHOUSE in kinds:
+                needs_warehouse = True
+            if ClientKind.HTTP in kinds:
+                needs_http = True
+            fragment = definition.codegen(node, ctx)
+
         code_fragments.append(fragment)
         for note_content in note_comments_by_target.get(node_id, []):
             code_fragments.append(CodeFragment(imports=[], body=_format_note_comment(note_content)))
@@ -250,6 +290,79 @@ def _assemble(graph: Graph) -> _AssembledModule:
         env_hints=tuple(sorted(env_hint_set)),
         connection_hints=tuple(sorted(connection_hint_set)),
     )
+
+
+def _codegen_composite(node: Node, ctx: CodegenContext) -> tuple[CodeFragment, _AssembledModule]:
+    """Recursively compile a `layout.composite` node's subgraph into a nested function.
+
+    Emits `def <fn_name>(...): ...subgraph body...; return ...` followed by a call-site
+    statement, both as a single fragment body -- the whole-module compiler indents it
+    uniformly into `main()`'s body (or an enclosing composite's own nested function body, for
+    nested composites) exactly like any other node's fragment. Giving the subgraph its own
+    nested Python scope means its variable names can never collide with the outer graph's or
+    with a sibling composite's, without either graph needing name-uniqueness across the
+    boundary -- the symmetric counterpart of `executor.py`'s `_execute_composite`, sharing the
+    same `resolve_composite_boundary` canonical port mapping so ADR-0002 equivalence holds.
+
+    Returns the node's own `CodeFragment` (for the enclosing `_assemble` call to append and to
+    collect imports from, exactly like any other fragment) alongside the subgraph's full
+    `_AssembledModule`, so the caller can bubble up its `needs_llm`/`needs_warehouse`/
+    `needs_http`/env/connection hints into the enclosing module.
+    """
+    if node.subgraph is None:
+        raise CodegenError(f"Composite node {_describe(node)} has no subgraph to compile.")
+
+    boundary = resolve_composite_boundary(node.subgraph)
+    in_ports = [p for p in node.ports if p.direction == Direction.IN]
+    out_ports = [p for p in node.ports if p.direction == Direction.OUT]
+    if len(in_ports) != len(boundary.dangling_in):
+        raise CodegenError(
+            f"Composite node {_describe(node)} declares {len(in_ports)} IN port(s) but its "
+            f"subgraph has {len(boundary.dangling_in)} dangling IN port(s); they must match."
+        )
+    if len(out_ports) != len(boundary.exposed_out):
+        raise CodegenError(
+            f"Composite node {_describe(node)} declares {len(out_ports)} OUT port(s) but its "
+            f"subgraph has {len(boundary.exposed_out)} exposed OUT port(s); they must match."
+        )
+
+    # Give each dangling boundary IN port a simple positional parameter name (p0, p1, ...) --
+    # distinct from anything `build_name_map` would generate for the subgraph itself, since
+    # those are always derived from node labels/types, never bare "p<N>".
+    param_names = [f"p{i}" for i in range(len(in_ports))]
+    param_overrides: dict[tuple[str, str], str] = {}
+    for param_name, ref in zip(param_names, boundary.dangling_in, strict=True):
+        owner = node.subgraph.nodes[ref.node_id]
+        port_name = next(p.name for p in owner.ports if p.id == ref.port_id)
+        param_overrides[(ref.node_id, port_name)] = param_name
+
+    inner = _assemble(node.subgraph, param_overrides=param_overrides)
+
+    return_vars = [inner.name_map.var_for(ref.node_id, ref.port_id) for ref in boundary.exposed_out]
+    if not return_vars:
+        return_stmt = "return None"
+    elif len(return_vars) == 1:
+        return_stmt = f"return {return_vars[0]}"
+    else:
+        return_stmt = f"return ({', '.join(return_vars)})"
+
+    inner_body_lines = [*inner.body_statements, return_stmt]
+    inner_body = textwrap.indent("\n".join(inner_body_lines), "    ")
+
+    fn_name = "_composite_" + _sanitize_identifier(_slugify(node.id))
+    call_args = [ctx.in_var(p.name) for p in in_ports]
+    call_expr = f"{fn_name}({', '.join(call_args)})"
+    out_vars = [ctx.out_var(p.name) for p in out_ports]
+    if not out_vars:
+        call_line = call_expr
+    elif len(out_vars) == 1:
+        call_line = f"{out_vars[0]} = {call_expr}"
+    else:
+        call_line = f"{', '.join(out_vars)} = {call_expr}"
+
+    body = f"def {fn_name}({', '.join(param_names)}):\n{inner_body}\n{call_line}"
+
+    return CodeFragment(imports=inner.imports, body=body), inner
 
 
 @public_op(name="ef.compile_to_code")
