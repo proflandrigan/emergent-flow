@@ -305,6 +305,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       paradigm: model.paradigm,
       nodes: model.nodes,
       edges: model.edges,
+      groupMeta: model.groupMeta ?? {},
     });
     clearDerivedStores();
   },
@@ -400,6 +401,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
 
   setGroupMeta(groupId, meta) {
+    // Only push history for semantic changes (label, color), not position updates
+    // which are tracked by the member moveNode calls during group drags.
+    if (meta.label !== undefined || meta.color !== undefined) {
+      get().pushHistory("setGroupMeta");
+    }
     set((state) => {
       const existing = (state.groupMeta ?? {})[groupId];
       if (!existing) return {};

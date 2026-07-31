@@ -1,6 +1,6 @@
 import type { CatalogNode } from "../catalog/types";
 import { newId } from "../store/ids";
-import type { CanvasModel, EdgeModel, NodeModel, ParamModel, PortModel } from "../store/model";
+import type { CanvasModel, NodeModel, ParamModel, PortModel } from "../store/model";
 
 const COLS = 40; // grid width
 const SPACING_X = 220;

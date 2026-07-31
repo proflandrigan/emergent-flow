@@ -150,6 +150,7 @@ describe("toIR", () => {
           target: { node_id: "node-2", port_id: "port-in" },
         },
       },
+      groupMeta: {},
     };
 
     expect(fromIR(toIR(model))).toEqual(model);

@@ -79,7 +79,7 @@ export function toRFGroupNodes(
     const memberIds = Object.values(nodes)
       .filter((n) => n.groupId === groupId)
       .map((n) => n.id);
-    if (memberIds.length < 2) continue;
+    if (memberIds.length < 1) continue;
     const memberCompleteCount = memberIds.filter(
       (id) => statuses?.[id]?.status === "ok" || statuses?.[id]?.status === "cached",
     ).length;

@@ -180,7 +180,7 @@ export function fromIR(graph: Graph): CanvasModel {
     paradigm: graph.paradigm ?? "functional",
     nodes,
     edges,
-    groupMeta: Object.keys(groupMeta).length > 0 ? groupMeta : undefined,
+    groupMeta,
   };
   if (graph.name !== undefined && graph.name !== null) {
     model.name = graph.name;

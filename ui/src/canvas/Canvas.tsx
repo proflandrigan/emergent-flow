@@ -122,7 +122,7 @@ export function Canvas(): JSX.Element {
       Object.values(edges).map((e) =>
         toRFEdge(e, !!selEdges[e.id], edgeCompatibility[e.id], reasons[e.id]),
       ),
-    [edges, selEdges, edgeCompatibility, reasons, groupMeta],
+    [edges, selEdges, edgeCompatibility, reasons],
   );
 
   const selectedNodeIds = useMemo(
