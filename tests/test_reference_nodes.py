@@ -29,6 +29,7 @@ from emergentflow.nodes.examples import (
     CastTypes,
     ChiSquare,
     CohortRetention,
+    Composite,
     CorrectPvalues,
     Correlation,
     Crosstab,
@@ -1633,6 +1634,39 @@ class TestGroupContainer:
         assert executed == {}
         user_keys = {k for k in scope if not k.startswith("__")}
         assert user_keys == set()
+
+
+# ---------------------------------------------------------------------------
+# layout.composite
+# ---------------------------------------------------------------------------
+
+
+class TestComposite:
+    def test_to_spec(self):
+        defn = Composite()
+        spec = defn.to_spec()
+        assert spec.type == "layout.composite"
+        assert spec.ports == []
+        assert {p.name for p in spec.params} == {"label"}
+
+    def test_instantiate_defaults(self):
+        defn = Composite()
+        node = defn.instantiate()
+        assert node.ports == []
+        values = {p.name: p.value for p in node.params}
+        assert values["label"] == "Composite"
+
+    def test_codegen_raises_not_implemented(self):
+        defn = Composite()
+        node = defn.instantiate(label="Feature engineering")
+        with pytest.raises(NotImplementedError):
+            defn.codegen(node, ctx=None)
+
+    def test_execute_raises_not_implemented(self):
+        defn = Composite()
+        node = defn.instantiate(label="Feature engineering")
+        with pytest.raises(NotImplementedError):
+            defn.execute(node, inputs={})
 
 
 # ---------------------------------------------------------------------------

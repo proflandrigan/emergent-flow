@@ -6986,6 +6986,29 @@
     {
       "advisor_persona": null,
       "category": "Organization",
+      "description": "A reusable container owning an extracted subgraph.",
+      "family": "layout",
+      "keywords": [],
+      "label": "Composite",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "Composite",
+          "help": "Display name for this composite.",
+          "hints": null,
+          "label": "Label",
+          "name": "label",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [],
+      "type": "layout.composite",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Organization",
       "description": "A visual container grouping other nodes; carries no data flow.",
       "family": "layout",
       "keywords": [],

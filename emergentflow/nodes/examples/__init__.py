@@ -25,6 +25,7 @@ from .clean_text import CleanText
 from .cluster_detect import ClusterDetect
 from .cohort_retention import CohortRetention
 from .compare_models import CompareModels
+from .composite import Composite
 from .concat import Concat
 from .correct_pvalues import CorrectPvalues
 from .correlation import Correlation
@@ -166,6 +167,7 @@ __all__ = [
     "ClusterDetect",
     "CohortRetention",
     "CompareModels",
+    "Composite",
     "Concat",
     "CorrectPvalues",
     "Correlation",
