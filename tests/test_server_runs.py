@@ -169,6 +169,9 @@ def test_list_empty_returns_empty_list(tmp_path: Path) -> None:
 
 
 def test_configure_runs_uses_configured_root(tmp_path: Path, monkeypatch) -> None:
+    import emergentflow.server.runs as runs_mod
+
+    monkeypatch.setattr(runs_mod, "_default_runs", None)
     monkeypatch.chdir(tmp_path)
     runs_root = tmp_path / ".ef-runs"
     configure_runs(runs_root, keep=10)
@@ -177,6 +180,9 @@ def test_configure_runs_uses_configured_root(tmp_path: Path, monkeypatch) -> Non
 
 
 def test_configure_runs_after_singleton_created_raises(tmp_path: Path, monkeypatch) -> None:
+    import emergentflow.server.runs as runs_mod
+
+    monkeypatch.setattr(runs_mod, "_default_runs", None)
     monkeypatch.chdir(tmp_path)
     get_default_runs()  # Force singleton creation
     with pytest.raises(RuntimeError, match="configure_runs"):

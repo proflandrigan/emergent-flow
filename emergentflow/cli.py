@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
-from typing import Any
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -98,6 +97,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         import json
         import pathlib
         import time as time_mod
+        from typing import Any
 
         graph_path = pathlib.Path(args.graph_file)
         if not graph_path.is_file():
@@ -134,7 +134,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         run_data = {
             "run_id": "",
-            "tag": args.tag,
+            "tag": args.tag if args.tag else None,
             "graph_name": graph_dict.get("name", ""),
             "graph_hash": graph_hash,
             "started_at": started_at,
@@ -146,8 +146,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             "sdk_version": __version__,
         }
 
-        # Build scalar payloads
-        payloads: dict[str, dict[str, Any]] = {}
+        # Build payloads (all ports, server-side _save_run_record filters to scalar/text/json)
+        payloads: dict[str, dict[str, dict[str, Any]]] = {}
         for node_id, ports in results.items():
             payloads[node_id] = {}
             for port_name, value in ports.items():
