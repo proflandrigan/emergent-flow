@@ -23,7 +23,6 @@ export function toRFNode(
   family: string | null | undefined,
   description: string | null | undefined,
   groupMeta?: Record<string, { label: string; color: string; position: { x: number; y: number } }>,
-  statuses?: Record<string, { status: NodeStatus }>,
 ): AnyRFNode {
   if (node.type === NOTE_NODE_TYPE) {
     const paramValue = (name: string): unknown =>

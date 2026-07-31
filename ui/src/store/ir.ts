@@ -167,8 +167,6 @@ export function fromIR(graph: Graph): CanvasModel {
     if (positions.length === 0) continue;
     const minX = Math.min(...positions.map((p) => p.x));
     const minY = Math.min(...positions.map((p) => p.y));
-    const maxX = Math.max(...positions.map((p) => p.x + 176));
-    const maxY = Math.max(...positions.map((p) => p.y + 60));
     groupMeta[gid] = {
       label: `Group ${++groupIndex}`,
       color: GROUP_COLORS[(groupIndex - 1) % GROUP_COLORS.length],

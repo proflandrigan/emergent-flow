@@ -365,8 +365,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const positions = nodeIds.map((id) => state.nodes[id]?.position).filter(Boolean);
     const minX = Math.min(...positions.map((p) => p.x));
     const minY = Math.min(...positions.map((p) => p.y));
-    const maxX = Math.max(...positions.map((p) => p.x + 176));
-    const maxY = Math.max(...positions.map((p) => p.y + 60));
     const groupMeta = {
       [groupId]: {
         label: groupName ?? `Group ${Object.keys(get().groupMeta ?? {}).length + 1}`,

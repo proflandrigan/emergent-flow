@@ -109,7 +109,6 @@ export function Canvas(): JSX.Element {
           familyByType[n.type] ?? null,
           descriptionByType[n.type] ?? null,
           groupMeta,
-          statuses,
         ),
       );
       const groupRFs = toRFGroupNodes(groupMeta, nodes, statuses);
@@ -159,7 +158,15 @@ export function Canvas(): JSX.Element {
               setGroupMeta(change.id, { position: change.position });
             }
           } else {
-            moveNode(change.id, change.position);
+            // If the node is a group member, React Flow reports position relative to the
+            // parent — convert to absolute before storing.
+            const memberGroupId = nodes[change.id]?.groupId;
+            if (memberGroupId && groupMeta?.[memberGroupId]) {
+              const gp = groupMeta[memberGroupId].position;
+              moveNode(change.id, { x: change.position.x + gp.x, y: change.position.y + gp.y });
+            } else {
+              moveNode(change.id, change.position);
+            }
           }
         } else if (change.type === "remove") {
           setNodeSelected(change.id, false);
