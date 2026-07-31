@@ -414,6 +414,90 @@ def test_empty_graph_equivalence() -> None:
     assert_equivalent(Graph())
 
 
+@pytest.mark.equivalence
+def test_composite_equivalence() -> None:
+    """A layout.composite node is equivalent end to end (issue #117 stage 3).
+
+    The composite's subgraph is `dbl -> join`, with TWO boundary inputs (dbl's
+    dangling `in_` and join's dangling `b`) and one exposed output (join's
+    `out`), exercising both multi-input boundary binding and internal wiring
+    inside the subgraph in one fixture. Canonical boundary order (subgraph
+    nodes sorted by id, ports in declared order) is "dbl" before "join", so
+    the composite's own ports are declared IN [in0 -> dbl.in_, in1 -> join.b],
+    OUT [out0 -> join.out] to match `resolve_composite_boundary`.
+    """
+    dbl = Node(
+        id="dbl",
+        type=_EquivDouble.type,
+        label=_EquivDouble.label,
+        ports=[
+            Port(id="dbl-in", name="in_", direction=Direction.IN, data_type="int"),
+            Port(id="dbl-out", name="out", direction=Direction.OUT, data_type="int"),
+        ],
+    )
+    join = Node(
+        id="join",
+        type=_EquivJoin2.type,
+        label=_EquivJoin2.label,
+        ports=[
+            Port(id="join-a", name="a", direction=Direction.IN, data_type="int"),
+            Port(id="join-b", name="b", direction=Direction.IN, data_type="int"),
+            Port(id="join-out", name="out", direction=Direction.OUT, data_type="int"),
+        ],
+    )
+    internal_edge = Edge(
+        source=PortRef(node_id="dbl", port_id="dbl-out"),
+        target=PortRef(node_id="join", port_id="join-a"),
+    )
+    subgraph = Graph(
+        nodes={"dbl": dbl, "join": join},
+        edges={internal_edge.id: internal_edge},
+    )
+
+    composite = Node(
+        id="composite1",
+        type="layout.composite",
+        label="Composite",
+        ports=[
+            Port(id="composite1-in0", name="in0", direction=Direction.IN, data_type="int"),
+            Port(id="composite1-in1", name="in1", direction=Direction.IN, data_type="int"),
+            Port(id="composite1-out0", name="out0", direction=Direction.OUT, data_type="int"),
+        ],
+        subgraph=subgraph,
+    )
+
+    src_a = Node(
+        id="src_a",
+        type=_EquivSource.type,
+        label=_EquivSource.label,
+        ports=[Port(id="src_a-out", name="out", direction=Direction.OUT, data_type="int")],
+    )
+    src_b = Node(
+        id="src_b",
+        type=_EquivSource.type,
+        label=_EquivSource.label,
+        ports=[Port(id="src_b-out", name="out", direction=Direction.OUT, data_type="int")],
+    )
+    edge_a = Edge(
+        source=PortRef(node_id="src_a", port_id="src_a-out"),
+        target=PortRef(node_id="composite1", port_id="composite1-in0"),
+    )
+    edge_b = Edge(
+        source=PortRef(node_id="src_b", port_id="src_b-out"),
+        target=PortRef(node_id="composite1", port_id="composite1-in1"),
+    )
+    graph = Graph(
+        nodes={"src_a": src_a, "src_b": src_b, "composite1": composite},
+        edges={edge_a.id: edge_a, edge_b.id: edge_b},
+    )
+
+    assert_equivalent(graph)
+
+    # Pin the expected value so a future regression fails with a concrete number,
+    # not just "sides disagree": dbl(7) = 14, join(14, 7) = 21.
+    assert execute(graph)["composite1"] == {"out0": 21}
+
+
 # ---------------------------------------------------------------------------
 # Corpus — the two graphs Story 6 names. Real reference nodes over real data.
 # ---------------------------------------------------------------------------
