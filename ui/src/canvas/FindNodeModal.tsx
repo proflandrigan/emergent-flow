@@ -47,7 +47,10 @@ export function FindNodeModal({
   const [focusedIndex, setFocusedIndex] = useState(0);
   const nodes = useGraphStore((s) => s.nodes);
 
-  const flatNodes = useMemo(() => flattenNodes(nodes), [nodes]);
+  const flatNodes = useMemo(() => {
+    const nodeEntries = flattenNodes(nodes);
+    return [...nodeEntries];
+  }, [nodes]);
 
   const results = useMemo(() => {
     if (!query.trim()) {

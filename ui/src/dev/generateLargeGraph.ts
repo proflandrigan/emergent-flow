@@ -37,5 +37,46 @@ export function generateLargeGraph(spec: CatalogNode, count: number): CanvasMode
       groupId: null,
     };
   }
+
+  // Group nodes in the first 3 columns as "Stage A"
+  const stageANodes = Object.values(nodes).filter((n) => n.position.x < 3 * SPACING_X);
+  const stageAGroupId = newId("group");
+  for (const node of stageANodes) {
+    nodes[node.id] = { ...node, groupId: stageAGroupId };
+  }
+  nodes[stageAGroupId] = {
+    id: stageAGroupId,
+    type: "layout.group",
+    label: "Stage A",
+    paradigm: "functional",
+    params: [
+      { name: "label", typeToken: "string", value: "Stage A", default: "Group" },
+      { name: "color", typeToken: "string", value: "purple", default: "slate" },
+    ],
+    ports: [],
+    position: { x: 0, y: 0 },
+    groupId: null,
+  };
+
+  // Group nodes in columns 3-5 as "Stage B"
+  const stageBNodes = Object.values(nodes).filter((n) => n.position.x >= 3 * SPACING_X && n.position.x < 6 * SPACING_X);
+  const stageBGroupId = newId("group");
+  for (const node of stageBNodes) {
+    nodes[node.id] = { ...node, groupId: stageBGroupId };
+  }
+  nodes[stageBGroupId] = {
+    id: stageBGroupId,
+    type: "layout.group",
+    label: "Stage B",
+    paradigm: "functional",
+    params: [
+      { name: "label", typeToken: "string", value: "Stage B", default: "Group" },
+      { name: "color", typeToken: "string", value: "rose", default: "slate" },
+    ],
+    ports: [],
+    position: { x: 0, y: 0 },
+    groupId: null,
+  };
+
   return { paradigm: "functional", nodes, edges: {} };
 }

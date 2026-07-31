@@ -16,6 +16,7 @@ import { useValidationStore } from "./validationStore";
 import type {
   CanvasModel,
   EdgeModel,
+  GroupMeta,
   NodeModel,
   ParamModel,
   PortModel,
@@ -37,12 +38,14 @@ function emptyGraph(): CanvasModel {
     paradigm: "functional",
     nodes: {},
     edges: {},
+    groupMeta: {},
   };
 }
 
 // Snapshot ONLY the model fields -- history must never leak into the IR (toIR builds its own
 // object already) and must never carry a live reference into past/future (hence structuredClone).
 const HISTORY_LIMIT = 100;
+const GROUP_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7"];
 
 // Fixed offset so pasted nodes are visibly distinct from their originals
 // rather than landing exactly on top of them.
@@ -57,6 +60,7 @@ export function snapshot(s: CanvasModel): CanvasModel {
     paradigm: s.paradigm,
     nodes: s.nodes,
     edges: s.edges,
+    groupMeta: s.groupMeta ?? {},
   });
 }
 
@@ -93,6 +97,9 @@ export interface GraphStore extends CanvasModel {
   canUndo: () => boolean;
   canRedo: () => boolean;
   setName: (name: string) => void;
+  groupNodes: (nodeIds: string[], groupName?: string) => string;
+  ungroupNodes: (groupId: string) => void;
+  setGroupMeta: (groupId: string, meta: Partial<GroupMeta>) => void;
 }
 
 export const useGraphStore = create<GraphStore>((set, get) => ({
@@ -557,6 +564,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       paradigm: model.paradigm,
       nodes: model.nodes,
       edges: model.edges,
+      groupMeta: model.groupMeta ?? {},
     });
     clearDerivedStores();
   },
@@ -604,5 +612,66 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setName(name) {
     get().pushHistory("setName");
     set({ name });
+  },
+
+  groupNodes(nodeIds, groupName) {
+    if (nodeIds.length < 2) {
+      throw new Error("groupNodes requires at least 2 nodes");
+    }
+    get().pushHistory("groupNodes");
+    const groupId = newId("group");
+    const state = get();
+    const positions = nodeIds.map((id) => state.nodes[id]?.position).filter(Boolean);
+    const minX = Math.min(...positions.map((p) => p.x));
+    const minY = Math.min(...positions.map((p) => p.y));
+    const groupMeta = {
+      [groupId]: {
+        label: groupName ?? `Group ${Object.keys(get().groupMeta ?? {}).length + 1}`,
+        color: GROUP_COLORS[Object.keys(get().groupMeta ?? {}).length % GROUP_COLORS.length],
+        position: { x: minX - 16, y: minY - 28 },
+      },
+    };
+    set((state) => {
+      const nodes = { ...state.nodes };
+      const meta = { ...(state.groupMeta ?? {}), ...groupMeta };
+      for (const id of nodeIds) {
+        if (nodes[id]) {
+          nodes[id] = { ...nodes[id], groupId };
+        }
+      }
+      return { nodes, groupMeta: meta };
+    });
+    return groupId;
+  },
+
+  ungroupNodes(groupId) {
+    get().pushHistory("ungroupNodes");
+    set((state) => {
+      const nodes: Record<string, NodeModel> = {};
+      for (const [id, node] of Object.entries(state.nodes)) {
+        nodes[id] = node.groupId === groupId ? { ...node, groupId: null } : node;
+      }
+      const meta = { ...(state.groupMeta ?? {}) };
+      delete meta[groupId];
+      return { nodes, groupMeta: meta };
+    });
+  },
+
+  setGroupMeta(groupId, meta) {
+    // Only push history for semantic changes (label, color), not position updates
+    // which are tracked by the member moveNode calls during group drags.
+    if (meta.label !== undefined || meta.color !== undefined) {
+      get().pushHistory("setGroupMeta");
+    }
+    set((state) => {
+      const existing = (state.groupMeta ?? {})[groupId];
+      if (!existing) return {};
+      return {
+        groupMeta: {
+          ...(state.groupMeta ?? {}),
+          [groupId]: { ...existing, ...meta },
+        },
+      };
+    });
   },
 }));

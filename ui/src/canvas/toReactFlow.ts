@@ -6,11 +6,11 @@ import type { Edge as RFEdge, Node as RFNode } from "@xyflow/react";
 
 import type { EdgeModel, NodeModel } from "../store/model";
 import type { NodeStatus, Payload } from "../store/execution";
+import type { CompositeNodeData } from "./nodes/CompositeNode";
 import type { EfEdgeData } from "./edges/EfEdge";
 import type { EfNodeData } from "./nodes/EfNode";
-import type { NoteNodeData } from "./nodes/NoteNode";
 import type { GroupNodeData } from "./nodes/GroupNode";
-import type { CompositeNodeData } from "./nodes/CompositeNode";
+import type { NoteNodeData } from "./nodes/NoteNode";
 
 const NOTE_NODE_TYPE = "notes.markdown";
 const GROUP_NODE_TYPE = "layout.group";

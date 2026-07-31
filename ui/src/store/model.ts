@@ -8,6 +8,12 @@ export type Paradigm = "functional" | "declarative";
 export type Direction = "in" | "out";
 export type Cardinality = "one" | "many";
 
+export interface GroupMeta {
+  label: string;
+  color: string;
+  position: { x: number; y: number };
+}
+
 export interface PortModel {
   id: string;
   name: string;
@@ -54,4 +60,5 @@ export interface CanvasModel {
   paradigm: Paradigm;
   nodes: Record<string, NodeModel>;
   edges: Record<string, EdgeModel>;
+  groupMeta?: Record<string, GroupMeta>;
 }

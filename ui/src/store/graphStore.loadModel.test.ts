@@ -28,7 +28,7 @@ describe("loadModel", () => {
     useGraphStore.getState().loadModel(model);
 
     const { nodes } = useGraphStore.getState();
-    expect(Object.keys(nodes)).toHaveLength(10);
+    expect(Object.keys(nodes)).toHaveLength(12);
   });
 
   test("undo restores prior state with single history entry", () => {

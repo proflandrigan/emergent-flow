@@ -57,17 +57,18 @@ export function nodeToIR(node: NodeModel): Node {
   const ir: Node = {
     id: node.id,
     type: node.type,
-    label: node.label ?? null,
     paradigm: node.paradigm,
     position: { x: node.position.x, y: node.position.y },
     params: node.params.map(paramToIR),
     ports: node.ports.map(portToIR),
     group_id: node.groupId ?? null,
   };
+  if (node.label !== undefined) {
+    ir.label = node.label;
+  }
   // Carried through opaquely, and only when the node actually had the key: the canvas never
   // authors a subgraph, so a canvas-built node stays free of a `subgraph: null` it never had,
-  // while an imported composite/module node keeps its inner graph byte-for-byte. Assigning
-  // unconditionally would also be wrong in the other direction -- see `nodeFromIR`.
+  // while an imported composite/module node keeps its inner graph byte-for-byte.
   if (node.subgraph !== undefined) {
     ir.subgraph = node.subgraph;
   }
@@ -78,13 +79,15 @@ export function nodeFromIR(node: Node): NodeModel {
   const model: NodeModel = {
     id: node.id ?? "",
     type: node.type,
-    label: node.label ?? undefined,
     paradigm: node.paradigm ?? "functional",
     params: (node.params ?? []).map(paramFromIR),
     ports: (node.ports ?? []).map(portFromIR),
     position: { x: node.position?.x ?? 0, y: node.position?.y ?? 0 },
     groupId: node.group_id ?? null,
   };
+  if (node.label !== undefined) {
+    model.label = node.label ?? undefined;
+  }
   // Preserve `null` vs absent exactly rather than collapsing both to one of them, so a
   // round-trip through the canvas is byte-identical for graphs the SDK wrote (which set
   // `subgraph: null` on every leaf node) and for graphs the canvas built (which omit it).
@@ -150,11 +153,38 @@ export function fromIR(graph: Graph): CanvasModel {
     edges[id] = edgeFromIR(edge);
   }
 
+  // Auto-generate group metadata from existing group_ids
+  const groupMeta: Record<string, { label: string; color: string; position: { x: number; y: number } }> = {};
+  const groupMemberIds: Record<string, string[]> = {};
+  for (const [, node] of Object.entries(graph.nodes ?? {})) {
+    if (node.group_id) {
+      if (!groupMemberIds[node.group_id]) groupMemberIds[node.group_id] = [];
+      groupMemberIds[node.group_id].push(node.id ?? "");
+    }
+  }
+  const GROUP_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7"];
+  let groupIndex = 0;
+  for (const [gid, memberIds] of Object.entries(groupMemberIds)) {
+    if (memberIds.length < 2) continue;
+    const positions = memberIds.map((id) => nodes[id]?.position).filter(Boolean);
+    if (positions.length === 0) continue;
+    const minX = Math.min(...positions.map((p) => p.x));
+    const minY = Math.min(...positions.map((p) => p.y));
+    groupMeta[gid] = {
+      label: `Group ${++groupIndex}`,
+      color: GROUP_COLORS[(groupIndex - 1) % GROUP_COLORS.length],
+      position: { x: minX - 16, y: minY - 28 },
+    };
+  }
+
   const model: CanvasModel = {
     paradigm: graph.paradigm ?? "functional",
     nodes,
     edges,
   };
+  if (Object.keys(groupMeta).length > 0) {
+    model.groupMeta = groupMeta;
+  }
   if (graph.name !== undefined && graph.name !== null) {
     model.name = graph.name;
   }

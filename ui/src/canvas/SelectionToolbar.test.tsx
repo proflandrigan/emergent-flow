@@ -4,12 +4,14 @@ import { describe, expect, test, vi } from "vitest";
 import { SelectionToolbar } from "./SelectionToolbar";
 
 describe("SelectionToolbar", () => {
-  test("renders the node count and both run buttons", () => {
+  test("renders the node count, run buttons, and group buttons when callbacks are provided", () => {
     render(
       <SelectionToolbar
         count={3}
         onRunSelectedOnly={vi.fn()}
         onRunToSelected={vi.fn()}
+        onGroup={vi.fn()}
+        onUngroup={vi.fn()}
       />,
     );
 
@@ -24,6 +26,25 @@ describe("SelectionToolbar", () => {
     const toBtn = screen.getByTestId("run-to-selected");
     expect(toBtn).toBeInTheDocument();
     expect(toBtn).toHaveTextContent("Run to selected");
+
+    const groupBtn = screen.getByTestId("group-selection");
+    expect(groupBtn).toBeInTheDocument();
+    expect(groupBtn).toHaveTextContent("Group");
+
+    const ungroupBtn = screen.getByTestId("ungroup-selection");
+    expect(ungroupBtn).toBeInTheDocument();
+    expect(ungroupBtn).toHaveTextContent("Ungroup");
+  });
+
+  test("omitting onGroup hides the Group button", () => {
+    render(
+      <SelectionToolbar
+        count={2}
+        onRunSelectedOnly={vi.fn()}
+        onRunToSelected={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("group-selection")).not.toBeInTheDocument();
   });
 
   test("clicking Run selected only calls onRunSelectedOnly once", () => {
