@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
-import type { Node, NodeProps } from "@xyflow/react";
+import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 
 import { useCollapseStore } from "../../store/collapseStore";
 import type { NodeStatus } from "../../store/execution";
@@ -160,16 +160,20 @@ export function GroupNode({ id, data }: NodeProps<GroupNodeType>): JSX.Element {
         )}
       </div>
       {collapsed ? (
-        <div className="group-node-summary" data-testid="group-node-summary">
-          <span
-            className="group-node-status-dot"
-            data-testid="group-node-status-dot"
-            style={{ background: statusDotColor(aggregateStatus) }}
-          />
-          <span data-testid="group-node-member-count">
-            {members.length} {members.length === 1 ? "node" : "nodes"}
-          </span>
-        </div>
+        <>
+          <Handle type="target" position={Position.Left} id="group-in" />
+          <Handle type="source" position={Position.Right} id="group-out" />
+          <div className="group-node-summary" data-testid="group-node-summary">
+            <span
+              className="group-node-status-dot"
+              data-testid="group-node-status-dot"
+              style={{ background: statusDotColor(aggregateStatus) }}
+            />
+            <span data-testid="group-node-member-count">
+              {members.length} {members.length === 1 ? "node" : "nodes"}
+            </span>
+          </div>
+        </>
       ) : (
         <div
           className="group-node-body"

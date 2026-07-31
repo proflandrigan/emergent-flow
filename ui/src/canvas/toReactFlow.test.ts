@@ -1,7 +1,19 @@
 import { describe, expect, test } from "vitest";
 
 import type { EdgeModel, NodeModel } from "../store/model";
-import { applyGroupNesting, computeGroupBounds, toAbsolutePosition, toRFEdge, toRFNode } from "./toReactFlow";
+import {
+  applyCollapsedGroups,
+  applyGroupNesting,
+  COLLAPSED_GROUP_HEIGHT,
+  COLLAPSED_GROUP_WIDTH,
+  computeGroupBounds,
+  GROUP_IN_HANDLE,
+  GROUP_OUT_HANDLE,
+  reanchorEdgesForCollapsedGroups,
+  toAbsolutePosition,
+  toRFEdge,
+  toRFNode,
+} from "./toReactFlow";
 
 const edge: EdgeModel = {
   id: "e1",
@@ -494,5 +506,339 @@ describe("toAbsolutePosition", () => {
     const absolutePosition = toAbsolutePosition(nodeModels, "m1", { x: 50, y: 60 });
 
     expect(absolutePosition).toEqual({ x: 50, y: 60 });
+  });
+});
+
+describe("applyCollapsedGroups", () => {
+  test("an empty collapsedGroupIds set returns the input unchanged", () => {
+    const member: NodeModel = {
+      id: "m1",
+      type: "data.load_csv",
+      label: "CSV",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 100, y: 100 },
+      groupId: "g1",
+    };
+    const group: NodeModel = groupModel({ id: "g1" });
+    const nodeModels = [member, group];
+
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+
+    const result = applyCollapsedGroups(nodeModels, new Set(), rfNodes);
+
+    expect(result).toBe(rfNodes); // reference check
+  });
+
+  test("members of a collapsed group are absent from the returned array", () => {
+    const member1: NodeModel = {
+      id: "m1",
+      type: "data.load_csv",
+      label: "CSV 1",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 100, y: 100 },
+      groupId: "g1",
+    };
+    const member2: NodeModel = {
+      id: "m2",
+      type: "data.load_csv",
+      label: "CSV 2",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 350, y: 250 },
+      groupId: "g1",
+    };
+    const group: NodeModel = groupModel({ id: "g1" });
+    const nodeModels = [member1, member2, group];
+
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const result = applyCollapsedGroups(nodeModels, new Set(["g1"]), rfNodes);
+
+    expect(result.map((n) => n.id)).toEqual(["g1"]);
+  });
+
+  test("a collapsed group's own node has style.width/height set to COLLAPSED_GROUP_WIDTH/HEIGHT", () => {
+    const member: NodeModel = {
+      id: "m1",
+      type: "data.load_csv",
+      label: "CSV",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 100, y: 100 },
+      groupId: "g1",
+    };
+    const group: NodeModel = groupModel({ id: "g1" });
+    const nodeModels = [member, group];
+
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const result = applyCollapsedGroups(nodeModels, new Set(["g1"]), rfNodes);
+
+    const groupNode = result.find((n) => n.id === "g1");
+    expect(groupNode?.style?.width).toBe(COLLAPSED_GROUP_WIDTH);
+    expect(groupNode?.style?.height).toBe(COLLAPSED_GROUP_HEIGHT);
+  });
+
+  test("an expanded group and its members are returned unaffected", () => {
+    const member: NodeModel = {
+      id: "m1",
+      type: "data.load_csv",
+      label: "CSV",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 100, y: 100 },
+      groupId: "g1",
+    };
+    const group: NodeModel = groupModel({ id: "g1" });
+    const nodeModels = [member, group];
+
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const result = applyCollapsedGroups(nodeModels, new Set(), rfNodes);
+
+    expect(result.length).toBe(2);
+    expect(result.map((n) => n.id).sort()).toEqual(["g1", "m1"]);
+  });
+});
+
+describe("reanchorEdgesForCollapsedGroups", () => {
+  test("an empty collapsedGroupIds set returns the input unchanged", () => {
+    const rfEdges = [
+      {
+        id: "e1",
+        type: "efEdge" as const,
+        source: "n1",
+        sourceHandle: "p1",
+        target: "n2",
+        targetHandle: "p2",
+        data: { incompatible: false, reason: null },
+      },
+    ];
+
+    const result = reanchorEdgesForCollapsedGroups([], new Set(), rfEdges);
+
+    expect(result).toBe(rfEdges); // reference check
+  });
+
+  test("an edge from an outside node to a member of a collapsed group gets target rewritten", () => {
+    const outside: NodeModel = {
+      id: "outside",
+      type: "data.load_csv",
+      label: "Outside",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 0, y: 0 },
+      groupId: null,
+    };
+    const member: NodeModel = {
+      id: "m1",
+      type: "data.load_csv",
+      label: "Member",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 100, y: 100 },
+      groupId: "g1",
+    };
+    const group: NodeModel = groupModel({ id: "g1" });
+    const nodeModels = [outside, member, group];
+
+    const rfEdges = [
+      {
+        id: "e1",
+        type: "efEdge" as const,
+        source: "outside",
+        sourceHandle: "p1",
+        target: "m1",
+        targetHandle: "p2",
+        data: { incompatible: false, reason: null },
+      },
+    ];
+
+    const result = reanchorEdgesForCollapsedGroups(nodeModels, new Set(["g1"]), rfEdges);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].target).toBe("g1");
+    expect(result[0].targetHandle).toBe(GROUP_IN_HANDLE);
+    expect(result[0].source).toBe("outside");
+    expect(result[0].sourceHandle).toBe("p1");
+  });
+
+  test("an edge from a member of a collapsed group to an outside node gets source rewritten", () => {
+    const member: NodeModel = {
+      id: "m1",
+      type: "data.load_csv",
+      label: "Member",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 100, y: 100 },
+      groupId: "g1",
+    };
+    const outside: NodeModel = {
+      id: "outside",
+      type: "data.load_csv",
+      label: "Outside",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 0, y: 0 },
+      groupId: null,
+    };
+    const group: NodeModel = groupModel({ id: "g1" });
+    const nodeModels = [member, outside, group];
+
+    const rfEdges = [
+      {
+        id: "e1",
+        type: "efEdge" as const,
+        source: "m1",
+        sourceHandle: "p1",
+        target: "outside",
+        targetHandle: "p2",
+        data: { incompatible: false, reason: null },
+      },
+    ];
+
+    const result = reanchorEdgesForCollapsedGroups(nodeModels, new Set(["g1"]), rfEdges);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].source).toBe("g1");
+    expect(result[0].sourceHandle).toBe(GROUP_OUT_HANDLE);
+    expect(result[0].target).toBe("outside");
+    expect(result[0].targetHandle).toBe("p2");
+  });
+
+  test("an edge whose source and target are both members of the same collapsed group is dropped", () => {
+    const member1: NodeModel = {
+      id: "m1",
+      type: "data.load_csv",
+      label: "Member 1",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 100, y: 100 },
+      groupId: "g1",
+    };
+    const member2: NodeModel = {
+      id: "m2",
+      type: "data.load_csv",
+      label: "Member 2",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 200, y: 200 },
+      groupId: "g1",
+    };
+    const group: NodeModel = groupModel({ id: "g1" });
+    const nodeModels = [member1, member2, group];
+
+    const rfEdges = [
+      {
+        id: "e1",
+        type: "efEdge" as const,
+        source: "m1",
+        sourceHandle: "p1",
+        target: "m2",
+        targetHandle: "p2",
+        data: { incompatible: false, reason: null },
+      },
+    ];
+
+    const result = reanchorEdgesForCollapsedGroups(nodeModels, new Set(["g1"]), rfEdges);
+
+    expect(result).toHaveLength(0);
+  });
+
+  test("an edge between two nodes neither in a collapsed group passes through unchanged", () => {
+    const node1: NodeModel = {
+      id: "n1",
+      type: "data.load_csv",
+      label: "Node 1",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 0, y: 0 },
+      groupId: null,
+    };
+    const node2: NodeModel = {
+      id: "n2",
+      type: "data.load_csv",
+      label: "Node 2",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 100, y: 100 },
+      groupId: null,
+    };
+    const nodeModels = [node1, node2];
+
+    const rfEdges = [
+      {
+        id: "e1",
+        type: "efEdge" as const,
+        source: "n1",
+        sourceHandle: "p1",
+        target: "n2",
+        targetHandle: "p2",
+        data: { incompatible: false, reason: null },
+      },
+    ];
+
+    const result = reanchorEdgesForCollapsedGroups(nodeModels, new Set(), rfEdges);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(rfEdges[0]);
+  });
+
+  test("an edge between members of two different collapsed groups gets both ends rewritten", () => {
+    const member1: NodeModel = {
+      id: "m1",
+      type: "data.load_csv",
+      label: "Member 1",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 100, y: 100 },
+      groupId: "g1",
+    };
+    const member2: NodeModel = {
+      id: "m2",
+      type: "data.load_csv",
+      label: "Member 2",
+      paradigm: "functional",
+      params: [],
+      ports: [],
+      position: { x: 200, y: 200 },
+      groupId: "g2",
+    };
+    const group1: NodeModel = groupModel({ id: "g1" });
+    const group2: NodeModel = groupModel({ id: "g2" });
+    const nodeModels = [member1, member2, group1, group2];
+
+    const rfEdges = [
+      {
+        id: "e1",
+        type: "efEdge" as const,
+        source: "m1",
+        sourceHandle: "p1",
+        target: "m2",
+        targetHandle: "p2",
+        data: { incompatible: false, reason: null },
+      },
+    ];
+
+    const result = reanchorEdgesForCollapsedGroups(nodeModels, new Set(["g1", "g2"]), rfEdges);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].source).toBe("g1");
+    expect(result[0].sourceHandle).toBe(GROUP_OUT_HANDLE);
+    expect(result[0].target).toBe("g2");
+    expect(result[0].targetHandle).toBe(GROUP_IN_HANDLE);
   });
 });

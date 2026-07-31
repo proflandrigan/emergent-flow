@@ -242,3 +242,93 @@ export function toRFEdge(
     data: { incompatible: compatible === false, reason: reason ?? null },
   };
 }
+
+export const COLLAPSED_GROUP_WIDTH = 220;
+export const COLLAPSED_GROUP_HEIGHT = 80;
+export const GROUP_IN_HANDLE = "group-in";
+export const GROUP_OUT_HANDLE = "group-out";
+
+// Hides every member of a collapsed group (its `layout.group` container already shows a
+// summary in its place, per GroupNode.tsx) and shrinks that container to a small fixed size
+// instead of the members'-bounding-box size `applyGroupNesting` gives it. A no-op (returns
+// `rfNodes` unchanged) when nothing is collapsed.
+export function applyCollapsedGroups(
+  nodeModels: NodeModel[],
+  collapsedGroupIds: ReadonlySet<string>,
+  rfNodes: RFNode[],
+): RFNode[] {
+  if (collapsedGroupIds.size === 0) {
+    return rfNodes;
+  }
+  const modelById = new Map(nodeModels.map((m) => [m.id, m]));
+  const result: RFNode[] = [];
+  for (const rfNode of rfNodes) {
+    const model = modelById.get(rfNode.id);
+    if (!model) {
+      result.push(rfNode);
+      continue;
+    }
+    if (model.groupId && collapsedGroupIds.has(model.groupId)) {
+      continue; // hide members of a collapsed group
+    }
+    if (model.type === GROUP_NODE_TYPE && collapsedGroupIds.has(model.id)) {
+      result.push({
+        ...rfNode,
+        style: {
+          ...(rfNode.style ?? {}),
+          width: COLLAPSED_GROUP_WIDTH,
+          height: COLLAPSED_GROUP_HEIGHT,
+        },
+      });
+      continue;
+    }
+    result.push(rfNode);
+  }
+  return result;
+}
+
+// Re-anchors any edge whose source or target is a hidden member of a collapsed group to the
+// group's own body instead, using the two generic handles above (`GROUP_OUT_HANDLE` for a
+// re-anchored source, `GROUP_IN_HANDLE` for a re-anchored target) rather than the member's own
+// specific port handle. An edge whose source AND target both resolve into the SAME collapsed
+// group (i.e. it was entirely internal to that group) is dropped -- both its endpoints are
+// hidden, so there is nothing meaningful left to draw. A no-op when nothing is collapsed.
+export function reanchorEdgesForCollapsedGroups(
+  nodeModels: NodeModel[],
+  collapsedGroupIds: ReadonlySet<string>,
+  rfEdges: RFEdge[],
+): RFEdge[] {
+  if (collapsedGroupIds.size === 0) {
+    return rfEdges;
+  }
+  const modelById = new Map(nodeModels.map((m) => [m.id, m]));
+
+  function resolve(nodeId: string): string {
+    const model = modelById.get(nodeId);
+    if (model?.groupId && collapsedGroupIds.has(model.groupId)) {
+      return model.groupId;
+    }
+    return nodeId;
+  }
+
+  const result: RFEdge[] = [];
+  for (const edge of rfEdges) {
+    const resolvedSource = resolve(edge.source);
+    const resolvedTarget = resolve(edge.target);
+    if (resolvedSource === resolvedTarget && resolvedSource !== edge.source) {
+      continue; // both endpoints hidden inside the same collapsed group
+    }
+    if (resolvedSource === edge.source && resolvedTarget === edge.target) {
+      result.push(edge); // unaffected by any collapsed group
+      continue;
+    }
+    result.push({
+      ...edge,
+      source: resolvedSource,
+      sourceHandle: resolvedSource === edge.source ? edge.sourceHandle : GROUP_OUT_HANDLE,
+      target: resolvedTarget,
+      targetHandle: resolvedTarget === edge.target ? edge.targetHandle : GROUP_IN_HANDLE,
+    });
+  }
+  return result;
+}

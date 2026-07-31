@@ -179,6 +179,28 @@ describe("GroupNode", () => {
     const dot = screen.getByTestId("group-node-status-dot");
     expect(dot.style.background).toBe("var(--danger)");
   });
+
+  test("when collapsed, the rendered output includes target and source handles", () => {
+    const groupId = useGraphStore.getState().addNodeFromSpec(groupNode, { x: 0, y: 0 });
+    const { container } = renderGroupNode(groupId, { label: "Test", color: "slate" });
+
+    fireEvent.click(screen.getByTestId("group-node-collapse-toggle"));
+
+    const groupInHandle = container.querySelector('[data-handleid="group-in"]');
+    const groupOutHandle = container.querySelector('[data-handleid="group-out"]');
+    expect(groupInHandle).toBeInTheDocument();
+    expect(groupOutHandle).toBeInTheDocument();
+  });
+
+  test("when expanded, the rendered output does not include the handles", () => {
+    const groupId = useGraphStore.getState().addNodeFromSpec(groupNode, { x: 0, y: 0 });
+    const { container } = renderGroupNode(groupId, { label: "Test", color: "slate" });
+
+    const groupInHandle = container.querySelector('[data-handleid="group-in"]');
+    const groupOutHandle = container.querySelector('[data-handleid="group-out"]');
+    expect(groupInHandle).not.toBeInTheDocument();
+    expect(groupOutHandle).not.toBeInTheDocument();
+  });
 });
 
 describe("aggregateGroupStatus", () => {

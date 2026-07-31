@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "r
 
 import { useCatalog } from "../catalog/useCatalog";
 import type { NodeModel } from "../store/model";
+import { useCollapseStore } from "../store/collapseStore";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
@@ -36,7 +37,14 @@ import { NodeInfoPanel } from "./NodeInfoPanel";
 import { NoteAnchorOverlay } from "./NoteAnchorOverlay";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { OverlayModal } from "../ui/OverlayModal";
-import { applyGroupNesting, toAbsolutePosition, toRFEdge, toRFNode } from "./toReactFlow";
+import {
+  applyCollapsedGroups,
+  applyGroupNesting,
+  reanchorEdgesForCollapsedGroups,
+  toAbsolutePosition,
+  toRFEdge,
+  toRFNode,
+} from "./toReactFlow";
 
 const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode };
 const edgeTypes: EdgeTypes = { efEdge: EfEdge };
@@ -89,6 +97,12 @@ export function Canvas(): JSX.Element {
     return m;
   }, [diagnostics]);
 
+  const collapsedMap = useCollapseStore((s) => s.collapsed);
+  const collapsedGroupIds = useMemo(
+    () => new Set(Object.keys(collapsedMap).filter((id) => collapsedMap[id])),
+    [collapsedMap],
+  );
+
   const rfNodes = useMemo(() => {
     const nodeModels = Object.values(nodes);
     const base = nodeModels.map((n) =>
@@ -101,15 +115,15 @@ export function Canvas(): JSX.Element {
         descriptionByType[n.type] ?? null,
       ),
     );
-    return applyGroupNesting(nodeModels, base);
-  }, [nodes, selNodes, statuses, results, familyByType, descriptionByType]);
-  const rfEdges = useMemo(
-    () =>
-      Object.values(edges).map((e) =>
-        toRFEdge(e, !!selEdges[e.id], edgeCompatibility[e.id], reasons[e.id]),
-      ),
-    [edges, selEdges, edgeCompatibility, reasons],
-  );
+    const nested = applyGroupNesting(nodeModels, base);
+    return applyCollapsedGroups(nodeModels, collapsedGroupIds, nested);
+  }, [nodes, selNodes, statuses, results, familyByType, descriptionByType, collapsedGroupIds]);
+  const rfEdges = useMemo(() => {
+    const base = Object.values(edges).map((e) =>
+      toRFEdge(e, !!selEdges[e.id], edgeCompatibility[e.id], reasons[e.id]),
+    );
+    return reanchorEdgesForCollapsedGroups(Object.values(nodes), collapsedGroupIds, base);
+  }, [edges, selEdges, edgeCompatibility, reasons, nodes, collapsedGroupIds]);
 
   const selectedNodeIds = useMemo(
     () => Object.keys(selNodes).filter((id) => selNodes[id]),
