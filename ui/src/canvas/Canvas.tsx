@@ -31,11 +31,13 @@ import { runGraph } from "../exec/runGraph";
 import { EfEdge } from "./edges/EfEdge";
 import { EfNode } from "./nodes/EfNode";
 import { GroupNode } from "./nodes/GroupNode";
+import { CompositeNode } from "./nodes/CompositeNode";
 import { NoteNode } from "./nodes/NoteNode";
 import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeInfoPanel } from "./NodeInfoPanel";
 import { NoteAnchorOverlay } from "./NoteAnchorOverlay";
 import { SelectionToolbar } from "./SelectionToolbar";
+import { SubgraphBreadcrumb } from "./SubgraphBreadcrumb";
 import { OverlayModal } from "../ui/OverlayModal";
 import {
   applyCollapsedGroups,
@@ -45,8 +47,10 @@ import {
   toRFEdge,
   toRFNode,
 } from "./toReactFlow";
+import { fromIR } from "../store/ir";
+import { useSubgraphStore, currentSubgraph } from "../store/subgraphStore";
 
-const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode };
+const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode, compositeNode: CompositeNode };
 const edgeTypes: EdgeTypes = { efEdge: EfEdge };
 
 export function Canvas(): JSX.Element {
@@ -104,8 +108,20 @@ export function Canvas(): JSX.Element {
     [collapsedMap],
   );
 
+  // Subgraph navigation: when inside a composite, render its subgraph's nodes/edges instead.
+  const breadcrumbs = useSubgraphStore((s) => s.breadcrumbs);
+  const pushSubgraph = useSubgraphStore((s) => s.pushSubgraph);
+  const activeSubgraph = useMemo(() => currentSubgraph({ breadcrumbs }), [breadcrumbs]);
+  const subgraphModel = useMemo(() => {
+    if (!activeSubgraph) return null;
+    return fromIR(activeSubgraph);
+  }, [activeSubgraph]);
+  const activeNodes = subgraphModel?.nodes ?? nodes;
+  const activeEdges = subgraphModel?.edges ?? edges;
+  const isInSubgraph = breadcrumbs.length > 0;
+
   const rfNodes = useMemo(() => {
-    const nodeModels = Object.values(nodes);
+    const nodeModels = Object.values(activeNodes);
     const base = nodeModels.map((n) =>
       toRFNode(
         n,
@@ -117,14 +133,19 @@ export function Canvas(): JSX.Element {
       ),
     );
     const nested = applyGroupNesting(nodeModels, base);
-    return applyCollapsedGroups(nodeModels, collapsedGroupIds, nested);
-  }, [nodes, selNodes, statuses, results, familyByType, descriptionByType, collapsedGroupIds]);
+    const collapsed = applyCollapsedGroups(nodeModels, collapsedGroupIds, nested);
+    // When in a subgraph view, make all nodes non-draggable (read-only exploration).
+    if (isInSubgraph) {
+      return collapsed.map((n) => ({ ...n, draggable: false }));
+    }
+    return collapsed;
+  }, [activeNodes, selNodes, statuses, results, familyByType, descriptionByType, collapsedGroupIds, isInSubgraph]);
   const rfEdges = useMemo(() => {
-    const base = Object.values(edges).map((e) =>
+    const base = Object.values(activeEdges).map((e) =>
       toRFEdge(e, !!selEdges[e.id], edgeCompatibility[e.id], reasons[e.id]),
     );
-    return reanchorEdgesForCollapsedGroups(Object.values(nodes), collapsedGroupIds, base);
-  }, [edges, selEdges, edgeCompatibility, reasons, nodes, collapsedGroupIds]);
+    return reanchorEdgesForCollapsedGroups(Object.values(activeNodes), collapsedGroupIds, base);
+  }, [activeEdges, selEdges, edgeCompatibility, reasons, activeNodes, collapsedGroupIds]);
 
   const selectedNodeIds = useMemo(
     () => Object.keys(selNodes).filter((id) => selNodes[id]),
@@ -143,6 +164,9 @@ export function Canvas(): JSX.Element {
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
+      if (isInSubgraph) {
+        return; // subgraph view is read-only
+      }
       for (const change of changes) {
         if (change.type === "position" && change.position) {
           const model = nodes[change.id];
@@ -161,11 +185,14 @@ export function Canvas(): JSX.Element {
         }
       }
     },
-    [moveNode, moveGroup, removeNode, setNodeSelected, nodes],
+    [isInSubgraph, moveNode, moveGroup, removeNode, setNodeSelected, nodes],
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
+      if (isInSubgraph) {
+        return; // subgraph view is read-only
+      }
       for (const change of changes) {
         if (change.type === "remove") {
           setEdgeSelected(change.id, false);
@@ -175,11 +202,14 @@ export function Canvas(): JSX.Element {
         }
       }
     },
-    [removeEdge, setEdgeSelected],
+    [isInSubgraph, removeEdge, setEdgeSelected],
   );
 
   const onConnect = useCallback(
     (c: Connection) => {
+      if (isInSubgraph) {
+        return; // subgraph view is read-only
+      }
       if (c.source && c.target && c.sourceHandle && c.targetHandle) {
         connect(
           { node_id: c.source, port_id: c.sourceHandle },
@@ -187,7 +217,7 @@ export function Canvas(): JSX.Element {
         );
       }
     },
-    [connect],
+    [isInSubgraph, connect],
   );
 
   const handleMoveStart = useCallback(() => {
@@ -197,6 +227,31 @@ export function Canvas(): JSX.Element {
   const handleMoveEnd = useCallback(() => {
     document.body.classList.remove("ef-panning");
   }, []);
+
+  const onNodeDragStop = useCallback(() => {
+    if (isInSubgraph) {
+      return;
+    }
+    endNodeDrag();
+  }, [isInSubgraph, endNodeDrag]);
+
+  const handleNodeDoubleClick = useCallback(
+    (_event: React.MouseEvent, rfNode: (typeof rfNodes)[number]) => {
+      const model = activeNodes[rfNode.id];
+      if (!model || model.type !== "layout.composite" || !model.subgraph) {
+        return;
+      }
+      const paramValue = (name: string): unknown =>
+        model.params.find((p) => p.name === name)?.value;
+      const label = typeof paramValue("label") === "string" ? (paramValue("label") as string) : "Composite";
+      pushSubgraph({
+        compositeId: model.id,
+        label,
+        subgraph: model.subgraph,
+      });
+    },
+    [activeNodes, pushSubgraph, isInSubgraph],
+  );
 
   const [contextMenu, setContextMenu] = useState<{
     nodeId: string;
@@ -280,7 +335,12 @@ export function Canvas(): JSX.Element {
   }, [clipboard, nodes, selNodes, pasteNodes, clearSelection, setNodeSelected]);
 
   return (
-    <div style={{ width: "100%", height: "100%" }}>
+    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+      {isInSubgraph && (
+        <div style={{ position: "absolute", top: 8, left: 8, zIndex: 20 }}>
+          <SubgraphBreadcrumb />
+        </div>
+      )}
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
@@ -289,15 +349,19 @@ export function Canvas(): JSX.Element {
         onNodesChange={onNodesChange}
         onMoveStart={handleMoveStart}
         onMoveEnd={handleMoveEnd}
-        onNodeDragStop={endNodeDrag}
+        onNodeDragStop={onNodeDragStop}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeDoubleClick={handleNodeDoubleClick}
         onNodeContextMenu={onNodeContextMenu}
         selectionOnDrag
         multiSelectionKeyCode="Shift"
-        deleteKeyCode={["Backspace", "Delete"]}
+        deleteKeyCode={isInSubgraph ? [] : ["Backspace", "Delete"]}
         fitView
         onlyRenderVisibleElements
+        nodesDraggable={!isInSubgraph}
+        nodesConnectable={!isInSubgraph}
+        elementsSelectable={!isInSubgraph}
         style={
           {
             "--xy-selection-background-color": "var(--accent-soft)",

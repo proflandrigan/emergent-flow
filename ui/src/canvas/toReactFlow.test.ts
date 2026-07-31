@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import type { EdgeModel, NodeModel } from "../store/model";
+import type { CompositeNodeData } from "./nodes/CompositeNode";
 import {
   applyCollapsedGroups,
   applyGroupNesting,
@@ -227,6 +228,90 @@ describe("toRFNode (layout.group)", () => {
 
     expect(rf.id).toBe("g1");
     expect(rf.position).toEqual({ x: 100, y: 200 });
+    expect(rf.selected).toBe(true);
+  });
+});
+
+function compositeModel(overrides?: Partial<NodeModel>): NodeModel {
+  return {
+    id: "comp1",
+    type: "layout.composite",
+    label: undefined,
+    paradigm: "functional",
+    params: [{ name: "label", typeToken: "str", value: "My Composite" }],
+    ports: [
+      { id: "p1", name: "in0", direction: "in", dataType: "any", cardinality: "one", label: null },
+      { id: "p2", name: "out0", direction: "out", dataType: "any", cardinality: "one", label: null },
+    ],
+    position: { x: 300, y: 100 },
+    subgraph: {
+      paradigm: "functional",
+      nodes: {
+        n1: { id: "n1", type: "data.load_csv", label: null, paradigm: "functional", position: { x: 0, y: 0 }, params: [], ports: [], group_id: null },
+        n2: { id: "n2", type: "transform.filter_rows", label: null, paradigm: "functional", position: { x: 200, y: 0 }, params: [], ports: [], group_id: null },
+      },
+      edges: {},
+    },
+    ...overrides,
+  };
+}
+
+describe("toRFNode (layout.composite)", () => {
+  test("produces a compositeNode with label / ports / memberCount from model", () => {
+    const rf = toRFNode(compositeModel(), false, null, null, null, null) as ReturnType<typeof toRFNode>;
+
+    expect(rf.type).toBe("compositeNode");
+    if (rf.type === "compositeNode") {
+      const d = rf.data as CompositeNodeData;
+      expect(d.label).toBe("My Composite");
+      expect(d.ports).toHaveLength(2);
+      expect(d.ports[0].name).toBe("in0");
+      expect(d.ports[1].name).toBe("out0");
+      expect(d.memberCount).toBe(2);
+    }
+  });
+
+  test("missing label falls back to Composite", () => {
+    const rf = toRFNode(
+      compositeModel({ params: [] }),
+      false, null, null, null, null,
+    ) as ReturnType<typeof toRFNode>;
+
+    if (rf.type === "compositeNode") {
+      const d = rf.data as CompositeNodeData;
+      expect(d.label).toBe("Composite");
+    }
+  });
+
+  test("non-string label falls back to Composite", () => {
+    const rf = toRFNode(
+      compositeModel({ params: [{ name: "label", typeToken: "str", value: 42 }] }),
+      false, null, null, null, null,
+    ) as ReturnType<typeof toRFNode>;
+
+    if (rf.type === "compositeNode") {
+      const d = rf.data as CompositeNodeData;
+      expect(d.label).toBe("Composite");
+    }
+  });
+
+  test("no subgraph reports 0 members", () => {
+    const rf = toRFNode(
+      compositeModel({ subgraph: undefined }),
+      false, null, null, null, null,
+    ) as ReturnType<typeof toRFNode>;
+
+    if (rf.type === "compositeNode") {
+      const d = rf.data as CompositeNodeData;
+      expect(d.memberCount).toBe(0);
+    }
+  });
+
+  test("passes id / position / selected through", () => {
+    const rf = toRFNode(compositeModel(), true, null, null, null, null) as ReturnType<typeof toRFNode>;
+
+    expect(rf.id).toBe("comp1");
+    expect(rf.position).toEqual({ x: 300, y: 100 });
     expect(rf.selected).toBe(true);
   });
 });

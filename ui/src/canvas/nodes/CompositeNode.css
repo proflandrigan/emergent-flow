@@ -1,0 +1,11 @@
+.composite-node-card {
+  transition: box-shadow 0.15s ease;
+}
+
+.composite-node-card:hover {
+  box-shadow: var(--shadow-3);
+}
+
+.composite-node-card:has(.composite-node-drill-hint:hover) {
+  box-shadow: 0 0 0 2px var(--fam-layout);
+}
