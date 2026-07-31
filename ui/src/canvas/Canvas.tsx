@@ -9,6 +9,7 @@ import "@xyflow/react/dist/style.css";
 import {
   Background,
   Controls,
+  MiniMap,
   ReactFlow,
   type Connection,
   type EdgeChange,
@@ -17,7 +18,8 @@ import {
   type NodeMouseHandler,
   type NodeTypes,
 } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Map, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { useCatalog } from "../catalog/useCatalog";
 import type { NodeModel } from "../store/model";
@@ -27,12 +29,17 @@ import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
 import { useLiveValidation } from "../store/useLiveValidation";
 import { useValidationStore } from "../store/validationStore";
+import { familyMeta } from "../theme/family";
+import { IconButton } from "../ui/IconButton";
+import { Tooltip } from "../ui/Tooltip";
 import { runGraph } from "../exec/runGraph";
 import { EfEdge } from "./edges/EfEdge";
 import { EfNode } from "./nodes/EfNode";
 import { GroupNode } from "./nodes/GroupNode";
 import { CompositeNode } from "./nodes/CompositeNode";
 import { NoteNode } from "./nodes/NoteNode";
+import { FindNodeModal } from "./FindNodeModal";
+import { ProblemsPanel } from "./ProblemsPanel";
 import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeInfoPanel } from "./NodeInfoPanel";
 import { NoteAnchorOverlay } from "./NoteAnchorOverlay";
@@ -176,8 +183,6 @@ export function Canvas(): JSX.Element {
             moveNode(change.id, toAbsolutePosition(Object.values(nodes), change.id, change.position));
           }
         } else if (change.type === "remove") {
-          // Clear any lingering selection flag so a deleted node can't masquerade as a second
-          // selection and make selectedNodeId() report "multiple selected".
           setNodeSelected(change.id, false);
           removeNode(change.id);
         } else if (change.type === "select") {
@@ -260,6 +265,24 @@ export function Canvas(): JSX.Element {
   } | null>(null);
   const [infoNodeId, setInfoNodeId] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<NodeModel[] | null>(null);
+  const [findModalOpen, setFindModalOpen] = useState(false);
+  const [minimapCollapsed, setMinimapCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("ef-minimap-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const reactFlowInstance = useRef<any>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("ef-minimap-collapsed", String(minimapCollapsed));
+    } catch {
+      // ignore write errors
+    }
+  }, [minimapCollapsed]);
 
   const infoCatalogNode = infoNodeId
     ? catalog.nodes.find((n) => n.type === nodes[infoNodeId]?.type)
@@ -271,6 +294,23 @@ export function Canvas(): JSX.Element {
     event.preventDefault();
     setContextMenu({ nodeId: node.id, x: event.clientX, y: event.clientY });
   }, []);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const onInit = useCallback((instance: any) => {
+    reactFlowInstance.current = instance;
+  }, []);
+
+  const navigateToNode = useCallback(
+    (nodeId: string) => {
+      const node = nodes[nodeId];
+      if (!node || !reactFlowInstance.current) return;
+      reactFlowInstance.current.setCenter(node.position.x, node.position.y, {
+        zoom: 1,
+        duration: 200,
+      });
+    },
+    [nodes],
+  );
 
   useEffect(() => {
     if (!contextMenu) return undefined;
@@ -327,12 +367,30 @@ export function Canvas(): JSX.Element {
         for (const id of newIds) {
           setNodeSelected(id, true);
         }
+      } else if (key === "k") {
+        e.preventDefault();
+        setFindModalOpen(true);
+      } else if (key === "0") {
+        e.preventDefault();
+        if (reactFlowInstance.current) {
+          reactFlowInstance.current.fitView({ duration: 200 });
+        }
+      } else if (key === "e" && e.shiftKey) {
+        e.preventDefault();
+        const selectedIds = Object.keys(selNodes).filter((id) => selNodes[id]);
+        if (selectedIds.length > 0 && reactFlowInstance.current) {
+          reactFlowInstance.current.fitView({
+            nodes: selectedIds.map((id) => ({ id })),
+            duration: 200,
+            padding: 0.2,
+          });
+        }
       }
     }
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [clipboard, nodes, selNodes, pasteNodes, clearSelection, setNodeSelected]);
+  }, [clipboard, nodes, selNodes, pasteNodes, clearSelection, setNodeSelected, setFindModalOpen]);
 
   return (
     <div style={{ width: "100%", height: "100%", position: "relative" }}>
@@ -354,6 +412,7 @@ export function Canvas(): JSX.Element {
         onConnect={onConnect}
         onNodeDoubleClick={handleNodeDoubleClick}
         onNodeContextMenu={onNodeContextMenu}
+        onInit={onInit}
         selectionOnDrag
         multiSelectionKeyCode="Shift"
         deleteKeyCode={isInSubgraph ? [] : ["Backspace", "Delete"]}
@@ -383,6 +442,29 @@ export function Canvas(): JSX.Element {
             } as CSSProperties
           }
         />
+        {!minimapCollapsed && (
+          <MiniMap
+            className="glass"
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            nodeColor={(node: any) => {
+              const family = node.data?.family as string | undefined;
+              if (family) return familyMeta(family).color;
+              return "var(--text-tertiary)";
+            }}
+            nodeStrokeColor="var(--border-strong)"
+            maskColor="var(--glass-fill)"
+            style={{
+              width: 180,
+              height: 140,
+              bottom: 10,
+              left: 10,
+              border: "1px solid var(--border-subtle)",
+              borderRadius: "var(--radius-sm)",
+            }}
+            pannable
+            zoomable
+          />
+        )}
       </ReactFlow>
       {(selectedNodeIds.length > 1 || canUngroup) && (
         <SelectionToolbar
@@ -420,6 +502,52 @@ export function Canvas(): JSX.Element {
           <NodeInfoPanel node={infoCatalogNode} />
         </OverlayModal>
       )}
+      {findModalOpen && (
+        <FindNodeModal
+          onClose={() => setFindModalOpen(false)}
+          onNavigate={navigateToNode}
+        />
+      )}
+      <ProblemsPanel onNavigate={navigateToNode} />
+      <div
+        style={{
+          position: "absolute",
+          bottom: 10,
+          left: 10,
+          zIndex: 5,
+          display: "flex",
+          gap: "var(--space-1)",
+        }}
+      >
+        <Tooltip label={minimapCollapsed ? "Show minimap" : "Hide minimap"}>
+          <IconButton
+            aria-label={minimapCollapsed ? "Show minimap" : "Hide minimap"}
+            data-testid="minimap-toggle"
+            onClick={() => setMinimapCollapsed((c) => !c)}
+            style={{
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: "var(--radius-sm)",
+            }}
+          >
+            <Map size={14} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip label="Find node (⌘K)">
+          <IconButton
+            aria-label="Find node"
+            data-testid="find-node-toggle"
+            onClick={() => setFindModalOpen(true)}
+            style={{
+              background: "var(--surface-1)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: "var(--radius-sm)",
+            }}
+          >
+            <Search size={14} />
+          </IconButton>
+        </Tooltip>
+      </div>
     </div>
   );
 }
