@@ -45,6 +45,7 @@ from emergentflow.server.artifacts import get_default_artifacts
 from emergentflow.server.cache import get_default_cache
 from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
 from emergentflow.server.reports import get_default_store
+from emergentflow.server.runs import get_default_runs
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -684,7 +685,7 @@ def _execute_functional_with_status(
     graph: Graph,
     only: set[str] | None = None,
     wiring_map: WiringMap | None = None,
-) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], dict[str, int]]:
     """Walk a FUNCTIONAL graph node by node, capturing a per-node run status.
 
     Mirrors ``emergentflow.codegen.executor.execute``'s FUNCTIONAL walk exactly,
@@ -704,6 +705,7 @@ def _execute_functional_with_status(
     """
     results: dict[str, dict[str, Any]] = {}
     statuses: dict[str, dict[str, Any]] = {}
+    node_elapsed: dict[str, int] = {}
     for event in _execute_functional_stream(graph, only=only, wiring_map=wiring_map):
         if event.phase == "skip":
             skip_status: dict[str, Any] = {"status": _STATUS_SKIPPED}
@@ -713,10 +715,12 @@ def _execute_functional_with_status(
         elif event.phase == "ok":
             results[event.node_id] = event.results or {}
             statuses[event.node_id] = {"status": _STATUS_CACHED if event.cached else _STATUS_OK}
+            node_elapsed[event.node_id] = event.elapsed_ms or 0
         elif event.phase == "error":
             statuses[event.node_id] = {"status": _STATUS_ERROR, "error": event.error}
+            node_elapsed[event.node_id] = event.elapsed_ms or 0
         # "start" carries no status change; ignore it here.
-    return results, statuses
+    return results, statuses, node_elapsed
 
 
 def _payload_for(value: Any) -> dict[str, Any]:
@@ -802,6 +806,72 @@ def _resolve_run_scope(
     return _SCOPES[key](graph, targets, wiring_map), wiring_map
 
 
+def _save_run_record(
+    graph: Graph,
+    graph_payload: dict[str, Any],
+    results: dict[str, dict[str, Any]],
+    statuses: dict[str, dict[str, Any]],
+    node_elapsed: dict[str, int] | None = None,
+    started_at: float | None = None,
+) -> None:
+    graph_hash = hashlib.sha256(json.dumps(graph_payload, sort_keys=True).encode()).hexdigest()
+    finished_at = time.time()
+    run_data = {
+        "run_id": "",  # filled by RunStore.save()
+        "tag": None,
+        "graph_name": graph_payload.get("name", ""),
+        "graph_hash": graph_hash,
+        "started_at": started_at if started_at is not None else finished_at,
+        "finished_at": finished_at,
+        "duration_ms": 0,
+        "node_count": len(graph.nodes),
+        "statuses": {},
+        "reproducibility": {"seeds": {}, "content_hashes": {}, "dependency_versions": {}},
+        "sdk_version": __version__,
+    }
+    # Build per-node statuses with elapsed_ms
+    for node_id in graph.nodes:
+        status_entry = dict(statuses.get(node_id, {}))
+        if node_elapsed and node_id in node_elapsed:
+            status_entry["elapsed_ms"] = node_elapsed[node_id]
+        run_data["statuses"][node_id] = status_entry
+
+    # Compute duration: prefer per-node sum (FUNCTIONAL), fall back to wall-clock
+    if node_elapsed:
+        run_data["duration_ms"] = sum(node_elapsed.values())
+    elif started_at is not None:
+        run_data["duration_ms"] = int((finished_at - started_at) * 1000)
+
+    # Capture reproducibility
+    try:
+        from emergentflow.research.reproducibility import (
+            capture_run,
+            resolve_dependency_versions,
+        )
+
+        deps = resolve_dependency_versions([])
+        repro = capture_run(graph, dependency_versions=deps)
+        run_data["reproducibility"] = {
+            "seeds": repro.seeds,
+            "content_hashes": repro.content_hashes,
+            "dependency_versions": repro.dependency_versions,
+        }
+    except Exception:
+        pass  # reproducibility capture is best-effort
+
+    # Build scalar payloads only (filter out non-scalar payloads)
+    payloads_data: dict[str, dict[str, Any]] = {}
+    for node_id, ports in results.items():
+        payloads_data[node_id] = {}
+        for port_name, value in ports.items():
+            payload = _payload_for(value)
+            if payload.get("kind") in ("scalar", "text", "json"):
+                payloads_data[node_id][port_name] = payload
+
+    with contextlib.suppress(Exception):
+        get_default_runs().save(run_data, graph_payload, payloads_data)
+
+
 def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     """IR graph (as a dict) -> ``{"payload_version", "results", "statuses"}``.
 
@@ -826,9 +896,21 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     graph_payload, scope = _split_request(payload)
     graph = _to_graph(graph_payload)
     validate_api_keys_present(graph)
+    started_at = time.time()
     if graph.paradigm is Paradigm.FUNCTIONAL:
         only, wiring_map = _resolve_run_scope(graph, scope)
-        results, statuses = _execute_functional_with_status(graph, only=only, wiring_map=wiring_map)
+        results, statuses, node_elapsed = _execute_functional_with_status(
+            graph, only=only, wiring_map=wiring_map
+        )
+        if not scope:
+            _save_run_record(
+                graph,
+                graph_payload,
+                results,
+                statuses,
+                node_elapsed=node_elapsed,
+                started_at=started_at,
+            )
         return {
             "payload_version": PAYLOAD_CONTRACT_VERSION,
             "results": _results_to_payloads(results),
@@ -841,6 +923,8 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     # rejections raise (CodegenError) -> 422.
     results = execute(graph)
     statuses = {node_id: {"status": _STATUS_OK} for node_id in results}
+    if not scope:
+        _save_run_record(graph, graph_payload, results, statuses, started_at=started_at)
     return {
         "payload_version": PAYLOAD_CONTRACT_VERSION,
         "results": _results_to_payloads(results),

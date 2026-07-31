@@ -106,6 +106,13 @@ from emergentflow.server.flows import (
     slugify,
 )
 from emergentflow.server.reports import get_default_store
+from emergentflow.server.runs import (
+    DEFAULT_RUNS_DIRNAME,
+    DEFAULT_RUNS_KEEP,
+    UnknownRunError,
+    configure_runs,
+    get_default_runs,
+)
 from emergentflow.server.service import (
     clear_cache,
     compile_graph,
@@ -1064,6 +1071,42 @@ def create_app() -> FastAPI:
             return _error_json(422, f"{type(exc).__name__}: {exc}")
         return JSONResponse(content=result)
 
+    # -- Run store routes (issue #120) -------------------------------------------
+
+    @application.get("/runs")
+    async def list_runs() -> Response:
+        return await _safe_json(lambda: {"runs": get_default_runs().list()})
+
+    @application.get("/runs/{run_id}")
+    async def get_run(run_id: str) -> Response:
+        try:
+            result = await _run_sync(lambda: get_default_runs().get(run_id))
+        except UnknownRunError as exc:
+            return _error_json(404, str(exc))
+        except Exception as exc:
+            return _error_json(422, f"{type(exc).__name__}: {exc}")
+        return JSONResponse(content=result)
+
+    @application.get("/runs/{run_id}/graph")
+    async def get_run_graph(run_id: str) -> Response:
+        try:
+            result = await _run_sync(lambda: get_default_runs().get_graph(run_id))
+        except UnknownRunError as exc:
+            return _error_json(404, str(exc))
+        except Exception as exc:
+            return _error_json(422, f"{type(exc).__name__}: {exc}")
+        return JSONResponse(content=result)
+
+    @application.delete("/runs/{run_id}")
+    async def delete_run(run_id: str) -> Response:
+        try:
+            await _run_sync(lambda: get_default_runs().delete(run_id))
+        except UnknownRunError as exc:
+            return _error_json(404, str(exc))
+        except Exception as exc:
+            return _error_json(422, f"{type(exc).__name__}: {exc}")
+        return JSONResponse(content={"status": "ok"})
+
     # -- Examples endpoint (issue #114) ------------------------------------------
 
     @application.get("/examples")
@@ -1167,6 +1210,7 @@ def serve(
     cache_dir: str | None = None,
     cache_max_mb: float | None = None,
     session_token: str | None = None,
+    runs_keep: int | None = None,
 ) -> None:
     """Boot the local canvas server on Uvicorn and block until interrupted.
 
@@ -1212,6 +1256,13 @@ def serve(
     # before the first request" contract as configure_cache/configure_artifacts.
     flow_root = cache_root.parent / DEFAULT_FLOW_DIRNAME
     configure_flows(flow_root)
+
+    # Configure the runs store (execution run history, Task 02) alongside the
+    # cache, artifacts, and flows, in a sibling directory under the same parent.
+    # Same "must run before the first request" contract as configure_cache.
+    runs_root = cache_root.parent / DEFAULT_RUNS_DIRNAME
+    resolved_runs_keep = runs_keep if runs_keep is not None else DEFAULT_RUNS_KEEP
+    configure_runs(runs_root, keep=resolved_runs_keep)
 
     if host == "127.0.0.1":
         configure_session_auth(required=False)
