@@ -502,3 +502,66 @@ def test_composite_port_count_mismatch_raises():
 
     with pytest.raises(CodegenError, match="IN port"):
         execute(outer_graph)
+
+
+def test_composite_compiles_and_runs():
+    """The symmetric compile_to_code path: a composite becomes a nested function.
+
+    Also cross-checks against execute() directly, reinforcing the ADR-0002
+    equivalence the formal corpus in tests/test_codegen_equivalence.py covers.
+    """
+    inner = _double_node("inner_dbl")
+    subgraph = _graph([inner])
+    composite = _composite_node("composite1", subgraph)
+
+    outer_src = _source_node()
+    edge = Edge(
+        source=PortRef(node_id=outer_src.id, port_id=_out_port(outer_src, "out").id),
+        target=PortRef(node_id=composite.id, port_id=_in_port(composite, "in0").id),
+    )
+    outer_graph = _graph([outer_src, composite], [edge])
+
+    code = compile_to_code(outer_graph)
+    assert "def _composite_" in code
+
+    namespace: dict[str, Any] = {}
+    exec(compile(code, "<generated>", "exec"), namespace)
+    results = namespace["main"]()
+
+    assert len(results) == 1
+    compiled_value = next(iter(results.values()))
+    assert compiled_value == 2
+    assert execute(outer_graph)["composite1"]["out0"] == compiled_value
+
+
+def test_composite_codegen_no_subgraph_raises():
+    composite = Node(
+        id="composite1",
+        type=COMPOSITE_NODE_TYPE,
+        label="Composite",
+        ports=[Port(id="composite1-out0", name="out0", direction=Direction.OUT, data_type="int")],
+    )
+    graph = _graph([composite])
+
+    with pytest.raises(CodegenError, match="no subgraph"):
+        compile_to_code(graph)
+
+
+def test_composite_codegen_port_count_mismatch_raises():
+    inner = _double_node("inner_dbl")
+    subgraph = _graph([inner])
+    composite = _composite_node("composite1", subgraph, num_in=2)
+
+    outer_src_a = _source_node()
+    outer_src_a.id = "src_a"
+    edge = Edge(
+        source=PortRef(node_id="src_a", port_id="src-out"),
+        target=PortRef(node_id=composite.id, port_id=_in_port(composite, "in0").id),
+    )
+    outer_graph = Graph(
+        nodes={"src_a": outer_src_a, composite.id: composite},
+        edges={edge.id: edge},
+    )
+
+    with pytest.raises(CodegenError, match="IN port"):
+        compile_to_code(outer_graph)
