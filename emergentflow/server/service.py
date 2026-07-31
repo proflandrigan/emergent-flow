@@ -813,20 +813,17 @@ def _save_run_record(
     results: dict[str, dict[str, Any]],
     statuses: dict[str, dict[str, Any]],
     node_elapsed: dict[str, int] | None = None,
+    started_at: float | None = None,
 ) -> None:
-    import hashlib
-    import time as time_mod
-    from datetime import UTC, datetime
-
-    now = datetime.now(UTC)
     graph_hash = hashlib.sha256(json.dumps(graph_payload, sort_keys=True).encode()).hexdigest()
+    finished_at = time.time()
     run_data = {
         "run_id": "",  # filled by RunStore.save()
         "tag": None,
         "graph_name": graph_payload.get("name", ""),
         "graph_hash": graph_hash,
-        "started_at": now.timestamp(),
-        "finished_at": time_mod.time(),
+        "started_at": started_at if started_at is not None else finished_at,
+        "finished_at": finished_at,
         "duration_ms": 0,
         "node_count": len(graph.nodes),
         "statuses": {},
@@ -840,9 +837,11 @@ def _save_run_record(
             status_entry["elapsed_ms"] = node_elapsed[node_id]
         run_data["statuses"][node_id] = status_entry
 
-    # Compute duration
+    # Compute duration: prefer per-node sum (FUNCTIONAL), fall back to wall-clock
     if node_elapsed:
         run_data["duration_ms"] = sum(node_elapsed.values())
+    elif started_at is not None:
+        run_data["duration_ms"] = int((finished_at - started_at) * 1000)
 
     # Capture reproducibility
     try:
@@ -895,13 +894,21 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     graph_payload, scope = _split_request(payload)
     graph = _to_graph(graph_payload)
     validate_api_keys_present(graph)
+    started_at = time.time()
     if graph.paradigm is Paradigm.FUNCTIONAL:
         only, wiring_map = _resolve_run_scope(graph, scope)
         results, statuses, node_elapsed = _execute_functional_with_status(
             graph, only=only, wiring_map=wiring_map
         )
         if not scope:
-            _save_run_record(graph, graph_payload, results, statuses, node_elapsed=node_elapsed)
+            _save_run_record(
+                graph,
+                graph_payload,
+                results,
+                statuses,
+                node_elapsed=node_elapsed,
+                started_at=started_at,
+            )
         return {
             "payload_version": PAYLOAD_CONTRACT_VERSION,
             "results": _results_to_payloads(results),
@@ -915,7 +922,7 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     results = execute(graph)
     statuses = {node_id: {"status": _STATUS_OK} for node_id in results}
     if not scope:
-        _save_run_record(graph, graph_payload, results, statuses)
+        _save_run_record(graph, graph_payload, results, statuses, started_at=started_at)
     return {
         "payload_version": PAYLOAD_CONTRACT_VERSION,
         "results": _results_to_payloads(results),
