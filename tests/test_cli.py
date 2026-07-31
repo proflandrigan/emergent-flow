@@ -19,6 +19,7 @@ def _patch_serve(monkeypatch) -> dict[str, Any]:
         open_browser: bool = True,
         cache_dir: str | None = None,
         cache_max_mb: float | None = None,
+        runs_keep: int | None = None,
     ) -> None:
         calls.update(
             host=host,
@@ -26,6 +27,7 @@ def _patch_serve(monkeypatch) -> dict[str, Any]:
             open_browser=open_browser,
             cache_dir=cache_dir,
             cache_max_mb=cache_max_mb,
+            runs_keep=runs_keep,
         )
 
     monkeypatch.setattr(server_pkg, "serve", fake_serve)
@@ -82,6 +84,7 @@ def test_serve_cache_flags_default_to_none(monkeypatch) -> None:
     assert main(["serve"]) == 0
     assert calls["cache_dir"] is None
     assert calls["cache_max_mb"] is None
+    assert calls["runs_keep"] is None
 
 
 def test_serve_cache_flags_are_forwarded(monkeypatch) -> None:
@@ -95,3 +98,9 @@ def test_lab_cache_flags_are_forwarded(monkeypatch) -> None:
     calls = _patch_serve(monkeypatch)
     assert main(["lab", "--cache-dir", "/tmp/labcache"]) == 0
     assert calls["cache_dir"] == "/tmp/labcache"
+
+
+def test_serve_runs_keep_forwarded(monkeypatch) -> None:
+    calls = _patch_serve(monkeypatch)
+    assert main(["serve", "--runs-keep", "100"]) == 0
+    assert calls["runs_keep"] == 100
