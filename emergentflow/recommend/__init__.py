@@ -18,13 +18,20 @@ module (Epic 15, Story 4 onward), imported here for its side effect once it exis
 from __future__ import annotations
 
 import importlib.util
+import json
 import math
+import time
+from pathlib import Path
 from typing import Any
 
+import joblib  # type: ignore[import-untyped]
 import numpy as np
 import pandas as pd
 
+from emergentflow import __version__
 from emergentflow.api import public_op
+from emergentflow.errors import ModelPersistenceError
+from emergentflow.ir.common import ArtifactRef
 from emergentflow.recommend.errors import (
     InvalidRecommenderParamsError,
     MissingOptionalDependencyError,
@@ -52,6 +59,8 @@ __all__ = [
     "recommend",
     "similar_items",
     "temporal_split",
+    "save_model",
+    "load_model",
 ]
 
 #: Pip extra -> probe modules whose absence means the extra is not installed, mirroring
@@ -754,6 +763,124 @@ def random_split(
         cold_start_mode="include",
     )
     return train, test
+
+
+@public_op(name="ef.recommend.save_model")
+def save_model(
+    model: FittedRecommender,
+    path: str | Path,
+) -> ArtifactRef:
+    """Serialize *model* to *path* using joblib and return an ArtifactRef.
+
+    Writes two files:
+      - ``<path>`` — the pickled model (via joblib).
+      - ``<path>.meta.json`` — a sidecar with sdk version, algorithm,
+        algorithm family, user/item counts, and fit stats.
+
+    The sidecar enables ``load_model`` to version-check before deserializing.
+    Loading a pickle is code execution (same trust model as
+    ``ExecutionCache`` / ``ArtifactStore``).
+
+    Parameters
+    ----------
+    model:
+        The fitted recommender to save.
+    path:
+        Destination file path (e.g. ``"models/popularity_v3.joblib"``).
+        Parent directories are created if missing.
+
+    Returns
+    -------
+    ArtifactRef
+        A reference to the saved artifact.
+
+    Raises
+    ------
+    ModelPersistenceError
+        If *model* is not a :class:`FittedRecommender`.
+    """
+    if not isinstance(model, FittedRecommender):
+        raise ModelPersistenceError(
+            f"save_model expects a FittedRecommender; got {type(model).__name__}."
+        )
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    import sklearn
+
+    joblib.dump(model, path)
+
+    meta = {
+        "sdk_version": __version__,
+        "sklearn_version": sklearn.__version__,
+        "algorithm": model.algorithm,
+        "algorithm_family": model.algorithm_family,
+        "n_users": model.n_users,
+        "n_items": model.n_items,
+        "fit_stats": model.fit_stats,
+        "timestamp": time.time(),
+    }
+    meta_path = path.with_suffix(path.suffix + ".meta.json")
+    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+    return ArtifactRef(uri=str(path), media_type="application/octet-stream")
+
+
+@public_op(name="ef.recommend.load_model")
+def load_model(
+    ref_or_path: str | Path | ArtifactRef,
+) -> FittedRecommender:
+    """Deserialize a saved recommender from *ref_or_path*.
+
+    Validates the sidecar's sklearn version against the current environment
+    and raises :class:`ModelPersistenceError` on mismatch with a clear
+    explanatory message.
+
+    Parameters
+    ----------
+    ref_or_path:
+        An ``ArtifactRef``, a file path string, or a ``Path``.
+
+    Returns
+    -------
+    FittedRecommender
+        The deserialized recommender.
+
+    Raises
+    ------
+    ModelPersistenceError
+        If the sidecar's sklearn version does not match the current
+        environment's sklearn version, or if the loaded object is not a
+        FittedRecommender.
+    FileNotFoundError
+        If the model file does not exist.
+    """
+    import sklearn
+
+    path = Path(ref_or_path.uri) if isinstance(ref_or_path, ArtifactRef) else Path(ref_or_path)
+
+    if not path.is_file():
+        raise FileNotFoundError(f"Model file not found: {path}")
+
+    meta_path = path.with_suffix(path.suffix + ".meta.json")
+    if meta_path.is_file():
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        saved_sklearn_version = meta.get("sklearn_version")
+        current_sklearn_version = sklearn.__version__
+        if saved_sklearn_version and saved_sklearn_version != current_sklearn_version:
+            raise ModelPersistenceError(
+                f"Model was saved with sklearn v{saved_sklearn_version} but the current "
+                f"environment has sklearn v{current_sklearn_version}. "
+                f"Install the matching version: `pip install scikit-learn=={saved_sklearn_version}`"
+            )
+
+    model = joblib.load(path)
+    if not isinstance(model, FittedRecommender):
+        raise ModelPersistenceError(
+            f"Loaded object is not a FittedRecommender; got {type(model).__name__}."
+        )
+    return model
 
 
 from emergentflow.recommend import catalog  # noqa: E402, F401

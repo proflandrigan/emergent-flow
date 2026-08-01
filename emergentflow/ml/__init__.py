@@ -21,10 +21,15 @@ from __future__ import annotations
 
 import contextlib
 import importlib.util
+import json
 import sys
+import time
+import warnings
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, cast
 
+import joblib  # type: ignore[import-untyped]
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
@@ -47,10 +52,13 @@ from sklearn.model_selection import train_test_split as _sk_split
 from sklearn.pipeline import Pipeline as _SkPipeline
 from tqdm import tqdm
 
+from emergentflow import __version__
 from emergentflow.api import public_op
+from emergentflow.ir.common import ArtifactRef
 from emergentflow.ml.errors import (
     InvalidEstimatorParamsError,
     MissingOptionalDependencyError,
+    ModelPersistenceError,
     UnknownEstimatorError,
 )
 from emergentflow.ml.registry import get_estimator_spec, keys_for_archetype
@@ -80,6 +88,8 @@ __all__ = [
     "EvaluationResult",
     "FittedModel",
     "FittedTransformer",
+    "save_model",
+    "load_model",
 ]
 
 FOREST_TASKS = ("classification", "regression")
@@ -1336,6 +1346,133 @@ def reduce_dimensions(
         seed=seed,
         explained_variance=explained_variance,
     )
+
+
+@public_op(name="ef.ml.save_model")
+def save_model(
+    model: FittedModel | FittedTransformer,
+    path: str | Path,
+) -> ArtifactRef:
+    """Serialize *model* to *path* using joblib and return an ArtifactRef.
+
+    Writes two files:
+      - ``<path>`` — the pickled model (via joblib).
+      - ``<path>.meta.json`` — a sidecar with sdk version, sklearn version,
+        estimator type, task, feature names, and target.
+
+    The sidecar enables ``load_model`` to version-check before deserializing.
+    Documented as unsandboxed deserialization (same trust model as
+    ``ExecutionCache`` / ``ArtifactStore``): loading a pickle is code execution.
+
+    Parameters
+    ----------
+    model:
+        The fitted model or transformer to save.
+    path:
+        Destination file path (e.g. ``"models/churn_rf_v3.joblib"``).
+        Parent directories are created if missing.
+
+    Returns
+    -------
+    ArtifactRef
+        A reference to the saved artifact with ``uri=str(path)`` and
+        ``media_type="application/octet-stream"``.
+
+    Raises
+    ------
+    ModelPersistenceError
+        If *model* is not a :class:`FittedModel` or :class:`FittedTransformer`.
+    """
+    if not isinstance(model, (FittedModel, FittedTransformer)):
+        raise ModelPersistenceError(
+            f"save_model expects a FittedModel or FittedTransformer; got {type(model).__name__}."
+        )
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    import sklearn
+
+    joblib.dump(model, path)
+
+    meta = {
+        "sdk_version": __version__,
+        "sklearn_version": sklearn.__version__,
+        "estimator_type": model.estimator_type,
+        "task": getattr(model, "task", None),
+        "feature_names": model.feature_names,
+        "target": getattr(model, "target", None),
+        "timestamp": time.time(),
+    }
+    meta_path = path.with_suffix(path.suffix + ".meta.json")
+    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+    return ArtifactRef(uri=str(path), media_type="application/octet-stream")
+
+
+@public_op(name="ef.ml.load_model")
+def load_model(
+    ref_or_path: str | Path | ArtifactRef,
+) -> FittedModel | FittedTransformer:
+    """Deserialize a saved model from *ref_or_path*.
+
+    Validates the sidecar's sklearn version against the current environment
+    and raises :class:`ModelPersistenceError` on mismatch with a clear
+    explanatory message instead of an opaque unpickling failure.
+
+    Parameters
+    ----------
+    ref_or_path:
+        An ``ArtifactRef``, a file path string, or a ``Path``. When an
+        ``ArtifactRef`` is passed, its ``uri`` is used as the path.
+
+    Returns
+    -------
+    FittedModel | FittedTransformer
+        The deserialized model.
+
+    Raises
+    ------
+    ModelPersistenceError
+        If the sidecar's sklearn version does not match the current
+        environment's sklearn version, or if the loaded object is not a
+        FittedModel / FittedTransformer.
+    FileNotFoundError
+        If the model file does not exist.
+    """
+    import sklearn
+
+    path = Path(ref_or_path.uri) if isinstance(ref_or_path, ArtifactRef) else Path(ref_or_path)
+
+    if not path.is_file():
+        raise FileNotFoundError(f"Model file not found: {path}")
+
+    meta_path = path.with_suffix(path.suffix + ".meta.json")
+    if meta_path.is_file():
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        saved_sklearn_version = meta.get("sklearn_version")
+        current_sklearn_version = sklearn.__version__
+        if saved_sklearn_version and saved_sklearn_version != current_sklearn_version:
+            raise ModelPersistenceError(
+                f"Model was saved with sklearn v{saved_sklearn_version} but the current "
+                f"environment has sklearn v{current_sklearn_version}. "
+                f"Install the matching version: `pip install scikit-learn=={saved_sklearn_version}`"
+            )
+    else:
+        # No sidecar: allow loading for backward compatibility with models saved
+        # before the sidecar was introduced, but warn that no version check ran.
+        warnings.warn(
+            f"Model at {path} has no {path.name}.meta.json sidecar; "
+            "skipping the sklearn version check.",
+            stacklevel=2,
+        )
+
+    model = joblib.load(path)
+    if not isinstance(model, (FittedModel, FittedTransformer)):
+        raise ModelPersistenceError(
+            f"Loaded object is not a FittedModel or FittedTransformer; got {type(model).__name__}."
+        )
+    return model
 
 
 # Importing the seed catalog registers its estimator allow-list entries (LogisticRegression,

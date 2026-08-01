@@ -68,6 +68,18 @@ test("typing in a text input updates the store", () => {
   expect(param?.value).toBe("latin-1");
 });
 
+test("typing in a filepath input updates the store", () => {
+  const id = addNode("ml.load_model");
+  const input = screen.getByTestId("param-path") as HTMLInputElement;
+
+  fireEvent.change(input, { target: { value: "models/churn.joblib" } });
+
+  const param = useGraphStore
+    .getState()
+    .nodes[id].params.find((p) => p.name === "path");
+  expect(param?.value).toBe("models/churn.joblib");
+});
+
 test("a required-but-empty param shows its error message", () => {
   // data.load_csv's `path` is required with a null default -> empty -> "Required".
   addNode("data.load_csv");

@@ -89,6 +89,7 @@ from .load_documents import LoadDocuments
 from .load_excel import LoadExcel
 from .load_google_sheet import LoadGoogleSheet
 from .load_json import LoadJson
+from .load_model import LoadModel
 from .load_parquet import LoadParquet
 from .load_sample import LoadSample
 from .mann_whitney import MannWhitney
@@ -113,7 +114,9 @@ from .recommend_fit import RecommendFit
 from .recommend_fit_two_tower import RecommendFitTwoTower
 from .recommend_hybrid_switching import HybridSwitching
 from .recommend_hybrid_weighted import HybridWeighted
+from .recommend_load_model import RecommendLoadModel
 from .recommend_recommend import Recommend
+from .recommend_save_model import RecommendSaveModel
 from .recommend_similar_items import SimilarItems
 from .recommend_temporal_split import RecommendTemporalSplit
 from .redact_pii import RedactPii
@@ -121,6 +124,7 @@ from .reduce_dimensions import ReduceDimensions
 from .report import GenerateHtmlSummary
 from .reshape import Reshape
 from .sample_rows import SampleRows
+from .save_model import SaveModel
 from .scale_features import ScaleFeatures
 from .seasonal_decompose import SeasonalDecompose
 from .select_columns import SelectColumns
@@ -234,6 +238,7 @@ __all__ = [
     "LoadExcel",
     "LoadGoogleSheet",
     "LoadJson",
+    "LoadModel",
     "LoadParquet",
     "LoadSample",
     "MannWhitney",
@@ -257,11 +262,14 @@ __all__ = [
     "RecommendEvaluate",
     "RecommendFit",
     "RecommendFitTwoTower",
+    "RecommendLoadModel",
+    "RecommendSaveModel",
     "RecommendTemporalSplit",
     "RedactPii",
     "ReduceDimensions",
     "Reshape",
     "SampleRows",
+    "SaveModel",
     "ScaleFeatures",
     "SeasonalDecompose",
     "SelectColumns",

@@ -10,11 +10,17 @@ staying compatible with existing ``pytest.raises(ValueError)``-style tests.
 
 from __future__ import annotations
 
+# ModelPersistenceError is shared with the recommend family (which must not import
+# this package), so it lives in the neutral ``emergentflow.errors`` module and is
+# re-exported here for discoverability from the ml family.
+from emergentflow.errors import ModelPersistenceError as ModelPersistenceError
+
 __all__ = [
     "MLAdapterError",
     "MissingOptionalDependencyError",
     "UnknownEstimatorError",
     "InvalidEstimatorParamsError",
+    "ModelPersistenceError",
 ]
 
 
