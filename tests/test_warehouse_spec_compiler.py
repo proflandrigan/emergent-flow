@@ -256,6 +256,24 @@ def test_cross_join_compiles_without_on() -> None:
     conn.execute(result)
 
 
+def test_cross_join_without_on_compiles() -> None:
+    """A CROSS join may omit the `on` list entirely (it has no join key).
+
+    Before the fix, a CROSS spec without `on` raised ``missing 'on' key
+    conditions`` even though CROSS joins never use a join key.
+    """
+    result = compile_spec(
+        {
+            "source": "sales",
+            "select": ["revenue"],
+            "join": [{"relation": "regions", "type": "CROSS"}],
+        },
+        "duckdb",
+    )
+    assert result == "SELECT revenue FROM sales CROSS JOIN regions"
+    assert " ON " not in result
+
+
 def test_other_join_types_keep_on() -> None:
     """LEFT/RIGHT/FULL/INNER joins still carry their ON condition."""
     for join_type in ("LEFT", "RIGHT", "FULL", "INNER"):

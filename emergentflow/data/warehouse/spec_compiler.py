@@ -169,21 +169,27 @@ def _build_predicate(pred: dict) -> exp.Expression:
     return cmp_cls(this=col_expr, expression=val_expr)
 
 
-def _build_join(join_spec: dict) -> tuple[exp.Expression, exp.Expression]:
+def _build_join(
+    join_spec: dict, *, join_type: str = "INNER"
+) -> tuple[exp.Expression, exp.Expression | None]:
     """Build a JOIN clause from a spec dict.
 
     Format: {"relation": "regions", "on": [{"left": "sales.region_id", "right": "regions.id"}],
              "type": "LEFT"}
-    Returns (table_expr, on_condition).
+    Returns (table_expr, on_condition). ``on_condition`` is ``None`` for a CROSS join
+    (which has no join key -- an ``on`` list is optional and never emitted as SQL).
     """
     relation = join_spec.get("relation")
     if not relation:
         raise SpecValidationError("Join spec missing 'relation' key.")
+    table_expr = exp.Table(this=exp.to_identifier(relation))
+
+    if join_type == "CROSS":
+        return table_expr, None
+
     on_keys = join_spec.get("on", [])
     if not on_keys:
         raise SpecValidationError(f"Join on {relation!r} missing 'on' key conditions.")
-
-    table_expr = exp.Table(this=exp.to_identifier(relation))
 
     conditions = []
     for pair in on_keys:
@@ -243,8 +249,8 @@ def compile_spec(spec: dict[str, Any], dialect: str) -> str:
 
     # JOINs
     for join_spec in spec.get("join", []):
-        table_expr, on_cond = _build_join(join_spec)
         join_type = join_spec.get("type", "INNER").upper()
+        table_expr, on_cond = _build_join(join_spec, join_type=join_type)
 
         # Map join type strings to sqlglot join kwargs. A CROSS JOIN cannot carry an
         # ON clause (invalid SQL in every dialect) -- the spec's `on` conditions are
@@ -255,9 +261,11 @@ def compile_spec(spec: dict[str, Any], dialect: str) -> str:
             join_kwargs["join_type"] = "CROSS"
         elif join_type in ("LEFT", "RIGHT", "FULL"):
             join_kwargs["join_type"] = join_type
+            assert on_cond is not None  # _build_join validates `on` for non-CROSS joins
             join_kwargs["on"] = on_cond
         else:
             # INNER is the default (no join_type kwarg needed).
+            assert on_cond is not None  # _build_join validates `on` for non-CROSS joins
             join_kwargs["on"] = on_cond
 
         select_node = select_node.join(table_expr, **join_kwargs)
