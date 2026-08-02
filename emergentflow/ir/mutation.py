@@ -170,14 +170,12 @@ def apply_mutation(graph: Graph, m: GraphMutation) -> Graph:
 
         for p in existing_params:
             if p.name in param_updates:
-                updated_params.append(
-                    Param(
-                        name=p.name,
-                        type_token=p.type_token,
-                        value=param_updates[p.name],
-                        default=p.default,
-                    )
-                )
+                # Update ONLY the value, preserving the existing param's other fields
+                # (type_token, default, and critically `ref`/`description` since issue
+                # #116). Rebuilding a fresh Param field-by-field here would silently
+                # drop a graph-parameter `ref` -- severing the author's graph-param
+                # wiring on an agent-proposed value edit (issue #116 interaction).
+                updated_params.append(p.model_copy(update={"value": param_updates[p.name]}))
                 updated_param_names.add(p.name)
             else:
                 updated_params.append(p)

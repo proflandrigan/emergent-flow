@@ -222,3 +222,56 @@ def test_missing_join_relation_raises() -> None:
             },
             "duckdb",
         )
+
+
+def test_cross_join_compiles_without_on() -> None:
+    """A CROSS join drops its (invalid) ON clause instead of emitting it.
+
+    CROSS JOIN cannot carry an ON condition in any SQL dialect -- before the fix,
+    the spec compiler emitted ``CROSS JOIN regions ON sales.region_id = regions.id``,
+    which DuckDB (and every other backend) rejects with a parser error.
+    """
+    result = compile_spec(
+        {
+            "source": "sales",
+            "select": ["revenue"],
+            "join": [
+                {
+                    "relation": "regions",
+                    "on": [{"left": "sales.region_id", "right": "regions.id"}],
+                    "type": "CROSS",
+                },
+            ],
+        },
+        "duckdb",
+    )
+    assert result == "SELECT revenue FROM sales CROSS JOIN regions"
+    assert " ON " not in result
+
+    # The compiled SQL is valid and runnable on the in-process backend.
+    duckdb = pytest.importorskip("duckdb")
+    conn = duckdb.connect()
+    conn.execute("CREATE TABLE sales (region_id INT, revenue INT)")
+    conn.execute("CREATE TABLE regions (id INT)")
+    conn.execute(result)
+
+
+def test_other_join_types_keep_on() -> None:
+    """LEFT/RIGHT/FULL/INNER joins still carry their ON condition."""
+    for join_type in ("LEFT", "RIGHT", "FULL", "INNER"):
+        result = compile_spec(
+            {
+                "source": "sales",
+                "select": ["revenue"],
+                "join": [
+                    {
+                        "relation": "regions",
+                        "on": [{"left": "sales.region_id", "right": "regions.id"}],
+                        "type": join_type,
+                    },
+                ],
+            },
+            "duckdb",
+        )
+        assert " ON sales.region_id = regions.id" in result, result
+        assert "CROSS" not in result.upper(), result

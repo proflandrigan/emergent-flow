@@ -246,17 +246,19 @@ def compile_spec(spec: dict[str, Any], dialect: str) -> str:
         table_expr, on_cond = _build_join(join_spec)
         join_type = join_spec.get("type", "INNER").upper()
 
-        # Map join type strings to sqlglot join kwargs
-        join_kwargs: dict[str, Any] = {"on": on_cond}
-        if join_type == "LEFT":
-            join_kwargs["join_type"] = "LEFT"
-        elif join_type == "RIGHT":
-            join_kwargs["join_type"] = "RIGHT"
-        elif join_type == "FULL":
-            join_kwargs["join_type"] = "FULL"
-        elif join_type == "CROSS":
+        # Map join type strings to sqlglot join kwargs. A CROSS JOIN cannot carry an
+        # ON clause (invalid SQL in every dialect) -- the spec's `on` conditions are
+        # dropped for it rather than emitted. LEFT/RIGHT/FULL and the INNER default
+        # keep the ON condition.
+        join_kwargs: dict[str, Any] = {}
+        if join_type == "CROSS":
             join_kwargs["join_type"] = "CROSS"
-        # INNER is the default (no join_type kwarg needed)
+        elif join_type in ("LEFT", "RIGHT", "FULL"):
+            join_kwargs["join_type"] = join_type
+            join_kwargs["on"] = on_cond
+        else:
+            # INNER is the default (no join_type kwarg needed).
+            join_kwargs["on"] = on_cond
 
         select_node = select_node.join(table_expr, **join_kwargs)
 
