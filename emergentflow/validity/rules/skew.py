@@ -13,6 +13,8 @@ different order). Pure, static, and deterministic over the graph IR.
 
 from __future__ import annotations
 
+from collections import Counter
+
 from emergentflow.ir import Graph, Node
 
 from ..contract import ValidityFinding, ValidityRule
@@ -196,14 +198,13 @@ class TrainServeSkew(ValidityRule):
                 if train_chain == predict_chain:
                     continue  # equivalent chain -- same transforms, same order
 
-                predict_types = [t.type for t in predict_transforms]
-                train_types = [t.type for t in train_transforms]
-                missing = [t for t in train_transforms if t.type not in predict_types]
-                extra = [t for t in predict_transforms if t.type not in train_types]
+                train_counts = Counter(t.type for t in train_transforms)
+                predict_counts = Counter(t.type for t in predict_transforms)
 
-                if not missing and not extra:
-                    # Same transform types, applied in a different order -- the
-                    # documented third skew shape (rationale + docs page).
+                if train_counts == predict_counts:
+                    # Same transform types in the same counts, applied in a
+                    # different order -- the documented third skew shape
+                    # (rationale + docs page).
                     findings.append(
                         ValidityFinding(
                             rule_id=self.id,
@@ -221,6 +222,16 @@ class TrainServeSkew(ValidityRule):
                         )
                     )
                     continue
+
+                # A transform type applied MORE times on one path than the other is a
+                # count difference, not an order difference -- report it as a missing/
+                # extra transform so the message is accurate.
+                missing = [
+                    t for t in train_transforms if train_counts[t.type] > predict_counts[t.type]
+                ]
+                extra = [
+                    t for t in predict_transforms if predict_counts[t.type] > train_counts[t.type]
+                ]
 
                 for transform in missing:
                     findings.append(

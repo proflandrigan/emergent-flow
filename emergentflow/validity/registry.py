@@ -17,7 +17,7 @@ from .contract import CONFIDENCE, SEVERITIES, ValidityRule
 #: Version of the rule-pack artifact emitted from the default registry.
 #: Bump when a rule's metadata (id, severity, title, rationale) changes in a
 #: way the canvas must see.
-PACK_VERSION: int = 1
+PACK_VERSION: int = 2
 
 
 class ValidityRuleRegistry:

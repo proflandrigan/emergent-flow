@@ -72,22 +72,31 @@ certain.
 
 - **`fit_before_split`** — *error / high / decidable-without-inference.* A
   fitting transform (`ml.fit_transform`, `ml.pipeline`, `transform.scale_features`,
-  `transform.encode_categorical`, `transform.discretize`,
-  `transform.generate_features`) reachable **upstream of** a split node
+  `transform.encode_categorical`, `transform.discretize`) reachable **upstream of**
+  a split node
   (`ml.train_test_split` or `recommend.temporal_split`) fits its parameters on
   the full frame, including the rows the split later holds out. **False-positive
   shape:** a fitting transform on a reporting/EDA branch that never feeds the
   split's frame input. `ml.transform` (apply a fitted transformer) is
   deliberately excluded — applying a fitted transform is the legitimate pattern.
+  `transform.generate_features` is likewise excluded: `PolynomialFeatures`
+  learns no data-derived parameters (a row's polynomial expansion depends only
+  on that row), so computing it before a split encodes no held-out information.
 
-- **`target_derived_feature`** — *error / high / decidable-without-inference.* A
+- **`target_derived_feature`** — *warning / medium / topological-approximation.*
+  A
   `clean.derive_column` whose expression references a column that is the
   `target` of a downstream supervised node (`ml.fit_estimator`, `ml.train_*`,
-  `ml.pipeline`). The derived feature is a function of the answer, so a model
-  trained on it leaks the target. Column references are extracted statically via
-  the same AST walk `emergentflow/clean/expressions.py` validates. **False-positive
+  `ml.pipeline`, `ml.cross_validate`, `ml.grid_search`). The derived feature is a function of the answer, so a
+  model trained on it leaks the target. Column references are extracted statically via
+  the same AST walk `emergentflow/clean/expressions.py` validates. Warning (not
+  error): the rule fires on node reachability, so it cannot always tell whether the
+  target-referencing derived column actually reaches the model's feature set — it
+  stays silent when the supervised node's `features` param excludes it.
+  **False-positive
   shape:** the derived column is computed for reporting and never feeds the
-  supervised node, or the name coincidentally matches an unrelated column.
+  supervised node, is dropped before the model, or the name coincidentally
+  matches an unrelated column.
 
 - **`global_aggregate_before_split`** — *warning / medium /
   topological-approximation.* `stats.group_by_aggregate` computed upstream of a

@@ -39,7 +39,6 @@ FITTING_TRANSFORMS: frozenset[str] = frozenset(
         "transform.scale_features",
         "transform.encode_categorical",
         "transform.discretize",
-        "transform.generate_features",
     }
 )
 
@@ -51,6 +50,8 @@ SUPERVISED_TARGET_NODES: frozenset[str] = frozenset(
         "ml.train_regressor",
         "ml.train_random_forest",
         "ml.pipeline",
+        "ml.cross_validate",
+        "ml.grid_search",
     }
 )
 
@@ -84,28 +85,37 @@ def _referenced_columns(expr: str) -> set[str]:
     return {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
 
 
-def _derive_expression_strings(node: Node) -> list[str]:
-    """Every expression string in a ``clean.derive_column`` node's columns spec.
+def _derive_columns(node: Node) -> list[tuple[str, set[str]]]:
+    """``(derived column name, referenced columns)`` per derived column.
 
-    Handles both spec shapes: ``{"expr": str}`` computed columns and
-    ``{"when": [{"if": str, ...}, ...]}`` case-when columns.
+    Handles both spec shapes: ``{"name", "expr"}`` computed columns and
+    ``{"name", "when": [{"if", ...}, ...]}`` case-when columns. The column
+    *name* is what a supervised node's ``features`` param may include or
+    exclude, so the rule can tell whether a target-referencing derived column
+    actually reaches the model.
     """
     specs = _node_params(node).get("columns") or []
     if not isinstance(specs, list):
         return []
-    exprs: list[str] = []
+    derived: list[tuple[str, set[str]]] = []
     for spec in specs:
         if not isinstance(spec, dict):
             continue
+        name = spec.get("name")
+        if not isinstance(name, str) or not name:
+            continue
+        referenced: set[str] = set()
         expr = spec.get("expr")
         if isinstance(expr, str):
-            exprs.append(expr)
+            referenced |= _referenced_columns(expr)
         when = spec.get("when")
         if isinstance(when, list):
             for branch in when:
                 if isinstance(branch, dict) and isinstance(branch.get("if"), str):
-                    exprs.append(branch["if"])
-    return exprs
+                    referenced |= _referenced_columns(branch["if"])
+        if referenced:
+            derived.append((name, referenced))
+    return derived
 
 
 def _target_column(node: Node) -> str | None:
@@ -168,16 +178,19 @@ class TargetDerivedFeature(ValidityRule):
     """A derived feature computed from the target column."""
 
     id = "target_derived_feature"
-    severity = "error"
-    confidence = "high"
+    severity = "warning"
+    confidence = "medium"
     title = "Derived feature references the target column"
     rationale = (
         "clean.derive_column computes a feature from an expression that references "
         "the model's target column. The feature is a function of the answer, so a "
-        "model trained on it leaks the target. False-positive shape: the derived "
+        "model trained on it leaks the target. Warning (not error): the rule is a "
+        "topological approximation -- it fires on node reachability, so it cannot "
+        "always tell whether the target-referencing derived column actually reaches "
+        "the model's feature set (it is silent when the supervised node explicitly "
+        "excludes it via the features param). False-positive shape: the derived "
         "column is computed for reporting and never feeds the supervised node, or "
-        "the expression coincidentally shares a name with an unrelated column. "
-        "Decidable without inference, so error."
+        "the expression coincidentally shares a name with an unrelated column."
     )
 
     @classmethod
@@ -185,31 +198,39 @@ class TargetDerivedFeature(ValidityRule):
         return any(n.type == "clean.derive_column" for n in graph.nodes.values())
 
     def check(self, graph: Graph) -> list[ValidityFinding]:
-        supervised: list[tuple[str, Node, str]] = []
+        supervised: list[tuple[str, Node]] = []
         for node in graph.nodes.values():
             if node.type not in SUPERVISED_TARGET_NODES:
                 continue
             target = _target_column(node)
             if target is not None:
-                supervised.append((target, node, node.id))
+                supervised.append((target, node))
         # Stable order (node id ascending) so findings are golden-testable regardless
         # of dict insertion order -- same discipline as the sorted derive-node loop.
-        supervised.sort(key=lambda entry: entry[2])
+        supervised.sort(key=lambda entry: entry[1].id)
         if not supervised:
             return []
         findings: list[ValidityFinding] = []
         for node in sorted(graph.nodes.values(), key=lambda n: n.id):
             if node.type != "clean.derive_column":
                 continue
-            referenced: set[str] = set()
-            for expr in _derive_expression_strings(node):
-                referenced |= _referenced_columns(expr)
-            if not referenced:
+            derived = _derive_columns(node)
+            if not derived:
                 continue
-            for target, _, supervised_id in supervised:
-                if target not in referenced:
+            for target, supervised_node in supervised:
+                if not reaches(graph, node.id, supervised_node.id):
                     continue
-                if not reaches(graph, node.id, supervised_id):
+                # Skip when every target-referencing derived column is explicitly
+                # excluded from the model's feature set (no leak reaches the model).
+                features = _node_params(supervised_node).get("features")
+                leaky_names = [name for name, refs in derived if target in refs]
+                if not leaky_names:
+                    continue
+                if (
+                    isinstance(features, list)
+                    and features
+                    and not any(col in features for col in leaky_names)
+                ):
                     continue
                 findings.append(
                     ValidityFinding(
@@ -218,13 +239,14 @@ class TargetDerivedFeature(ValidityRule):
                         message=(
                             f"node {node.id!r} (clean.derive_column) derives a "
                             f"feature from target column {target!r}, which is the "
-                            f"target of supervised node {supervised_id!r}; the "
+                            f"target of supervised node {supervised_node.id!r}; the "
                             "derived feature leaks the answer."
                         ),
                         node_id=node.id,
-                        related_node_ids=[supervised_id],
+                        related_node_ids=[supervised_node.id],
                     )
                 )
+                break
         return findings
 
 
@@ -305,7 +327,7 @@ class GlobalImputationBeforeSplit(ValidityRule):
         for node in sorted(graph.nodes.values(), key=lambda n: n.id):
             if node.type != "clean.impute_missing":
                 continue
-            strategy = _node_params(node).get("strategy")
+            strategy = _node_params(node).get("strategy") or "mean"
             if strategy not in DATA_DERIVED_IMPUTE_STRATEGIES:
                 continue
             for split_id in splits:

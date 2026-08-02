@@ -1,5 +1,5 @@
 {
-  "pack_version": 1,
+  "pack_version": 2,
   "rules": [
     {
       "confidence": "medium",
@@ -44,10 +44,10 @@
       "title": "Ranking metrics measured against a random split"
     },
     {
-      "confidence": "high",
+      "confidence": "medium",
       "id": "target_derived_feature",
-      "rationale": "clean.derive_column computes a feature from an expression that references the model's target column. The feature is a function of the answer, so a model trained on it leaks the target. False-positive shape: the derived column is computed for reporting and never feeds the supervised node, or the expression coincidentally shares a name with an unrelated column. Decidable without inference, so error.",
-      "severity": "error",
+      "rationale": "clean.derive_column computes a feature from an expression that references the model's target column. The feature is a function of the answer, so a model trained on it leaks the target. Warning (not error): the rule is a topological approximation -- it fires on node reachability, so it cannot always tell whether the target-referencing derived column actually reaches the model's feature set (it is silent when the supervised node explicitly excludes it via the features param). False-positive shape: the derived column is computed for reporting and never feeds the supervised node, or the expression coincidentally shares a name with an unrelated column.",
+      "severity": "warning",
       "title": "Derived feature references the target column"
     },
     {

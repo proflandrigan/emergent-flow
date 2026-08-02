@@ -451,3 +451,117 @@ def test_apply_suppressions_filters_validity_findings_only() -> None:
     # non-validity diagnostics (no rule_id) are never suppressed
     unfiltered = ef.apply_suppressions(result, [["fit_before_split", "other-node"]])
     assert len(unfiltered.diagnostics) == len(result.diagnostics)
+
+
+# ---------------------------------------------------------------------------
+# Regression tests for confirmed bug-hunt findings (PR #147 review)
+# ---------------------------------------------------------------------------
+
+
+def test_global_imputation_before_split_trips_for_default_strategy() -> None:
+    """An impute node with no strategy param executes with the data-derived
+    default (\"mean\"), so it must still trip -- not just an explicit mean."""
+    impute = _node("impute", "clean.impute_missing", _io("impute", "i"))
+    split = _split("split")
+    graph = _graph([impute, split], [_edge("e1", "impute", "i-out", "split", "sp-in")])
+    assert "global_imputation_before_split" in _rule_ids(graph)
+
+
+def test_target_derived_feature_silent_when_features_param_excludes_derived() -> None:
+    """The derived target-referencing column never reaches the model when the
+    supervised node's features param explicitly excludes it -- no leak, no
+    finding (and never an error that would block compile/execute)."""
+    derive = _derive("derive", "churn * 2")
+    sup = _node(
+        "sup",
+        "ml.fit_estimator",
+        [("m-in", "frame", IN, DF), ("m-out", "model", OUT, "Model")],
+        [("target", "churn"), ("features", ["age"])],
+    )
+    graph = _graph([derive, sup], [_edge("e1", "derive", "d-out", "sup", "m-in")])
+    assert "target_derived_feature" not in _rule_ids(graph)
+
+
+def test_target_derived_feature_trips_for_cross_validate_and_grid_search() -> None:
+    """ml.cross_validate / ml.grid_search fit supervised estimators on a target;
+    a target-referencing derived feature feeding them is the same leak as for
+    fit_estimator."""
+    derive = _derive("derive", "churn * 2")
+    cv = _node(
+        "cv",
+        "ml.cross_validate",
+        [("cv-in", "frame", IN, DF), ("cv-out", "result", OUT, DF)],
+        [("estimator", "RandomForestClassifier"), ("target", "churn")],
+    )
+    graph = _graph([derive, cv], [_edge("e1", "derive", "d-out", "cv", "cv-in")])
+    assert "target_derived_feature" in _rule_ids(graph)
+
+    gs = _node(
+        "gs",
+        "ml.grid_search",
+        [("gs-in", "frame", IN, DF), ("gs-out", "result", OUT, DF)],
+        [("estimator", "RandomForestClassifier"), ("target", "churn")],
+    )
+    graph = _graph([derive, gs], [_edge("e1", "derive", "d-out", "gs", "gs-in")])
+    assert "target_derived_feature" in _rule_ids(graph)
+
+
+def test_target_derived_feature_is_warning_not_blocking() -> None:
+    """target_derived_feature is a topological approximation, so it must warn,
+    never error -- an error would hard-block compile/execute on a graph where
+    the derived column is dropped before the model."""
+    derive = _derive("derive", "churn * 2")
+    sup = _supervised()
+    graph = _graph([derive, sup], [_edge("e1", "derive", "d-out", "sup", "m-in")])
+    findings = [f for f in run_validity_checks(graph) if f.rule_id == "target_derived_feature"]
+    assert findings
+    assert all(f.severity == "warning" for f in findings)
+
+
+def test_fit_before_split_silent_for_generate_features() -> None:
+    """PolynomialFeatures learns no data-derived parameters, so generating
+    features before a split is not a target leak and must not trip the error
+    rule."""
+    gen = _node("gen", "transform.generate_features", _io("gen", "g"))
+    split = _split("split")
+    graph = _graph([gen, split], [_edge("e1", "gen", "g-out", "split", "sp-in")])
+    assert "fit_before_split" not in _rule_ids(graph)
+
+
+def test_train_serve_skew_reports_count_mismatch_not_order() -> None:
+    """Applying a transform twice on train and once on serve is a count
+    difference -- it must not be reported as \"same transforms, different
+    order\"."""
+    src = _node("src", "test.source", [("src-out", "out", OUT, DF)])
+    sa = _node("sa", "transform.scale_features", _io("sa", "a"))
+    sb = _node("sb", "transform.scale_features", _io("sb", "b"))
+    sc = _node("sc", "transform.scale_features", _io("sc", "c"))
+    fit = _node(
+        "fit",
+        "ml.fit_estimator",
+        [("f-in", "frame", IN, DF), ("f-out", "model", OUT, "Model")],
+    )
+    lm = _node("lm", "ml.load_model", [("lm-out", "model", OUT, "Model")], [("path", "m.joblib")])
+    pred = _node(
+        "pred",
+        "ml.predict",
+        [
+            ("p-model", "model", IN, "Model"),
+            ("p-frame", "frame", IN, DF),
+            ("p-out", "predictions", OUT, "Predictions"),
+        ],
+    )
+    graph = _graph(
+        [src, sa, sb, sc, fit, lm, pred],
+        [
+            _edge("e1", "src", "src-out", "sa", "a-in"),
+            _edge("e2", "sa", "a-out", "sb", "b-in"),
+            _edge("e3", "sb", "b-out", "fit", "f-in"),
+            _edge("e4", "src", "src-out", "sc", "c-in"),
+            _edge("e5", "sc", "c-out", "pred", "p-frame"),
+            _edge("e6", "lm", "lm-out", "pred", "p-model"),
+        ],
+    )
+    skew = [f for f in run_validity_checks(graph) if f.rule_id == "train_serve_skew"]
+    assert skew, "skew must still be detected"
+    assert all("different order" not in f.message for f in skew)
