@@ -28,7 +28,7 @@ from emergentflow.clients import ClientKind, Clients
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
 from emergentflow.codegen.executor import _has_graph_param_refs
 from emergentflow.codegen.inspect import build_step_traces
-from emergentflow.codegen.params import materialize_graph
+from emergentflow.codegen.params import materialize_graph, resolve_graph_params
 from emergentflow.codegen.traversal import topological_sort
 from emergentflow.codegen.validation import enforce_validation_gate, required_in_port_names
 from emergentflow.codegen.wiring import WiringMap, build_wiring_map
@@ -859,7 +859,14 @@ def _save_run_record(
         )
 
         deps = resolve_dependency_versions([])
-        repro = capture_run(graph, dependency_versions=deps, params=params)
+        # Record every graph-level param's RESOLVED value (stored value with any request
+        # override applied), not just the override keys -- a partial map would make a
+        # multi-param run's reproducibility record incomplete.
+        repro = capture_run(
+            graph,
+            dependency_versions=deps,
+            params=resolve_graph_params(graph, overrides=params) if params else None,
+        )
         run_data["reproducibility"] = {
             "seeds": repro.seeds,
             "content_hashes": repro.content_hashes,

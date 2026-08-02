@@ -126,6 +126,7 @@ def _assemble(
     graph: Graph,
     *,
     param_overrides: dict[tuple[str, str], str] | None = None,
+    graph_param_names: dict[str, str] | None = None,
 ) -> _AssembledModule:
     """Runs the per-node compilation pipeline and returns its structured result.
 
@@ -139,6 +140,16 @@ def _assemble(
     a composite node's subgraph boundary ports to the enclosing nested function's own parameter
     names (issue #117 stage 3). `compile_to_code`'s top-level call always passes
     `param_overrides=None`.
+
+    `graph_param_names`, when given, names the compiled ``main()`` keyword-argument variable for
+    each graph-level param and is used instead of deriving names from *graph*'s own ``params``
+    map. Used exactly once, by `_codegen_composite`, to compile a composite node's subgraph
+    against the ENCLOSING graph's params: a ref'd node param inside a subgraph resolves at run
+    time against the outer graph's params (see ``emergentflow.codegen.params.materialize_graph``,
+    which recurses into subgraphs with the outer resolved map), so the compiled body must emit
+    the outer param's variable name for it — ``_param_expr_refs`` would otherwise KeyError
+    looking the ref up in the subgraph's own (typically empty) ``params`` map. The nested
+    function closes over the outer ``main()`` kwarg, so the name resolves either way.
     """
     # Step 1: Paradigm guard
     if graph.paradigm is not Paradigm.FUNCTIONAL:
@@ -181,7 +192,8 @@ def _assemble(
 
     # Step 4: Per-node codegen
     name_map = build_name_map(graph)
-    graph_param_names = build_graph_param_names(graph, name_map)
+    if graph_param_names is None:
+        graph_param_names = build_graph_param_names(graph, name_map)
     code_fragments: list[CodeFragment] = []
     needs_llm = False
     needs_warehouse = False
@@ -237,7 +249,7 @@ def _assemble(
             # generic per-node dispatch -- its own `codegen()` raises NotImplementedError
             # on purpose. Its subgraph's own client/env/connection needs must still bubble
             # up into the enclosing module's `main()` signature and docstring hints.
-            fragment, inner = _codegen_composite(node, ctx)
+            fragment, inner = _codegen_composite(node, ctx, graph_param_names)
             needs_llm = needs_llm or inner.needs_llm
             needs_warehouse = needs_warehouse or inner.needs_warehouse
             needs_http = needs_http or inner.needs_http
@@ -317,7 +329,9 @@ def _assemble(
     )
 
 
-def _codegen_composite(node: Node, ctx: CodegenContext) -> tuple[CodeFragment, _AssembledModule]:
+def _codegen_composite(
+    node: Node, ctx: CodegenContext, graph_param_names: dict[str, str]
+) -> tuple[CodeFragment, _AssembledModule]:
     """Recursively compile a `layout.composite` node's subgraph into a nested function.
 
     Emits `def <fn_name>(...): ...subgraph body...; return ...` followed by a call-site
@@ -333,6 +347,11 @@ def _codegen_composite(node: Node, ctx: CodegenContext) -> tuple[CodeFragment, _
     collect imports from, exactly like any other fragment) alongside the subgraph's full
     `_AssembledModule`, so the caller can bubble up its `needs_llm`/`needs_warehouse`/
     `needs_http`/env/connection hints into the enclosing module.
+
+    *graph_param_names* is the ENCLOSING graph's param-name map (see ``_assemble``'s docstring):
+    a ref'd param on a subgraph node must emit the outer ``main()`` kwarg's variable name so the
+    compiled body matches what ``execute`` resolves via ``materialize_graph``'s subgraph
+    recursion (ADR 0002 equivalence for composite graphs).
     """
     if node.subgraph is None:
         raise CodegenError(f"Composite node {_describe(node)} has no subgraph to compile.")
@@ -361,7 +380,11 @@ def _codegen_composite(node: Node, ctx: CodegenContext) -> tuple[CodeFragment, _
         port_name = next(p.name for p in owner.ports if p.id == ref.port_id)
         param_overrides[(ref.node_id, port_name)] = param_name
 
-    inner = _assemble(node.subgraph, param_overrides=param_overrides)
+    inner = _assemble(
+        node.subgraph,
+        param_overrides=param_overrides,
+        graph_param_names=graph_param_names,
+    )
 
     return_vars = [inner.name_map.var_for(ref.node_id, ref.port_id) for ref in boundary.exposed_out]
     if not return_vars:

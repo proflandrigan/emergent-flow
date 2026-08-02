@@ -89,10 +89,20 @@ def _coerce_param_value(raw: str, type_token: str) -> Any:
     """Coerce a ``--param`` value to the graph param's declared *type_token* (issue #116)."""
     value = _json_coerce(raw)
     if type_token == "int" and not isinstance(value, int):
+        # json.loads parses "10.5" to a float; truncating to 10 would silently
+        # corrupt a bad value, so reject it instead (matching the ValueError the
+        # string path already raises for a non-numeric raw).
+        if isinstance(value, float) and not value.is_integer():
+            raise ValueError(f"expected an integer value, got {raw!r}")
         return int(value)
     if type_token == "float" and not isinstance(value, (int, float)):
         return float(value)
     if type_token == "bool" and not isinstance(value, bool):
+        # json.loads already parses "true"/"false" to real bools, but "1"/"0" arrive
+        # as JSON numbers; the string tuple below would silently coerce --param flag=1
+        # to False. Map numeric spellings by truthiness first.
+        if isinstance(value, (int, float)):
+            return value != 0
         return value in ("true", "True", "1", "yes")
     if type_token == "str" and not isinstance(value, str):
         return str(value)
@@ -154,6 +164,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         # Execute
         from emergentflow import __version__, execute
+        from emergentflow.codegen.params import resolve_graph_params
         from emergentflow.ir.serialize import deserialize_graph
         from emergentflow.research.reproducibility import capture_run, resolve_dependency_versions
         from emergentflow.server.payload import to_payload
@@ -212,7 +223,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             repro = capture_run(
                 graph,
                 dependency_versions=deps,
-                params=params if params else None,
+                # Record every graph-level param's RESOLVED value (stored value with any
+                # --param override applied), not just the override keys -- a partial map
+                # would make a multi-param run's record incomplete.
+                params=resolve_graph_params(graph, overrides=params) if params else None,
             )
             run_data["reproducibility"] = {
                 "seeds": repro.seeds,

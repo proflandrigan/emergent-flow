@@ -278,6 +278,38 @@ class TestExecute:
         with pytest.raises(GraphValidationError):
             execute(g)
 
+    def test_composite_subgraph_ref_resolves_against_outer_params(self) -> None:
+        """A ref'd param on a node inside a composite's subgraph resolves against the OUTER
+        graph's params on both the compile and execute paths (reviewer fix: ADR-0002
+        equivalence for composite subgraphs)."""
+        sink = Node(
+            id="sink",
+            type=_GraphParamSink.type,
+            label=_GraphParamSink.label,
+            ports=[
+                Port(id="sink-out", name="out", direction=Direction.OUT, data_type="int")
+            ],
+            params=[Param(name="value", type_token="int", ref="p")],
+        )
+        sub = Graph(params={}, nodes={"sink": sink}, edges={})
+        composite = Node(
+            id="comp",
+            type="layout.composite",
+            label="Composite",
+            ports=[
+                Port(id="comp-out", name="out", direction=Direction.OUT, data_type="int")
+            ],
+            subgraph=sub,
+        )
+        g = Graph(params={"p": Param(name="p", type_token="int", value=3)})
+        g.nodes["comp"] = composite
+
+        source = compile_to_code(g)
+        assert "def main(*, p=" in source
+        assert "= p" in source
+        assert execute(g)["comp"] == {"out": 3}
+        assert execute(g, params={"p": 7})["comp"] == {"out": 7}
+
 
 # ---------------------------------------------------------------------------
 # Reproducibility
