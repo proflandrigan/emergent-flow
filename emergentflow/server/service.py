@@ -182,6 +182,22 @@ def get_catalog() -> dict[str, Any]:
     return export_catalog()
 
 
+def get_validity_rules() -> dict[str, Any]:
+    """Return the versioned experiment-validity rule-pack artifact (Epic 17 Story 2).
+
+    Delegates to the single canonical builder ``ef.build_validity_rules_artifact``
+    so the server's ``GET /validity-rules``, the committed
+    ``ui/src/generated/validity_rules.json``, and the SDK's
+    ``ef.build_validity_rules_artifact()`` all serve byte-identical data -- one
+    source of truth. Shape: ``{"pack_version": <int>, "rules": [<rule metadata>,
+    ...]}`` with ``rules`` sorted by rule id. The canvas renders a finding's rule
+    explanation from this, with no Python round-trip (ADR 0012).
+    """
+    from emergentflow.validity.artifact import build_validity_rules_artifact
+
+    return build_validity_rules_artifact()
+
+
 def get_mutation_schema() -> dict[str, Any]:
     """Return the JSON Schema for `GraphMutation` (Epic 14 Story 4) for the canvas to consume."""
     from emergentflow.collab.contracts import mutation_json_schema

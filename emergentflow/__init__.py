@@ -53,8 +53,13 @@ _LAZY_ENTRY_POINTS = {
     "export_report": ("emergentflow.codegen.export", "export_report"),
     "export_script": ("emergentflow.codegen.export", "export_script"),
     "validate": ("emergentflow.codegen.validation", "validate"),
+    "apply_suppressions": ("emergentflow.codegen.validation", "apply_suppressions"),
     "apply_type_compatibility": ("emergentflow.codegen.validation", "apply_type_compatibility"),
     "build_rules_artifact": ("emergentflow.types.rules_artifact", "build_rules_artifact"),
+    "build_validity_rules_artifact": (
+        "emergentflow.validity.artifact",
+        "build_validity_rules_artifact",
+    ),
     "diagnostics_json_schema": (
         "emergentflow.codegen.diagnostics_schema",
         "diagnostics_json_schema",
@@ -84,9 +89,14 @@ if TYPE_CHECKING:  # let type-checkers resolve ef.data, ef.codegen, ... statical
     from emergentflow.codegen.diagnostics_schema import diagnostics_json_schema
     from emergentflow.codegen.executor import execute
     from emergentflow.codegen.export import export_report, export_script
-    from emergentflow.codegen.validation import apply_type_compatibility, validate
+    from emergentflow.codegen.validation import (
+        apply_suppressions,
+        apply_type_compatibility,
+        validate,
+    )
     from emergentflow.nodes.catalog import export_catalog
     from emergentflow.types.rules_artifact import build_rules_artifact
+    from emergentflow.validity.artifact import build_validity_rules_artifact
 
 __all__ = [
     "__version__",
@@ -115,8 +125,10 @@ __all__ = [
     "export_report",
     "export_script",
     "validate",
+    "apply_suppressions",
     "apply_type_compatibility",
     "build_rules_artifact",
+    "build_validity_rules_artifact",
     "diagnostics_json_schema",
     "export_catalog",
 ]

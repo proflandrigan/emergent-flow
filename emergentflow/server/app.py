@@ -135,6 +135,7 @@ from emergentflow.server.service import (
     get_personas,
     get_schema,
     get_session_event_schema,
+    get_validity_rules,
     inspect_graph,
     label_eval,
     lineage_for_node,
@@ -521,6 +522,10 @@ def create_app() -> FastAPI:
     @application.get("/catalog")
     async def catalog() -> Response:
         return await _safe_json(get_catalog)
+
+    @application.get("/validity-rules")
+    async def validity_rules() -> Response:
+        return await _safe_json(get_validity_rules)
 
     @application.get("/mutation-schema")
     async def mutation_schema() -> Response:

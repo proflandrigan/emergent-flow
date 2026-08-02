@@ -4,6 +4,8 @@ Subcommands:
 - ``emergentflow serve`` -- boot the thin local canvas server (in-process ``ef.*``).
 - ``emergentflow lab``   -- alias for ``serve`` (the JupyterLab-style launch verb).
 - ``emergentflow run``   -- execute a graph from a file and record the run.
+- ``emergentflow validate`` -- validate a graph from a file and print findings
+  (``--strict`` exits non-zero on error-severity diagnostics).
 
 Kept dependency-light: the server (and stdlib ``http.server``) is imported lazily
 inside ``main`` so ``import emergentflow.cli`` stays cheap.
@@ -73,6 +75,31 @@ def _build_parser() -> argparse.ArgumentParser:
             "typed per the parameter's declared type_token, e.g. --param start_date=2026-02-01 "
             "--param min_events=10."
         ),
+    )
+
+    p = sub.add_parser("validate", help="Validate a graph from a file and print findings.")
+    p.add_argument("graph_file", help="Path to a .json graph file.")
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help=(
+            "Exit non-zero when any error-severity diagnostic remains after "
+            "suppression (Epic 17 validity gate)."
+        ),
+    )
+    p.add_argument(
+        "--suppressions",
+        default=None,
+        metavar="FILE",
+        help=(
+            "Path to a JSON file containing a list of [rule_id, node_id] pairs to "
+            "suppress before deciding the exit code."
+        ),
+    )
+    p.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit the full Diagnostics result as JSON (machine-readable).",
     )
     return parser
 
@@ -258,6 +285,53 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"  Tag: {args.tag}")
         print(f"  Nodes: {run_data['node_count']}")
         print(f"  Duration: {run_data['duration_ms']}ms")
+        return 0
+
+    if args.command == "validate":
+        import json as json_mod
+        import pathlib
+
+        graph_path = pathlib.Path(args.graph_file)
+        if not graph_path.is_file():
+            print(f"Error: graph file not found: {graph_path}", file=sys.stderr)
+            return 1
+        raw_text = graph_path.read_text(encoding="utf-8")
+
+        from emergentflow import apply_suppressions, validate
+        from emergentflow.ir.serialize import deserialize_graph
+
+        graph = deserialize_graph(raw_text)
+        result = validate(graph)
+
+        suppressions: list[list[str]] = []
+        if args.suppressions:
+            supp_path = pathlib.Path(args.suppressions)
+            if not supp_path.is_file():
+                print(f"Error: suppressions file not found: {supp_path}", file=sys.stderr)
+                return 1
+            suppressions = json_mod.loads(supp_path.read_text(encoding="utf-8"))
+
+        filtered = apply_suppressions(result, suppressions)
+
+        if args.json:
+            print(json_mod.dumps(filtered.model_dump(mode="json"), indent=2))
+        else:
+            errors = [d for d in filtered.diagnostics if d.severity.value == "error"]
+            warnings = [d for d in filtered.diagnostics if d.severity.value == "warning"]
+            info = [d for d in filtered.diagnostics if d.severity.value == "info"]
+            print(
+                f"Validation: {len(filtered.diagnostics)} finding(s) "
+                f"({len(errors)} error, {len(warnings)} warning, {len(info)} info)"
+            )
+            for d in filtered.diagnostics:
+                tag = f"{d.severity.value}:"
+                location = d.node_id or d.edge_id or "(graph)"
+                rule = f" [{d.rule_id}]" if d.rule_id else ""
+                print(f"  {tag} {location}: {d.message}{rule}")
+
+        if args.strict:
+            errors = [d for d in filtered.diagnostics if d.severity.value == "error"]
+            return 1 if errors else 0
         return 0
 
     parser.print_help()
