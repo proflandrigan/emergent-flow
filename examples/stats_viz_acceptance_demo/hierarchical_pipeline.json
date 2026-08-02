@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "paradigm": "functional",
   "name": "Stats/Viz Acceptance Demo -- Hierarchical",
   "nodes": {
@@ -13,7 +13,9 @@
           "name": "name",
           "type_token": "str",
           "value": "iris",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -122,7 +124,9 @@
           "name": "diagnostic",
           "type_token": "str",
           "value": "vif",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -160,7 +164,9 @@
           "name": "target",
           "type_token": "str",
           "value": "sepal width (cm)",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "fixed_effects",
@@ -168,7 +174,9 @@
           "value": [
             "petal length (cm)"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "random_effects",
@@ -176,13 +184,17 @@
           "value": [
             "petal length (cm)"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "groups",
           "type_token": "str",
           "value": "target",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -291,5 +303,6 @@
       },
       "type_compatible": null
     }
-  }
+  },
+  "params": {}
 }

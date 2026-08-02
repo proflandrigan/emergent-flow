@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "paradigm": "functional",
   "name": "epic16_transform",
   "nodes": {
@@ -13,37 +13,49 @@
           "name": "path",
           "type_token": "str",
           "value": "examples/epic16_acceptance_demos/sales/sales_*.csv",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "encoding",
           "type_token": "str",
           "value": "utf-8",
-          "default": "utf-8"
+          "default": "utf-8",
+          "ref": null,
+          "description": null
         },
         {
           "name": "source_file",
           "type_token": "bool",
           "value": false,
-          "default": false
+          "default": false,
+          "ref": null,
+          "description": null
         },
         {
           "name": "connection",
           "type_token": "str",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "expect_columns",
           "type_token": "list[str]",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "expect_dtypes",
           "type_token": "dict",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -75,7 +87,9 @@
           "value": [
             "region"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "operations",
@@ -88,13 +102,17 @@
               "op": "lower"
             }
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "suffix",
           "type_token": "str",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -132,31 +150,41 @@
           "name": "mode",
           "type_token": "str",
           "value": "melt",
-          "default": "pivot"
+          "default": "pivot",
+          "ref": null,
+          "description": null
         },
         {
           "name": "index",
           "type_token": "list[str]",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "columns",
           "type_token": "list[str]",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "values",
           "type_token": "list[str]",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "aggfunc",
           "type_token": "str",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "id_vars",
@@ -165,7 +193,9 @@
             "region",
             "channel"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "value_vars",
@@ -174,19 +204,25 @@
             "revenue",
             "units"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "var_name",
           "type_token": "str",
           "value": "metric",
-          "default": "variable"
+          "default": "variable",
+          "ref": null,
+          "description": null
         },
         {
           "name": "value_name",
           "type_token": "str",
           "value": "amount",
-          "default": "value"
+          "default": "value",
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -227,13 +263,17 @@
             "region",
             "metric"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "agg",
           "type_token": "str",
           "value": "mean",
-          "default": "mean"
+          "default": "mean",
+          "ref": null,
+          "description": null
         },
         {
           "name": "columns",
@@ -241,7 +281,9 @@
           "value": [
             "amount"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -279,25 +321,33 @@
           "name": "row_col",
           "type_token": "str",
           "value": "region",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "col_col",
           "type_token": "str",
           "value": "metric",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "normalize",
           "type_token": "str",
           "value": "none",
-          "default": "none"
+          "default": "none",
+          "ref": null,
+          "description": null
         },
         {
           "name": "margins",
           "type_token": "bool",
           "value": false,
-          "default": true
+          "default": true,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -335,7 +385,9 @@
           "name": "chart",
           "type_token": "str",
           "value": "bar",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "encoding",
@@ -344,13 +396,17 @@
             "x": "region",
             "y": "amount"
           },
-          "default": {}
+          "default": {},
+          "ref": null,
+          "description": null
         },
         {
           "name": "options",
           "type_token": "dict[str, any]",
           "value": {},
-          "default": {}
+          "default": {},
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -440,5 +496,6 @@
       },
       "type_compatible": null
     }
-  }
+  },
+  "params": {}
 }

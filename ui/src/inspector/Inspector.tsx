@@ -18,6 +18,7 @@ import { Segmented } from "../ui/Segmented";
 import { Tooltip } from "../ui/Tooltip";
 import { CodePanel } from "./CodePanel";
 import { ConfigForm } from "./ConfigForm";
+import { FlowParamsPanel } from "./FlowParamsPanel";
 import { LineagePanel } from "./LineagePanel";
 import { PayloadView } from "./PayloadView";
 import { StepsPanel } from "./StepsPanel";
@@ -129,16 +130,7 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
 
   function renderBody(): JSX.Element {
     if (tab === "config") {
-      return node ? (
-        <ConfigForm node={node} />
-      ) : (
-        <p
-          data-testid="inspector-empty"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          Select a node to edit its parameters.
-        </p>
-      );
+      return node ? <ConfigForm node={node} /> : <FlowParamsPanel />;
     }
     if (tab === "code") return <CodePanel highlightVarName={highlightVarName} />;
     if (tab === "steps") {

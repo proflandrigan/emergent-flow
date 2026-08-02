@@ -15,6 +15,7 @@ export interface CatalogValidationHints {
   pattern?: string | null;
   widget?: string | null;
   connection_kind?: string | null;
+  ref_supported?: boolean;
 }
 
 export interface CatalogParam {

@@ -34,7 +34,7 @@ class SqlQuery(NodeDefinition):
     """Run a raw SQL query against a warehouse and return a DataFrame."""
 
     type = "data.sql_query"
-    version = 2
+    version = 3
     family = "data"
     label = "SQL Query"
     category = "Ingest"
@@ -67,7 +67,7 @@ class SqlQuery(NodeDefinition):
             required=True,
             label="SQL",
             help="The SQL query to run (SELECT/WITH only under read-only connections).",
-            hints=ValidationHints(widget="sql"),
+            hints=ValidationHints(widget="sql", ref_supported=True),
         ),
         connection_param(),
         ParamSpec(
@@ -80,6 +80,7 @@ class SqlQuery(NodeDefinition):
             hints=ValidationHints(
                 choices=["duckdb", "bigquery", "redshift", "postgres"],
                 widget="select",
+                ref_supported=True,
             ),
         ),
         ParamSpec(
@@ -88,7 +89,7 @@ class SqlQuery(NodeDefinition):
             default=None,
             label="Max rows",
             help="Optional row cap; injects LIMIT when absent from the SQL.",
-            hints=ValidationHints(min=1, widget="number"),
+            hints=ValidationHints(min=1, widget="number", ref_supported=True),
         ),
         ParamSpec(
             name="dry_run",
@@ -96,7 +97,7 @@ class SqlQuery(NodeDefinition):
             default=False,
             label="Dry run",
             help="When True, return a cost estimate without running the query.",
-            hints=ValidationHints(widget="checkbox"),
+            hints=ValidationHints(widget="checkbox", ref_supported=True),
         ),
     ]
 
@@ -109,6 +110,9 @@ class SqlQuery(NodeDefinition):
         dry_run = cast(bool, values.get("dry_run", False) or False)
         return sql, connection, dialect, max_rows, dry_run
 
+    def _refs(self, node: Node) -> set[str]:
+        return {p.name for p in node.params if p.ref is not None}
+
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         sql, connection, dialect, max_rows, dry_run = self._args(node)
         # The 'frame' port is always a genuine DataFrame -- empty under dry_run (see
@@ -117,15 +121,20 @@ class SqlQuery(NodeDefinition):
         # The QueryResult's cost/byte-scan metadata (populated under dry_run, and by
         # some adapters on a real run too) goes out its own 'cost_estimate' port instead
         # of overloading 'frame' with two different shapes.
+        refs = self._refs(node)
+        sql_expr = ctx.param_expr("sql") if "sql" in refs else repr(sql)
+        dialect_expr = ctx.param_expr("dialect") if "dialect" in refs else repr(dialect)
+        max_rows_expr = ctx.param_expr("max_rows") if "max_rows" in refs else repr(max_rows)
+        dry_run_expr = ctx.param_expr("dry_run") if "dry_run" in refs else repr(dry_run)
         bundle = f"_{ctx.out_var('frame')}_bundle"
         lines = [
             f"{bundle} = ef.data.query(",
-            f"    sql={sql!r},",
+            f"    sql={sql_expr},",
             f"    connection={connection!r},",
-            f"    dialect={dialect!r},",
+            f"    dialect={dialect_expr},",
             "    client=warehouse,",
-            f"    max_rows={max_rows!r},",
-            f"    dry_run={dry_run!r},",
+            f"    max_rows={max_rows_expr},",
+            f"    dry_run={dry_run_expr},",
             ")",
             f"{ctx.out_var('frame')} = {bundle}.df",
             f"{ctx.out_var('cost_estimate')} = "

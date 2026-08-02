@@ -216,3 +216,27 @@ def build_name_map(graph: Graph) -> NameMap:
         bindings.append(OutBinding(node_id=node_id, port_id=port_id, var_name=var_name))
 
     return NameMap(bindings=bindings)
+
+
+def build_graph_param_names(graph: Graph, name_map: NameMap) -> dict[str, str]:
+    """Assign a stable, collision-free Python variable name to each graph-level param.
+
+    The compiled ``main()`` takes one keyword argument per graph param, named from the param's
+    name (sanitized to a valid identifier). A candidate that collides with an OUT-port variable
+    already allocated by *name_map*, or with another graph param's sanitized form, is
+    disambiguated with the same stable blake2s hash suffix ``build_name_map`` uses. Graph params
+    are processed in sorted param-name order for determinism.
+    """
+    taken = {b.var_name for b in name_map.bindings}
+    names: dict[str, str] = {}
+    for pname in sorted(graph.params):
+        base = _sanitize_identifier(_slugify(pname)) or "param"
+        candidate = base
+        if candidate in taken:
+            length = 4
+            while candidate in taken and length <= 16:
+                candidate = f"{base}_{_hash_suffix(pname, 'gparam', length)}"
+                length += 1
+        names[pname] = candidate
+        taken.add(candidate)
+    return names

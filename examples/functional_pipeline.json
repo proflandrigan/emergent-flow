@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "paradigm": "functional",
   "name": "Functional Pipeline Example",
   "nodes": {
@@ -13,7 +13,9 @@
           "name": "path",
           "type_token": "str",
           "value": "examples/vertical_slice/sample.csv",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -43,7 +45,9 @@
           "name": "strategy",
           "type_token": "str",
           "value": "median",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -81,13 +85,17 @@
           "name": "group_col",
           "type_token": "str",
           "value": "cohort",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "value_col",
           "type_token": "str",
           "value": "score",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -141,5 +149,6 @@
       },
       "type_compatible": null
     }
-  }
+  },
+  "params": {}
 }

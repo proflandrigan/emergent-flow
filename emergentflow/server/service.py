@@ -26,7 +26,9 @@ import pandas as pd
 from emergentflow import __version__, compile_to_code, execute, export_catalog, validate
 from emergentflow.clients import ClientKind, Clients
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
+from emergentflow.codegen.executor import _has_graph_param_refs
 from emergentflow.codegen.inspect import build_step_traces
+from emergentflow.codegen.params import materialize_graph
 from emergentflow.codegen.traversal import topological_sort
 from emergentflow.codegen.validation import enforce_validation_gate, required_in_port_names
 from emergentflow.codegen.wiring import WiringMap, build_wiring_map
@@ -751,12 +753,13 @@ def _results_to_payloads(
 _SCOPE_KEYS = ("run_to", "run_from", "run_only")
 
 
-def _split_request(payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Split an /execute body into ``(graph_dict, scope)``.
+def _split_request(payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], Any]:
+    """Split an /execute body into ``(graph_dict, scope, params)``.
 
     *scope* is a dict carrying at most one of ``run_to`` / ``run_from`` /
-    ``run_only`` (whichever the request supplied). A bare IR graph (no
-    ``"graph"`` key) yields an empty scope (run everything). Backward
+    ``run_only`` (whichever the request supplied); *params* is the optional
+    graph-level parameter override map (issue #116), or ``None``. A bare IR
+    graph (no ``"graph"`` key) yields an empty scope and no params. Backward
     compatible with the pre-issue-105 ``run_to`` envelope.
     """
     if isinstance(payload.get("graph"), dict):
@@ -764,8 +767,8 @@ def _split_request(payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str, A
         for key in _SCOPE_KEYS:
             if payload.get(key) is not None:
                 scope[key] = payload[key]
-        return payload["graph"], scope
-    return payload, {}
+        return payload["graph"], scope, payload.get("params")
+    return payload, {}, None
 
 
 # Maps a scope key to the set-expansion function that turns the targets into
@@ -813,6 +816,7 @@ def _save_run_record(
     statuses: dict[str, dict[str, Any]],
     node_elapsed: dict[str, int] | None = None,
     started_at: float | None = None,
+    params: dict[str, Any] | None = None,
 ) -> None:
     graph_hash = hashlib.sha256(json.dumps(graph_payload, sort_keys=True).encode()).hexdigest()
     finished_at = time.time()
@@ -826,7 +830,12 @@ def _save_run_record(
         "duration_ms": 0,
         "node_count": len(graph.nodes),
         "statuses": {},
-        "reproducibility": {"seeds": {}, "content_hashes": {}, "dependency_versions": {}},
+        "reproducibility": {
+            "seeds": {},
+            "content_hashes": {},
+            "dependency_versions": {},
+            "params": {},
+        },
         "sdk_version": __version__,
     }
     # Build per-node statuses with elapsed_ms
@@ -850,11 +859,12 @@ def _save_run_record(
         )
 
         deps = resolve_dependency_versions([])
-        repro = capture_run(graph, dependency_versions=deps)
+        repro = capture_run(graph, dependency_versions=deps, params=params)
         run_data["reproducibility"] = {
             "seeds": repro.seeds,
             "content_hashes": repro.content_hashes,
             "dependency_versions": repro.dependency_versions,
+            "params": repro.params,
         }
     except Exception:
         pass  # reproducibility capture is best-effort
@@ -893,11 +903,16 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     the previous run's stored outputs for the targets' own IN ports. ``run_only``
     runs exactly the listed nodes, likewise reusing stored outputs where available.
     """
-    graph_payload, scope = _split_request(payload)
+    graph_payload, scope, params = _split_request(payload)
     graph = _to_graph(graph_payload)
     validate_api_keys_present(graph)
     started_at = time.time()
     if graph.paradigm is Paradigm.FUNCTIONAL:
+        # Resolve graph-level parameter overrides into the graph the walk reads
+        # (ref'd node params baked to their resolved values) so the server-side
+        # FUNCTIONAL walk matches `ef.execute(graph, params=...)` (issue #116).
+        if params is not None or _has_graph_param_refs(graph):
+            graph = materialize_graph(graph, params=params)
         only, wiring_map = _resolve_run_scope(graph, scope)
         results, statuses, node_elapsed = _execute_functional_with_status(
             graph, only=only, wiring_map=wiring_map
@@ -910,6 +925,7 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
                 statuses,
                 node_elapsed=node_elapsed,
                 started_at=started_at,
+                params=params,
             )
         return {
             "payload_version": PAYLOAD_CONTRACT_VERSION,
@@ -921,10 +937,12 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     # DECLARATIVE (and any future paradigm): delegate to the reference executor,
     # which is all-or-nothing. On success the single nn.module node is "ok"; its
     # rejections raise (CodegenError) -> 422.
-    results = execute(graph)
+    results = execute(graph, params=params)
     statuses = {node_id: {"status": _STATUS_OK} for node_id in results}
     if not scope:
-        _save_run_record(graph, graph_payload, results, statuses, started_at=started_at)
+        _save_run_record(
+            graph, graph_payload, results, statuses, started_at=started_at, params=params
+        )
     return {
         "payload_version": PAYLOAD_CONTRACT_VERSION,
         "results": _results_to_payloads(results),
@@ -1012,12 +1030,14 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
     per-node granularity to report, so it becomes a terminal ``"run_error"``
     event instead.
     """
-    graph_payload, scope = _split_request(payload)
+    graph_payload, scope, params = _split_request(payload)
     graph = _to_graph(graph_payload)
     validate_api_keys_present(graph)
     start_time = time.monotonic()
     try:
         if graph.paradigm is Paradigm.FUNCTIONAL:
+            if params is not None or _has_graph_param_refs(graph):
+                graph = materialize_graph(graph, params=params)
             only, wiring_map = _resolve_run_scope(graph, scope)
             for event in _execute_functional_stream(graph, only=only, wiring_map=wiring_map):
                 if event.phase == "start":
@@ -1065,7 +1085,7 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
             # all-or-nothing and has no per-node granularity to stream, so emit
             # one node_start/node_ok pair per produced node (mirrors
             # execute_graph's all-"ok" statuses on success).
-            results = execute(graph)
+            results = execute(graph, params=params)
             for node_id, ports in results.items():
                 yield {
                     "type": "node_start",

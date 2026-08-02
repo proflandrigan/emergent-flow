@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "paradigm": "functional",
   "name": "Acceptance Demo",
   "nodes": {
@@ -13,7 +13,9 @@
           "name": "name",
           "type_token": "str",
           "value": "diabetes",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -43,13 +45,17 @@
           "name": "axis",
           "type_token": "str",
           "value": "rows",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "how",
           "type_token": "str",
           "value": "any",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -93,13 +99,17 @@
             "s1",
             "target"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "drop",
           "type_token": "bool",
           "value": false,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -137,13 +147,17 @@
           "name": "test_size",
           "type_token": "float",
           "value": 0.25,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "random_state",
           "type_token": "int",
           "value": 0,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -189,7 +203,9 @@
           "name": "target",
           "type_token": "str",
           "value": "target",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "features",
@@ -200,7 +216,9 @@
             "bp",
             "s1"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -277,7 +295,9 @@
           "name": "columns",
           "type_token": "list[str]",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -315,7 +335,9 @@
           "name": "title",
           "type_token": "str",
           "value": "Emergent Flow — Acceptance Demo",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -441,5 +463,6 @@
       },
       "type_compatible": null
     }
-  }
+  },
+  "params": {}
 }

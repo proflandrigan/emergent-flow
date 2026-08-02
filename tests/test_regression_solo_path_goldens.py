@@ -119,12 +119,13 @@ def test_execute_response_golden(client: TestClient, snapshot) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_current_schema_version_is_pinned_at_one() -> None:
-    # Epic 14's DoD requires the IR wire format stay untouched by the
-    # collaboration layer: no new Graph/Node/Edge field, no migration step,
-    # no schema_version bump (epics/epic-14-agent-collaboration.md, Definition
-    # of Done). This pins that invariant permanently.
-    assert CURRENT_SCHEMA_VERSION == 1
+def test_current_schema_version_is_pinned() -> None:
+    # Epic 14's DoD requires the IR wire format stay untouched by the collaboration
+    # layer: no new Graph/Node/Edge field, no migration step, no schema_version bump
+    # (epics/epic-14-agent-collaboration.md, Definition of Done). Issue #116 (graph-level
+    # parameters) is the sanctioned exception that bumped the wire format 1 -> 2; this
+    # pins the current value so any further bump is a deliberate, reviewed change.
+    assert CURRENT_SCHEMA_VERSION == 2
 
 
 def test_ir_schema_json_unchanged_golden(snapshot) -> None:

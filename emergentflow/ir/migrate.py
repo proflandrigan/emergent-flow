@@ -199,7 +199,20 @@ def _migrate_v0_to_v1(doc: dict[str, Any]) -> dict[str, Any]:
     return doc
 
 
+def _migrate_v1_to_v2(doc: dict[str, Any]) -> dict[str, Any]:
+    """Schema v1 -> v2: introduce the optional top-level ``params`` map (issue #116).
+
+    The field defaults to an empty map and is additive/back-compatible, so the step only
+    needs to ensure the key exists on v1 documents that predate it.
+    """
+    doc = dict(doc)
+    if "params" not in doc:
+        doc["params"] = {}
+    return doc
+
+
 register_migration(0, _migrate_v0_to_v1)
+register_migration(1, _migrate_v1_to_v2)
 
 
 # ---------------------------------------------------------------------------

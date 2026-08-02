@@ -43,7 +43,9 @@ export type ParamValue =
   | {
       [k: string]: ParamValue;
     };
+export type Description = string | null;
 export type Name1 = string;
+export type Ref = string | null;
 export type TypeToken = string;
 export type Params = Param[];
 /**
@@ -85,12 +87,16 @@ export type Type = string;
  *     CRDT-friendly id→Node map.  Keys MUST equal ``node.id``.
  * edges:
  *     CRDT-friendly id→Edge map.  Keys MUST equal ``edge.id``.
+ * params:
+ *     Optional graph-level id→Param map.  Keys MUST equal ``param.name``.
+ *     Defaults to an empty map.
  */
 export interface Graph {
   edges?: Edges;
   name?: Name;
   nodes?: Nodes;
   paradigm?: Paradigm1;
+  params?: Params1;
   schema_version?: SchemaVersion;
 }
 export interface Edges {
@@ -191,6 +197,13 @@ export interface Node {
  *     Current serializable value.  Defaults to ``None``.
  * default:
  *     Default serializable value.  Defaults to ``None``.
+ * ref:
+ *     When set, this node param's value is resolved from the graph-level
+ *     param of that name (issue #116).  The literal ``value`` is ignored
+ *     at resolve time.  Defaults to ``None``.
+ * description:
+ *     Human-readable description (used by graph-level params).
+ *     Defaults to ``None``.
  */
 export interface Param {
   default?:
@@ -200,7 +213,9 @@ export interface Param {
     | {
         [k: string]: ParamValue;
       };
+  description?: Description;
   name: Name1;
+  ref?: Ref;
   type_token: TypeToken;
   value?:
     | (string | number | boolean | null)
@@ -274,11 +289,18 @@ export interface Position {
  *     CRDT-friendly id→Node map.  Keys MUST equal ``node.id``.
  * edges:
  *     CRDT-friendly id→Edge map.  Keys MUST equal ``edge.id``.
+ * params:
+ *     Optional graph-level id→Param map.  Keys MUST equal ``param.name``.
+ *     Defaults to an empty map.
  */
 export interface Graph1 {
   edges?: Edges;
   name?: Name;
   nodes?: Nodes;
   paradigm?: Paradigm1;
+  params?: Params1;
   schema_version?: SchemaVersion;
+}
+export interface Params1 {
+  [k: string]: Param;
 }

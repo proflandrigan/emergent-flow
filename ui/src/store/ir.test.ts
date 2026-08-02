@@ -296,3 +296,67 @@ describe("composite/module subgraph fidelity", () => {
     expect(toIR(model).nodes!["n-1"]).not.toHaveProperty("subgraph");
   });
 });
+
+describe("graph-level params", () => {
+  // `paramToIR`/`paramFromIR` are module-private, so `ref`/`description` fidelity is verified
+  // through the node-param path (`nodeToIR`/`nodeFromIR` route every param through them).
+
+  test("a ParamModel with ref/description maps to IR and back unchanged", () => {
+    const model: CanvasModel = {
+      paradigm: "functional",
+      nodes: {
+        "node-1": {
+          id: "node-1",
+          type: "data.load_csv",
+          paradigm: "functional",
+          position: { x: 10, y: 20 },
+          groupId: null,
+          params: [
+            {
+              name: "path",
+              typeToken: "str",
+              value: "a.csv",
+              default: null,
+              ref: "data_dir",
+              description: "CSV file to load",
+            },
+          ],
+          ports: [],
+        },
+      },
+      edges: {},
+    };
+
+    const roundTripped = fromIR(toIR(model));
+
+    expect(roundTripped.nodes["node-1"].params[0]).toEqual(
+      model.nodes["node-1"].params[0],
+    );
+  });
+
+  test("a CanvasModel with graph-level params round-trips through toIR/fromIR", () => {
+    const model: CanvasModel = {
+      paradigm: "functional",
+      nodes: {},
+      edges: {},
+      params: {
+        p: {
+          name: "p",
+          typeToken: "str",
+          value: "hello",
+          default: null,
+          ref: null,
+          description: "A graph-level param",
+        },
+      },
+    };
+
+    expect(fromIR(toIR(model))).toEqual(model);
+  });
+
+  test("a CanvasModel without params produces an IR graph without a params key", () => {
+    const graph = toIR(emptyModel());
+
+    expect(graph).not.toHaveProperty("params");
+  });
+});

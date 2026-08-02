@@ -59,16 +59,22 @@ class ReproducibilityCapture:
         ``"data."``).
     dependency_versions: package name -> resolved version string, exactly as supplied by the
         caller (see ``resolve_dependency_versions``).
+    params: resolved graph-level parameter values this run used; defaults to the graph's
+        stored param values when not supplied.
     """
 
     seeds: dict[str, int] = field(default_factory=dict)
     content_hashes: dict[str, str] = field(default_factory=dict)
     dependency_versions: dict[str, str] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
 
 
 @public_op(name="ef.research.capture_run")
 def capture_run(
-    graph: Graph, *, dependency_versions: dict[str, str] | None = None
+    graph: Graph,
+    *,
+    dependency_versions: dict[str, str] | None = None,
+    params: dict[str, Any] | None = None,
 ) -> ReproducibilityCapture:
     """Capture a reproducibility snapshot of *graph*.
 
@@ -80,14 +86,20 @@ def capture_run(
         Optional caller-supplied map of package name -> resolved version string (see
         :func:`resolve_dependency_versions`). Recorded verbatim; ``capture_run`` itself never
         reads the environment, keeping it pure and reproducible from its inputs alone.
+    params:
+        Optional resolved graph-level parameter values this run used (issue #116). When
+        ``None``, records each graph-level param's stored value. Callers that ran with runtime
+        overrides (``ef.execute(..., params=...)``, the CLI ``--param`` flag) should pass the
+        RESOLVED values so the snapshot says what the run was actually given.
 
     Returns
     -------
     ReproducibilityCapture
         ``seeds`` collected from every node param named ``"seed"`` or ``"random_state"`` with a
         non-``None`` value; ``content_hashes`` collected from every node whose ``type`` starts
-        with ``"data."``; ``dependency_versions`` as supplied (empty dict if not given). Node
-        iteration is in sorted node-id order for determinism.
+        with ``"data."``; ``dependency_versions`` as supplied (empty dict if not given);
+        ``params`` as supplied (the graph's stored values if not given). Node iteration is in
+        sorted node-id order for determinism.
     """
     seeds: dict[str, int] = {}
     content_hashes: dict[str, str] = {}
@@ -102,10 +114,14 @@ def capture_run(
             params_snapshot = {p.name: p.value for p in node.params}
             content_hashes[node_id] = _content_hash({"type": node.type, "params": params_snapshot})
 
+    if params is None:
+        params = {name: param.value for name, param in graph.params.items()}
+
     return ReproducibilityCapture(
         seeds=seeds,
         content_hashes=content_hashes,
         dependency_versions=dict(dependency_versions or {}),
+        params=dict(params),
     )
 
 

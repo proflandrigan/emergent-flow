@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "paradigm": "functional",
   "name": "Sklearn Acceptance Demo -- Unsupervised",
   "nodes": {
@@ -13,7 +13,9 @@
           "name": "name",
           "type_token": "str",
           "value": "iris",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -43,13 +45,17 @@
           "name": "estimator",
           "type_token": "str",
           "value": "StandardScaler",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "target",
           "type_token": "str",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "features",
@@ -60,13 +66,17 @@
             "petal length (cm)",
             "petal width (cm)"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "params",
           "type_token": "dict[str, any]",
           "value": {},
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -112,7 +122,9 @@
           "name": "estimator",
           "type_token": "str",
           "value": "KMeans",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "features",
@@ -123,7 +135,9 @@
             "component_2",
             "component_3"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "params",
@@ -132,7 +146,9 @@
             "n_clusters": 3,
             "n_init": 5
           },
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -209,7 +225,9 @@
           "name": "op",
           "type_token": "str",
           "value": "transform",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -307,5 +325,6 @@
       },
       "type_compatible": null
     }
-  }
+  },
+  "params": {}
 }

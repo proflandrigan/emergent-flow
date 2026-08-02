@@ -20,6 +20,8 @@ export interface RunGraphOptions {
   /** If set, exactly the listed nodes run, reusing prior run's stored outputs
    *  where available ("run this node" / "run selected only"). */
   runOnly?: string | string[];
+  /** Graph-level parameter overrides sent as `params` (issue #116). */
+  params?: Record<string, unknown>;
   /** Called with a human-readable message whenever the run fails (in addition to
    *  `executionStore.error` always being set). Callers that render their own error
    *  banner (e.g. `ExecutionToolbar`) pass this; callers that don't need a local
@@ -35,7 +37,7 @@ export async function runGraph(options: RunGraphOptions = {}): Promise<void> {
     return;
   }
 
-  const { runTo, runFrom, runOnly, onError } = options;
+  const { runTo, runFrom, runOnly, params, onError } = options;
   const graph = useGraphStore.getState().toIR();
   // Only include a scope key when it is a non-empty string or a non-empty
   // array. Using `!== undefined` would send `run_to: []` alongside another
@@ -54,9 +56,15 @@ export async function runGraph(options: RunGraphOptions = {}): Promise<void> {
       : []),
   ];
   const hasScope = scopeEntries.length > 0;
-  const body = hasScope
+  const hasParams = params !== undefined && Object.keys(params).length > 0;
+  const body: Record<string, unknown> = hasScope
     ? { graph, ...Object.fromEntries(scopeEntries) }
-    : graph;
+    : hasParams
+      ? { graph }
+      : (graph as unknown as Record<string, unknown>);
+  if (hasParams) {
+    body.params = params;
+  }
 
   function fail(message: string) {
     useExecutionStore.getState().setError(message);

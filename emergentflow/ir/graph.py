@@ -22,12 +22,13 @@ from pydantic import Field, model_validator
 from .common import Direction, IRId, IRModel, Paradigm
 from .edge import Edge
 from .node import Node
+from .params import Param
 
 # ---------------------------------------------------------------------------
 # Schema version — bump when the Graph wire format changes incompatibly
 # ---------------------------------------------------------------------------
 
-CURRENT_SCHEMA_VERSION: int = 1
+CURRENT_SCHEMA_VERSION: int = 2
 
 # The version assumed for a serialized graph that carries no ``schema_version`` field at
 # all — i.e. one written before versioning existed. Such a graph is treated as the earliest
@@ -58,6 +59,9 @@ class Graph(IRModel):
         CRDT-friendly id→Node map.  Keys MUST equal ``node.id``.
     edges:
         CRDT-friendly id→Edge map.  Keys MUST equal ``edge.id``.
+    params:
+        Optional graph-level id→Param map.  Keys MUST equal ``param.name``.
+        Defaults to an empty map.
     """
 
     schema_version: int = CURRENT_SCHEMA_VERSION
@@ -65,6 +69,7 @@ class Graph(IRModel):
     name: str | None = None
     nodes: dict[IRId, Node] = Field(default_factory=dict)
     edges: dict[IRId, Edge] = Field(default_factory=dict)
+    params: dict[IRId, Param] = Field(default_factory=dict)
 
     # ------------------------------------------------------------------
     # Structural validator
@@ -92,6 +97,14 @@ class Graph(IRModel):
                 )
             for port in node.ports:
                 port_direction[(node_id, port.id)] = port.direction
+
+        for param_name, param in self.params.items():
+            # 1c. Key/name agreement for graph-level params.
+            if param.name != param_name:
+                raise ValueError(
+                    f"Graph.params key {param_name!r} does not match param.name {param.name!r}. "
+                    "Map keys must equal the object's own .name."
+                )
 
         for edge_id, edge in self.edges.items():
             # 1b. Key/id agreement for edges.

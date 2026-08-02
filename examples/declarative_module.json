@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "paradigm": "declarative",
   "name": "Declarative Module Example",
   "nodes": {
@@ -16,7 +16,7 @@
       },
       "group_id": null,
       "subgraph": {
-        "schema_version": 1,
+        "schema_version": 2,
         "paradigm": "declarative",
         "name": "SimpleClassifier body",
         "nodes": {
@@ -30,13 +30,17 @@
                 "name": "in_features",
                 "type_token": "int",
                 "value": 128,
-                "default": null
+                "default": null,
+                "ref": null,
+                "description": null
               },
               {
                 "name": "out_features",
                 "type_token": "int",
                 "value": 64,
-                "default": null
+                "default": null,
+                "ref": null,
+                "description": null
               }
             ],
             "ports": [
@@ -105,13 +109,17 @@
                 "name": "in_features",
                 "type_token": "int",
                 "value": 64,
-                "default": null
+                "default": null,
+                "ref": null,
+                "description": null
               },
               {
                 "name": "out_features",
                 "type_token": "int",
                 "value": 10,
-                "default": null
+                "default": null,
+                "ref": null,
+                "description": null
               }
             ],
             "ports": [
@@ -165,9 +173,11 @@
             },
             "type_compatible": null
           }
-        }
+        },
+        "params": {}
       }
     }
   },
-  "edges": {}
+  "edges": {},
+  "params": {}
 }

@@ -7,15 +7,51 @@ import { useState } from "react";
 
 import { useGraphStore } from "../store/graphStore";
 import { useExecutionStore } from "../store/executionStore";
+import type { ParamModel } from "../store/model";
 import { runGraph } from "./runGraph";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
+import { Input } from "../ui/Input";
+
+function parseOverrideValue(typeToken: string, raw: string): unknown {
+  if (typeToken === "int") {
+    const n = Number(raw);
+    return Number.isNaN(n) ? raw : Math.round(n);
+  }
+  if (typeToken === "float") {
+    const n = Number(raw);
+    return Number.isNaN(n) ? raw : n;
+  }
+  if (typeToken === "bool") {
+    return raw === "true";
+  }
+  return raw;
+}
+
+function buildOverrides(
+  params: Record<string, ParamModel> | undefined,
+  raw: Record<string, string>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [name, param] of Object.entries(params ?? {})) {
+    const text = raw[name];
+    if (text === undefined || text === "") {
+      continue; // blank input -> use the graph's default value
+    }
+    out[name] = parseOverrideValue(param.typeToken, text);
+  }
+  return out;
+}
 
 export function ExecutionToolbar(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [clearingCache, setClearingCache] = useState(false);
   const running = useExecutionStore((s) => s.running);
   const progress = useExecutionStore((s) => s.progress);
+  const [showParams, setShowParams] = useState(false);
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const graphParams = useGraphStore((s) => s.params);
+  const paramEntries = Object.values(graphParams ?? {});
 
   async function handleDownload() {
     const graph = useGraphStore.getState().toIR();
@@ -57,7 +93,10 @@ export function ExecutionToolbar(): JSX.Element {
       return;
     }
     setError(null);
-    await runGraph({ onError: setError });
+    await runGraph({
+      params: buildOverrides(graphParams, overrides),
+      onError: setError,
+    });
   }
 
   async function handleClearCache() {
@@ -100,6 +139,15 @@ export function ExecutionToolbar(): JSX.Element {
         >
           {running ? "Running…" : "Execute"}
         </Button>
+        {paramEntries.length > 0 ? (
+          <Button
+            variant="ghost"
+            data-testid="exec-params-toggle"
+            onClick={() => setShowParams((v) => !v)}
+          >
+            {showParams ? "Hide run params" : "Run params…"}
+          </Button>
+        ) : null}
         <Button
           variant="ghost"
           data-testid="exec-clear-cache"
@@ -109,6 +157,28 @@ export function ExecutionToolbar(): JSX.Element {
           {clearingCache ? "Clearing…" : "Clear cache"}
         </Button>
       </div>
+      {showParams && paramEntries.length > 0 ? (
+        <div
+          data-testid="exec-params-form"
+          style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}
+        >
+          {paramEntries.map((p) => (
+            <label key={p.name} style={{ fontSize: "var(--text-sm)" }}>
+              <span style={{ fontWeight: 600 }}>{p.name}</span> ({p.typeToken})
+              <Input
+                data-testid={`exec-param-${p.name}`}
+                placeholder={
+                  p.value !== null && p.value !== undefined ? String(p.value) : ""
+                }
+                value={overrides[p.name] ?? ""}
+                onChange={(e) =>
+                  setOverrides((o) => ({ ...o, [p.name]: e.target.value }))
+                }
+              />
+            </label>
+          ))}
+        </div>
+      ) : null}
       {progress && (
         <div
           data-testid="exec-progress"

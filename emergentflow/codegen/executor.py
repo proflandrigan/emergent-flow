@@ -35,6 +35,7 @@ from emergentflow.clients import Clients
 from emergentflow.codegen.composite import COMPOSITE_NODE_TYPE, resolve_composite_boundary
 from emergentflow.codegen.declarative import _prepare_declarative
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
+from emergentflow.codegen.params import materialize_graph
 from emergentflow.codegen.traversal import topological_sort
 from emergentflow.codegen.validation import enforce_validation_gate, required_in_port_names
 from emergentflow.codegen.wiring import build_wiring_map
@@ -51,10 +52,21 @@ def _describe(node: Node) -> str:
     return f"{node.type!r} (id={node.id})"
 
 
+def _has_graph_param_refs(graph: Graph) -> bool:
+    """True when any node (recursively, through composite subgraphs) carries a ref'd param."""
+    for node in graph.nodes.values():
+        if any(p.ref is not None for p in node.params):
+            return True
+        if node.subgraph is not None and _has_graph_param_refs(node.subgraph):
+            return True
+    return False
+
+
 @public_op(name="ef.execute")
 def execute(
     graph: Graph,
     *,
+    params: dict[str, Any] | None = None,
     clients: Clients | None = None,
     client: Any | None = None,
 ) -> dict[str, dict[str, Any]]:
@@ -62,6 +74,11 @@ def execute(
 
     Args:
         graph: The IR graph to execute.
+        params: Optional runtime overrides for graph-level parameters (issue #116).
+            Each key must name a graph-level param; overrides are applied on top of the
+            param's stored value before any node runs, and never mutate *graph*. When None
+            (and the graph declares no ref'd params), execution is byte-identical to the
+            pre-parameter behavior.
         clients: An injected ``Clients`` bundle (ADR 0018) exposing named
             effectful-client seams (``clients.llm``, ``clients.warehouse``, ...).
             Each node is handed the client for the single capability it declares
@@ -76,6 +93,8 @@ def execute(
         OUT-port name: ``{node_id: {out_port_name: value}}``.
 
     Raises:
+        GraphParamError: If an override in *params* names no graph-level parameter
+            (from `emergentflow.codegen.params.resolve_graph_params`).
         CodegenError: If the graph is `Paradigm.DECLARATIVE` and the
                       declarative seam rejects it (unsupported layer type,
                       not exactly one `nn.module` node, or an agent/LangGraph
@@ -89,9 +108,10 @@ def execute(
         CycleError: If the graph contains a cycle (propagated from
                     `topological_sort`).
         GraphValidationError: If the graph fails the shared validation gate —
-                              a type incompatibility, a cardinality violation,
-                              or an unconnected required IN port. Raised before
-                              any node runs. Warnings do not block.
+            a type incompatibility, a cardinality violation, an unconnected required
+            IN port, OR an error-severity graph-param ref diagnostic (unresolved ref,
+            mistyped ref, or ref on a node that does not support refs). Raised before
+            any node runs. Warnings do not block.
         ValueError: If both ``clients`` and ``client`` are passed.
     """
     if clients is not None and client is not None:
@@ -103,17 +123,30 @@ def execute(
         clients = Clients.from_legacy_client(client)
 
     if graph.paradigm is Paradigm.DECLARATIVE:
-        return _execute_declarative(graph)
+        declarative = (
+            materialize_graph(graph, params=params)
+            if params is not None or _has_graph_param_refs(graph)
+            else graph
+        )
+        return _execute_declarative(declarative)
 
     # Story 6: gate the FUNCTIONAL path on validation before running any node, so
     # execute and compile_to_code reject identical graphs for identical reasons
     # (ADR 0002 equivalence extends to rejection). Warnings pass through. Only the
     # top-level graph is gated this way -- a composite node's subgraph is not
     # (see `_execute_functional`), mirroring how `_prepare_declarative` never
-    # re-runs this gate on an `nn.module`'s subgraph either.
+    # re-runs this gate on an `nn.module`'s subgraph either. The gate runs on the
+    # ORIGINAL graph BEFORE refs are materialized, so an unresolved/mistyped ref
+    # surfaces as an error-severity diagnostic here, never as a later KeyError.
     enforce_validation_gate(graph)
 
-    return _execute_functional(graph, clients)
+    materialized = (
+        materialize_graph(graph, params=params)
+        if params is not None or _has_graph_param_refs(graph)
+        else graph
+    )
+
+    return _execute_functional(materialized, clients)
 
 
 def _execute_functional(

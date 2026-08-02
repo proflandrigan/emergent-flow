@@ -234,6 +234,94 @@ def _collect_param_diagnostics(
     return diagnostics
 
 
+def _param_token_compatible(source_type: str, target_type: str) -> bool:
+    """True when a graph-param *source_type* token can feed a node-param *target_type* token.
+
+    Param ``type_token`` labels (``"str"``, ``"int"``, ``"list[str]"``, ...) are NOT registered
+    in the port ``data_type`` type registry (that registry only knows port tokens like
+    ``"DataFrame"``), so ``is_compatible`` cannot judge them. This is the small, deterministic
+    rule: equal tokens, the ``"any"`` wildcard on either side, and the safe numeric widening
+    ``int -> float`` are compatible; everything else is a mismatch (issue #116).
+    """
+    if source_type == target_type or source_type == "any" or target_type == "any":
+        return True
+    return source_type == "int" and target_type == "float"
+
+
+def _collect_param_ref_diagnostics(
+    graph: Graph,
+    node_registry: NodeRegistry,
+) -> list[Diagnostic]:
+    """Collect diagnostics for node params that ``ref`` a graph-level parameter (issue #116).
+
+    A ``ref`` must name a graph-level param (``ref_unresolved``), the referenced graph param's
+    ``type_token`` must be compatible with the node param's declared ``type_token``
+    (``ref_type_mismatch``), and the node's codegen must support refs on that param
+    (``ref_not_supported``). Deterministic: nodes in ascending node-id order, params in declared
+    order, mirroring ``_collect_param_diagnostics``.
+    """
+    diagnostics: list[Diagnostic] = []
+
+    for node in sorted(graph.nodes.values(), key=lambda n: n.id):
+        definition_cls = node_registry.try_get(node.type)
+        specs = {ps.name: ps for ps in definition_cls.params} if definition_cls is not None else {}
+
+        for param in node.params:
+            if param.ref is None:
+                continue
+            ref = param.ref
+            graph_param = graph.params.get(ref)
+            if graph_param is None:
+                diagnostics.append(
+                    Diagnostic(
+                        severity=Severity.ERROR,
+                        code="ref_unresolved",
+                        message=(
+                            f"node {node.id!r} ({node.type}) param {param.name!r} "
+                            f"references graph parameter {ref!r} which is not defined"
+                        ),
+                        node_id=node.id,
+                    )
+                )
+                continue
+
+            spec = specs.get(param.name)
+            if spec is None or spec.hints is None or not spec.hints.ref_supported:
+                diagnostics.append(
+                    Diagnostic(
+                        severity=Severity.ERROR,
+                        code="ref_not_supported",
+                        message=(
+                            f"node {node.id!r} ({node.type}) param {param.name!r} "
+                            f"references graph parameter {ref!r} but this node's codegen "
+                            "does not support graph-parameter references"
+                        ),
+                        node_id=node.id,
+                    )
+                )
+                continue
+
+            result = _param_token_compatible(graph_param.type_token, spec.type_token)
+            if result:
+                continue
+            diagnostics.append(
+                Diagnostic(
+                    severity=Severity.ERROR,
+                    code="ref_type_mismatch",
+                    message=(
+                        f"node {node.id!r} ({node.type}) param {param.name!r} references graph "
+                        f"parameter {ref!r} with type token {graph_param.type_token!r} which is "
+                        f"incompatible with the param's declared type token {spec.type_token!r}"
+                    ),
+                    node_id=node.id,
+                    expected_type=spec.type_token,
+                    actual_type=graph_param.type_token,
+                )
+            )
+
+    return diagnostics
+
+
 def _collect_type_diagnostics(
     graph: Graph,
     node_registry: NodeRegistry,
@@ -345,11 +433,13 @@ def validate(
     """
     structural = _collect_structural_diagnostics(graph, node_registry)
     params = _collect_param_diagnostics(graph, node_registry)
+    ref_params = _collect_param_ref_diagnostics(graph, node_registry)
     type_diagnostics, edge_compatibility = _collect_type_diagnostics(
         graph, node_registry, type_registry
     )
     diagnostics = [
-        d.model_copy(update={"source": "validator"}) for d in structural + params + type_diagnostics
+        d.model_copy(update={"source": "validator"})
+        for d in structural + params + ref_params + type_diagnostics
     ]
     return Diagnostics(
         diagnostics=diagnostics,

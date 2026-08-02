@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "paradigm": "functional",
   "name": "Recommender Acceptance Demo -- Content-Based",
   "nodes": {
@@ -13,7 +13,9 @@
           "name": "name",
           "type_token": "str",
           "value": "iris",
-          "default": "iris"
+          "default": "iris",
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -43,7 +45,9 @@
           "name": "code",
           "type_token": "str",
           "value": "def transform(value):\n    grouped = value.groupby(\"sepal width (cm)\", as_index=False)[[\"target\"]].mean()\n    grouped[\"description\"] = (\n        grouped[\"target\"]\n        .round()\n        .astype(int)\n        .map({0: \"small delicate petals\", 1: \"medium balanced petals\", 2: \"large showy petals\"})\n    )\n    return grouped[[\"sepal width (cm)\", \"description\"]]\n",
-          "default": ""
+          "default": "",
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -81,49 +85,65 @@
           "name": "user_col",
           "type_token": "str",
           "value": "sepal length (cm)",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "item_col",
           "type_token": "str",
           "value": "sepal width (cm)",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "value_col",
           "type_token": "str",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "implicit",
           "type_token": "bool",
           "value": true,
-          "default": true
+          "default": true,
+          "ref": null,
+          "description": null
         },
         {
           "name": "agg",
           "type_token": "str",
           "value": "sum",
-          "default": "sum"
+          "default": "sum",
+          "ref": null,
+          "description": null
         },
         {
           "name": "min_user_interactions",
           "type_token": "int",
           "value": 0,
-          "default": 0
+          "default": 0,
+          "ref": null,
+          "description": null
         },
         {
           "name": "min_item_interactions",
           "type_token": "int",
           "value": 0,
-          "default": 0
+          "default": 0,
+          "ref": null,
+          "description": null
         },
         {
           "name": "cold_start_mode",
           "type_token": "str",
           "value": "warn-and-skip",
-          "default": "warn-and-skip"
+          "default": "warn-and-skip",
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -161,13 +181,17 @@
           "name": "algorithm",
           "type_token": "str",
           "value": "popularity",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "params",
           "type_token": "dict[str, any]",
           "value": {},
-          "default": {}
+          "default": {},
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -213,7 +237,9 @@
           "name": "algorithm",
           "type_token": "str",
           "value": "tfidf_similarity",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "params",
@@ -222,7 +248,9 @@
             "item_id_col": "sepal width (cm)",
             "text_col": "description"
           },
-          "default": {}
+          "default": {},
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -268,7 +296,9 @@
           "name": "k",
           "type_token": "int",
           "value": 5,
-          "default": 10
+          "default": 10,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -314,7 +344,9 @@
           "name": "metrics",
           "type_token": "list[str]",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -452,5 +484,6 @@
       },
       "type_compatible": null
     }
-  }
+  },
+  "params": {}
 }

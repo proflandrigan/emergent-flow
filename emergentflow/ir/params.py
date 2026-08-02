@@ -88,12 +88,21 @@ class Param(IRModel):
         Current serializable value.  Defaults to ``None``.
     default:
         Default serializable value.  Defaults to ``None``.
+    ref:
+        When set, this node param's value is resolved from the graph-level
+        param of that name (issue #116).  The literal ``value`` is ignored
+        at resolve time.  Defaults to ``None``.
+    description:
+        Human-readable description (used by graph-level params).
+        Defaults to ``None``.
     """
 
     name: str
     type_token: str
     value: ParamValue = None
     default: ParamValue = None
+    ref: str | None = None
+    description: str | None = None
 
     @field_validator("name")
     @classmethod

@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "paradigm": "functional",
   "name": "epic16_research",
   "nodes": {
@@ -13,19 +13,25 @@
           "name": "path",
           "type_token": "str",
           "value": "examples/epic16_acceptance_demos/documents/handbook.md",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "chunk_size",
           "type_token": "int",
           "value": 200,
-          "default": 1000
+          "default": 1000,
+          "ref": null,
+          "description": null
         },
         {
           "name": "chunk_overlap",
           "type_token": "int",
           "value": 20,
-          "default": 100
+          "default": 100,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -55,19 +61,25 @@
           "name": "columns",
           "type_token": "list[str]",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "top_n",
           "type_token": "int",
           "value": 3,
-          "default": 5
+          "default": 5,
+          "ref": null,
+          "description": null
         },
         {
           "name": "notes",
           "type_token": "dict",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -105,7 +117,9 @@
           "name": "columns",
           "type_token": "list[str]",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "categories",
@@ -114,19 +128,25 @@
             "email",
             "phone"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "mask",
           "type_token": "str",
           "value": "[REDACTED]",
-          "default": "[REDACTED]"
+          "default": "[REDACTED]",
+          "ref": null,
+          "description": null
         },
         {
           "name": "engine",
           "type_token": "str",
           "value": "regex",
-          "default": "regex"
+          "default": "regex",
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -164,43 +184,57 @@
           "name": "title",
           "type_token": "str",
           "value": "Document Corpus Codebook",
-          "default": "Emergent Flow Report"
+          "default": "Emergent Flow Report",
+          "ref": null,
+          "description": null
         },
         {
           "name": "author",
           "type_token": "str",
           "value": "Emergent Flow",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "description",
           "type_token": "str",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "generated_at",
           "type_token": "str",
           "value": "2026-07-29",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "titles",
           "type_token": "list[str]",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "kinds",
           "type_token": "list[str]",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "render_pdf",
           "type_token": "bool",
           "value": false,
-          "default": false
+          "default": false,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -266,5 +300,6 @@
       },
       "type_compatible": null
     }
-  }
+  },
+  "params": {}
 }
