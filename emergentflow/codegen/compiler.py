@@ -114,10 +114,21 @@ class _AssembledModule:
 
 
 def _param_expr_refs(node: Node, graph_param_names: dict[str, str]) -> dict[str, str]:
-    """Map a node's ref'd params to the compiled ``main()`` kwarg variable names."""
+    """Map a node's ref'd params to the compiled ``main()`` kwarg variable names.
+
+    Raises ``CodegenError`` (never a bare ``KeyError``) when a ref names a graph parameter the
+    name map has no entry for -- the validation gate normally catches this first
+    (``ref_unresolved``), but a direct ``_assemble`` call on an unvalidated graph must still fail
+    with a codegen error rather than an opaque KeyError.
+    """
     refs: dict[str, str] = {}
     for param in node.params:
         if param.ref is not None:
+            if param.ref not in graph_param_names:
+                raise CodegenError(
+                    f"node {node.id!r} param {param.name!r} references graph parameter "
+                    f"{param.ref!r} which is not defined"
+                )
             refs[param.name] = graph_param_names[param.ref]
     return refs
 

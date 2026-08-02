@@ -1182,6 +1182,11 @@ def execute_node(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(inputs, dict):
         raise CodegenError("execute_node 'inputs' must be an object keyed by IN-port name")
     graph = _to_graph(graph_payload)
+    # A ref'd param on the target node must resolve against the graph's stored param values
+    # before the node runs -- otherwise `run this node` executes the stale literal (which refs
+    # ignore), disagreeing with the same node inside a full graph run (issue #116).
+    if has_graph_param_refs(graph):
+        graph = materialize_graph(graph)
     if node_id not in graph.nodes:
         raise CodegenError(f"run_node not in graph: {node_id!r}")
     node = graph.nodes[node_id]

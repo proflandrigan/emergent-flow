@@ -533,6 +533,37 @@ def test_execute_node_runs_single_source_node() -> None:
     json.dumps(out)  # JSON-native
 
 
+def test_execute_node_resolves_graph_param_refs() -> None:
+    # A ref'd `path` must resolve against the graph param's value, NOT the node's stale
+    # literal (which refs ignore) -- `run this node` must agree with a full graph run.
+    node = Node(
+        id="n-load",
+        type="data.load_csv",
+        label="Load CSV",
+        paradigm=Paradigm.FUNCTIONAL,
+        params=[Param(name="path", type_token="str", value="/stale/nope.csv", ref="data_dir")],
+        ports=[
+            Port(
+                id="p-load-frame",
+                name="frame",
+                direction=Direction.OUT,
+                data_type="DataFrame",
+            ),
+        ],
+        position=Position(x=0.0, y=0.0),
+    )
+    graph = Graph(
+        paradigm=Paradigm.FUNCTIONAL,
+        name="server-test-ref",
+        params={"data_dir": Param(name="data_dir", type_token="str", value=str(SAMPLE_CSV))},
+        nodes={node.id: node},
+        edges={},
+    )
+    out = execute_node({"graph": json.loads(serialize_graph(graph)), "run_node": "n-load"})
+    assert out["statuses"]["n-load"]["status"] == "ok"
+    assert out["results"]["n-load"]["frame"]["kind"] == "table"
+
+
 def test_execute_node_runtime_error_is_per_node_status() -> None:
     out = execute_node({"graph": _load_csv_graph(path="/no/such/file.csv"), "run_node": "n-load"})
     assert out["statuses"]["n-load"]["status"] == "error"

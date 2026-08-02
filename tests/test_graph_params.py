@@ -222,6 +222,74 @@ class TestValidation:
         with pytest.raises(GraphValidationError, match="ref_unresolved"):
             enforce_validation_gate(g)
 
+    def test_ref_diagnostics_recurse_into_composite_subgraph(self) -> None:
+        """Refs inside a composite's subgraph resolve against the OUTER graph's params and are
+        validated there -- compile and execute must reject them identically (ADR 0002 extends
+        to rejection), not diverge into KeyError/GraphParamError (issue #116 regression)."""
+        sub_sink = Node(
+            id="sink",
+            type=_GraphParamSink.type,
+            label=_GraphParamSink.label,
+            ports=[Port(id="sink-out", name="out", direction=Direction.OUT, data_type="int")],
+            params=[Param(name="value", type_token="int", ref="missing")],
+        )
+        sub = Graph(params={}, nodes={"sink": sub_sink}, edges={})
+        composite = Node(
+            id="comp",
+            type="layout.composite",
+            label="Composite",
+            ports=[Port(id="comp-out", name="out", direction=Direction.OUT, data_type="int")],
+            subgraph=sub,
+        )
+        g = Graph(nodes={"comp": composite})
+
+        codes = [d.code for d in validate(g).diagnostics]
+        assert "ref_unresolved" in codes
+
+        from emergentflow.codegen.validation import enforce_validation_gate
+
+        with pytest.raises(GraphValidationError, match="ref_unresolved"):
+            enforce_validation_gate(g)
+        with pytest.raises(GraphValidationError, match="ref_unresolved"):
+            compile_to_code(g)
+        with pytest.raises(GraphValidationError, match="ref_unresolved"):
+            execute(g)
+
+    def test_ref_type_mismatch_recurse_into_composite_subgraph(self) -> None:
+        """A mistyped ref inside a subgraph is an error (silently baking the wrong-typed value
+        used to slip through -- the old code only checked top-level nodes)."""
+        sub_sink = Node(
+            id="sink",
+            type=_GraphParamSink.type,
+            label=_GraphParamSink.label,
+            ports=[Port(id="sink-out", name="out", direction=Direction.OUT, data_type="int")],
+            params=[Param(name="value", type_token="int", ref="p")],
+        )
+        sub = Graph(params={}, nodes={"sink": sub_sink}, edges={})
+        composite = Node(
+            id="comp",
+            type="layout.composite",
+            label="Composite",
+            ports=[Port(id="comp-out", name="out", direction=Direction.OUT, data_type="int")],
+            subgraph=sub,
+        )
+        g = Graph(
+            params={"p": Param(name="p", type_token="str", value="not-an-int")},
+            nodes={"comp": composite},
+        )
+
+        codes = [d.code for d in validate(g).diagnostics]
+        assert "ref_type_mismatch" in codes
+
+        from emergentflow.codegen.validation import enforce_validation_gate
+
+        with pytest.raises(GraphValidationError, match="ref_type_mismatch"):
+            enforce_validation_gate(g)
+        with pytest.raises(GraphValidationError, match="ref_type_mismatch"):
+            compile_to_code(g)
+        with pytest.raises(GraphValidationError, match="ref_type_mismatch"):
+            execute(g)
+
 
 # ---------------------------------------------------------------------------
 # Codegen
@@ -329,6 +397,48 @@ class TestExecute:
         g.nodes["n"] = _sink_node(ref="p")
         with pytest.raises(GraphParamError, match="'bogus'"):
             execute(g, params={"bogus": 1})
+
+    def test_execute_rejects_override_violating_refd_param_contract(self) -> None:
+        """An override whose value violates the ref'd node param's OWN declared contract
+        (here: `choices`) must be rejected by `ef.execute` exactly like the server's
+        FUNCTIONAL walk rejects it -- not silently produce output the canvas would 422 on."""
+        from emergentflow.nodes.spec import ValidationHints
+
+        @register
+        class _ChoiceSink(NodeDefinition):
+            type = "test.choice_sink"
+            family = "test"
+            label = "Choice Sink"
+            ports = [PortSpec(name="out", direction=Direction.OUT, data_type="str")]
+            params = [
+                ParamSpec(
+                    name="choice",
+                    type_token="str",
+                    hints=ValidationHints(choices=["a", "b", "c"], ref_supported=True),
+                )
+            ]
+
+            def codegen(self, node: Node, ctx: Any) -> CodeFragment:
+                return CodeFragment(body=f"{ctx.out_var('out')} = {ctx.param_expr('choice')}")
+
+            def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
+                return {"out": node.params[0].value}
+
+        g = Graph(
+            params={"p": Param(name="p", type_token="str", value="a")},
+            nodes={
+                "n": Node(
+                    id="n",
+                    type=_ChoiceSink.type,
+                    label=_ChoiceSink.label,
+                    ports=[Port(id="n-out", name="out", direction=Direction.OUT, data_type="str")],
+                    params=[Param(name="choice", type_token="str", value="a", ref="p")],
+                )
+            },
+        )
+        assert execute(g)["n"] == {"out": "a"}  # default passes (stored value is valid)
+        with pytest.raises(GraphValidationError, match="param_invalid"):
+            execute(g, params={"p": "z"})  # 'z' is not in the node param's choices
 
     def test_execute_unresolved_ref_raises_validation_error_not_key_error(self) -> None:
         g = Graph(nodes={"n": _sink_node(ref="missing")})

@@ -24,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from emergentflow.api import public_op
 from emergentflow.codegen.errors import CardinalityError, GraphValidationError
 from emergentflow.codegen.inference import infer_graph_types
-from emergentflow.ir import Direction, Graph, Port
+from emergentflow.ir import Direction, Graph, IRId, Node, Port
 from emergentflow.nodes import NodeRegistry
 from emergentflow.nodes import registry as default_node_registry
 from emergentflow.types.compatibility import Compatibility, check_cardinality, is_compatible
@@ -257,68 +257,85 @@ def _collect_param_ref_diagnostics(
     A ``ref`` must name a graph-level param (``ref_unresolved``), the referenced graph param's
     ``type_token`` must be compatible with the node param's declared ``type_token``
     (``ref_type_mismatch``), and the node's codegen must support refs on that param
-    (``ref_not_supported``). Deterministic: nodes in ascending node-id order, params in declared
-    order, mirroring ``_collect_param_diagnostics``.
+    (``ref_not_supported``).
+
+    Composite subgraphs are walked recursively, and every ref at every nesting level resolves
+    against the TOP graph's params map: ``materialize_graph`` resolves subgraph refs against the
+    enclosing graph's params (see ``emergentflow.codegen.params``), and ``_codegen_composite``
+    compiles subgraph refs against the enclosing graph's ``main()`` kwargs -- so the gate must
+    validate them against the same map, or a subgraph ref that compile rejects with ``KeyError``
+    (``_param_expr_refs``) and that execute rejects with ``GraphParamError`` would slip through
+    ``validate`` entirely (ADR 0002 equivalence extends to rejection).
+
+    Deterministic: nodes in ascending node-id order (subgraph nodes visited within their owning
+    composite's visit), params in declared order, mirroring ``_collect_param_diagnostics``.
     """
     diagnostics: list[Diagnostic] = []
 
-    for node in sorted(graph.nodes.values(), key=lambda n: n.id):
-        definition_cls = node_registry.try_get(node.type)
-        specs = {ps.name: ps for ps in definition_cls.params} if definition_cls is not None else {}
-
-        for param in node.params:
-            if param.ref is None:
-                continue
-            ref = param.ref
-            graph_param = graph.params.get(ref)
-            if graph_param is None:
-                diagnostics.append(
-                    Diagnostic(
-                        severity=Severity.ERROR,
-                        code="ref_unresolved",
-                        message=(
-                            f"node {node.id!r} ({node.type}) param {param.name!r} "
-                            f"references graph parameter {ref!r} which is not defined"
-                        ),
-                        node_id=node.id,
-                    )
-                )
-                continue
-
-            spec = specs.get(param.name)
-            if spec is None or spec.hints is None or not spec.hints.ref_supported:
-                diagnostics.append(
-                    Diagnostic(
-                        severity=Severity.ERROR,
-                        code="ref_not_supported",
-                        message=(
-                            f"node {node.id!r} ({node.type}) param {param.name!r} "
-                            f"references graph parameter {ref!r} but this node's codegen "
-                            "does not support graph-parameter references"
-                        ),
-                        node_id=node.id,
-                    )
-                )
-                continue
-
-            result = _param_token_compatible(graph_param.type_token, spec.type_token)
-            if result:
-                continue
-            diagnostics.append(
-                Diagnostic(
-                    severity=Severity.ERROR,
-                    code="ref_type_mismatch",
-                    message=(
-                        f"node {node.id!r} ({node.type}) param {param.name!r} references graph "
-                        f"parameter {ref!r} with type token {graph_param.type_token!r} which is "
-                        f"incompatible with the param's declared type token {spec.type_token!r}"
-                    ),
-                    node_id=node.id,
-                    expected_type=spec.type_token,
-                    actual_type=graph_param.type_token,
-                )
+    def _visit(nodes: dict[IRId, Node]) -> None:
+        for node in sorted(nodes.values(), key=lambda n: n.id):
+            if node.subgraph is not None:
+                _visit(node.subgraph.nodes)
+            definition_cls = node_registry.try_get(node.type)
+            specs = (
+                {ps.name: ps for ps in definition_cls.params} if definition_cls is not None else {}
             )
 
+            for param in node.params:
+                if param.ref is None:
+                    continue
+                ref = param.ref
+                graph_param = graph.params.get(ref)
+                if graph_param is None:
+                    diagnostics.append(
+                        Diagnostic(
+                            severity=Severity.ERROR,
+                            code="ref_unresolved",
+                            message=(
+                                f"node {node.id!r} ({node.type}) param {param.name!r} "
+                                f"references graph parameter {ref!r} which is not defined"
+                            ),
+                            node_id=node.id,
+                        )
+                    )
+                    continue
+
+                spec = specs.get(param.name)
+                if spec is None or spec.hints is None or not spec.hints.ref_supported:
+                    diagnostics.append(
+                        Diagnostic(
+                            severity=Severity.ERROR,
+                            code="ref_not_supported",
+                            message=(
+                                f"node {node.id!r} ({node.type}) param {param.name!r} "
+                                f"references graph parameter {ref!r} but this node's codegen "
+                                "does not support graph-parameter references"
+                            ),
+                            node_id=node.id,
+                        )
+                    )
+                    continue
+
+                result = _param_token_compatible(graph_param.type_token, spec.type_token)
+                if result:
+                    continue
+                diagnostics.append(
+                    Diagnostic(
+                        severity=Severity.ERROR,
+                        code="ref_type_mismatch",
+                        message=(
+                            f"node {node.id!r} ({node.type}) param {param.name!r} references "
+                            f"graph parameter {ref!r} with type token "
+                            f"{graph_param.type_token!r} which is "
+                            f"incompatible with the param's declared type token {spec.type_token!r}"
+                        ),
+                        node_id=node.id,
+                        expected_type=spec.type_token,
+                        actual_type=graph_param.type_token,
+                    )
+                )
+
+    _visit(graph.nodes)
     return diagnostics
 
 

@@ -130,11 +130,19 @@ def execute(
     # surfaces as an error-severity diagnostic here, never as a later KeyError.
     enforce_validation_gate(graph)
 
-    materialized = (
-        materialize_graph(graph, params=params)
-        if params is not None or has_graph_param_refs(graph)
-        else graph
-    )
+    if params is not None or has_graph_param_refs(graph):
+        materialized = materialize_graph(graph, params=params)
+        # Re-gate the materialized copy so an override whose value violates a ref'd
+        # node param's OWN declared contract (choices/min/max, ...) is rejected here
+        # too -- the server's FUNCTIONAL walk already does this via
+        # `_execute_functional_stream`, and a value `ef.execute` accepts while the
+        # server 422s on is an inconsistency (issue #116). `validate_param_values`
+        # skips None, and refs are re-checked against the same map, so a graph that
+        # passed the first gate passes here unless an override value is genuinely
+        # invalid for the node it feeds.
+        enforce_validation_gate(materialized)
+    else:
+        materialized = graph
 
     return _execute_functional(materialized, clients)
 
