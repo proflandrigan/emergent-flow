@@ -14,7 +14,10 @@ from __future__ import annotations
 
 from .contract import CONFIDENCE, SEVERITIES, ValidityRule
 
-DEFAULT_PACK_VERSION: int = 1
+#: Version of the rule-pack artifact emitted from the default registry.
+#: Bump when a rule's metadata (id, severity, title, rationale) changes in a
+#: way the canvas must see.
+PACK_VERSION: int = 1
 
 
 class ValidityRuleRegistry:
@@ -150,11 +153,6 @@ class ValidityRuleRegistry:
 #: The default :class:`ValidityRuleRegistry` singleton. In-tree rules register
 #: here via the module-level :func:`validity_rule` decorator.
 registry = ValidityRuleRegistry()
-
-#: Version of the rule-pack artifact emitted from the default registry.
-#: Bump when a rule's metadata (id, severity, title, rationale) changes in a
-#: way the canvas must see.
-PACK_VERSION: int = DEFAULT_PACK_VERSION
 
 
 def validity_rule(rule: type[ValidityRule]) -> type[ValidityRule]:

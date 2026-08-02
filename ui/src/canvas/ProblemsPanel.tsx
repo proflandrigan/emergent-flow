@@ -8,7 +8,7 @@ import { useExecutionStore } from "../store/executionStore";
 import { useValidationStore } from "../store/validationStore";
 import { severityColor } from "../store/validation";
 import { useSelectionStore } from "../store/selectionStore";
-import { useSuppressionStore } from "../store/suppressionStore";
+import { keyFor, useSuppressionStore } from "../store/suppressionStore";
 import { ruleMeta } from "../store/validityRules";
 
 export interface ProblemsPanelProps {
@@ -37,6 +37,7 @@ const buttonStyle: CSSProperties = {
 export function ProblemsPanel({ onNavigate }: ProblemsPanelProps): JSX.Element {
   const diagnostics = useValidationStore((s) => s.diagnostics);
   const statuses = useExecutionStore((s) => s.statuses);
+  const suppressions = useSuppressionStore((s) => s.suppressions);
 
   const problems = useMemo(() => {
     const rows: ProblemRow[] = [];
@@ -63,11 +64,10 @@ export function ProblemsPanel({ onNavigate }: ProblemsPanelProps): JSX.Element {
       }
     }
 
-    const isSuppressed = useSuppressionStore.getState().isSuppressed;
     return rows.filter(
-      (r) => !(r.ruleId && r.nodeId && isSuppressed(r.ruleId, r.nodeId)),
+      (r) => !(r.ruleId && r.nodeId && keyFor(r.ruleId, r.nodeId) in suppressions),
     );
-  }, [diagnostics, statuses]);
+  }, [diagnostics, statuses, suppressions]);
 
   const [collapsed, setCollapsed] = useState(false);
 

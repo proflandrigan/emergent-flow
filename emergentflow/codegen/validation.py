@@ -480,7 +480,7 @@ def _collect_validity_diagnostics(graph: Graph) -> list[Diagnostic]:
     """Run the experiment-validity rule pack and map findings to `Diagnostic`s.
 
     Each `ValidityFinding` becomes a `Diagnostic` carrying ``rule_id`` and
-    ``related_node_ids`` (added Task 01) so findings ride the existing
+    ``related_node_ids`` (added Story 1) so findings ride the existing
     diagnostics channel (ADR 0012). Lazy-imports the validity package to avoid a
     circular import through ``emergentflow.ir`` (mutation imports this module).
 

@@ -30,7 +30,7 @@ export interface SuppressionStore {
   clear: () => void;
 }
 
-const keyFor = (ruleId: string, nodeId: string) => `${ruleId}::${nodeId}`;
+export const keyFor = (ruleId: string, nodeId: string) => `${ruleId}::${nodeId}`;
 
 export const useSuppressionStore = create<SuppressionStore>((set, get) => ({
   suppressions: readStored(),
