@@ -88,15 +88,28 @@ def _json_coerce(raw: str) -> Any:
 def _coerce_param_value(raw: str, type_token: str) -> Any:
     """Coerce a ``--param`` value to the graph param's declared *type_token* (issue #116)."""
     value = _json_coerce(raw)
-    if type_token == "int" and not isinstance(value, int):
+    if type_token in ("int", "float") and isinstance(value, bool):
+        # json.loads parses "true"/"false" to real bools; a bool is never a valid
+        # number (and isinstance(True, int) is True, so the int branch below would
+        # otherwise accept --param p=true silently).
+        raise ValueError(f"expected a number, got {raw!r}")
+    if type_token == "int":
+        if isinstance(value, int):
+            return value
         # json.loads parses "10.5" to a float; truncating to 10 would silently
         # corrupt a bad value, so reject it instead (matching the ValueError the
-        # string path already raises for a non-numeric raw).
+        # string path raises for a non-numeric raw).
         if isinstance(value, float) and not value.is_integer():
             raise ValueError(f"expected an integer value, got {raw!r}")
-        return int(value)
+        try:
+            return int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"expected an integer value, got {raw!r}") from exc
     if type_token == "float" and not isinstance(value, (int, float)):
-        return float(value)
+        try:
+            return float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"expected a number, got {raw!r}") from exc
     if type_token == "bool" and not isinstance(value, bool):
         # json.loads already parses "true"/"false" to real bools, but "1"/"0" arrive
         # as JSON numbers; the string tuple below would silently coerce --param flag=1

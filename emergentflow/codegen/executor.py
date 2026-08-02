@@ -35,7 +35,7 @@ from emergentflow.clients import Clients
 from emergentflow.codegen.composite import COMPOSITE_NODE_TYPE, resolve_composite_boundary
 from emergentflow.codegen.declarative import _prepare_declarative
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
-from emergentflow.codegen.params import materialize_graph
+from emergentflow.codegen.params import has_graph_param_refs, materialize_graph
 from emergentflow.codegen.traversal import topological_sort
 from emergentflow.codegen.validation import enforce_validation_gate, required_in_port_names
 from emergentflow.codegen.wiring import build_wiring_map
@@ -50,16 +50,6 @@ def _describe(node: Node) -> str:
     if label:
         return f"{label!r} (id={node.id})"
     return f"{node.type!r} (id={node.id})"
-
-
-def _has_graph_param_refs(graph: Graph) -> bool:
-    """True when any node (recursively, through composite subgraphs) carries a ref'd param."""
-    for node in graph.nodes.values():
-        if any(p.ref is not None for p in node.params):
-            return True
-        if node.subgraph is not None and _has_graph_param_refs(node.subgraph):
-            return True
-    return False
 
 
 @public_op(name="ef.execute")
@@ -125,7 +115,7 @@ def execute(
     if graph.paradigm is Paradigm.DECLARATIVE:
         declarative = (
             materialize_graph(graph, params=params)
-            if params is not None or _has_graph_param_refs(graph)
+            if params is not None or has_graph_param_refs(graph)
             else graph
         )
         return _execute_declarative(declarative)
@@ -142,7 +132,7 @@ def execute(
 
     materialized = (
         materialize_graph(graph, params=params)
-        if params is not None or _has_graph_param_refs(graph)
+        if params is not None or has_graph_param_refs(graph)
         else graph
     )
 

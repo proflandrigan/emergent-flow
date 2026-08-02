@@ -147,9 +147,7 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
   const setParamRef = useGraphStore((s) => s.setParamRef);
   const catalogParam = resolveCatalogParam(meta, param);
   const kind = widgetForParam(catalogParam);
-  const canBindRef =
-    Boolean(catalogParam.hints?.ref_supported) &&
-    Object.keys(graphParams ?? {}).length > 0;
+  const canBindRef = Boolean(catalogParam.hints?.ref_supported);
   const boundTo = param.ref ?? null;
   const error = boundTo !== null ? null : validateValue(catalogParam, param.value);
   const testId = `param-${param.name}`;
@@ -365,6 +363,13 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
             {name}
           </option>
         ))}
+        {/* A ref whose flow parameter was removed stays representable (and selectable away
+            back to "(literal value)"), rather than dangling as an unselectable value. */}
+        {boundTo !== null && !(boundTo in (graphParams ?? {})) ? (
+          <option key={boundTo} value={boundTo}>
+            {boundTo} (removed)
+          </option>
+        ) : null}
       </Select>
     </div>
   ) : null;

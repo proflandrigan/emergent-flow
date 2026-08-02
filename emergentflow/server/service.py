@@ -26,9 +26,12 @@ import pandas as pd
 from emergentflow import __version__, compile_to_code, execute, export_catalog, validate
 from emergentflow.clients import ClientKind, Clients
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
-from emergentflow.codegen.executor import _has_graph_param_refs
 from emergentflow.codegen.inspect import build_step_traces
-from emergentflow.codegen.params import materialize_graph, resolve_graph_params
+from emergentflow.codegen.params import (
+    has_graph_param_refs,
+    materialize_graph,
+    resolve_graph_params,
+)
 from emergentflow.codegen.traversal import topological_sort
 from emergentflow.codegen.validation import enforce_validation_gate, required_in_port_names
 from emergentflow.codegen.wiring import WiringMap, build_wiring_map
@@ -918,7 +921,7 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
         # Resolve graph-level parameter overrides into the graph the walk reads
         # (ref'd node params baked to their resolved values) so the server-side
         # FUNCTIONAL walk matches `ef.execute(graph, params=...)` (issue #116).
-        if params is not None or _has_graph_param_refs(graph):
+        if params is not None or has_graph_param_refs(graph):
             graph = materialize_graph(graph, params=params)
         only, wiring_map = _resolve_run_scope(graph, scope)
         results, statuses, node_elapsed = _execute_functional_with_status(
@@ -1043,7 +1046,7 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
     start_time = time.monotonic()
     try:
         if graph.paradigm is Paradigm.FUNCTIONAL:
-            if params is not None or _has_graph_param_refs(graph):
+            if params is not None or has_graph_param_refs(graph):
                 graph = materialize_graph(graph, params=params)
             only, wiring_map = _resolve_run_scope(graph, scope)
             for event in _execute_functional_stream(graph, only=only, wiring_map=wiring_map):

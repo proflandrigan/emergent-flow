@@ -434,3 +434,31 @@ test("unbinding a ref (selecting '(literal value)' again) clears ref and shows t
   expect(screen.queryByTestId("param-path-bound")).toBeNull();
   expect(screen.getByTestId("param-path")).toBeInTheDocument();
 });
+
+test("a bound param stays unbindable even after its flow param is removed", () => {
+  useGraphStore.getState().addGraphParam(); // creates param1
+  const id = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("data.load_csv"), { x: 0, y: 0 });
+  const { rerender } = render(
+    <ConfigForm node={useGraphStore.getState().nodes[id]} />,
+  );
+
+  fireEvent.change(screen.getByTestId("param-path-ref") as HTMLSelectElement, {
+    target: { value: "param1" },
+  });
+  useGraphStore.getState().removeGraphParam("param1");
+
+  // With no flow params left, the dropdown must still render (only "(literal value)") so the
+  // bound ref is not a dead-end the user cannot escape (reviewer fix).
+  rerender(<ConfigForm node={useGraphStore.getState().nodes[id]} />);
+  const refSelect = screen.getByTestId("param-path-ref") as HTMLSelectElement;
+  expect(refSelect).toBeInTheDocument();
+  expect(refSelect.value).toBe("param1"); // still shows the (now-unresolvable) binding
+  fireEvent.change(refSelect, { target: { value: "" } });
+
+  const param = useGraphStore
+    .getState()
+    .nodes[id].params.find((p) => p.name === "path");
+  expect(param?.ref).toBeUndefined();
+});

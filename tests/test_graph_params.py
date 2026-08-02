@@ -247,6 +247,63 @@ class TestCodegen:
         assert assembled.graph_param_names == {"p": "p"}
         assert assembled.graph_param_defaults == [("p", "3")]
 
+    def test_param_name_not_an_identifier_uses_sanitized_kwarg(self) -> None:
+        """A graph-param name that is not a valid Python identifier (space, hyphen, leading
+        digit) must compile to a SANITIZED main() kwarg -- the raw name would be invalid
+        Python syntax (reviewer fix)."""
+        g = Graph(params={"max events": Param(name="max events", type_token="int", value=3)})
+        g.nodes["n"] = _sink_node(ref="max events")
+        source = compile_to_code(g)
+        assert "def main(*, max_events=3)" in source
+        assert execute(g)["n"] == {"out": 3}
+        assert execute(g, params={"max events": 5})["n"] == {"out": 5}
+
+    def test_param_colliding_with_main_reserved_names_is_disambiguated(self) -> None:
+        """A graph-param name that collides with the compiled main()'s reserved kwarg/local
+        names (clients/client/warehouse/http) must be hashed, or a warehouse/LLM graph emits
+        a duplicate-parameter SyntaxError (reviewer fix)."""
+        from emergentflow.codegen.compiler import _assemble
+        from emergentflow.codegen.naming import _MAIN_RESERVED_NAMES, build_graph_param_names
+
+        g = Graph(
+            params={"clients": Param(name="clients", type_token="int", value=3)},
+            nodes={"n": _sink_node(ref="clients")},
+        )
+        names = build_graph_param_names(g, _assemble(g).name_map)
+        assert names["clients"].startswith("clients_")  # disambiguated off the reserved name
+        assert not set(names.values()) & set(_MAIN_RESERVED_NAMES)
+        source = compile_to_code(g)
+        assert "def main(*, clients_" in source
+
+    def test_reserved_name_collision_in_warehouse_graph_compiles(self) -> None:
+        """End-to-end: a warehouse graph (which reserves the `clients` kwarg) with a graph
+        param also named `clients` must still compile (no duplicate-parameter SyntaxError)."""
+        q = Node(
+            id="q",
+            type="data.sql_query",
+            label="Q",
+            ports=[
+                Port(id="q-frame", name="frame", direction=Direction.OUT, data_type="DataFrame"),
+                Port(
+                    id="q-cost", name="cost_estimate", direction=Direction.OUT, data_type="number"
+                ),
+            ],
+            params=[
+                Param(name="sql", type_token="str", ref="clients"),
+                Param(name="connection", type_token="str", value="default"),
+                Param(name="dialect", type_token="str", value="duckdb"),
+                Param(name="max_rows", type_token="int", value=100),
+                Param(name="dry_run", type_token="bool", value=False),
+            ],
+        )
+        g = Graph(
+            params={"clients": Param(name="clients", type_token="str", value="SELECT 1")},
+            nodes={"q": q},
+        )
+        source = compile_to_code(g)
+        assert "def main(*, clients_" in source
+        assert "clients: object | None = None" in source  # the real bundle kwarg survives
+
 
 # ---------------------------------------------------------------------------
 # execute(graph, *, params=)
@@ -286,9 +343,7 @@ class TestExecute:
             id="sink",
             type=_GraphParamSink.type,
             label=_GraphParamSink.label,
-            ports=[
-                Port(id="sink-out", name="out", direction=Direction.OUT, data_type="int")
-            ],
+            ports=[Port(id="sink-out", name="out", direction=Direction.OUT, data_type="int")],
             params=[Param(name="value", type_token="int", ref="p")],
         )
         sub = Graph(params={}, nodes={"sink": sink}, edges={})
@@ -296,9 +351,7 @@ class TestExecute:
             id="comp",
             type="layout.composite",
             label="Composite",
-            ports=[
-                Port(id="comp-out", name="out", direction=Direction.OUT, data_type="int")
-            ],
+            ports=[Port(id="comp-out", name="out", direction=Direction.OUT, data_type="int")],
             subgraph=sub,
         )
         g = Graph(params={"p": Param(name="p", type_token="int", value=3)})
@@ -385,3 +438,19 @@ class TestCli:
         graph_file = self._write_graph(tmp_path, "graph.json")
         monkeypatch.chdir(tmp_path)
         assert main(["run", str(graph_file), "--param", "p=abc"]) == 1
+
+    def test_coerce_rejects_bool_and_null_for_numeric_types(self) -> None:
+        """json.loads parses "true" to a real bool (an int subclass) and "null" to None;
+        neither may silently satisfy an int/float param (reviewer fix)."""
+        from emergentflow.cli import _coerce_param_value
+
+        with pytest.raises(ValueError, match="number"):
+            _coerce_param_value("true", "int")
+        with pytest.raises(ValueError, match="integer"):
+            _coerce_param_value("null", "int")
+        with pytest.raises(ValueError, match="number"):
+            _coerce_param_value("false", "float")
+        with pytest.raises(ValueError, match="number"):
+            _coerce_param_value("null", "float")
+        assert _coerce_param_value("10", "int") == 10
+        assert _coerce_param_value("3.5", "float") == 3.5

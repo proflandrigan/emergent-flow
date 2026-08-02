@@ -285,7 +285,12 @@ def _assemble(
         for note_content in note_comments_by_target.get(node_id, []):
             code_fragments.append(CodeFragment(imports=[], body=_format_note_comment(note_content)))
 
-    graph_param_defaults = [(name, repr(graph.params[name].value)) for name in sorted(graph.params)]
+    # Use the SANITIZED var name (graph_param_names), not the raw param name: the emitted
+    # `main()` signature and every `ctx.param_expr` reference must agree, and a raw name like
+    # "max events" would emit invalid Python (issue #116).
+    graph_param_defaults = [
+        (graph_param_names[name], repr(graph.params[name].value)) for name in sorted(graph.params)
+    ]
 
     # Step 5: Import collection
     all_imports: set[str] = set()

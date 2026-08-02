@@ -20,7 +20,12 @@ from typing import Any
 from emergentflow.ir.graph import Graph
 from emergentflow.ir.node import Node
 
-__all__ = ["GraphParamError", "resolve_graph_params", "materialize_graph"]
+__all__ = [
+    "GraphParamError",
+    "has_graph_param_refs",
+    "resolve_graph_params",
+    "materialize_graph",
+]
 
 
 class GraphParamError(ValueError):
@@ -29,6 +34,20 @@ class GraphParamError(ValueError):
     Covers an override key that names no graph-level param, and (defensively, for
     callers that bypass the validator) a node ``ref`` that names no graph-level param.
     """
+
+
+def has_graph_param_refs(graph: Graph) -> bool:
+    """True when any node (recursively, through composite subgraphs) carries a ref'd param.
+
+    Shared by the executor and the server to decide whether ``materialize_graph`` is needed
+    before running a graph that received no explicit overrides.
+    """
+    for node in graph.nodes.values():
+        if any(p.ref is not None for p in node.params):
+            return True
+        if node.subgraph is not None and has_graph_param_refs(node.subgraph):
+            return True
+    return False
 
 
 def resolve_graph_params(
