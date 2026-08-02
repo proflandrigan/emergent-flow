@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "paradigm": "functional",
   "name": "Sklearn Acceptance Demo -- Supervised",
   "nodes": {
@@ -13,7 +13,9 @@
           "name": "name",
           "type_token": "str",
           "value": "iris",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -43,13 +45,17 @@
           "name": "axis",
           "type_token": "str",
           "value": "rows",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "how",
           "type_token": "str",
           "value": "any",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -105,13 +111,17 @@
               }
             }
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "target",
           "type_token": "str",
           "value": "target",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "features",
@@ -122,7 +132,9 @@
             "petal length (cm)",
             "petal width (cm)"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -239,5 +251,6 @@
       },
       "type_compatible": null
     }
-  }
+  },
+  "params": {}
 }

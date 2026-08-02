@@ -143,9 +143,13 @@ function ConnectionSelect({
 
 function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
   const setParam = useGraphStore((s) => s.setParam);
+  const graphParams = useGraphStore((s) => s.params);
+  const setParamRef = useGraphStore((s) => s.setParamRef);
   const catalogParam = resolveCatalogParam(meta, param);
   const kind = widgetForParam(catalogParam);
-  const error = validateValue(catalogParam, param.value);
+  const canBindRef = Boolean(catalogParam.hints?.ref_supported);
+  const boundTo = param.ref ?? null;
+  const error = boundTo !== null ? null : validateValue(catalogParam, param.value);
   const testId = `param-${param.name}`;
 
   let widget: JSX.Element;
@@ -343,6 +347,33 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
     );
   }
 
+  const refWidget = canBindRef ? (
+    <div style={{ marginBottom: "0.25rem" }}>
+      <Select
+        data-testid={`param-${param.name}-ref`}
+        value={boundTo ?? ""}
+        onChange={(e) => {
+          const value = e.target.value;
+          setParamRef(node.id, param.name, value === "" ? undefined : value);
+        }}
+      >
+        <option value="">(literal value)</option>
+        {Object.keys(graphParams ?? {}).map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+        {/* A ref whose flow parameter was removed stays representable (and selectable away
+            back to "(literal value)"), rather than dangling as an unselectable value. */}
+        {boundTo !== null && !(boundTo in (graphParams ?? {})) ? (
+          <option key={boundTo} value={boundTo}>
+            {boundTo} (removed)
+          </option>
+        ) : null}
+      </Select>
+    </div>
+  ) : null;
+
   return (
     <div style={{ marginBottom: "0.75rem" }}>
       <label
@@ -351,14 +382,29 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
         {meta?.label ?? param.name}
         {catalogParam.required ? " *" : ""}
       </label>
-      {widget}
-      {kind === "list" ? (
-        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
-          comma-separated
+      {refWidget}
+      {boundTo !== null ? (
+        <div
+          data-testid={`param-${param.name}-bound`}
+          style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}
+        >
+          Bound to flow parameter <strong>{boundTo}</strong> (the literal is
+          ignored).
         </div>
-      ) : null}
+      ) : (
+        <>
+          {widget}
+          {kind === "list" ? (
+            <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+              comma-separated
+            </div>
+          ) : null}
+        </>
+      )}
       {meta?.help ? (
-        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{meta.help}</div>
+        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+          {meta.help}
+        </div>
       ) : null}
       {error ? (
         <span data-testid={`error-${param.name}`} style={{ color: "var(--danger)" }}>

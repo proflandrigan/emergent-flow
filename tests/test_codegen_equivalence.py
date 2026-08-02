@@ -47,10 +47,10 @@ from emergentflow.codegen.compiler import _assemble, compile_to_code
 from emergentflow.codegen.errors import CycleError, GraphValidationError
 from emergentflow.codegen.executor import execute
 from emergentflow.codegen.validation import validate
-from emergentflow.ir import Direction, Edge, Graph, Node, Port, PortRef, load_graph
+from emergentflow.ir import Direction, Edge, Graph, Node, Param, Port, PortRef, load_graph
 from emergentflow.nodes.contract import CodeFragment, NodeDefinition
 from emergentflow.nodes.registry import register
-from emergentflow.nodes.spec import PortSpec
+from emergentflow.nodes.spec import ParamSpec, PortSpec, ValidationHints
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent
 
@@ -132,7 +132,9 @@ def _volatile_ports(graph: Graph) -> set[tuple[str, str]]:
     return out
 
 
-def _execute_side(graph: Graph, *, cwd: pathlib.Path) -> dict[str, dict[str, Any]]:
+def _execute_side(
+    graph: Graph, *, params: dict[str, Any] | None = None, cwd: pathlib.Path
+) -> dict[str, dict[str, Any]]:
     """Run execute() in-process and canonicalize every per-port artifact.
 
     Runs under ``cwd`` so relative data paths in the graph resolve exactly as
@@ -141,7 +143,7 @@ def _execute_side(graph: Graph, *, cwd: pathlib.Path) -> dict[str, dict[str, Any
     prev = pathlib.Path.cwd()
     os.chdir(cwd)
     try:
-        raw = execute(graph)
+        raw = execute(graph, params=params)
     finally:
         os.chdir(prev)
     canon = {nid: {p: _canon(v) for p, v in outs.items()} for nid, outs in raw.items()}
@@ -150,7 +152,9 @@ def _execute_side(graph: Graph, *, cwd: pathlib.Path) -> dict[str, dict[str, Any
     return json.loads(json.dumps(canon))
 
 
-def _code_side(graph: Graph, *, cwd: pathlib.Path) -> dict[str, dict[str, Any]]:
+def _code_side(
+    graph: Graph, *, params: dict[str, Any] | None = None, cwd: pathlib.Path
+) -> dict[str, dict[str, Any]]:
     """Compile the graph, run the emitted module as a subprocess, return artifacts.
 
     Builds an *instrumented* variant of the compiled module from the compiler's
@@ -167,6 +171,13 @@ def _code_side(graph: Graph, *, cwd: pathlib.Path) -> dict[str, dict[str, Any]]:
 
     lines: list[str] = []
     lines.extend(assembled.imports)
+    # Graph-level params become module-scope variables named by the compiler's
+    # graph-param names (the compiled `main()` kwargs); bind defaults then overrides.
+    effective = {name: graph.params[name].value for name in graph.params}
+    if params is not None:
+        effective.update(params)
+    for gname in sorted(graph.params):
+        lines.append(f"{assembled.graph_param_names[gname]} = {effective[gname]!r}")
     lines.append(_CANON_SRC)
     lines.append("import json as _json")
     lines.append("import pathlib as _pl")
@@ -233,14 +244,19 @@ def _assert_equiv(exec_v: Any, code_v: Any, path: str = "") -> None:
         assert exec_v == code_v, f"mismatch at {path}: {exec_v!r} != {code_v!r}"
 
 
-def assert_equivalent(graph: Graph, *, cwd: pathlib.Path = REPO_ROOT) -> None:
+def assert_equivalent(
+    graph: Graph,
+    *,
+    params: dict[str, Any] | None = None,
+    cwd: pathlib.Path = REPO_ROOT,
+) -> None:
     """Assert ``execute(graph)`` artifacts equal artifacts from running compiled code.
 
     ``cwd`` is the working directory the compiled subprocess runs in, so that any
     relative data paths in the graph (e.g. a ``load_csv`` path) resolve.
     """
-    exec_side = _execute_side(graph, cwd=cwd)
-    code_side = _code_side(graph, cwd=cwd)
+    exec_side = _execute_side(graph, params=params, cwd=cwd)
+    code_side = _code_side(graph, params=params, cwd=cwd)
 
     assert exec_side.keys() == code_side.keys(), (
         f"node-id sets differ: {sorted(exec_side)} vs {sorted(code_side)}"
@@ -379,6 +395,29 @@ class _EquivHTMLSink(NodeDefinition):
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
         return {"out": inputs["in_"]}
+
+
+@register
+class _EquivParamSink(NodeDefinition):
+    """Test fixture: emits its ref'd param's resolved value unchanged (issue #116)."""
+
+    type = "test.equiv_param"
+    family = "test"
+    label = "Equiv Param"
+    ports = [PortSpec(name="out", direction=Direction.OUT, data_type="int")]
+    params = [
+        ParamSpec(
+            name="value",
+            type_token="int",
+            hints=ValidationHints(ref_supported=True),
+        ),
+    ]
+
+    def codegen(self, node: Node, ctx: Any) -> CodeFragment:
+        return CodeFragment(body=f"{ctx.out_var('out')} = {ctx.param_expr('value')}")
+
+    def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
+        return {"out": node.params[0].value}
 
 
 @pytest.mark.equivalence
@@ -597,6 +636,46 @@ def _diamond_graph() -> Graph:
 def test_diamond_equivalence() -> None:
     """The reconverging diamond is execute/compile equivalent (join out == 28)."""
     assert_equivalent(_diamond_graph())
+
+
+@pytest.mark.equivalence
+def test_parameterized_equivalence_with_overrides() -> None:
+    """A graph-level param feeding a ref'd node param is equivalent under defaults AND overrides.
+
+    `p` emits the resolved value of graph param `multiplier` (3 by default); `d` doubles it.
+    The equivalence harness binds the override to the compiled module's module-scope variable,
+    so the compiled code uses the override just like `execute(graph, params=...)` does.
+    """
+    p = Node(
+        id="p",
+        type=_EquivParamSink.type,
+        label=_EquivParamSink.label,
+        ports=[Port(id="p-out", name="out", direction=Direction.OUT, data_type="int")],
+        params=[Param(name="value", type_token="int", ref="multiplier")],
+    )
+    d = Node(
+        id="d",
+        type=_EquivDouble.type,
+        label=_EquivDouble.label,
+        ports=[
+            Port(id="d-in", name="in_", direction=Direction.IN, data_type="int"),
+            Port(id="d-out", name="out", direction=Direction.OUT, data_type="int"),
+        ],
+    )
+    edge = Edge(
+        source=PortRef(node_id="p", port_id="p-out"),
+        target=PortRef(node_id="d", port_id="d-in"),
+    )
+    graph = Graph(
+        params={"multiplier": Param(name="multiplier", type_token="int", value=3)},
+        nodes={p.id: p, d.id: d},
+        edges={edge.id: edge},
+    )
+
+    assert_equivalent(graph)  # defaults: multiplier == 3
+    assert_equivalent(graph, params={"multiplier": 7})  # override: multiplier == 7
+    assert execute(graph, params={"multiplier": 7})["d"] == {"out": 14}
+    assert execute(graph)["d"] == {"out": 6}
 
 
 def test_diamond_golden(snapshot) -> None:

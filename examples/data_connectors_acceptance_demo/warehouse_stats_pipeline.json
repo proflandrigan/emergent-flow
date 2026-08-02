@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "paradigm": "functional",
   "name": "Data Connectors Acceptance Demo -- Warehouse to Stats",
   "nodes": {
@@ -13,7 +13,9 @@
           "name": "source",
           "type_token": "str",
           "value": "sales",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "select",
@@ -32,13 +34,17 @@
               "alias": "avg_market_index"
             }
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "where",
           "type_token": "list",
           "value": [],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "join",
@@ -55,7 +61,9 @@
               "type": "INNER"
             }
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "group_by",
@@ -64,55 +72,73 @@
             "sales.region",
             "sales.rep_id"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "having",
           "type_token": "list",
           "value": [],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "order_by",
           "type_token": "list",
           "value": [],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "limit",
           "type_token": "int",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "distinct",
           "type_token": "bool",
           "value": false,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "connection",
           "type_token": "ConnectionRef",
           "value": "demo_bigquery",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "dialect",
           "type_token": "str",
           "value": "bigquery",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "max_rows",
           "type_token": "int",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "dry_run",
           "type_token": "bool",
           "value": false,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -150,7 +176,9 @@
           "name": "target",
           "type_token": "str",
           "value": "total_revenue",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "fixed_effects",
@@ -158,19 +186,25 @@
           "value": [
             "avg_market_index"
           ],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "random_effects",
           "type_token": "list[str]",
           "value": [],
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "groups",
           "type_token": "str",
           "value": "region",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -255,5 +289,6 @@
       },
       "type_compatible": null
     }
-  }
+  },
+  "params": {}
 }

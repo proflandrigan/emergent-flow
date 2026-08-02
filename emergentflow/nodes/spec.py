@@ -125,6 +125,10 @@ class ValidationHints(IRModel):
         should be filtered to — `"warehouse"` or `"llm"`. `None` (the default) means
         `"warehouse"`, matching every pre-existing `connection`-widget param, which predates
         this field and was always warehouse-only.
+    ref_supported:
+        When True, this param's codegen supports binding to a graph-level parameter
+        reference (issue #116) — the node routes it through ``ctx.param_expr``.
+        Defaults to False.
     """
 
     min: float | None = None
@@ -136,6 +140,7 @@ class ValidationHints(IRModel):
     pattern: str | None = None
     widget: str | None = None
     connection_kind: str | None = None
+    ref_supported: bool = False
 
 
 # ---------------------------------------------------------------------------

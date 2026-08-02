@@ -59,6 +59,38 @@ describe("addNodeFromSpec", () => {
   });
 });
 
+describe("setParamRef", () => {
+  test("binds a node param's ref to a graph-param name", () => {
+    const nodeId = useGraphStore
+      .getState()
+      .addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+
+    useGraphStore.getState().setParamRef(nodeId, "path", "param1");
+
+    const param = useGraphStore
+      .getState()
+      .nodes[nodeId].params.find((p) => p.name === "path");
+    expect(param?.ref).toBe("param1");
+  });
+
+  test("setParamRef(node, 'p', undefined) removes the ref key from the param", () => {
+    const nodeId = useGraphStore
+      .getState()
+      .addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    useGraphStore.getState().setParamRef(nodeId, "path", "param1");
+
+    useGraphStore.getState().setParamRef(nodeId, "path", undefined);
+
+    const param = useGraphStore
+      .getState()
+      .nodes[nodeId].params.find((p) => p.name === "path");
+    expect(param?.ref).toBeUndefined();
+    const graph = useGraphStore.getState().toIR();
+    const irParam = graph.nodes![nodeId].params!.find((p) => p.name === "path");
+    expect(irParam).not.toHaveProperty("ref");
+  });
+});
+
 describe("connect", () => {
   function addTwoConnectableNodes() {
     const sourceId = useGraphStore

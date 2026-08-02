@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "paradigm": "functional",
   "name": "Data Connectors Acceptance Demo -- Exploration",
   "nodes": {
@@ -13,31 +13,41 @@
           "name": "sql",
           "type_token": "str",
           "value": "SELECT * FROM read_parquet('examples/data_connectors_acceptance_demo/sales.parquet')",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "connection",
           "type_token": "ConnectionRef",
           "value": "demo_duckdb",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "dialect",
           "type_token": "str",
           "value": "duckdb",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "max_rows",
           "type_token": "int",
           "value": null,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "dry_run",
           "type_token": "bool",
           "value": false,
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -196,5 +206,6 @@
       },
       "type_compatible": null
     }
-  }
+  },
+  "params": {}
 }

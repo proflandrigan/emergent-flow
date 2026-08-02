@@ -61,6 +61,7 @@ export function snapshot(s: CanvasModel): CanvasModel {
     nodes: s.nodes,
     edges: s.edges,
     groupMeta: s.groupMeta ?? {},
+    params: s.params,
   });
 }
 
@@ -76,6 +77,7 @@ export interface GraphStore extends CanvasModel {
   moveNode: (nodeId: string, position: { x: number; y: number }) => void;
   endNodeDrag: () => void;
   setParam: (nodeId: string, paramName: string, value: unknown) => void;
+  setParamRef: (nodeId: string, paramName: string, ref: string | null | undefined) => void;
   connect: (
     source: { node_id: string; port_id: string },
     target: { node_id: string; port_id: string },
@@ -97,6 +99,11 @@ export interface GraphStore extends CanvasModel {
   canUndo: () => boolean;
   canRedo: () => boolean;
   setName: (name: string) => void;
+  addGraphParam: () => void;
+  setGraphParamValue: (name: string, value: unknown) => void;
+  setGraphParamType: (name: string, typeToken: string) => void;
+  setGraphParamDescription: (name: string, description: string) => void;
+  removeGraphParam: (name: string) => void;
   groupNodes: (nodeIds: string[], groupName?: string) => string;
   ungroupNodes: (groupId: string) => void;
   setGroupMeta: (groupId: string, meta: Partial<GroupMeta>) => void;
@@ -218,6 +225,31 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         nodes: {
           ...state.nodes,
           [nodeId]: { ...existing, params },
+        },
+      };
+    });
+  },
+
+  setParamRef(nodeId, paramName, ref) {
+    const existing = get().nodes[nodeId];
+    if (!existing) {
+      return;
+    }
+    get().pushHistory("setParamRef");
+    set((state) => {
+      const node = state.nodes[nodeId];
+      if (!node) {
+        return {};
+      }
+      return {
+        nodes: {
+          ...state.nodes,
+          [nodeId]: {
+            ...node,
+            params: node.params.map((p) =>
+              p.name === paramName ? { ...p, ref } : p,
+            ),
+          },
         },
       };
     });
@@ -546,13 +578,18 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       paradigm: state.paradigm,
       nodes: state.nodes,
       edges: state.edges,
+      params: state.params,
     });
   },
 
   loadIR(graph) {
     get().pushHistory("loadIR");
     const model = fromIR(graph);
-    set({ ...model, nodes: separateOverlappingNodes(model.nodes) });
+    set({
+      ...model,
+      params: model.params,
+      nodes: separateOverlappingNodes(model.nodes),
+    });
     clearDerivedStores();
   },
 
@@ -565,6 +602,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       nodes: model.nodes,
       edges: model.edges,
       groupMeta: model.groupMeta ?? {},
+      params: model.params,
     });
     clearDerivedStores();
   },
@@ -575,7 +613,16 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   },
 
   reset() {
-    set({ ...emptyGraph(), past: [], future: [], _lastTxn: null });
+    // `params` must be reset EXPLICITLY: zustand's set() shallow-merges, so omitting it
+    // (as `emptyGraph()` does, to keep param-free graphs byte-identical) would leave stale
+    // flow parameters behind across resets.
+    set({
+      ...emptyGraph(),
+      params: undefined,
+      past: [],
+      future: [],
+      _lastTxn: null,
+    });
     clearDerivedStores();
   },
 
@@ -612,6 +659,69 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   setName(name) {
     get().pushHistory("setName");
     set({ name });
+  },
+
+  addGraphParam() {
+    get().pushHistory("addGraphParam");
+    set((state) => {
+      const existing = Object.keys(state.params ?? {});
+      let n = 1;
+      while (existing.includes(`param${n}`)) {
+        n += 1;
+      }
+      const name = `param${n}`;
+      return {
+        params: {
+          ...(state.params ?? {}),
+          [name]: { name, typeToken: "str", value: null, description: "" },
+        },
+      };
+    });
+  },
+
+  setGraphParamValue(name, value) {
+    const existing = get().params?.[name];
+    if (!existing) {
+      return;
+    }
+    get().pushHistory("setGraphParamValue");
+    set((state) => ({
+      params: { ...(state.params ?? {}), [name]: { ...existing, value } },
+    }));
+  },
+
+  setGraphParamType(name, typeToken) {
+    const existing = get().params?.[name];
+    if (!existing) {
+      return;
+    }
+    get().pushHistory("setGraphParamType");
+    set((state) => ({
+      params: { ...(state.params ?? {}), [name]: { ...existing, typeToken } },
+    }));
+  },
+
+  setGraphParamDescription(name, description) {
+    const existing = get().params?.[name];
+    if (!existing) {
+      return;
+    }
+    get().pushHistory("setGraphParamDescription");
+    set((state) => ({
+      params: { ...(state.params ?? {}), [name]: { ...existing, description } },
+    }));
+  },
+
+  removeGraphParam(name) {
+    if (!get().params?.[name]) {
+      return;
+    }
+    get().pushHistory("removeGraphParam");
+    set((state) => {
+      const params = { ...(state.params ?? {}) };
+      delete params[name];
+      return { params };
+    });
   },
 
   groupNodes(nodeIds, groupName) {

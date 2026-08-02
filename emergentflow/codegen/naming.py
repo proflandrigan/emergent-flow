@@ -146,6 +146,13 @@ def _hash_suffix(node_id: str, port_id: str, length: int) -> str:
     return digest.hexdigest()[:length]
 
 
+# Names the compiled `main()` reserves for its own keyword arguments (`clients`/`client`) and
+# preamble locals (`warehouse`/`http`/`client`): a graph param that sanitized to one of these
+# would either duplicate a signature parameter (SyntaxError) or be shadowed by the preamble
+# assignment before any node runs, silently discarding the override (issue #116).
+_MAIN_RESERVED_NAMES = frozenset({"clients", "client", "warehouse", "http"})
+
+
 def _base_name(node: Node) -> str:
     """Readable base name for *node*: its label, falling back to its type."""
     label = (node.label or "").strip()
@@ -216,3 +223,29 @@ def build_name_map(graph: Graph) -> NameMap:
         bindings.append(OutBinding(node_id=node_id, port_id=port_id, var_name=var_name))
 
     return NameMap(bindings=bindings)
+
+
+def build_graph_param_names(graph: Graph, name_map: NameMap) -> dict[str, str]:
+    """Assign a stable, collision-free Python variable name to each graph-level param.
+
+    The compiled ``main()`` takes one keyword argument per graph param, named from the param's
+    name (sanitized to a valid identifier). A candidate that collides with an OUT-port variable
+    already allocated by *name_map*, with one of the names the compiled ``main()`` reserves for
+    its own signature/locals (``clients``, ``client``, ``warehouse``, ``http``), or with another
+    graph param's sanitized form, is disambiguated with the same stable blake2s hash suffix
+    ``build_name_map`` uses. Graph params are processed in sorted param-name order for
+    determinism.
+    """
+    taken = {b.var_name for b in name_map.bindings} | _MAIN_RESERVED_NAMES
+    names: dict[str, str] = {}
+    for pname in sorted(graph.params):
+        base = _sanitize_identifier(_slugify(pname)) or "param"
+        candidate = base
+        if candidate in taken:
+            length = 4
+            while candidate in taken and length <= 16:
+                candidate = f"{base}_{_hash_suffix(pname, 'gparam', length)}"
+                length += 1
+        names[pname] = candidate
+        taken.add(candidate)
+    return names

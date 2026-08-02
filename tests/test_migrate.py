@@ -155,7 +155,7 @@ class TestExampleMigrationAndDocumentWalk:
 
         doc = {"schema_version": 0, "mode": "functional", "nodes": {}, "edges": {}}
         result = migrate_document(doc)
-        assert result["schema_version"] == 1
+        assert result["schema_version"] == CURRENT_SCHEMA_VERSION
         assert result["paradigm"] == "functional"
         assert "mode" not in result
 
@@ -181,7 +181,7 @@ class TestExampleMigrationAndDocumentWalk:
         }
         result = migrate_document(doc)
         sub = result["nodes"]["n1"]["subgraph"]
-        assert sub["schema_version"] == 1
+        assert sub["schema_version"] == CURRENT_SCHEMA_VERSION
         assert sub["paradigm"] == "declarative"
         assert "mode" not in sub
 

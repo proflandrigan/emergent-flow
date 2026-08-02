@@ -30,7 +30,7 @@ class LoadCsv(NodeDefinition):
     """Load a CSV file into a pandas DataFrame."""
 
     type = "data.load_csv"
-    version = 4
+    version = 5
     family = "data"
     label = "Load CSV"
     category = "Ingest"
@@ -60,7 +60,7 @@ class LoadCsv(NodeDefinition):
             "`data/*.csv`) to row-concatenate every match in sorted order, or an "
             "object-store URI (`s3://`, `gs://`, `az://`) which requires the `[cloud]` "
             "extra.",
-            hints=ValidationHints(widget="file"),
+            hints=ValidationHints(widget="file", ref_supported=True),
         ),
         ParamSpec(
             name="encoding",
@@ -68,7 +68,7 @@ class LoadCsv(NodeDefinition):
             default="utf-8",
             label="Encoding",
             help="Text encoding used to read the file.",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(widget="text", ref_supported=True),
         ),
         ParamSpec(
             name="source_file",
@@ -77,7 +77,7 @@ class LoadCsv(NodeDefinition):
             label="Add source file column",
             help="Add a 'source_file' column naming the file each row came from. Useful "
             "when loading a glob pattern across many files.",
-            hints=ValidationHints(widget="checkbox"),
+            hints=ValidationHints(widget="checkbox", ref_supported=True),
         ),
         ParamSpec(
             name="connection",
@@ -132,12 +132,21 @@ class LoadCsv(NodeDefinition):
             cast("dict[str, str] | None", values.get("expect_dtypes")),
         )
 
+    def _refs(self, node: Node) -> set[str]:
+        return {p.name for p in node.params if p.ref is not None}
+
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         path, encoding, source_file, connection, expect_columns, expect_dtypes = self._args(node)
+        refs = self._refs(node)
+        path_expr = ctx.param_expr("path") if "path" in refs else repr(path)
+        encoding_expr = ctx.param_expr("encoding") if "encoding" in refs else repr(encoding)
+        source_file_expr = (
+            ctx.param_expr("source_file") if "source_file" in refs else repr(source_file)
+        )
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=f"{ctx.out_var('frame')} = ef.data.load_csv("
-            f"{path!r}, encoding={encoding!r}, source_file={source_file!r}, "
+            f"{path_expr}, encoding={encoding_expr}, source_file={source_file_expr}, "
             f"connection={connection!r}, expect_columns={expect_columns!r}, "
             f"expect_dtypes={expect_dtypes!r})",
         )

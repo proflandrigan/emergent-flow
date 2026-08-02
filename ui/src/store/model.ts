@@ -28,6 +28,8 @@ export interface ParamModel {
   typeToken: string;
   value: unknown;
   default?: unknown;
+  ref?: string | null;
+  description?: string | null;
 }
 
 export interface NodeModel {
@@ -61,4 +63,5 @@ export interface CanvasModel {
   nodes: Record<string, NodeModel>;
   edges: Record<string, EdgeModel>;
   groupMeta?: Record<string, GroupMeta>;
+  params?: Record<string, ParamModel>;
 }

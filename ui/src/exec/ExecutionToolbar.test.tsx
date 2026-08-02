@@ -265,3 +265,44 @@ test("Clear cache disables itself and Execute while in flight, then re-enables b
   );
   expect(screen.getByTestId("exec-run")).not.toBeDisabled();
 });
+
+test("Run params form sends overrides to /execute/stream", async () => {
+  const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    sseResponse([{ type: "run_complete", total_ms: 0 }]),
+  );
+  useGraphStore.getState().addGraphParam(); // param1 (str)
+  addNode();
+  render(<ExecutionToolbar />);
+
+  fireEvent.click(screen.getByTestId("exec-params-toggle"));
+  fireEvent.change(screen.getByTestId("exec-param-param1"), {
+    target: { value: "2026-02-01" },
+  });
+  fireEvent.click(screen.getByTestId("exec-run"));
+
+  await waitFor(() => expect(f).toHaveBeenCalled());
+  const callArgs = (vi.mocked(fetch).mock.calls as [[string, RequestInit]])[0];
+  const parsedBody = JSON.parse(callArgs[1].body as string);
+  expect(parsedBody.params).toEqual({ param1: "2026-02-01" });
+});
+
+test("blank run-param inputs send no params (graph defaults used)", async () => {
+  const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    sseResponse([{ type: "run_complete", total_ms: 0 }]),
+  );
+  useGraphStore.getState().addGraphParam();
+  addNode();
+  render(<ExecutionToolbar />);
+
+  fireEvent.click(screen.getByTestId("exec-params-toggle"));
+  fireEvent.click(screen.getByTestId("exec-run"));
+
+  await waitFor(() => expect(f).toHaveBeenCalled());
+  const callArgs = (vi.mocked(fetch).mock.calls as [[string, RequestInit]])[0];
+  const parsedBody = JSON.parse(callArgs[1].body as string);
+  // Blank inputs -> no RUN overrides, so the request body is the bare graph (no envelope
+  // `graph` key). The graph's own `params` definitions are still present at the top level.
+  expect(parsedBody).toHaveProperty("nodes");
+  expect(parsedBody).toHaveProperty("params");
+  expect(parsedBody).not.toHaveProperty("graph");
+});

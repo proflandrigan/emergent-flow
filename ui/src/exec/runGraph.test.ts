@@ -265,3 +265,31 @@ test("runGraph with an empty array runTo sends the bare graph without run_to", a
   expect(parsedBody).toHaveProperty("edges");
   expect(parsedBody).not.toHaveProperty("run_to");
 });
+
+test("runGraph with params sends params in the POST body", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    sseResponse([{ type: "run_complete", total_ms: 0 }]),
+  );
+
+  await runGraph({ params: { start_date: "2026-02-01" } });
+
+  const callArgs = (vi.mocked(fetch).mock.calls as [[string, RequestInit]])[0];
+  const parsedBody = JSON.parse(callArgs[1].body as string);
+  expect(parsedBody).toEqual({
+    graph: expect.anything(),
+    params: { start_date: "2026-02-01" },
+  });
+});
+
+test("runGraph without params sends the bare graph", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    sseResponse([{ type: "run_complete", total_ms: 0 }]),
+  );
+
+  await runGraph();
+
+  const callArgs = (vi.mocked(fetch).mock.calls as [[string, RequestInit]])[0];
+  const parsedBody = JSON.parse(callArgs[1].body as string);
+  expect(parsedBody).toHaveProperty("nodes");
+  expect(parsedBody).not.toHaveProperty("params");
+});

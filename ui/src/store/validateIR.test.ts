@@ -12,9 +12,9 @@ function validGraph(): Graph {
 }
 
 describe("supportedSchemaVersion", () => {
-  test("is read from the schema and equals 1", () => {
+  test("is read from the schema and equals the current IR version", () => {
     expect(typeof supportedSchemaVersion).toBe("number");
-    expect(supportedSchemaVersion).toBe(1);
+    expect(supportedSchemaVersion).toBe(2);
   });
 });
 
@@ -42,7 +42,7 @@ describe("validateIR", () => {
 
 describe("checkSchemaVersion", () => {
   test("returns null when schema_version matches the supported version", () => {
-    const graph: Graph = { ...validGraph(), schema_version: 1 };
+    const graph: Graph = { ...validGraph(), schema_version: supportedSchemaVersion };
 
     expect(checkSchemaVersion(graph)).toBeNull();
   });
@@ -54,7 +54,7 @@ describe("checkSchemaVersion", () => {
 
     expect(message).not.toBeNull();
     expect(message).toContain("999");
-    expect(message).toContain("1");
+    expect(message).toContain(String(supportedSchemaVersion));
   });
 
   test("returns null when schema_version is omitted", () => {

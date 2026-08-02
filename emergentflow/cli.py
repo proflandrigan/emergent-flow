@@ -12,8 +12,10 @@ inside ``main`` so ``import emergentflow.cli`` stays cheap.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections.abc import Sequence
+from typing import Any
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -61,7 +63,63 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Number of run history entries to keep. Default: 50.",
     )
+    p.add_argument(
+        "--param",
+        action="append",
+        default=None,
+        metavar="KEY=VALUE",
+        help=(
+            "Override a graph-level parameter (repeatable). The value is JSON-coerced and "
+            "typed per the parameter's declared type_token, e.g. --param start_date=2026-02-01 "
+            "--param min_events=10."
+        ),
+    )
     return parser
+
+
+def _json_coerce(raw: str) -> Any:
+    """Coerce a raw CLI value to JSON-native (numbers, bool, list, dict, quoted string)."""
+    try:
+        return json.loads(raw)
+    except ValueError:
+        return raw
+
+
+def _coerce_param_value(raw: str, type_token: str) -> Any:
+    """Coerce a ``--param`` value to the graph param's declared *type_token* (issue #116)."""
+    value = _json_coerce(raw)
+    if type_token in ("int", "float") and isinstance(value, bool):
+        # json.loads parses "true"/"false" to real bools; a bool is never a valid
+        # number (and isinstance(True, int) is True, so the int branch below would
+        # otherwise accept --param p=true silently).
+        raise ValueError(f"expected a number, got {raw!r}")
+    if type_token == "int":
+        if isinstance(value, int):
+            return value
+        # json.loads parses "10.5" to a float; truncating to 10 would silently
+        # corrupt a bad value, so reject it instead (matching the ValueError the
+        # string path raises for a non-numeric raw).
+        if isinstance(value, float) and not value.is_integer():
+            raise ValueError(f"expected an integer value, got {raw!r}")
+        try:
+            return int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"expected an integer value, got {raw!r}") from exc
+    if type_token == "float" and not isinstance(value, (int, float)):
+        try:
+            return float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"expected a number, got {raw!r}") from exc
+    if type_token == "bool" and not isinstance(value, bool):
+        # json.loads already parses "true"/"false" to real bools, but "1"/"0" arrive
+        # as JSON numbers; the string tuple below would silently coerce --param flag=1
+        # to False. Map numeric spellings by truthiness first.
+        if isinstance(value, (int, float)):
+            return value != 0
+        return value in ("true", "True", "1", "yes")
+    if type_token == "str" and not isinstance(value, str):
+        return str(value)
+    return value
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -97,7 +155,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         import json
         import pathlib
         import time as time_mod
-        from typing import Any
 
         graph_path = pathlib.Path(args.graph_file)
         if not graph_path.is_file():
@@ -120,14 +177,34 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         # Execute
         from emergentflow import __version__, execute
+        from emergentflow.codegen.params import resolve_graph_params
         from emergentflow.ir.serialize import deserialize_graph
         from emergentflow.research.reproducibility import capture_run, resolve_dependency_versions
         from emergentflow.server.payload import to_payload
 
         graph = deserialize_graph(raw_text)
 
+        params: dict[str, Any] = {}
+        for item in args.param or []:
+            if "=" not in item:
+                print(f"Error: --param must be KEY=VALUE, got {item!r}", file=sys.stderr)
+                return 1
+            key, raw_value = item.split("=", 1)
+            if key not in graph.params:
+                print(
+                    f"Error: --param names {key!r} which is not a graph-level parameter. "
+                    f"Defined: {sorted(graph.params) or '(none)'}",
+                    file=sys.stderr,
+                )
+                return 1
+            try:
+                params[key] = _coerce_param_value(raw_value, graph.params[key].type_token)
+            except ValueError as exc:
+                print(f"Error: --param {key!r}: {exc}", file=sys.stderr)
+                return 1
+
         started_at = time_mod.time()
-        results = execute(graph)
+        results = execute(graph, params=params)
         finished_at = time_mod.time()
 
         graph_hash = hashlib.sha256(json.dumps(graph_dict, sort_keys=True).encode()).hexdigest()
@@ -156,11 +233,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Capture reproducibility
         try:
             deps = resolve_dependency_versions([])
-            repro = capture_run(graph, dependency_versions=deps)
+            repro = capture_run(
+                graph,
+                dependency_versions=deps,
+                # Record every graph-level param's RESOLVED value (stored value with any
+                # --param override applied), not just the override keys -- a partial map
+                # would make a multi-param run's record incomplete.
+                params=resolve_graph_params(graph, overrides=params) if params else None,
+            )
             run_data["reproducibility"] = {
                 "seeds": repro.seeds,
                 "content_hashes": repro.content_hashes,
                 "dependency_versions": repro.dependency_versions,
+                "params": repro.params,
             }
         except Exception:
             pass

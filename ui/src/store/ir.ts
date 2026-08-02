@@ -14,21 +14,37 @@ import type {
 } from "./model";
 
 function paramToIR(param: ParamModel): Param {
-  return {
+  const ir: Param = {
     name: param.name,
     type_token: param.typeToken,
     value: param.value as Param["value"],
     default: param.default as Param["default"],
   };
+  // Only emit ref/description when the model actually carries them (byte-preserving round-trip:
+  // a canvas-authored param without a ref stays key-free, exactly like subgraph/name handling).
+  if (param.ref !== undefined) {
+    ir.ref = param.ref ?? null;
+  }
+  if (param.description !== undefined) {
+    ir.description = param.description ?? null;
+  }
+  return ir;
 }
 
 function paramFromIR(param: Param): ParamModel {
-  return {
+  const model: ParamModel = {
     name: param.name,
     typeToken: param.type_token,
     value: param.value ?? null,
     default: param.default ?? null,
   };
+  if (param.ref !== undefined) {
+    model.ref = param.ref ?? null;
+  }
+  if (param.description !== undefined) {
+    model.description = param.description ?? null;
+  }
+  return model;
 }
 
 function portToIR(port: PortModel): Port {
@@ -139,6 +155,12 @@ export function toIR(model: CanvasModel): Graph {
   if (model.schemaVersion !== undefined) {
     graph.schema_version = model.schemaVersion;
   }
+  if (model.params !== undefined) {
+    graph.params = {};
+    for (const [name, param] of Object.entries(model.params)) {
+      graph.params[name] = paramToIR(param);
+    }
+  }
   return graph;
 }
 
@@ -190,6 +212,12 @@ export function fromIR(graph: Graph): CanvasModel {
   }
   if (graph.schema_version !== undefined) {
     model.schemaVersion = graph.schema_version;
+  }
+  if (graph.params !== undefined) {
+    model.params = {};
+    for (const [name, param] of Object.entries(graph.params)) {
+      model.params[name] = paramFromIR(param);
+    }
   }
   return model;
 }

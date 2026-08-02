@@ -373,7 +373,7 @@
       },
       "Graph": {
         "additionalProperties": false,
-        "description": "Top-level, serialisable IR graph for an Emergent Flow pipeline.\n\nAttributes\n----------\nschema_version:\n    Embedded schema version (default: CURRENT_SCHEMA_VERSION).  Allows\n    loaders to detect and reject stale or future graphs.\nparadigm:\n    Graph-level paradigm tag (default: FUNCTIONAL).  Combined with\n    per-node ``paradigm``, this drives codegen/execution branching.\nname:\n    Optional human-friendly label for the graph.\nnodes:\n    CRDT-friendly id\u2192Node map.  Keys MUST equal ``node.id``.\nedges:\n    CRDT-friendly id\u2192Edge map.  Keys MUST equal ``edge.id``.",
+        "description": "Top-level, serialisable IR graph for an Emergent Flow pipeline.\n\nAttributes\n----------\nschema_version:\n    Embedded schema version (default: CURRENT_SCHEMA_VERSION).  Allows\n    loaders to detect and reject stale or future graphs.\nparadigm:\n    Graph-level paradigm tag (default: FUNCTIONAL).  Combined with\n    per-node ``paradigm``, this drives codegen/execution branching.\nname:\n    Optional human-friendly label for the graph.\nnodes:\n    CRDT-friendly id\u2192Node map.  Keys MUST equal ``node.id``.\nedges:\n    CRDT-friendly id\u2192Edge map.  Keys MUST equal ``edge.id``.\nparams:\n    Optional graph-level id\u2192Param map.  Keys MUST equal ``param.name``.\n    Defaults to an empty map.",
         "properties": {
           "edges": {
             "additionalProperties": {
@@ -405,8 +405,15 @@
             "$ref": "#/$defs/Paradigm",
             "default": "functional"
           },
+          "params": {
+            "additionalProperties": {
+              "$ref": "#/$defs/Param"
+            },
+            "title": "Params",
+            "type": "object"
+          },
           "schema_version": {
-            "default": 1,
+            "default": 2,
             "title": "Schema Version",
             "type": "integer"
           }
@@ -500,15 +507,39 @@
       },
       "Param": {
         "additionalProperties": false,
-        "description": "A single typed, defaulted, serializable parameter on an IR node.\n\nFields\n------\nname:\n    Non-empty parameter name.\ntype_token:\n    Declared-type label (e.g. ``\"str\"``, ``\"int\"``, ``\"DataFrame\"``). A\n    descriptive label for the param value, distinct from the port\n    ``data_type`` tokens the connection type system validates.\nvalue:\n    Current serializable value.  Defaults to ``None``.\ndefault:\n    Default serializable value.  Defaults to ``None``.",
+        "description": "A single typed, defaulted, serializable parameter on an IR node.\n\nFields\n------\nname:\n    Non-empty parameter name.\ntype_token:\n    Declared-type label (e.g. ``\"str\"``, ``\"int\"``, ``\"DataFrame\"``). A\n    descriptive label for the param value, distinct from the port\n    ``data_type`` tokens the connection type system validates.\nvalue:\n    Current serializable value.  Defaults to ``None``.\ndefault:\n    Default serializable value.  Defaults to ``None``.\nref:\n    When set, this node param's value is resolved from the graph-level\n    param of that name (issue #116).  The literal ``value`` is ignored\n    at resolve time.  Defaults to ``None``.\ndescription:\n    Human-readable description (used by graph-level params).\n    Defaults to ``None``.",
         "properties": {
           "default": {
             "$ref": "#/$defs/ParamValue",
             "default": null
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Ref"
           },
           "type_token": {
             "title": "Type Token",

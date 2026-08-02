@@ -89,9 +89,9 @@ class TestGraphConstruction:
         assert tgt.id in graph.nodes
         assert edge.id in graph.edges
 
-    def test_schema_version_default_is_1(self):
+    def test_schema_version_default_is_current(self):
         g = Graph()
-        assert g.schema_version == 1
+        assert g.schema_version == CURRENT_SCHEMA_VERSION
 
     def test_schema_version_in_json_dump(self):
         g = Graph()

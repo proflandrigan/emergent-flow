@@ -45,6 +45,7 @@ class CodegenContext:
 
     in_vars: dict[str, str] = field(default_factory=dict)
     out_vars: dict[str, str] = field(default_factory=dict)
+    param_exprs: dict[str, str] = field(default_factory=dict)
 
     def in_var(self, port_name: str) -> str:
         """Return the variable name feeding the named IN port.
@@ -85,6 +86,17 @@ class CodegenContext:
             raise KeyError(f"No OUT port {port_name!r} in this codegen context.")
         return self.out_vars[port_name]
 
+    def param_expr(self, param_name: str) -> str:
+        """Return the Python expression to embed for the named node param.
+
+        A param bound to a graph-level parameter reference (``ref``) emits the compiled
+        ``main()`` keyword-argument variable name; a literal param emits its repr'd value.
+        Raises KeyError if the node has no param of that name in this context.
+        """
+        if param_name not in self.param_exprs:
+            raise KeyError(f"No param {param_name!r} in this codegen context.")
+        return self.param_exprs[param_name]
+
     @classmethod
     def preview(cls, node: Node) -> CodegenContext:
         """Build a trivial preview context: every port's variable IS its port name.
@@ -97,7 +109,8 @@ class CodegenContext:
         """
         in_vars = {p.name: p.name for p in node.ports if p.direction == Direction.IN}
         out_vars = {p.name: p.name for p in node.ports if p.direction == Direction.OUT}
-        return cls(in_vars=in_vars, out_vars=out_vars)
+        param_exprs = {p.name: repr(p.value) for p in node.params}
+        return cls(in_vars=in_vars, out_vars=out_vars, param_exprs=param_exprs)
 
 
 def build_codegen_context(
@@ -141,6 +154,7 @@ def build_codegen_context(
     """
     in_vars: dict[str, str] = {}
     out_vars: dict[str, str] = {}
+    param_exprs = {p.name: repr(p.value) for p in node.params}
 
     for port in node.ports:
         if port.direction == Direction.OUT:
@@ -174,4 +188,4 @@ def build_codegen_context(
                     continue
                 in_vars[spec.name] = "[]" if spec.cardinality == Cardinality.MANY else "None"
 
-    return CodegenContext(in_vars=in_vars, out_vars=out_vars)
+    return CodegenContext(in_vars=in_vars, out_vars=out_vars, param_exprs=param_exprs)

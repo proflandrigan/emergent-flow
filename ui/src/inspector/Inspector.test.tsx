@@ -23,16 +23,16 @@ beforeEach(() => {
   useExecutionStore.getState().clear();
 });
 
-test("with nothing selected, the Config tab shows the empty state", () => {
+test("with nothing selected, the Config tab shows the flow-parameters panel", () => {
   render(<Inspector />);
-  expect(screen.getByTestId("inspector-empty")).toBeInTheDocument();
+  expect(screen.getByTestId("flow-params-panel")).toBeInTheDocument();
 });
 
-test("clicking the Code tab shows the code panel and hides the empty state", () => {
+test("clicking the Code tab shows the code panel and hides the flow-params panel", () => {
   render(<Inspector />);
   fireEvent.click(screen.getByTestId("inspector-tab-code"));
   expect(screen.getByTestId("code-empty")).toBeInTheDocument();
-  expect(screen.queryByTestId("inspector-empty")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("flow-params-panel")).not.toBeInTheDocument();
 });
 
 test("with exactly one node selected, the Config tab shows the config form", () => {
@@ -42,7 +42,7 @@ test("with exactly one node selected, the Config tab shows the config form", () 
   render(<Inspector />);
 
   expect(screen.getByTestId("config-form")).toBeInTheDocument();
-  expect(screen.queryByTestId("inspector-empty")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("flow-params-panel")).not.toBeInTheDocument();
 });
 
 test("Results tab with nothing selected shows the no-selection empty state", () => {
@@ -218,7 +218,7 @@ test("clicking the Lineage tab shows the no-selection empty state", () => {
   expect(
     screen.getByTestId("lineage-empty-no-selection"),
   ).toBeInTheDocument();
-  expect(screen.queryByTestId("inspector-empty")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("flow-params-panel")).not.toBeInTheDocument();
 });
 
 test("the Lineage tab traces the selected node without a prior run", async () => {

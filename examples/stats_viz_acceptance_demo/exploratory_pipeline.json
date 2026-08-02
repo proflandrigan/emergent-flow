@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "paradigm": "functional",
   "name": "Stats/Viz Acceptance Demo -- Exploratory",
   "nodes": {
@@ -13,7 +13,9 @@
           "name": "name",
           "type_token": "str",
           "value": "iris",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -136,7 +138,9 @@
           "name": "chart",
           "type_token": "str",
           "value": "scatter",
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "encoding",
@@ -146,7 +150,9 @@
             "y": "petal length (cm)",
             "facet_col": "target"
           },
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         },
         {
           "name": "options",
@@ -154,7 +160,9 @@
           "value": {
             "trendline": "ols"
           },
-          "default": null
+          "default": null,
+          "ref": null,
+          "description": null
         }
       ],
       "ports": [
@@ -232,5 +240,6 @@
       },
       "type_compatible": null
     }
-  }
+  },
+  "params": {}
 }
