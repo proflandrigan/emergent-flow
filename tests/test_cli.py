@@ -104,3 +104,120 @@ def test_serve_runs_keep_forwarded(monkeypatch) -> None:
     calls = _patch_serve(monkeypatch)
     assert main(["serve", "--runs-keep", "100"]) == 0
     assert calls["runs_keep"] == 100
+
+
+def _write_graph(path, nodes: dict, edges: dict | None = None) -> None:
+    import json
+
+    payload = {"schema_version": 2, "name": "test", "nodes": nodes, "edges": edges or {}}
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _simple_node(node_id: str, node_type: str, ports=None, params=None) -> dict:
+    return {"id": node_id, "type": node_type, "ports": ports or [], "params": params or []}
+
+
+def _port(port_id: str, name: str, direction: str) -> dict:
+    return {"id": port_id, "name": name, "direction": direction, "data_type": "DataFrame"}
+
+
+def _leaky_graph(tmp_path) -> dict:
+    """Write a leaky graph (scale_features upstream of train_test_split)."""
+    from emergentflow.ir import Direction
+
+    graph_file = tmp_path / "leaky.json"
+    _write_graph(
+        graph_file,
+        nodes={
+            "scale": _simple_node(
+                "scale",
+                "transform.scale_features",
+                ports=[
+                    _port("si", "in", Direction.IN.value),
+                    _port("so", "out", Direction.OUT.value),
+                ],
+            ),
+            "split": _simple_node(
+                "split",
+                "ml.train_test_split",
+                ports=[
+                    _port("spi", "in", Direction.IN.value),
+                    _port("spt", "train", Direction.OUT.value),
+                    _port("spx", "test", Direction.OUT.value),
+                ],
+            ),
+        },
+        edges={
+            "e1": {
+                "id": "e1",
+                "source": {"node_id": "scale", "port_id": "so"},
+                "target": {"node_id": "split", "port_id": "spi"},
+            }
+        },
+    )
+    return graph_file
+
+
+def test_validate_clean_graph_exits_zero(tmp_path) -> None:
+    from emergentflow.ir import Direction
+
+    graph_file = tmp_path / "clean.json"
+    _write_graph(
+        graph_file,
+        nodes={
+            "n-src": _simple_node(
+                "n-src",
+                "test.source",
+                ports=[_port("p-out", "out", Direction.OUT.value)],
+            ),
+        },
+    )
+    assert main(["validate", str(graph_file)]) == 0
+
+
+def test_validate_leaky_graph_non_strict_exits_zero(tmp_path) -> None:
+    graph_file = _leaky_graph(tmp_path)
+    # non-strict: findings printed, exit 0
+    assert main(["validate", str(graph_file)]) == 0
+    # strict: error-severity validity finding remains -> exit 1
+    assert main(["validate", str(graph_file), "--strict"]) == 1
+
+
+def test_validate_strict_with_suppressions_exits_zero(tmp_path) -> None:
+    import json as json_mod
+
+    graph_file = _leaky_graph(tmp_path)
+    supp = tmp_path / "supp.json"
+    supp.write_text(json_mod.dumps([["fit_before_split", "scale"]]), encoding="utf-8")
+    # suppressing the error-severity finding makes strict pass
+    assert main(["validate", str(graph_file), "--strict", "--suppressions", str(supp)]) == 0
+
+
+def test_validate_missing_file_returns_1(tmp_path) -> None:
+    assert main(["validate", str(tmp_path / "nope.json")]) == 1
+
+
+def test_validate_json_output_is_valid(tmp_path) -> None:
+    import io
+    import json as json_mod
+    from contextlib import redirect_stdout
+
+    from emergentflow.ir import Direction
+
+    graph_file = tmp_path / "clean.json"
+    _write_graph(
+        graph_file,
+        nodes={
+            "n-src": _simple_node(
+                "n-src",
+                "test.source",
+                ports=[_port("p-out", "out", Direction.OUT.value)],
+            ),
+        },
+    )
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        rc = main(["validate", str(graph_file), "--json"])
+    assert rc == 0
+    data = json_mod.loads(buf.getvalue())
+    assert "diagnostics" in data and "edge_compatibility" in data

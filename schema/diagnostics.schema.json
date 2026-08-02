@@ -2,7 +2,7 @@
   "$defs": {
     "Diagnostic": {
       "additionalProperties": false,
-      "description": "A single structured validation finding.\n\nAttributes:\n    severity: error (hard problem) or warning (runtime-only-knowable).\n    code: machine-readable code, e.g. \"type_incompatible\".\n    message: human-readable explanation (the canvas's \"why\" tooltip text).\n    edge_id: the offending edge id, when the finding is about an edge.\n    node_id: the node id, when the finding is about a port.\n    port_id: the port id, when the finding is about a port.\n    port_name: the port name, when the finding is about a port.\n    expected_type: the type the target IN port expected, for type findings.\n    actual_type: the type the source OUT port produced, for type findings.\n    source: who produced this finding -- \"validator\" (ef.validate itself) or a persona\n        slug (an agent's review comment, Epic 14 Story 6). None for pre-Story-6 callers\n        that never set it.",
+      "description": "A single structured validation finding.\n\nAttributes:\n    severity: error (hard problem) or warning (runtime-only-knowable).\n    code: machine-readable code, e.g. \"type_incompatible\".\n    message: human-readable explanation (the canvas's \"why\" tooltip text).\n    edge_id: the offending edge id, when the finding is about an edge.\n    node_id: the node id, when the finding is about a port.\n    port_id: the port id, when the finding is about a port.\n    port_name: the port name, when the finding is about a port.\n    expected_type: the type the target IN port expected, for type findings.\n    actual_type: the type the source OUT port produced, for type findings.\n    source: who produced this finding -- \"validator\" (ef.validate itself) or a persona\n        slug (an agent's review comment, Epic 14 Story 6). None for pre-Story-6 callers\n        that never set it.\n    rule_id: the machine-readable id of the validity rule that produced this\n        finding, when it came from the experiment-validity engine.\n    related_node_ids: other nodes implicated alongside ``node_id``, for\n        findings about a relationship between two nodes (e.g. a transform\n        fitted upstream of a split).",
       "properties": {
         "actual_type": {
           "anyOf": [
@@ -83,6 +83,25 @@
           ],
           "default": null,
           "title": "Port Name"
+        },
+        "related_node_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Node Ids",
+          "type": "array"
+        },
+        "rule_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rule Id"
         },
         "severity": {
           "$ref": "#/$defs/Severity"

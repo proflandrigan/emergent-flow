@@ -24,6 +24,8 @@ export interface Diagnostic {
   expected_type?: string | null;
   actual_type?: string | null;
   source?: string | null;
+  rule_id?: string | null;
+  related_node_ids?: string[];
 }
 
 export interface Diagnostics {

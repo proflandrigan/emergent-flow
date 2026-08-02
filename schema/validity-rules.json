@@ -1,0 +1,75 @@
+{
+  "pack_version": 2,
+  "rules": [
+    {
+      "confidence": "medium",
+      "id": "eda_peek_on_test",
+      "rationale": "stats.auto_eda / stats.eda_profile summarise the distribution of their input frame. When that frame is the test branch of a split, the analyst sees the held-out distribution before evaluation -- a form of peeking that can bias model selection. False-positive shape: the EDA is explicitly for reporting after the experiment, or the frame is the train/full frame (rule stays silent). Warning: intent depends on when the analysis runs.",
+      "severity": "warning",
+      "title": "Exploratory analysis computed on the test frame"
+    },
+    {
+      "confidence": "high",
+      "id": "fit_before_split",
+      "rationale": "A fitting transform (ml.fit_transform, ml.pipeline, transform.*) placed upstream of a train/test split fits its parameters on the full frame, including the rows the split later holds out. The fitted parameters therefore encode test information -- a target leak. False-positive shape: a fitting transform on a reporting/EDA branch that never feeds the split's frame input. Decidable without inference, so error.",
+      "severity": "error",
+      "title": "Transform fitted before the train/test split"
+    },
+    {
+      "confidence": "medium",
+      "id": "global_aggregate_before_split",
+      "rationale": "stats.group_by_aggregate computes aggregate statistics over the whole input frame. When it runs upstream of a train/test split and its output feeds the feature path, those statistics are computed on the held-out rows as well -- a leak. False-positive shape: the aggregate feeds a reporting/EDA branch, or is computed for a summary that never enters the model's features. Warning: whether it leaks depends on downstream wiring.",
+      "severity": "warning",
+      "title": "Group-by aggregate computed before the train/test split"
+    },
+    {
+      "confidence": "medium",
+      "id": "global_imputation_before_split",
+      "rationale": "clean.impute_missing with a data-derived strategy (mean/median/most_frequent) fits global statistics on the full frame. When it runs upstream of a train/test split, the imputation values are computed on the held-out rows as well -- a leak. False-positive shape: a constant strategy (which does not depend on the data) or imputation that only runs on the train branch. Warning: whether it leaks depends on wiring.",
+      "severity": "warning",
+      "title": "Data-derived imputation computed before the train/test split"
+    },
+    {
+      "confidence": "medium",
+      "id": "random_split_on_temporal_graph",
+      "rationale": "ml.train_test_split shuffles its rows before splitting (it has no shuffle param; sklearn's default is shuffle=True). When the graph's rows are time-ordered -- signalled by the presence of timeseries.* nodes or recommend.temporal_split -- a random split assigns future rows to train and past rows to test, so the model is trained on tomorrow to predict yesterday. Use a temporal split instead. False-positive shape: timeseries nodes present for EDA while the model branch splits an unrelated static frame. Warning: the intended holdout depends on the experiment.",
+      "severity": "warning",
+      "title": "Random train/test split on a temporal graph"
+    },
+    {
+      "confidence": "medium",
+      "id": "ranking_metrics_on_random_split",
+      "rationale": "recommend.evaluate computes ranking metrics (precision@k, recall@k, NDCG@k, MAP@k) against its test_interactions input. When that input is held out by a random ml.train_test_split rather than a temporal recommend.temporal_split, the metric silently overstates quality on time-ordered interaction data. False-positive shape: the graph legitimately evaluates a non-temporal baseline, or the test interactions are random-held-out by design. Warning: the intended holdout depends on the experiment.",
+      "severity": "warning",
+      "title": "Ranking metrics measured against a random split"
+    },
+    {
+      "confidence": "medium",
+      "id": "target_derived_feature",
+      "rationale": "clean.derive_column computes a feature from an expression that references the model's target column. The feature is a function of the answer, so a model trained on it leaks the target. Warning (not error): the rule is a topological approximation -- it fires on node reachability, so it cannot always tell whether the target-referencing derived column actually reaches the model's feature set (it is silent when the supervised node explicitly excludes it via the features param). False-positive shape: the derived column is computed for reporting and never feeds the supervised node, or the expression coincidentally shares a name with an unrelated column.",
+      "severity": "warning",
+      "title": "Derived feature references the target column"
+    },
+    {
+      "confidence": "medium",
+      "id": "task_mismatched_scoring",
+      "rationale": "ml.cross_validate's scoring string must match the estimator's task: a classification metric (accuracy, precision, recall, f1, roc_auc, ...) on a regression estimator, or a regression metric (r2, mae, mse, ...) on a classifier, reports a meaningless number. The task is read from the estimator catalog (emergentflow.ml.registry). False-positive shape: an unknown estimator key or an unlisted custom scoring string skips the rule (it only fires on known catalog tasks vs. known scoring families).",
+      "severity": "warning",
+      "title": "Scoring metric mismatches the estimator's task"
+    },
+    {
+      "confidence": "medium",
+      "id": "train_serve_skew",
+      "rationale": "A model served through ml.load_model -> ml.predict must receive data transformed exactly as the data it was trained on. This rule diffs the feature-transform chain feeding the scoring predict's frame against the chain feeding the supervised training node's frame (when both derive from a common source), and flags transforms present in one but not the other, or applied in a different order. False-positive shape: the scoring path deliberately serves an un-transformed baseline, or the two paths consume different data sources (no common fork -> rule stays silent). Warning: parity intent depends on the experiment.",
+      "severity": "warning",
+      "title": "Train/serve transform chain differs"
+    },
+    {
+      "confidence": "medium",
+      "id": "window_crosses_split",
+      "rationale": "A windowed feature transform (timeseries.lag_features, timeseries.rolling_aggregate, timeseries.ewma, timeseries.time_weighted_aggregate) placed upstream of a train/test split computes each row's window over neighbors that include the rows the split later holds out. Future/test values therefore leak into the features. False-positive shape: the window transform feeds a reporting/EDA branch and never enters the split's frame input, or the graph splits a non-temporal frame that merely passes through a window node. Warning: whether it leaks depends on wiring.",
+      "severity": "warning",
+      "title": "Windowed feature transform crosses the split boundary"
+    }
+  ]
+}

@@ -20,6 +20,9 @@
         'node_id': 'n-sink',
         'port_id': 'p-in',
         'port_name': 'in0',
+        'related_node_ids': list([
+        ]),
+        'rule_id': None,
         'severity': 'error',
         'source': 'validator',
       }),
@@ -49,6 +52,9 @@
         'node_id': 'n-sink',
         'port_id': 'p-in',
         'port_name': 'in0',
+        'related_node_ids': list([
+        ]),
+        'rule_id': None,
         'severity': 'error',
         'source': 'validator',
       }),
@@ -69,6 +75,9 @@
         'node_id': 'n-sink',
         'port_id': 'p-in',
         'port_name': 'in0',
+        'related_node_ids': list([
+        ]),
+        'rule_id': None,
         'severity': 'error',
         'source': 'validator',
       }),
@@ -99,6 +108,9 @@
         'node_id': 'n-sink',
         'port_id': 'p-in',
         'port_name': 'in0',
+        'related_node_ids': list([
+        ]),
+        'rule_id': None,
         'severity': 'warning',
         'source': 'validator',
       }),

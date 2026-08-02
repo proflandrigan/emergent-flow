@@ -57,6 +57,11 @@ class Diagnostic(BaseModel):
         source: who produced this finding -- "validator" (ef.validate itself) or a persona
             slug (an agent's review comment, Epic 14 Story 6). None for pre-Story-6 callers
             that never set it.
+        rule_id: the machine-readable id of the validity rule that produced this
+            finding, when it came from the experiment-validity engine.
+        related_node_ids: other nodes implicated alongside ``node_id``, for
+            findings about a relationship between two nodes (e.g. a transform
+            fitted upstream of a split).
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -71,6 +76,8 @@ class Diagnostic(BaseModel):
     expected_type: str | None = None
     actual_type: str | None = None
     source: str | None = None
+    rule_id: str | None = None
+    related_node_ids: list[str] = Field(default_factory=list)
 
 
 class Diagnostics(BaseModel):
@@ -429,6 +436,10 @@ def validate(
     every `ValidationHints` constraint, via `NodeDefinition.validate_node`). The
     result is JSON-native so the canvas renders it directly.
 
+    The experiment-validity rule pack (Epic 17) is also run: findings ride the
+    same channel, each carrying a ``rule_id`` and every implicated node in
+    ``related_node_ids``, with ``source="validator"``.
+
     This is deliberately a *separate* call from `Graph`'s construction-time
     structural validation: type/cardinality validation must NOT block building
     exploratory, half-wired graphs, so those can exist on the canvas and still be
@@ -454,13 +465,75 @@ def validate(
     type_diagnostics, edge_compatibility = _collect_type_diagnostics(
         graph, node_registry, type_registry
     )
+    validity_diagnostics = _collect_validity_diagnostics(graph)
     diagnostics = [
         d.model_copy(update={"source": "validator"})
-        for d in structural + params + ref_params + type_diagnostics
+        for d in structural + params + ref_params + type_diagnostics + validity_diagnostics
     ]
     return Diagnostics(
         diagnostics=diagnostics,
         edge_compatibility=edge_compatibility,
+    )
+
+
+def _collect_validity_diagnostics(graph: Graph) -> list[Diagnostic]:
+    """Run the experiment-validity rule pack and map findings to `Diagnostic`s.
+
+    Each `ValidityFinding` becomes a `Diagnostic` carrying ``rule_id`` and
+    ``related_node_ids`` (added Story 1) so findings ride the existing
+    diagnostics channel (ADR 0012). Lazy-imports the validity package to avoid a
+    circular import through ``emergentflow.ir`` (mutation imports this module).
+
+    Deterministic: the runner returns findings in rule-id order, each rule in
+    node-id order, so `validate` stays golden-testable.
+    """
+    from emergentflow.validity.runner import run_validity_checks
+
+    return [
+        Diagnostic(
+            severity=Severity(finding.severity),
+            code=finding.rule_id,
+            message=finding.message,
+            node_id=finding.node_id,
+            related_node_ids=list(finding.related_node_ids),
+            rule_id=finding.rule_id,
+        )
+        for finding in run_validity_checks(graph)
+    ]
+
+
+@public_op(name="ef.apply_suppressions")
+def apply_suppressions(
+    diagnostics: Diagnostics,
+    suppressions: list[list[str]],
+) -> Diagnostics:
+    """Return a copy of *diagnostics* with suppressed validity findings removed.
+
+    Suppression is workspace/session state that lives BESIDE the graph, never on
+    it (ADR 0019 discipline): a finding is suppressed by (rule_id, node_id).
+    *suppressions* is a list of ``[rule_id, node_id]`` pairs (JSON-native shape,
+    matching what the canvas stores per flow). A diagnostic is dropped when its
+    ``rule_id`` and ``node_id`` both match a pair. Non-validity diagnostics
+    (no ``rule_id``) are never suppressed. Pure: the input *diagnostics* is not
+    mutated.
+
+    Args:
+        diagnostics: The `Diagnostics` to filter.
+        suppressions: JSON-native list of ``[rule_id, node_id]`` pairs.
+
+    Returns:
+        A new `Diagnostics` with the same ``edge_compatibility`` and the
+        unsuppressed diagnostics, in the original order.
+    """
+    suppressed = {(pair[0], pair[1]) for pair in suppressions if len(pair) >= 2}
+    kept = [
+        d
+        for d in diagnostics.diagnostics
+        if d.rule_id is None or (d.rule_id, d.node_id) not in suppressed
+    ]
+    return Diagnostics(
+        diagnostics=kept,
+        edge_compatibility=diagnostics.edge_compatibility,
     )
 
 
