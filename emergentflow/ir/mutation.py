@@ -217,6 +217,75 @@ def apply_mutation(graph: Graph, m: GraphMutation) -> Graph:
     return result
 
 
+def invert_mutation(graph: Graph, m: GraphMutation) -> GraphMutation:
+    """Derive the inverse of *m* against *graph*.
+
+    Returns a new GraphMutation that, when applied to apply_mutation(graph, m),
+    returns a graph equivalent to the original *graph*.
+
+    The inverse swaps adds/removes and restores original param values.
+
+    Raises
+    ------
+    MutationError
+        If a removed node/edge does not exist in *graph* (cannot invert).
+    """
+    # Inverse of add_nodes: remove them
+    inverse_remove_nodes = [node.id for node in m.add_nodes]
+
+    # Inverse of add_edges: remove them
+    inverse_remove_edges = [edge.id for edge in m.add_edges]
+
+    # Inverse of remove_nodes: add them back (need original nodes from graph)
+    inverse_add_nodes: list[Node] = []
+    for node_id in m.remove_nodes:
+        if node_id not in graph.nodes:
+            raise MutationError(
+                f"Cannot invert remove_nodes: node {node_id!r} does not exist in the graph."
+            )
+        inverse_add_nodes.append(graph.nodes[node_id])
+
+    # Inverse of remove_edges: add them back (need original edges from graph)
+    inverse_add_edges: list[Edge] = []
+    for edge_id in m.remove_edges:
+        if edge_id not in graph.edges:
+            raise MutationError(
+                f"Cannot invert remove_edges: edge {edge_id!r} does not exist in the graph."
+            )
+        inverse_add_edges.append(graph.edges[edge_id])
+
+    # Inverse of set_params: restore original param values
+    inverse_set_params: dict[str, dict[str, ParamValue]] = {}
+    for node_id, param_updates in m.set_params.items():
+        if node_id not in graph.nodes:
+            raise MutationError(
+                f"Cannot invert set_params: node {node_id!r} does not exist in the graph."
+            )
+        original_node = graph.nodes[node_id]
+        original_values: dict[str, ParamValue] = {}
+        for param_name in param_updates:
+            # Find the original param value
+            for param in original_node.params:
+                if param.name == param_name:
+                    original_values[param_name] = param.value
+                    break
+            else:
+                # Param didn't exist before, so inverse removes it (set to None)
+                original_values[param_name] = None
+        inverse_set_params[node_id] = original_values
+
+    return GraphMutation(
+        base_version=m.base_version,
+        add_nodes=inverse_add_nodes,
+        add_edges=inverse_add_edges,
+        remove_nodes=inverse_remove_nodes,
+        remove_edges=inverse_remove_edges,
+        set_params=inverse_set_params,
+        description=f"Inverse of: {m.description}" if m.description else "Inverse mutation",
+        author=m.author,
+    )
+
+
 def propose_diagnostics(graph: Graph, m: GraphMutation) -> Diagnostics:
     """Validate-on-propose: apply *m* to *graph* and validate the result.
 

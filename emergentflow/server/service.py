@@ -1021,13 +1021,30 @@ def execute_session(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     one of ``run_to`` / ``run_from`` / ``run_only`` (the same partial-run scopes
     ``execute_graph`` already supports) -- the graph itself always comes from
     the session, never from the request body.
+
+    If the estimated run cost exceeds the configured budget ceiling, auto-opens
+    an EXECUTE gate and returns budget info instead of executing.
     """
+    from emergentflow.collab.budget_gate import (
+        check_budget_and_open_gate,
+        estimate_run_cost,
+        get_budget_ceiling,
+    )
     from emergentflow.collab.session import get_default_store as get_default_session_store
 
     store = get_default_session_store()
     session = store.get(session_id)
     store.assert_no_open_gates(session_id)
+
+    # Check budget before executing (Epic 17 Story 9)
     graph_dict = session.graph.model_dump(mode="json")
+    estimated_cost = estimate_run_cost(graph_dict)
+    budget_ceiling = get_budget_ceiling()
+
+    budget_result = check_budget_and_open_gate(session_id, estimated_cost, budget_ceiling)
+    if budget_result is not None:
+        return budget_result
+
     scope = {k: payload[k] for k in _SCOPE_KEYS if payload.get(k) is not None}
     return execute_graph({"graph": graph_dict, **scope})
 

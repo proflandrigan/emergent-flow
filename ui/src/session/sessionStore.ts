@@ -15,11 +15,13 @@ import {
   acceptProposal,
   addReviewComment,
   closeGateRequest,
+  compileSession,
   consultSession,
   createGate,
   createReview,
   createSession,
   endChat as endChatRequest,
+  executeSession,
   getSession,
   postGateDecision,
   proposeMutation,
@@ -29,11 +31,14 @@ import {
   startChat as startChatRequest,
   stopChatTurn as stopChatTurnRequest,
   subscribeToSessionEvents,
+  type Attempt,
   type ChatState,
   type ChatTurn,
   type ConsultInput,
   type CreateGateInput,
   type CreateReviewInput,
+  type ExecuteSessionResult,
+  type ExecuteSessionScope,
   type Gate,
   type GraphSession,
   type ReviewThread,
@@ -54,6 +59,7 @@ export interface SessionStoreState {
   reviews: Record<string, ReviewThread>;
   gates: Record<string, Gate>;
   chat: ChatState;
+  attempts: Record<string, Attempt>;
   status: SessionConnectionStatus;
   error: string | null;
   // Set when a PUT .../graph call is rejected for a stale expected_version (someone else's
@@ -87,6 +93,8 @@ export interface SessionStoreState {
   startChat: (backend: string, message: string) => Promise<ChatTurn>;
   stopChat: (turnId: string) => Promise<void>;
   endChat: () => Promise<void>;
+  compileSession: () => Promise<{ code: string }>;
+  executeSession: (scope?: ExecuteSessionScope) => Promise<ExecuteSessionResult>;
 }
 
 // Holds the live SSE/poll subscription outside Zustand state (it is not serializable/comparable
@@ -118,6 +126,7 @@ async function refreshFromServer(
       reviews: session.collab?.reviews ?? {},
       gates: session.collab?.gates ?? {},
       chat: session.collab?.chat ?? idleChatState,
+      attempts: session.collab?.attempts ?? {},
     });
     if (event.type === "graph_replaced" || event.type === "proposal_accepted") {
       useGraphStore.getState().loadIR(session.graph);
@@ -189,6 +198,8 @@ type ConnectionState = Omit<
   | "startChat"
   | "stopChat"
   | "endChat"
+  | "compileSession"
+  | "executeSession"
 >;
 
 const idleChatState: ChatState = {
@@ -205,6 +216,7 @@ const idleConnectionState: ConnectionState = {
   reviews: {},
   gates: {},
   chat: idleChatState,
+  attempts: {},
   status: "idle",
   error: null,
   rebaseNeeded: false,
@@ -226,6 +238,7 @@ function applySession(session: GraphSession): ConnectionState {
     reviews: session.collab?.reviews ?? {},
     gates: session.collab?.gates ?? {},
     chat: session.collab?.chat ?? idleChatState,
+    attempts: session.collab?.attempts ?? {},
     status: "connected",
   };
 }
@@ -487,6 +500,32 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
       });
     } catch (err) {
       set({ error: errorMessage(err) });
+    }
+  },
+
+  async compileSession() {
+    const state = get();
+    if (state.sessionId === null) {
+      throw new Error("cannot compile: no active session");
+    }
+    try {
+      return await compileSession(state.sessionId);
+    } catch (err) {
+      set({ error: errorMessage(err) });
+      throw err;
+    }
+  },
+
+  async executeSession(scope) {
+    const state = get();
+    if (state.sessionId === null) {
+      throw new Error("cannot execute: no active session");
+    }
+    try {
+      return await executeSession(state.sessionId, scope);
+    } catch (err) {
+      set({ error: errorMessage(err) });
+      throw err;
     }
   },
 }));

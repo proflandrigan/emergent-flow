@@ -50,11 +50,13 @@ def create_mcp_server() -> Any:
     mcp = fastmcp.FastMCP("emergent-flow-collaboration")
 
     from emergentflow.collab.review import ReviewThread
-    from emergentflow.collab.session import UnknownProposalError
+    from emergentflow.collab.session import OpenGatesError, UnknownProposalError
     from emergentflow.collab.session import get_default_store as get_default_session_store
     from emergentflow.ir.mutation import GraphMutation
     from emergentflow.server.service import (
         compile_graph,
+        compile_session,  # ADD
+        execute_session,  # ADD
         get_catalog,
         get_knowledge_entry,
         list_knowledge,
@@ -85,9 +87,205 @@ def create_mcp_server() -> Any:
         return validate_graph(graph)
 
     @mcp.tool()
+    def run_validity_checks_tool(graph: dict) -> dict:
+        """Run validity rules over a graph and return findings.
+
+        Checks for issues like data leakage, train/test contamination, and
+        methodological errors. Returns a list of findings with rule_id, severity,
+        message, and implicated node_ids.
+        """
+        import json
+
+        from emergentflow.ir import deserialize_graph
+        from emergentflow.validity.runner import run_validity_checks
+
+        graph_obj = deserialize_graph(json.dumps(graph))
+        findings = run_validity_checks(graph_obj)
+        return {
+            "findings": [
+                {
+                    "rule_id": f.rule_id,
+                    "severity": f.severity,
+                    "message": f.message,
+                    "node_id": f.node_id,
+                    "related_node_ids": f.related_node_ids or [],
+                }
+                for f in findings
+            ]
+        }
+
+    @mcp.tool()
     def compile_preview(graph: dict) -> dict:
         """Compile an IR graph to Python code (same as POST /compile)."""
         return compile_graph(graph)
+
+    @mcp.tool()
+    def compile_session_tool(session_id: str) -> dict:
+        """Compile the session's current graph to Python code (same as POST /sessions/{id}/compile).
+
+        Returns {"code": "..."} on success, or {"blocked_by_gates": [...]} if any gate is OPEN.
+        """
+        try:
+            return compile_session(session_id)
+        except OpenGatesError as exc:
+            return {
+                "blocked_by_gates": [
+                    {
+                        "gate_id": g.id,
+                        "phase": g.phase,
+                        "kind": g.kind.value,
+                        "description": g.description,
+                    }
+                    for g in exc.open_gates
+                ]
+            }
+
+    @mcp.tool()
+    def execute_session_tool(
+        session_id: str,
+        run_to: list[str] | None = None,
+        run_from: list[str] | None = None,
+        run_only: list[str] | None = None,
+    ) -> dict:
+        """Execute the session's current graph (same as POST /sessions/{id}/execute).
+
+        Optional partial-execution scopes (mutually exclusive):
+        - run_to: execute up to and including these node ids
+        - run_from: execute from these node ids onward
+        - run_only: execute only these node ids
+
+        Returns {"payloads": {...}, "statuses": {...}, "elapsed_ms": {...}} on success,
+        or {"blocked_by_gates": [...]} if any gate is OPEN.
+        """
+        payload: dict[str, Any] = {}
+        if run_to is not None:
+            payload["run_to"] = run_to
+        if run_from is not None:
+            payload["run_from"] = run_from
+        if run_only is not None:
+            payload["run_only"] = run_only
+        try:
+            return execute_session(session_id, payload)
+        except OpenGatesError as exc:
+            return {
+                "blocked_by_gates": [
+                    {
+                        "gate_id": g.id,
+                        "phase": g.phase,
+                        "kind": g.kind.value,
+                        "description": g.description,
+                    }
+                    for g in exc.open_gates
+                ]
+            }
+
+    @mcp.tool()
+    def get_results(run_id: str) -> dict:
+        """Fetch execution results for a run, digested for agent consumption.
+
+        Returns bounded summaries: scalars verbatim, tables as shape+head,
+        images as presence markers. Raises UnknownRunError if run_id doesn't exist.
+        """
+        from emergentflow.collab.digest import digest_results
+        from emergentflow.server.runs import UnknownRunError, get_default_runs
+
+        try:
+            run_store = get_default_runs()
+            run_data = run_store.get(run_id)
+            payloads = run_data.get("payloads", {})
+            return {
+                "run_id": run_id,
+                "results": digest_results(payloads),
+            }
+        except UnknownRunError:
+            return {"error": f"Run {run_id!r} not found"}
+
+    @mcp.tool()
+    def fetch_artifact(handle: str) -> dict:
+        """Fetch the raw bytes of an artifact by handle.
+
+        Artifact handles are returned by get_results in digest form (e.g.,
+        "image:800x600", "html:12345bytes"). This tool retrieves the full artifact.
+
+        Note: Full artifact storage is not yet implemented. This tool returns a
+        placeholder response. Future work will wire this to .ef-artifacts/ storage.
+        """
+        return {
+            "error": "Artifact fetching not yet implemented",
+            "handle": handle,
+            "message": (
+                "Full artifact storage requires wiring the execution pipeline to save "
+                "artifacts to .ef-artifacts/ and mapping handles to file paths. "
+                "For now, use the digest summaries from get_results."
+            ),
+        }
+
+    @mcp.tool()
+    def get_metric(run_id: str, node_id: str, metric_name: str) -> dict:
+        """Extract a named scalar metric from a run's payloads.
+        
+        Returns {"run_id", "node_id", "metric_name", "value"} or error if not found.
+        """
+        from emergentflow.collab.metrics import extract_metric
+        from emergentflow.server.runs import UnknownRunError, get_default_runs
+    
+        try:
+            run_store = get_default_runs()
+            run_data = run_store.get(run_id)
+            payloads = run_data.get("payloads", {})
+            value = extract_metric(payloads, node_id, metric_name)
+            
+            if value is None:
+                return {
+                    "error": f"Metric {metric_name!r} not found in node {node_id!r}",
+                    "run_id": run_id,
+                    "node_id": node_id,
+                    "metric_name": metric_name,
+                }
+            
+            return {
+                "run_id": run_id,
+                "node_id": node_id,
+                "metric_name": metric_name,
+                "value": value,
+            }
+        except UnknownRunError:
+            return {"error": f"Run {run_id!r} not found"}
+
+    @mcp.tool()
+    def compare_runs(
+        run_id_a: str,
+        run_id_b: str,
+        node_id: str,
+        metric_name: str,
+    ) -> dict:
+        """Compare a metric across two runs.
+        
+        Returns {"before", "after", "delta", "delta_pct"} or error.
+        """
+        from emergentflow.collab.metrics import compare_metrics, extract_metric
+        from emergentflow.server.runs import UnknownRunError, get_default_runs
+    
+        try:
+            run_store = get_default_runs()
+            run_a = run_store.get(run_id_a)
+            run_b = run_store.get(run_id_b)
+            
+            payloads_a = run_a.get("payloads", {})
+            payloads_b = run_b.get("payloads", {})
+            
+            value_a = extract_metric(payloads_a, node_id, metric_name)
+            value_b = extract_metric(payloads_b, node_id, metric_name)
+            
+            comparison = compare_metrics(value_a, value_b)
+            comparison["run_id_a"] = run_id_a
+            comparison["run_id_b"] = run_id_b
+            comparison["node_id"] = node_id
+            comparison["metric_name"] = metric_name
+            
+            return comparison
+        except UnknownRunError as exc:
+            return {"error": str(exc)}
 
     @mcp.tool()
     def save_knowledge_tool(entry: dict) -> dict:

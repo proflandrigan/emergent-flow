@@ -170,3 +170,20 @@ passed as `session_token=` to `serve()` or set as `EMERGENTFLOW_SESSION_TOKEN` i
 environment — and the server will refuse to start without one. See the "Trust boundary"
 section of [ADR 0019](./adr/0019-graph-sessions-and-agent-collaboration.md) for the full
 reasoning.
+
+## Experiment Protocol (Epic 17)
+
+The experimenter persona drives closed-loop experimentation over graph sessions. The protocol:
+
+1. **Hypothesis**: State what you're changing and why
+2. **Propose**: Use `propose_mutation` to submit a single change
+3. **Execute**: Use `execute_session_tool` to run the graph
+4. **Measure**: Use `get_metric` or `compare_runs` to extract the target metric
+5. **Decide**: Keep (accept proposal) or revert (propose inverse mutation)
+6. **Record**: Every attempt is appended to the session's attempt ledger
+
+The attempt ledger (`CollaborationState.attempts`) tracks each experiment with its mutation_id,
+run_id, metric_name, metric_value, verdict (kept/reverted), and hypothesis.
+
+Budget ceilings (configured via `EMERGENTFLOW_BUDGET_CEILING_USD` env var) auto-open an
+EXECUTE gate when exceeded, requiring human approval to continue.

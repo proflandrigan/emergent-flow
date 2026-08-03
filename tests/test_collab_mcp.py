@@ -169,6 +169,94 @@ class TestTools:
         assert isinstance(result, dict)
         assert "code" in result
 
+    def test_compile_session_tool(self) -> None:
+        """compile_session_tool returns {"code": "..."} for a valid session."""
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(mcp, "compile_session_tool", {"session_id": session.id})
+        )
+        assert isinstance(result, dict)
+        assert "code" in result
+
+    def test_compile_session_tool_blocked_by_gates(self) -> None:
+        """compile_session_tool returns {"blocked_by_gates": [...]} when gates are OPEN."""
+        from emergentflow.collab.gates import Gate, GateKind
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        # Open a gate to block compilation
+        session_mod.get_default_store().open_gate(
+            session.id,
+            Gate(phase="test", kind=GateKind.PHASE, description="test gate"),
+        )
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(mcp, "compile_session_tool", {"session_id": session.id})
+        )
+        assert isinstance(result, dict)
+        assert "blocked_by_gates" in result
+        assert len(result["blocked_by_gates"]) == 1
+        assert result["blocked_by_gates"][0]["phase"] == "test"
+        assert result["blocked_by_gates"][0]["kind"] == "phase"
+
+    def test_execute_session_tool(self) -> None:
+        """execute_session_tool returns results/statuses for a valid session."""
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(mcp, "execute_session_tool", {"session_id": session.id})
+        )
+        assert isinstance(result, dict)
+        assert "results" in result
+        assert "statuses" in result
+
+    def test_execute_session_tool_blocked_by_gates(self) -> None:
+        """execute_session_tool returns {"blocked_by_gates": [...]} when gates are OPEN."""
+        from emergentflow.collab.gates import Gate, GateKind
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        # Open a gate to block execution
+        session_mod.get_default_store().open_gate(
+            session.id,
+            Gate(phase="test", kind=GateKind.EXECUTE, description="test execute gate"),
+        )
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(mcp, "execute_session_tool", {"session_id": session.id})
+        )
+        assert isinstance(result, dict)
+        assert "blocked_by_gates" in result
+        assert len(result["blocked_by_gates"]) == 1
+        assert result["blocked_by_gates"][0]["kind"] == "execute"
+
+    def test_execute_session_tool_with_scope(self) -> None:
+        """execute_session_tool accepts optional run_to/run_from/run_only scopes."""
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+
+        mcp = create_mcp_server()
+        # Test with run_to scope (empty graph, so no nodes to target, but validates the param passes through)
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "execute_session_tool",
+                {"session_id": session.id, "run_to": []},
+            )
+        )
+        assert isinstance(result, dict)
+        assert "results" in result
+
     def test_propose_mutation(self) -> None:
         from emergentflow.collab.mcp import create_mcp_server
 
