@@ -26,6 +26,7 @@ from emergentflow.ir.mutation import (
     propose_diagnostics,
 )
 from emergentflow.ir.node import Node, Position
+from emergentflow.ir.params import Param
 from emergentflow.nodes.examples.cast_types import CastTypes
 from emergentflow.nodes.examples.load_csv import LoadCsv
 
@@ -236,6 +237,49 @@ class TestApplyMutationSetParams:
         result = apply_mutation(graph, m)
         path_param = next(p for p in result.nodes[node.id].params if p.name == "path")
         assert path_param.value == "overridden.csv"
+
+    def test_set_params_preserves_ref_and_description_on_refd_param(self) -> None:
+        # A param ref'd to a graph-level parameter (issue #116) must keep its `ref`
+        # (and `description`) when set_params updates only its value -- rebuilding
+        # the Param field-by-field would silently sever the author's graph-param
+        # wiring on any agent-proposed value edit.
+        node = Node(
+            id="n1",
+            type="test.sink",
+            params=[
+                Param(
+                    name="value",
+                    type_token="int",
+                    value=999,
+                    default=999,
+                    ref="p",
+                    description="linked to graph param p",
+                ),
+            ],
+        )
+        graph = Graph(nodes={node.id: node})
+        m = GraphMutation(base_version=0, set_params={"n1": {"value": 42}})
+        result = apply_mutation(graph, m)
+        updated = next(p for p in result.nodes["n1"].params if p.name == "value")
+        assert updated.value == 42
+        assert updated.ref == "p"
+        assert updated.description == "linked to graph param p"
+        assert updated.type_token == "int"
+        assert updated.default == 999
+
+    def test_set_params_does_not_mutate_input_node(self) -> None:
+        # Purity: the value update on a ref'd param must not mutate the source node.
+        node = Node(
+            id="n1",
+            type="test.sink",
+            params=[Param(name="value", type_token="int", value=999, ref="p")],
+        )
+        graph = Graph(nodes={node.id: node})
+        m = GraphMutation(base_version=0, set_params={"n1": {"value": 42}})
+        apply_mutation(graph, m)
+        original = graph.nodes["n1"].params[0]
+        assert original.value == 999
+        assert original.ref == "p"
 
 
 # ---------------------------------------------------------------------------
