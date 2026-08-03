@@ -261,11 +261,17 @@ def compile_spec(spec: dict[str, Any], dialect: str) -> str:
             join_kwargs["join_type"] = "CROSS"
         elif join_type in ("LEFT", "RIGHT", "FULL"):
             join_kwargs["join_type"] = join_type
-            assert on_cond is not None  # _build_join validates `on` for non-CROSS joins
+            if on_cond is None:
+                raise RuntimeError(
+                    f"Internal error: _build_join returned None on_cond for {join_type} join"
+                )
             join_kwargs["on"] = on_cond
         else:
             # INNER is the default (no join_type kwarg needed).
-            assert on_cond is not None  # _build_join validates `on` for non-CROSS joins
+            if on_cond is None:
+                raise RuntimeError(
+                    f"Internal error: _build_join returned None on_cond for {join_type} join"
+                )
             join_kwargs["on"] = on_cond
 
         select_node = select_node.join(table_expr, **join_kwargs)
