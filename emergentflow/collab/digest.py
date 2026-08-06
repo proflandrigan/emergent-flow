@@ -13,6 +13,7 @@ collaboration state lives beside the graph (ADR 0019).
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any
 
@@ -73,13 +74,17 @@ def digest_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if kind == "image":
         # Replace with summary, no base64 data
         data = payload.get("data", "")
+        # Content hash disambiguates two images with identical dimensions from colliding
+        # on the same handle (sha1 of the base64 is cheap and collision-safe enough for a
+        # fetch key).
+        digest = hashlib.sha1(data.encode("utf-8")).hexdigest()[:12]
         return {
             "kind": "image_summary",
             "mime": payload.get("mime", "image/png"),
             "width": payload.get("width", 0),
             "height": payload.get("height", 0),
             "bytes": len(data) * 3 // 4,  # Approximate original bytes from base64
-            "handle": f"image:{payload.get('width', 0)}x{payload.get('height', 0)}",
+            "handle": f"image:{payload.get('width', 0)}x{payload.get('height', 0)}:{digest}",
         }
 
     if kind == "html":

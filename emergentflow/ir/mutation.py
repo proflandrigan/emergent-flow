@@ -262,16 +262,21 @@ def invert_mutation(graph: Graph, m: GraphMutation) -> GraphMutation:
                 f"Cannot invert set_params: node {node_id!r} does not exist in the graph."
             )
         original_node = graph.nodes[node_id]
+        original_present = {p.name for p in original_node.params}
         original_values: dict[str, ParamValue] = {}
         for param_name in param_updates:
+            if param_name not in original_present:
+                raise MutationError(
+                    f"Cannot invert set_params: param {param_name!r} on node {node_id!r} "
+                    "did not exist in the original graph. The graph-mutation protocol has no "
+                    "way to express removing a param, so this forward mutation is not "
+                    "invertible."
+                )
             # Find the original param value
             for param in original_node.params:
                 if param.name == param_name:
                     original_values[param_name] = param.value
                     break
-            else:
-                # Param didn't exist before, so inverse removes it (set to None)
-                original_values[param_name] = None
         inverse_set_params[node_id] = original_values
 
     return GraphMutation(

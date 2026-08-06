@@ -895,13 +895,17 @@ def _save_run_record(
     except Exception:
         pass  # reproducibility capture is best-effort
 
-    # Build scalar payloads only (filter out non-scalar payloads)
+    # Persist the payloads the collaboration tools digest -- scalars/text/json verbatim plus
+    # table/record digests (RunStore caps each entry at 100KB, so large tables are truncated,
+    # not dropped). Image/html stay excluded: their binary payload is not agent-metric-relevant
+    # and would bloat the run log.
+    _PERSISTED_KINDS = ("scalar", "text", "json", "table", "record")
     payloads_data: dict[str, dict[str, Any]] = {}
     for node_id, ports in results.items():
         payloads_data[node_id] = {}
         for port_name, value in ports.items():
             payload = _payload_for(value)
-            if payload.get("kind") in ("scalar", "text", "json"):
+            if payload.get("kind") in _PERSISTED_KINDS:
                 payloads_data[node_id][port_name] = payload
 
     with contextlib.suppress(Exception):

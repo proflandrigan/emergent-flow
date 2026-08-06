@@ -154,7 +154,7 @@ def create_mcp_server() -> Any:
         - run_from: execute from these node ids onward
         - run_only: execute only these node ids
 
-        Returns {"payloads": {...}, "statuses": {...}, "elapsed_ms": {...}} on success,
+        Returns {"payload_version", "results", "statuses"} on success,
         or {"blocked_by_gates": [...]} if any gate is OPEN.
         """
         payload: dict[str, Any] = {}
@@ -191,8 +191,7 @@ def create_mcp_server() -> Any:
 
         try:
             run_store = get_default_runs()
-            run_data = run_store.get(run_id)
-            payloads = run_data.get("payloads", {})
+            payloads = run_store.get_payloads(run_id)
             return {
                 "run_id": run_id,
                 "results": digest_results(payloads),
@@ -223,18 +222,17 @@ def create_mcp_server() -> Any:
     @mcp.tool()
     def get_metric(run_id: str, node_id: str, metric_name: str) -> dict:
         """Extract a named scalar metric from a run's payloads.
-        
+
         Returns {"run_id", "node_id", "metric_name", "value"} or error if not found.
         """
         from emergentflow.collab.metrics import extract_metric
         from emergentflow.server.runs import UnknownRunError, get_default_runs
-    
+
         try:
             run_store = get_default_runs()
-            run_data = run_store.get(run_id)
-            payloads = run_data.get("payloads", {})
+            payloads = run_store.get_payloads(run_id)
             value = extract_metric(payloads, node_id, metric_name)
-            
+
             if value is None:
                 return {
                     "error": f"Metric {metric_name!r} not found in node {node_id!r}",
@@ -242,7 +240,7 @@ def create_mcp_server() -> Any:
                     "node_id": node_id,
                     "metric_name": metric_name,
                 }
-            
+
             return {
                 "run_id": run_id,
                 "node_id": node_id,
@@ -260,32 +258,64 @@ def create_mcp_server() -> Any:
         metric_name: str,
     ) -> dict:
         """Compare a metric across two runs.
-        
+
         Returns {"before", "after", "delta", "delta_pct"} or error.
         """
         from emergentflow.collab.metrics import compare_metrics, extract_metric
         from emergentflow.server.runs import UnknownRunError, get_default_runs
-    
+
         try:
             run_store = get_default_runs()
-            run_a = run_store.get(run_id_a)
-            run_b = run_store.get(run_id_b)
-            
-            payloads_a = run_a.get("payloads", {})
-            payloads_b = run_b.get("payloads", {})
-            
+            payloads_a = run_store.get_payloads(run_id_a)
+            payloads_b = run_store.get_payloads(run_id_b)
+
             value_a = extract_metric(payloads_a, node_id, metric_name)
             value_b = extract_metric(payloads_b, node_id, metric_name)
-            
+
             comparison = compare_metrics(value_a, value_b)
             comparison["run_id_a"] = run_id_a
             comparison["run_id_b"] = run_id_b
             comparison["node_id"] = node_id
             comparison["metric_name"] = metric_name
-            
+
             return comparison
         except UnknownRunError as exc:
             return {"error": str(exc)}
+
+    @mcp.tool()
+    def record_attempt_tool(
+        session_id: str,
+        mutation_id: str,
+        run_id: str | None = None,
+        metric_name: str | None = None,
+        metric_value: float | int | None = None,
+        verdict: str = "pending",
+        hypothesis: str = "",
+    ) -> dict:
+        """Record an experiment attempt in the session's attempt ledger.
+
+        Writes an ``Attempt`` to ``GraphSession.collab.attempts`` (the closed-loop ledger:
+        mutation -> run -> metric -> verdict) and publishes an ``attempt_recorded`` event so
+        the canvas timeline reflects it. Returns the stored Attempt dict.
+        """
+        from emergentflow.collab.review import Attempt, AttemptVerdict
+        from emergentflow.collab.session import get_default_store
+
+        try:
+            verdict_enum = AttemptVerdict(verdict)
+        except ValueError:
+            expected = ", ".join(v.value for v in AttemptVerdict)
+            raise ValueError(f"invalid verdict {verdict!r}; expected one of {expected}") from None
+        attempt = Attempt(
+            mutation_id=mutation_id,
+            run_id=run_id,
+            metric_name=metric_name,
+            metric_value=metric_value,
+            verdict=verdict_enum,
+            hypothesis=hypothesis,
+        )
+        stored = get_default_store().record_attempt(session_id, attempt)
+        return stored.model_dump(mode="json")
 
     @mcp.tool()
     def save_knowledge_tool(entry: dict) -> dict:

@@ -35,16 +35,28 @@ def get_budget_ceiling() -> float:
 def estimate_run_cost(graph_dict: dict[str, Any]) -> float:
     """Estimate the cost of running a graph in USD.
 
-    This is a simple heuristic: count the number of LLM call nodes
-    and multiply by an average cost per call. A more sophisticated
-    implementation would analyze the graph structure and node params.
+    Counts the nodes that require a network/LLM client (Epic 17 ADR 0017 nodes:
+    LLM calls, embed calls, warehouse queries) and multiplies by an average cost
+    per client call. Pure local-model / data-only runs estimate to 0.0.
 
-    For now, return 0.0 as a placeholder — the actual cost tracking
-    happens via BudgetClient during execution.
+    The per-call cost is a heuristic default, overridable via
+    ``EMERGENTFLOW_EST_COST_PER_CALL``.
     """
-    # Placeholder: in a real implementation, we'd analyze the graph
-    # to estimate cost based on LLM nodes, expected token counts, etc.
-    return 0.0
+    from emergentflow.nodes import registry as default_node_registry
+
+    avg_cost_per_call = float(os.environ.get("EMERGENTFLOW_EST_COST_PER_CALL", "0.001"))
+    counted = 0
+    for node_data in graph_dict.get("nodes", {}).values():
+        node_type = node_data.get("type")
+        definition_cls = default_node_registry.try_get(node_type)
+        if definition_cls is None:
+            # Unknown types count as cost-affecting too: conservative, never
+            # under-estimate a run.
+            counted += 1
+            continue
+        if definition_cls.required_client_kinds():
+            counted += 1
+    return counted * avg_cost_per_call
 
 
 def check_budget_and_open_gate(

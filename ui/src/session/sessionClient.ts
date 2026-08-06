@@ -171,9 +171,9 @@ export interface ExecuteSessionScope {
 }
 
 export interface ExecuteSessionResult {
-  payloads: Record<string, Record<string, unknown>>;
+  payload_version: number;
+  results: Record<string, Record<string, unknown>>;
   statuses: Record<string, { status: string; error?: string; reason?: string }>;
-  elapsed_ms: Record<string, number>;
 }
 
 export async function executeSession(

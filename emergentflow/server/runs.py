@@ -148,6 +148,19 @@ class RunStore:
                 raise UnknownRunError(run_id)
             return json.loads(path.read_text(encoding="utf-8"))
 
+    def get_payloads(self, run_id: str) -> dict[str, Any]:
+        """Return the ``payloads.json`` dict for *run_id*. Raise ``UnknownRunError`` if missing.
+
+        ``get`` returns only the metadata in ``run.json``; the node output payloads live in a
+        separate ``payloads.json`` file, so the collaboration tools that read run results must
+        use this method rather than ``...get(run_id).get("payloads", {})``.
+        """
+        path = self._run_dir(run_id) / "payloads.json"
+        with self._lock:
+            if not path.is_file():
+                raise UnknownRunError(run_id)
+            return json.loads(path.read_text(encoding="utf-8"))
+
     def save(
         self,
         run_data: dict[str, Any],

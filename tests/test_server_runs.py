@@ -79,6 +79,36 @@ def test_get_unknown_raises(tmp_path: Path) -> None:
         store.get(_VALID_RUN_ID)
 
 
+def test_get_payloads_returns_payloads_json(tmp_path: Path) -> None:
+    store = RunStore(root=tmp_path, keep=50)
+    run_data = {
+        "run_id": "",
+        "tag": None,
+        "graph_name": "",
+        "graph_hash": "",
+        "started_at": time.time(),
+        "finished_at": time.time(),
+        "duration_ms": 0,
+        "node_count": 0,
+        "statuses": {},
+        "reproducibility": {"seeds": {}, "content_hashes": {}, "dependency_versions": {}},
+        "sdk_version": "0.3.3",
+    }
+    payloads_data = {"n1": {"out": {"kind": "scalar", "value": 42}}}
+    run_id = store.save(run_data, {}, payloads_data)
+
+    # The metadata dict (run.json) must NOT contain the payloads.
+    assert "payloads" not in store.get(run_id)
+    # And a dedicated reader must return them.
+    assert store.get_payloads(run_id) == {"n1": {"out": {"kind": "scalar", "value": 42}}}
+
+
+def test_get_payloads_unknown_raises(tmp_path: Path) -> None:
+    store = RunStore(root=tmp_path, keep=50)
+    with pytest.raises(UnknownRunError):
+        store.get_payloads(_VALID_RUN_ID)
+
+
 def test_get_graph_unknown_raises(tmp_path: Path) -> None:
     store = RunStore(root=tmp_path, keep=50)
     with pytest.raises(UnknownRunError):
