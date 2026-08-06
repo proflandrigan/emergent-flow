@@ -34,7 +34,7 @@ from emergentflow.ir.node import Node, Position
 from emergentflow.ir.params import Param, ParamValue
 from emergentflow.ir.port import Port
 
-from .spec import NodeSpec, ParamSpec, PortSpec
+from .spec import ColumnEffect, NodeSpec, ParamSpec, PortSpec
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -148,6 +148,12 @@ class NodeDefinition(ABC):
         affordance (Epic 14 Story 8, not yet wired to an executable consult in
         this task).  This is advisory metadata only — the string is not validated
         against the persona registry at catalog-build time.
+    column_effect:
+        Optional declarative column-mapping metadata for this node type (see
+        :class:`ColumnEffect`). ``None`` (the default) means the node makes no
+        declaration — the tracer reports "unknown" rather than guessing a
+        passthrough. Advisory metadata surfaced through ``to_spec()`` →
+        ``/catalog``.
     ports:
         Declared :class:`PortSpec` list.
     params:
@@ -166,6 +172,7 @@ class NodeDefinition(ABC):
     requires_client: ClassVar[bool] = False
     requires: ClassVar[frozenset[ClientKind]] = frozenset()
     advisor_persona: ClassVar[str | None] = None
+    column_effect: ClassVar[ColumnEffect | None] = None
     ports: ClassVar[list[PortSpec]] = []
     params: ClassVar[list[ParamSpec]] = []
 
@@ -280,6 +287,7 @@ class NodeDefinition(ABC):
             keywords=list(cls.keywords),
             paradigm=cls.paradigm,
             advisor_persona=cls.advisor_persona,
+            column_effect=cls.column_effect,
             ports=list(cls.ports),
             params=list(cls.params),
         )

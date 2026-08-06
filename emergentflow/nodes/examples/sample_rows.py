@@ -18,7 +18,7 @@ from emergentflow.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -37,6 +37,8 @@ class SampleRows(NodeDefinition):
         "Draw a subset of rows -- uniformly at random, stratified within groups, or the first "
         "n rows -- with an always-captured seed so the result is reproducible."
     )
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.PASSTHROUGH)
 
     ports = [
         PortSpec(

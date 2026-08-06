@@ -22,7 +22,7 @@ from emergentflow.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -41,6 +41,7 @@ class LoadDocuments(NodeDefinition):
         "Chunk PDF/text/markdown file(s) into a tidy (doc_id, chunk_id, text, ...) frame. "
         "No embedding or retrieval -- that's Epic 11; this only produces the frame."
     )
+    column_effect = ColumnEffect(kind=ColumnEffectKind.SOURCE)
     advisor_persona = "data_modeller"
     # execute() re-reads files from disk on every call; not a pure function of its declared
     # params alone (mirrors LoadExcel's cacheable=False for the same reason).

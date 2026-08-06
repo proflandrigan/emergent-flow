@@ -19,7 +19,7 @@ from emergentflow.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -38,6 +38,8 @@ class DeriveColumn(NodeDefinition):
         "Add computed and conditional (case-when) columns using a safe, restricted "
         "expression grammar."
     )
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.DERIVE)
 
     ports = [
         PortSpec(

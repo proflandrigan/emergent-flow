@@ -19,7 +19,7 @@ from emergentflow.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -35,6 +35,8 @@ class SelectColumns(NodeDefinition):
     label = "Select Columns"
     category = "Transform"
     description = "Keep or drop a chosen subset of columns."
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.SELECT)
 
     ports = [
         PortSpec(

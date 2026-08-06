@@ -20,7 +20,7 @@ from emergentflow.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -40,6 +40,8 @@ class LoadSample(NodeDefinition):
         "classification/regression toy sets (iris, wine, diabetes), a daily web-traffic "
         "time series, a product-review text corpus, and a retail transactions table."
     )
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.SOURCE)
 
     ports = [
         PortSpec(

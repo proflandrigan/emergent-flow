@@ -14,6 +14,8 @@ const SERVER_ROUTES = [
   "/validate",
   "/execute",
   "/execute_node",
+  "/lineage",
+  "/lineage/column",
   "/sessions",
   "/agents",
   "/consult",

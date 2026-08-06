@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from emergentflow.server.app import app, create_app, serve
 from emergentflow.server.service import (
+    column_lineage_for,
     compile_graph,
     execute_graph,
     execute_node,
@@ -34,6 +35,7 @@ __all__ = [
     "get_catalog",
     "get_schema",
     "label_eval",
+    "column_lineage_for",
     "lineage_for_node",
     "validate_graph",
 ]

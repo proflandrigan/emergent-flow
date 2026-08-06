@@ -2203,6 +2203,10 @@
       dict({
         'advisor_persona': None,
         'category': 'Transform',
+        'column_effect': dict({
+          'detail': None,
+          'kind': 'passthrough',
+        }),
         'description': 'Cast selected columns to new data types.',
         'family': 'clean',
         'keywords': list([
@@ -2257,6 +2261,10 @@
       dict({
         'advisor_persona': None,
         'category': 'Transform',
+        'column_effect': dict({
+          'detail': None,
+          'kind': 'passthrough',
+        }),
         'description': 'Drop rows or columns that contain missing values.',
         'family': 'clean',
         'keywords': list([
@@ -2357,6 +2365,10 @@
       dict({
         'advisor_persona': None,
         'category': 'Transform',
+        'column_effect': dict({
+          'detail': None,
+          'kind': 'passthrough',
+        }),
         'description': 'Keep rows matching a column/operator/value predicate.',
         'family': 'clean',
         'keywords': list([
@@ -2459,6 +2471,10 @@
       dict({
         'advisor_persona': None,
         'category': 'Transform',
+        'column_effect': dict({
+          'detail': None,
+          'kind': 'passthrough',
+        }),
         'description': 'Fill missing values in selected columns using a chosen strategy.',
         'family': 'clean',
         'keywords': list([
@@ -2537,6 +2553,10 @@
       dict({
         'advisor_persona': None,
         'category': 'Transform',
+        'column_effect': dict({
+          'detail': None,
+          'kind': 'select',
+        }),
         'description': 'Keep or drop a chosen subset of columns.',
         'family': 'clean',
         'keywords': list([
@@ -2611,6 +2631,10 @@
       dict({
         'advisor_persona': 'data_modeller',
         'category': 'Ingest',
+        'column_effect': dict({
+          'detail': None,
+          'kind': 'source',
+        }),
         'description': 'Load a CSV file into a pandas DataFrame.',
         'family': 'data',
         'keywords': list([
@@ -2756,6 +2780,10 @@
       dict({
         'advisor_persona': 'data_modeller',
         'category': 'Ingest',
+        'column_effect': dict({
+          'detail': None,
+          'kind': 'source',
+        }),
         'description': 'Load a sheet from an Excel workbook into a pandas DataFrame.',
         'family': 'data',
         'keywords': list([
@@ -2941,6 +2969,10 @@
       dict({
         'advisor_persona': 'data_modeller',
         'category': 'Ingest',
+        'column_effect': dict({
+          'detail': None,
+          'kind': 'source',
+        }),
         'description': 'Load a Google Sheets tab into a pandas DataFrame over the HTTP client seam.',
         'family': 'data',
         'keywords': list([
@@ -3106,6 +3138,10 @@
       dict({
         'advisor_persona': None,
         'category': 'Ingest',
+        'column_effect': dict({
+          'detail': None,
+          'kind': 'source',
+        }),
         'description': 'Load a JSON or JSON Lines (.jsonl) file into a pandas DataFrame.',
         'family': 'data',
         'keywords': list([
@@ -3249,6 +3285,10 @@
       dict({
         'advisor_persona': None,
         'category': 'Ingest',
+        'column_effect': dict({
+          'detail': None,
+          'kind': 'source',
+        }),
         'description': 'Load a Parquet file into a pandas DataFrame.',
         'family': 'data',
         'keywords': list([
@@ -3383,6 +3423,10 @@
       dict({
         'advisor_persona': None,
         'category': 'Ingest',
+        'column_effect': dict({
+          'detail': None,
+          'kind': 'source',
+        }),
         'description': 'Load a small bundled sample dataset (zero filesystem setup): the sklearn classification/regression toy sets (iris, wine, diabetes), a daily web-traffic time series, a product-review text corpus, and a retail transactions table.',
         'family': 'data',
         'keywords': list([
@@ -3435,6 +3479,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Ingest',
+        'column_effect': None,
         'description': 'Build a SQL query from a structured spec (source, select, where, join, group_by, order_by) and return a DataFrame.',
         'family': 'data',
         'keywords': list([
@@ -3740,6 +3785,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Ingest',
+        'column_effect': None,
         'description': 'Run a raw SQL query against a warehouse connection and return a DataFrame.',
         'family': 'data',
         'keywords': list([
@@ -3879,6 +3925,7 @@
       dict({
         'advisor_persona': None,
         'category': 'LLM',
+        'column_effect': None,
         'description': 'Run one completion call against a provider through the unified gateway. Use for a single completion call once you already have rendered messages.',
         'family': 'llm',
         'keywords': list([
@@ -4068,6 +4115,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Machine Learning',
+        'column_effect': None,
         'description': 'Score a fitted model against labeled data.',
         'family': 'ml',
         'keywords': list([
@@ -4111,6 +4159,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Machine Learning',
+        'column_effect': None,
         'description': 'Apply a fitted model to data, producing predictions.',
         'family': 'ml',
         'keywords': list([
@@ -4154,6 +4203,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Machine Learning',
+        'column_effect': None,
         'description': 'Train a logistic-regression classifier and report evaluation metrics.',
         'family': 'ml',
         'keywords': list([
@@ -4268,6 +4318,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Machine Learning',
+        'column_effect': None,
         'description': 'Fit a random-forest classifier or regressor.',
         'family': 'ml',
         'keywords': list([
@@ -4405,6 +4456,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Machine Learning',
+        'column_effect': None,
         'description': 'Fit a linear-regression model.',
         'family': 'ml',
         'keywords': list([
@@ -4479,6 +4531,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Machine Learning',
+        'column_effect': None,
         'description': 'Split a DataFrame into train and test sets.',
         'family': 'ml',
         'keywords': list([
@@ -4562,6 +4615,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Neural Network',
+        'column_effect': None,
         'description': 'A linear (fully-connected) layer.',
         'family': 'nn',
         'keywords': list([
@@ -4614,6 +4668,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Neural Network',
+        'column_effect': None,
         'description': 'An nn.Module that owns a subgraph of layers.',
         'family': 'nn',
         'keywords': list([
@@ -4630,6 +4685,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Neural Network',
+        'column_effect': None,
         'description': 'A ReLU activation layer.',
         'family': 'nn',
         'keywords': list([
@@ -4664,6 +4720,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Reporting',
+        'column_effect': None,
         'description': 'Generate an HTML profiling report summarising a DataFrame.',
         'family': 'reports',
         'keywords': list([
@@ -4718,6 +4775,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Statistics',
+        'column_effect': None,
         'description': 'One-way ANOVA testing a numeric column across groups.',
         'family': 'stats',
         'keywords': list([
@@ -4812,6 +4870,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Statistics',
+        'column_effect': None,
         'description': 'Compute a pairwise correlation matrix.',
         'family': 'stats',
         'keywords': list([
@@ -4890,6 +4949,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Statistics',
+        'column_effect': None,
         'description': 'Compute summary statistics for numeric columns.',
         'family': 'stats',
         'keywords': list([
@@ -4944,6 +5004,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Statistics',
+        'column_effect': None,
         'description': 'Two-sample t-test between two groups.',
         'family': 'stats',
         'keywords': list([
@@ -5058,6 +5119,7 @@
       dict({
         'advisor_persona': None,
         'category': 'Visualization',
+        'column_effect': None,
         'description': 'Render a curated, allow-listed chart (plotly.express) from a DataFrame.',
         'family': 'viz',
         'keywords': list([

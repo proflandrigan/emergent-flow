@@ -20,7 +20,7 @@ from emergentflow.ml import fit_transform
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -49,6 +49,8 @@ class ScaleFeatures(NodeDefinition):
         "(StandardScaler, MinMaxScaler, RobustScaler, MaxAbsScaler, "
         "Normalizer, or PowerTransformer)."
     )
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.PASSTHROUGH)
 
     ports = [
         PortSpec(

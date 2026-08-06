@@ -19,7 +19,7 @@ from emergentflow.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -35,6 +35,8 @@ class CastTypes(NodeDefinition):
     label = "Cast Types"
     category = "Transform"
     description = "Cast selected columns to new data types."
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.PASSTHROUGH)
 
     ports = [
         PortSpec(

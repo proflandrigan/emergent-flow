@@ -80,6 +80,7 @@ _NODE_KEYS = {
     "keywords",
     "paradigm",
     "advisor_persona",
+    "column_effect",
     "ports",
     "params",
 }

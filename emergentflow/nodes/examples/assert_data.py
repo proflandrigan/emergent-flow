@@ -23,7 +23,7 @@ from emergentflow.research import check_data_quality
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -44,6 +44,8 @@ class AssertData(NodeDefinition):
         "allowed-values, regex-match, row-count, schema) against a DataFrame; passes it "
         "through unchanged on success, raises a typed error with a violations frame on failure."
     )
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.PASSTHROUGH)
 
     ports = [
         PortSpec(

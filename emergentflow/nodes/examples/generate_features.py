@@ -19,7 +19,7 @@ from emergentflow.ml import fit_transform
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -42,6 +42,8 @@ class GenerateFeatures(NodeDefinition):
         "Generate new features from existing ones using a curated sklearn "
         "feature generator (PolynomialFeatures)."
     )
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.DERIVE)
 
     ports = [
         PortSpec(

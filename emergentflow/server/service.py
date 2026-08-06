@@ -45,7 +45,7 @@ from emergentflow.llm.gateway import GatewayClient
 from emergentflow.llm.secrets import validate_api_keys_present
 from emergentflow.nodes import get as get_node_definition
 from emergentflow.nodes import registry as default_node_registry
-from emergentflow.research.lineage import trace_lineage
+from emergentflow.research.lineage import trace_column_lineage, trace_lineage
 from emergentflow.server.artifacts import get_default_artifacts
 from emergentflow.server.cache import get_default_cache
 from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
@@ -1265,6 +1265,69 @@ def lineage_for_node(payload: dict[str, Any]) -> dict[str, Any]:
     graph = _to_graph(graph_payload)
     lineage = trace_lineage(graph, node_id)
     return {"lineage": asdict(lineage)}
+
+
+def _observed_columns() -> dict[str, list[str]]:
+    """Output column names (node_id -> columns) observed in the latest saved run.
+
+    Reads the most recent run's ``payloads.json`` (the same artifact the canvas
+    digest consumes) and projects each table payload's ``columns`` list onto its
+    node id. Used by Epic 18 Story 4 runtime refinement: a statically
+    undecidable node (``sql_query``/``http_fetch``/``custom_code``) resolves
+    its output columns from the last run's observed schema. Returns an empty
+    mapping when no run exists or nothing is readable — the caller must treat
+    "no observed schema" as the honest ``unknown`` case, not an error.
+    """
+    try:
+        runs = get_default_runs().list()
+    except Exception:  # noqa: BLE001 - store may be unconfigured in tests
+        return {}
+    if not runs:
+        return {}
+    latest_run_id = runs[0]["run_id"]
+    try:
+        payloads = get_default_runs().get_payloads(latest_run_id)
+    except Exception:  # noqa: BLE001 - a corrupt run must degrade to empty, not crash
+        return {}
+    observed: dict[str, list[str]] = {}
+    for node_id, ports in payloads.items():
+        cols: list[str] = []
+        for _port_name, value in ports.items():
+            if isinstance(value, dict) and value.get("kind") == "table":
+                cols = [str(c) for c in value.get("columns", [])]
+                break
+        if cols:
+            observed[node_id] = cols
+    return observed
+
+
+def column_lineage_for(payload: dict[str, Any]) -> dict[str, Any]:
+    """``POST /lineage/column``: {"graph": <ir>, "node_id": <id>, "column": <name>}
+    -> {"lineage": <ColumnLineage as JSON>, "observed": <bool>}.
+
+    Stateless: traces fresh from the supplied graph (Epic 18). When a source
+    node's columns aren't statically decidable (``sql_query``/``http_fetch``/
+    ``custom_code``), the observed column set from the last run refines the
+    answer; ``observed`` flags whether any observed schema was applied.
+    """
+    graph_payload = payload.get("graph")
+    if not isinstance(graph_payload, dict):
+        raise CodegenError(
+            'column_lineage_for requires an envelope: {"graph": ..., "node_id": ..., "column": ...}'
+        )
+    node_id = payload.get("node_id")
+    column = payload.get("column")
+    if not node_id:
+        raise CodegenError("column_lineage_for requires 'node_id'")
+    if not isinstance(column, str) or not column:
+        raise CodegenError("column_lineage_for requires a non-empty 'column'")
+    graph = _to_graph(graph_payload)
+    observed = _observed_columns()
+    lineage = trace_column_lineage(graph, node_id, column, observed=observed)
+    return {
+        "lineage": asdict(lineage),
+        "observed": bool(observed),
+    }
 
 
 _warehouse_adapters_singleton: Mapping[str, WarehouseAdapter] | None = None

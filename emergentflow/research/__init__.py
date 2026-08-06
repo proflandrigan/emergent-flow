@@ -15,7 +15,18 @@ from emergentflow.research.errors import (
     ResearchError,
     UnknownNodeError,
 )
-from emergentflow.research.lineage import Lineage, LineageEdge, LineageNode, trace_lineage
+from emergentflow.research.lineage import (
+    ColumnLineage,
+    ColumnLineageEdge,
+    ColumnLineageNode,
+    ColumnRole,
+    Lineage,
+    LineageEdge,
+    LineageNode,
+    trace_column_impact,
+    trace_column_lineage,
+    trace_lineage,
+)
 from emergentflow.research.quality import EXPECTATION_TYPES, check_data_quality
 from emergentflow.research.report import (
     Report,
@@ -53,4 +64,10 @@ __all__ = [
     "section_from_value",
     "sections_from_values",
     "trace_lineage",
+    "trace_column_impact",
+    "trace_column_lineage",
+    "ColumnLineage",
+    "ColumnLineageEdge",
+    "ColumnLineageNode",
+    "ColumnRole",
 ]

@@ -21,7 +21,7 @@ from emergentflow.ir.params import ParamValue
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -40,6 +40,8 @@ class DetectOutliers(NodeDefinition):
         "Flag outlying rows using z-score, modified z-score, IQR, quantile, or "
         "percent thresholds. Adds boolean 'is_outlier' and 'outlier_score' columns."
     )
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.DERIVE)
 
     ports = [
         PortSpec(

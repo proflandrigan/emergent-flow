@@ -21,7 +21,7 @@ from emergentflow.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -41,6 +41,8 @@ class RedactPii(NodeDefinition):
         "columns via regex, or NER-based via presidio ([pii] extra); positioned to run "
         "right after ingestion."
     )
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.PASSTHROUGH)
 
     ports = [
         PortSpec(
