@@ -55,6 +55,20 @@ export interface Gate {
   decisions: Decision[];
 }
 
+export type AttemptVerdict = "kept" | "reverted" | "pending";
+
+export interface Attempt {
+  id: string;
+  mutation_id: string;
+  run_id: string | null;
+  metric_name: string | null;
+  metric_value: number | null;
+  verdict: AttemptVerdict;
+  hypothesis: string;
+  author: string;
+  timestamp: number;
+}
+
 export interface CreateGateInput {
   phase: string;
   kind: GateKind;
@@ -95,6 +109,7 @@ export interface GraphSession {
     reviews: Record<string, ReviewThread>;
     gates: Record<string, Gate>;
     chat: ChatState;
+    attempts?: Record<string, Attempt>;
   };
 }
 
@@ -142,6 +157,31 @@ export async function proposeMutation(
 ): Promise<StoredProposal> {
   const res = await postJson(`/sessions/${sessionId}/proposals`, mutation);
   return (await res.json()) as StoredProposal;
+}
+
+export async function compileSession(sessionId: string): Promise<{ code: string }> {
+  const res = await postJson(`/sessions/${sessionId}/compile`, {});
+  return (await res.json()) as { code: string };
+}
+
+export interface ExecuteSessionScope {
+  run_to?: string[];
+  run_from?: string[];
+  run_only?: string[];
+}
+
+export interface ExecuteSessionResult {
+  payload_version: number;
+  results: Record<string, Record<string, unknown>>;
+  statuses: Record<string, { status: string; error?: string; reason?: string }>;
+}
+
+export async function executeSession(
+  sessionId: string,
+  scope?: ExecuteSessionScope,
+): Promise<ExecuteSessionResult> {
+  const res = await postJson(`/sessions/${sessionId}/execute`, scope ?? {});
+  return (await res.json()) as ExecuteSessionResult;
 }
 
 export interface ConsultInput {

@@ -49,6 +49,7 @@ from emergentflow.collab.gates import (
     UnknownGateError,
 )
 from emergentflow.collab.review import (
+    Attempt,
     CollaborationState,
     ReviewComment,
     ReviewThread,
@@ -418,6 +419,31 @@ class SessionStore:
                 {"type": "review_added", "session_id": session_id, "review_id": thread.id},
             )
             return thread
+
+    def record_attempt(self, session_id: str, attempt: Attempt) -> Attempt:
+        """Record *attempt* in the session's experiment ledger and publish an
+        ``attempt_recorded`` event.
+
+        The ledger (``collab.attempts``) is the closed-loop record: an attempt
+        pairs a mutation with a run, the metric that measured it, and its verdict.
+        Callers build an ``Attempt`` with a ``mutation_id`` and the produced
+        ``run_id`` once a run completes.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            session.collab.attempts[attempt.id] = attempt
+            self._publish(
+                session_id,
+                {"type": "attempt_recorded", "session_id": session_id, "attempt_id": attempt.id},
+            )
+            return attempt
 
     def add_review_comment(
         self, session_id: str, review_id: str, comment: ReviewComment

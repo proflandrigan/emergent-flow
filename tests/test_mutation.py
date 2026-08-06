@@ -23,6 +23,7 @@ from emergentflow.ir.mutation import (
     GraphMutation,
     MutationError,
     apply_mutation,
+    invert_mutation,
     propose_diagnostics,
 )
 from emergentflow.ir.node import Node, Position
@@ -280,6 +281,53 @@ class TestApplyMutationSetParams:
         original = graph.nodes["n1"].params[0]
         assert original.value == 999
         assert original.ref == "p"
+
+
+# ---------------------------------------------------------------------------
+# invert_mutation
+# ---------------------------------------------------------------------------
+
+
+class TestInvertMutation:
+    def test_invert_set_params_restores_original_value(self) -> None:
+        # Forward: set a param; inverse must restore its original value.
+        graph = _one_node_graph()
+        node_id = next(iter(graph.nodes))
+        m = GraphMutation(base_version=1, set_params={node_id: {"path": "b.csv"}})
+        forward = apply_mutation(graph, m)
+        restored = apply_mutation(forward, invert_mutation(graph, m))
+        assert graph.model_dump(mode="json") == restored.model_dump(mode="json")
+
+    def test_invert_add_node(self) -> None:
+        graph = _one_node_graph()
+        node = _load_csv_node("new.csv")
+        m = GraphMutation(base_version=1, add_nodes=[node])
+        forward = apply_mutation(graph, m)
+        restored = apply_mutation(forward, invert_mutation(graph, m))
+        assert graph.model_dump(mode="json") == restored.model_dump(mode="json")
+
+    def test_invert_remove_node(self) -> None:
+        node_a = _load_csv_node()
+        node_b = _load_csv_node("b.csv")
+        node_b = node_b.model_copy(
+            update={"position": Position(x=200.0, y=200.0)}
+        )
+        graph = Graph(nodes={node_a.id: node_a, node_b.id: node_b})
+        m = GraphMutation(base_version=1, remove_nodes=[node_b.id])
+        forward = apply_mutation(graph, m)
+        restored = apply_mutation(forward, invert_mutation(graph, m))
+        assert graph.model_dump(mode="json") == restored.model_dump(mode="json")
+
+    def test_invert_new_param_raises(self) -> None:
+        # set_params on a param the ORIGINAL node does not carry is not invertible:
+        # the graph-mutation protocol has no way to express removing a param, so a
+        # forward-only small-set must not silently produce a broken inverse.
+        node = Node(id="n1", type="totally.unregistered.type", label="x")
+        graph = Graph(nodes={node.id: node})
+        m = GraphMutation(base_version=1, set_params={"n1": {"fresh": 1}})
+        apply_mutation(graph, m)  # forward apply works (best-effort for unregistered)
+        with pytest.raises(MutationError, match="not invertible"):
+            invert_mutation(graph, m)
 
 
 # ---------------------------------------------------------------------------

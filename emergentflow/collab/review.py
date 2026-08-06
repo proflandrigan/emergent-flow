@@ -68,6 +68,33 @@ class ReviewThread(BaseModel):
     status: ReviewStatus = ReviewStatus.OPEN
 
 
+class AttemptVerdict(str, Enum):
+    """Verdict on an experiment attempt."""
+
+    KEPT = "kept"
+    REVERTED = "reverted"
+    PENDING = "pending"
+
+
+class Attempt(BaseModel):
+    """One experiment attempt: mutation → run → metric → verdict.
+
+    Lives on CollaborationState.attempts, BESIDE the graph (ADR 0019).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(default_factory=new_id)
+    mutation_id: str
+    run_id: str | None = None
+    metric_name: str | None = None
+    metric_value: float | int | None = None
+    verdict: AttemptVerdict = AttemptVerdict.PENDING
+    hypothesis: str = ""
+    author: str = "agent"
+    timestamp: float = Field(default_factory=lambda: __import__("time").time())
+
+
 class CollaborationState(BaseModel):
     """Session-scoped collaboration state beyond the graph itself.
 
@@ -84,6 +111,7 @@ class CollaborationState(BaseModel):
     reviews: dict[str, ReviewThread] = Field(default_factory=dict)
     gates: dict[str, Gate] = Field(default_factory=dict)
     chat: ChatState = Field(default_factory=ChatState)
+    attempts: dict[str, Attempt] = Field(default_factory=dict)
 
 
 def validate_anchors(graph: Graph, findings: list[Diagnostic]) -> None:

@@ -175,7 +175,7 @@ class TestRegisterBuiltinPersonas:
 
         register_builtin_personas()
         register_builtin_personas()  # must not raise
-        assert len(list_personas()) == 4
+        assert len(list_personas()) == 5
 
     def test_registers_data_scientist(self) -> None:
         from emergentflow.collab.persona_defs import register_builtin_personas
@@ -205,9 +205,9 @@ class TestRegisterBuiltinPersonas:
             "comparisons, distribution assessment."
         )
 
-    def test_list_personas_returns_all_four(self) -> None:
+    def test_list_personas_returns_all_five(self) -> None:
         from emergentflow.collab.persona_defs import register_builtin_personas
 
         register_builtin_personas()
         slugs = [p.slug for p in list_personas()]
-        assert slugs == ["data_modeller", "data_scientist", "ml_engineer", "researcher"]
+        assert slugs == ["data_modeller", "data_scientist", "experimenter", "ml_engineer", "researcher"]

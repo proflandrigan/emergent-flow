@@ -42,7 +42,13 @@ def test_get_personas_returns_all_builtins(client: TestClient) -> None:
     assert r.status_code == 200, r.text
     body = r.json()
     slugs = [p["slug"] for p in body["personas"]]
-    assert slugs == ["data_modeller", "data_scientist", "ml_engineer", "researcher"]
+    assert slugs == [
+        "data_modeller",
+        "data_scientist",
+        "experimenter",
+        "ml_engineer",
+        "researcher",
+    ]
     for p in body["personas"]:
         assert "label" in p
         assert "description" in p

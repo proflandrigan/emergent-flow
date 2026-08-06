@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import builtins
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -31,6 +32,18 @@ def _fresh_session_store(monkeypatch: pytest.MonkeyPatch) -> None:
     by one test never leak into another.
     """
     monkeypatch.setattr(session_mod, "_default_store", None)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_runs_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Isolate the process-wide default RunStore per test into tmp_path so the
+    read-back tools (get_results/get_metric/compare_runs) never touch the repo's
+    real ``.ef-runs/`` directory.
+    """
+    import emergentflow.server.runs as runs_mod
+
+    monkeypatch.setattr(runs_mod, "_default_runs", None)
+    monkeypatch.setattr(runs_mod, "_configured_runs_root", tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -169,6 +182,94 @@ class TestTools:
         assert isinstance(result, dict)
         assert "code" in result
 
+    def test_compile_session_tool(self) -> None:
+        """compile_session_tool returns {"code": "..."} for a valid session."""
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(mcp, "compile_session_tool", {"session_id": session.id})
+        )
+        assert isinstance(result, dict)
+        assert "code" in result
+
+    def test_compile_session_tool_blocked_by_gates(self) -> None:
+        """compile_session_tool returns {"blocked_by_gates": [...]} when gates are OPEN."""
+        from emergentflow.collab.gates import Gate, GateKind
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        # Open a gate to block compilation
+        session_mod.get_default_store().open_gate(
+            session.id,
+            Gate(phase="test", kind=GateKind.PHASE, description="test gate"),
+        )
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(mcp, "compile_session_tool", {"session_id": session.id})
+        )
+        assert isinstance(result, dict)
+        assert "blocked_by_gates" in result
+        assert len(result["blocked_by_gates"]) == 1
+        assert result["blocked_by_gates"][0]["phase"] == "test"
+        assert result["blocked_by_gates"][0]["kind"] == "phase"
+
+    def test_execute_session_tool(self) -> None:
+        """execute_session_tool returns results/statuses for a valid session."""
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(mcp, "execute_session_tool", {"session_id": session.id})
+        )
+        assert isinstance(result, dict)
+        assert "results" in result
+        assert "statuses" in result
+
+    def test_execute_session_tool_blocked_by_gates(self) -> None:
+        """execute_session_tool returns {"blocked_by_gates": [...]} when gates are OPEN."""
+        from emergentflow.collab.gates import Gate, GateKind
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        # Open a gate to block execution
+        session_mod.get_default_store().open_gate(
+            session.id,
+            Gate(phase="test", kind=GateKind.EXECUTE, description="test execute gate"),
+        )
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(mcp, "execute_session_tool", {"session_id": session.id})
+        )
+        assert isinstance(result, dict)
+        assert "blocked_by_gates" in result
+        assert len(result["blocked_by_gates"]) == 1
+        assert result["blocked_by_gates"][0]["kind"] == "execute"
+
+    def test_execute_session_tool_with_scope(self) -> None:
+        """execute_session_tool accepts optional run_to/run_from/run_only scopes."""
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+
+        mcp = create_mcp_server()
+        # run_to scope (empty graph, so no nodes to target, but validates the param passes through)
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "execute_session_tool",
+                {"session_id": session.id, "run_to": []},
+            )
+        )
+        assert isinstance(result, dict)
+        assert "results" in result
+
     def test_propose_mutation(self) -> None:
         from emergentflow.collab.mcp import create_mcp_server
 
@@ -306,3 +407,107 @@ class TestTools:
                 )
             )
         assert time.monotonic() - start < 1.0
+
+    def test_get_results_reads_persisted_payloads(self, tmp_path: Path) -> None:
+        """get_results reads payloads.json (separate from run.json) -- regression for
+        the closed-loop read-back being empty because it read the wrong file."""
+        from emergentflow.collab.mcp import create_mcp_server
+        from emergentflow.server.runs import get_default_runs
+
+        run_id = get_default_runs().save(
+            {"tag": "x", "graph_name": "g", "started_at": 1.0},
+            {"name": "g"},
+            {
+                "n1": {
+                    "metric": {"kind": "scalar", "value": 1.5},
+                    "name": {"kind": "text", "value": "hi"},
+                }
+            },
+        )
+
+        mcp = create_mcp_server()
+        result = _run_async(_call_tool(mcp, "get_results", {"run_id": run_id}))
+        assert result["results"]["n1"]["metric"]["value"] == 1.5
+
+    def test_get_metric_reads_persisted_payloads(self, tmp_path: Path) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+        from emergentflow.server.runs import get_default_runs
+
+        run_id = get_default_runs().save(
+            {"tag": "x", "graph_name": "g", "started_at": 1.0},
+            {"name": "g"},
+            {"n1": {"metric": {"kind": "scalar", "value": 1.5}}},
+        )
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "get_metric",
+                {"run_id": run_id, "node_id": "n1", "metric_name": "metric"},
+            )
+        )
+        assert result["value"] == 1.5
+
+    def test_compare_runs_reads_persisted_payloads(self, tmp_path: Path) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+        from emergentflow.server.runs import get_default_runs
+
+        store = get_default_runs()
+        run_a = store.save(
+            {"tag": "a", "graph_name": "g", "started_at": 1.0},
+            {"name": "g"},
+            {"n1": {"metric": {"kind": "scalar", "value": 1.5}}},
+        )
+        run_b = store.save(
+            {"tag": "b", "graph_name": "g", "started_at": 2.0},
+            {"name": "g"},
+            {"n1": {"metric": {"kind": "scalar", "value": 2.5}}},
+        )
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "compare_runs",
+                {
+                    "run_id_a": run_a,
+                    "run_id_b": run_b,
+                    "node_id": "n1",
+                    "metric_name": "metric",
+                },
+            )
+        )
+        assert result["before"] == 1.5
+        assert result["after"] == 2.5
+        assert result["delta"] == 1.0
+
+    def test_record_attempt_tool(self, tmp_path: Path) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "record_attempt_tool",
+                {
+                    "session_id": session.id,
+                    "mutation_id": "m1",
+                    "run_id": "r1",
+                    "metric_name": "accuracy",
+                    "metric_value": 0.9,
+                    "verdict": "kept",
+                    "hypothesis": "increase lr",
+                },
+            )
+        )
+        assert result["mutation_id"] == "m1"
+        assert result["metric_value"] == 0.9
+        assert result["verdict"] == "kept"
+        # The ledger is wired: the session can read the attempt back.
+        attempts = session_mod.get_default_store().get(session.id).collab.attempts
+        assert len(attempts) == 1
+        stored = next(iter(attempts.values()))
+        assert stored.mutation_id == "m1"
