@@ -504,37 +504,43 @@ def trace_column_lineage(
                 )
             )
             return
-        nodes.append(
-            ColumnLineageNode(
-                node_id=nid,
-                node_type=node.type,
-                label=node.label,
-                column=col,
-                role=role,
-                source_column=source_cols[0] if source_cols else None,
-                detail=(
-                    f"derived from {', '.join(source_cols)}"
-                    if role == ColumnRole.DERIVED and source_cols
-                    else None
-                ),
-            )
+        node_entry = ColumnLineageNode(
+            node_id=nid,
+            node_type=node.type,
+            label=node.label,
+            column=col,
+            role=role,
+            source_column=source_cols[0] if source_cols else None,
+            detail=(
+                f"derived from {', '.join(source_cols)}"
+                if role == ColumnRole.DERIVED and source_cols
+                else None
+            ),
         )
         if role == ColumnRole.SOURCE or not source_cols:
+            nodes.append(node_entry)
             return
         pred = _frame_predecessor(graph, node)
         if pred is None:
-            # Multi-table input: provenance genuinely splits here -> unknown.
-            nodes.append(
-                ColumnLineageNode(
-                    node_id=nid,
-                    node_type=node.type,
-                    label=node.label,
-                    column=col,
-                    role=ColumnRole.UNKNOWN,
-                    detail="column flows from multiple upstream inputs; origin ambiguous",
+            if any(e.target.node_id == nid for e in graph.edges.values()):
+                # Multi-table input: provenance genuinely splits here -> unknown.
+                nodes.append(
+                    ColumnLineageNode(
+                        node_id=nid,
+                        node_type=node.type,
+                        label=node.label,
+                        column=col,
+                        role=ColumnRole.UNKNOWN,
+                        detail="column flows from multiple upstream inputs; origin ambiguous",
+                    )
                 )
-            )
+                return
+            # A terminal node producing the column from named sources with no
+            # further upstream (e.g. the head of a two-hop chain): keep its
+            # resolved entry and stop.
+            nodes.append(node_entry)
             return
+        nodes.append(node_entry)
         for sc in source_cols:
             edges.append(
                 ColumnLineageEdge(
