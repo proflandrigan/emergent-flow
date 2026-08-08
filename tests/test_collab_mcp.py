@@ -189,9 +189,7 @@ class TestTools:
         session = session_mod.get_default_store().create()
 
         mcp = create_mcp_server()
-        result = _run_async(
-            _call_tool(mcp, "compile_session_tool", {"session_id": session.id})
-        )
+        result = _run_async(_call_tool(mcp, "compile_session_tool", {"session_id": session.id}))
         assert isinstance(result, dict)
         assert "code" in result
 
@@ -208,9 +206,7 @@ class TestTools:
         )
 
         mcp = create_mcp_server()
-        result = _run_async(
-            _call_tool(mcp, "compile_session_tool", {"session_id": session.id})
-        )
+        result = _run_async(_call_tool(mcp, "compile_session_tool", {"session_id": session.id}))
         assert isinstance(result, dict)
         assert "blocked_by_gates" in result
         assert len(result["blocked_by_gates"]) == 1
@@ -224,9 +220,7 @@ class TestTools:
         session = session_mod.get_default_store().create()
 
         mcp = create_mcp_server()
-        result = _run_async(
-            _call_tool(mcp, "execute_session_tool", {"session_id": session.id})
-        )
+        result = _run_async(_call_tool(mcp, "execute_session_tool", {"session_id": session.id}))
         assert isinstance(result, dict)
         assert "results" in result
         assert "statuses" in result
@@ -244,9 +238,7 @@ class TestTools:
         )
 
         mcp = create_mcp_server()
-        result = _run_async(
-            _call_tool(mcp, "execute_session_tool", {"session_id": session.id})
-        )
+        result = _run_async(_call_tool(mcp, "execute_session_tool", {"session_id": session.id}))
         assert isinstance(result, dict)
         assert "blocked_by_gates" in result
         assert len(result["blocked_by_gates"]) == 1

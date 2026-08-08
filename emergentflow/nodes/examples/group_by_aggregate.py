@@ -19,7 +19,7 @@ from emergentflow.stats import group_by_aggregate
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -35,6 +35,8 @@ class GroupByAggregate(NodeDefinition):
     label = "Group By Aggregate"
     category = "Statistics"
     description = "Split-apply-combine: group by column(s) and aggregate."
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.AGGREGATE)
 
     ports = [
         PortSpec(

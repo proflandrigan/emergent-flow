@@ -518,6 +518,48 @@ def test_target_derived_feature_is_warning_not_blocking() -> None:
     assert all(f.severity == "warning" for f in findings)
 
 
+def _derive_named(node_id: str, name: str, expr: str) -> Node:
+    return _node(
+        node_id,
+        "clean.derive_column",
+        _io(node_id, node_id[0]),
+        [("columns", [{"name": name, "expr": expr}])],
+    )
+
+
+def test_target_derived_feature_catches_two_hop_leak() -> None:
+    """A two-hop leak (target -> intermediate -> feature) must be caught by
+    column lineage even though no single derive expression names the target.
+
+    ``churn`` -> ``two_churn`` (derive *2) -> ``feature`` (derive *3) -> model.
+    The old topological approximation only checked whether a derive *expression*
+    references the target directly, so it was silent here; column lineage walks
+    the whole chain and sees ``churn`` in ``feature``'s provenance (Epic 18,
+    Story 7).
+    """
+    derive1 = _derive_named("derive1", "two_churn", "churn * 2")
+    derive2 = _derive_named("derive2", "feature", "two_churn * 3")
+    sup = _supervised()
+    graph = _graph(
+        [derive1, derive2, sup],
+        [
+            _edge("e1", "derive1", "d-out", "derive2", "d-in"),
+            _edge("e2", "derive2", "d-out", "sup", "m-in"),
+        ],
+    )
+    assert "target_derived_feature" in _rule_ids(graph)
+
+
+def test_target_derived_feature_silent_for_label_only_use() -> None:
+    """A legitimate use of the target as the label only (not as a derived feature)
+    must not be flagged -- e.g. the target column is never referenced by any
+    derive feeding the model."""
+    derive = _derive("derive", "age * 2")
+    sup = _supervised()
+    graph = _graph([derive, sup], [_edge("e1", "derive", "d-out", "sup", "m-in")])
+    assert "target_derived_feature" not in _rule_ids(graph)
+
+
 def test_fit_before_split_silent_for_generate_features() -> None:
     """PolynomialFeatures learns no data-derived parameters, so generating
     features before a split is not a target leak and must not trip the error

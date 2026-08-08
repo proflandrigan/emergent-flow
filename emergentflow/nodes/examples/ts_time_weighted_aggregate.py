@@ -17,7 +17,7 @@ from emergentflow.timeseries import time_weighted_aggregate
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -33,6 +33,8 @@ class TsTimeWeightedAggregate(NodeDefinition):
     label = "Time-Weighted Aggregate"
     category = "Time Series"
     description = "Append recency-weighted aggregate columns (linear or exponential decay)."
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.PASSTHROUGH)
 
     ports = [
         PortSpec(

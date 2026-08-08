@@ -22,7 +22,7 @@ from emergentflow.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -41,6 +41,8 @@ class FuzzyJoin(NodeDefinition):
         "Merge two DataFrames on a string-similarity match between one left and one right key "
         "column, rather than on exact equality. Requires the [fuzzy] extra."
     )
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.CUSTOM)
 
     ports = [
         PortSpec(

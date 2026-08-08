@@ -210,4 +210,10 @@ class TestRegisterBuiltinPersonas:
 
         register_builtin_personas()
         slugs = [p.slug for p in list_personas()]
-        assert slugs == ["data_modeller", "data_scientist", "experimenter", "ml_engineer", "researcher"]
+        assert slugs == [
+            "data_modeller",
+            "data_scientist",
+            "experimenter",
+            "ml_engineer",
+            "researcher",
+        ]

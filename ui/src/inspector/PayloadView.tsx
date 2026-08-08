@@ -23,8 +23,10 @@ const cellStyle: CSSProperties = {
 
 export function PayloadView({
   payload,
+  onColumnClick,
 }: {
   payload: Payload;
+  onColumnClick?: (column: string) => void;
 }): JSX.Element | null {
   switch (payload.kind) {
     case "scalar": {
@@ -63,7 +65,26 @@ export function PayloadView({
             <tr>
               {payload.columns.map((col) => (
                 <th key={col} style={cellStyle}>
-                  {col}
+                  {onColumnClick ? (
+                    <button
+                      type="button"
+                      data-testid="payload-column-header"
+                      onClick={() => onColumnClick(col)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        color: "inherit",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        textDecoration: "underline dotted",
+                      }}
+                    >
+                      {col}
+                    </button>
+                  ) : (
+                    col
+                  )}
                 </th>
               ))}
             </tr>

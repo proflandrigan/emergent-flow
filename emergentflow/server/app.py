@@ -115,6 +115,7 @@ from emergentflow.server.runs import (
 )
 from emergentflow.server.service import (
     clear_cache,
+    column_lineage_for,
     compile_graph,
     compile_query_spec,
     compile_session,
@@ -230,6 +231,7 @@ _POST_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "/inspect": inspect_graph,
     "/knowledge": save_knowledge,
     "/lineage": lineage_for_node,
+    "/lineage/column": column_lineage_for,
     "/validate": validate_graph,
 }
 

@@ -2200,6 +2200,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Cast selected columns to new data types.",
       "family": "clean",
       "keywords": [],
@@ -2253,6 +2257,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Apply an ordered pipeline of text operations (trim, case, regex replace/extract, split) to one or more string columns.",
       "family": "clean",
       "keywords": [],
@@ -2335,6 +2343,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "custom"
+      },
       "description": "Row-wise union of two or more DataFrames, schema-aligned by column name, with an optional provenance column.",
       "family": "clean",
       "keywords": [],
@@ -2428,6 +2440,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Drop duplicate rows, optionally keying on a subset of columns.",
       "family": "clean",
       "keywords": [],
@@ -2525,6 +2541,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "derive"
+      },
       "description": "Add computed and conditional (case-when) columns using a safe, restricted expression grammar.",
       "family": "clean",
       "keywords": [],
@@ -2567,6 +2587,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "derive"
+      },
       "description": "Flag outlying rows using z-score, modified z-score, IQR, quantile, or percent thresholds. Adds boolean 'is_outlier' and 'outlier_score' columns.",
       "family": "clean",
       "keywords": [],
@@ -2709,6 +2733,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Drop rows or columns that contain missing values.",
       "family": "clean",
       "keywords": [],
@@ -2808,6 +2836,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Multi-hot encode a list-valued column into wide 0/1 indicator columns (one per distinct label).",
       "family": "clean",
       "keywords": [],
@@ -2899,6 +2931,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "derive"
+      },
       "description": "Explode one or more index-aligned list columns into long rows (like pandas explode).",
       "family": "clean",
       "keywords": [
@@ -2998,6 +3034,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Keep rows matching a column/operator/value predicate.",
       "family": "clean",
       "keywords": [],
@@ -3099,6 +3139,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "custom"
+      },
       "description": "Merge two DataFrames on a string-similarity match between one left and one right key column, rather than on exact equality. Requires the [fuzzy] extra.",
       "family": "clean",
       "keywords": [],
@@ -3312,6 +3356,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Fill missing values in selected columns using a chosen strategy.",
       "family": "clean",
       "keywords": [],
@@ -3389,6 +3437,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "custom"
+      },
       "description": "Join two DataFrames on key column(s) (pandas-style inner/left/right/outer/cross).",
       "family": "clean",
       "keywords": [],
@@ -3565,6 +3617,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Parse string column(s) to datetime and optionally extract calendar components (year, month, day, quarter, ...) into new columns.",
       "family": "clean",
       "keywords": [],
@@ -3681,6 +3737,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Detect and mask common PII (email, phone, SSN-like, credit-card-like) in text columns via regex, or NER-based via presidio ([pii] extra); positioned to run right after ingestion.",
       "family": "clean",
       "keywords": [],
@@ -3797,6 +3857,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "custom"
+      },
       "description": "Reshape a DataFrame between long and wide form: pivot (long->wide) or melt (wide->long).",
       "family": "clean",
       "keywords": [
@@ -4032,6 +4096,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Draw a subset of rows -- uniformly at random, stratified within groups, or the first n rows -- with an always-captured seed so the result is reproducible.",
       "family": "clean",
       "keywords": [],
@@ -4169,6 +4237,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "select"
+      },
       "description": "Keep or drop a chosen subset of columns.",
       "family": "clean",
       "keywords": [],
@@ -4242,6 +4314,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "custom"
+      },
       "description": "Keep or exclude rows whose key column(s) match another DataFrame (semi-join / anti-join); never adds columns from the keys frame.",
       "family": "clean",
       "keywords": [],
@@ -4367,6 +4443,10 @@
     {
       "advisor_persona": null,
       "category": "Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Sort rows by one or more columns, with per-key direction and NA placement.",
       "family": "clean",
       "keywords": [],
@@ -4472,6 +4552,7 @@
     {
       "advisor_persona": null,
       "category": "Ingest",
+      "column_effect": null,
       "description": "Describe a relation's columns (name/dtype/nullable) as a tidy DataFrame.",
       "family": "data",
       "keywords": [],
@@ -4576,6 +4657,7 @@
     {
       "advisor_persona": "data_modeller",
       "category": "Ingest",
+      "column_effect": null,
       "description": "Fetch JSON records from an HTTP/REST endpoint into a tidy DataFrame.",
       "family": "data",
       "keywords": [],
@@ -4928,6 +5010,10 @@
     {
       "advisor_persona": "data_modeller",
       "category": "Ingest",
+      "column_effect": {
+        "detail": null,
+        "kind": "source"
+      },
       "description": "Load a CSV file into a pandas DataFrame.",
       "family": "data",
       "keywords": [],
@@ -5072,6 +5158,10 @@
     {
       "advisor_persona": "data_modeller",
       "category": "Ingest",
+      "column_effect": {
+        "detail": null,
+        "kind": "source"
+      },
       "description": "Chunk PDF/text/markdown file(s) into a tidy (doc_id, chunk_id, text, ...) frame. No embedding or retrieval -- that's Epic 11; this only produces the frame.",
       "family": "data",
       "keywords": [],
@@ -5156,6 +5246,10 @@
     {
       "advisor_persona": "data_modeller",
       "category": "Ingest",
+      "column_effect": {
+        "detail": null,
+        "kind": "source"
+      },
       "description": "Load a sheet from an Excel workbook into a pandas DataFrame.",
       "family": "data",
       "keywords": [],
@@ -5340,6 +5434,10 @@
     {
       "advisor_persona": "data_modeller",
       "category": "Ingest",
+      "column_effect": {
+        "detail": null,
+        "kind": "source"
+      },
       "description": "Load a Google Sheets tab into a pandas DataFrame over the HTTP client seam.",
       "family": "data",
       "keywords": [],
@@ -5504,6 +5602,10 @@
     {
       "advisor_persona": null,
       "category": "Ingest",
+      "column_effect": {
+        "detail": null,
+        "kind": "source"
+      },
       "description": "Load a JSON or JSON Lines (.jsonl) file into a pandas DataFrame.",
       "family": "data",
       "keywords": [],
@@ -5646,6 +5748,10 @@
     {
       "advisor_persona": null,
       "category": "Ingest",
+      "column_effect": {
+        "detail": null,
+        "kind": "source"
+      },
       "description": "Load a Parquet file into a pandas DataFrame.",
       "family": "data",
       "keywords": [],
@@ -5779,6 +5885,10 @@
     {
       "advisor_persona": null,
       "category": "Ingest",
+      "column_effect": {
+        "detail": null,
+        "kind": "source"
+      },
       "description": "Load a small bundled sample dataset (zero filesystem setup): the sklearn classification/regression toy sets (iris, wine, diabetes), a daily web-traffic time series, a product-review text corpus, and a retail transactions table.",
       "family": "data",
       "keywords": [],
@@ -5830,6 +5940,7 @@
     {
       "advisor_persona": null,
       "category": "Ingest",
+      "column_effect": null,
       "description": "Build a SQL query from a structured spec (source, select, where, join, group_by, order_by) and return a DataFrame.",
       "family": "data",
       "keywords": [],
@@ -6128,6 +6239,7 @@
     {
       "advisor_persona": null,
       "category": "Ingest",
+      "column_effect": null,
       "description": "Run a raw SQL query against a warehouse connection and return a DataFrame.",
       "family": "data",
       "keywords": [],
@@ -6266,6 +6378,7 @@
     {
       "advisor_persona": null,
       "category": "Embeddings",
+      "column_effect": null,
       "description": "Embed a text column in a DataFrame using an API provider (OpenAI, Anthropic, Gemini, etc.) or a local sentence-transformers model.",
       "family": "embed",
       "keywords": [],
@@ -6442,6 +6555,7 @@
     {
       "advisor_persona": null,
       "category": "LLM",
+      "column_effect": null,
       "description": "LLM-as-judge: grade an eval-run compare table's output column against a rubric.",
       "family": "eval",
       "keywords": [],
@@ -6535,6 +6649,7 @@
     {
       "advisor_persona": null,
       "category": "LLM",
+      "column_effect": null,
       "description": "Merge a labels table onto an eval-run compare table, keyed by (row_id, variant).",
       "family": "eval",
       "keywords": [],
@@ -6576,6 +6691,7 @@
     {
       "advisor_persona": null,
       "category": "LLM",
+      "column_effect": null,
       "description": "Run one prompt over N inputs x M model variants for side-by-side compare.",
       "family": "eval",
       "keywords": [],
@@ -6669,6 +6785,7 @@
     {
       "advisor_persona": null,
       "category": "LLM",
+      "column_effect": null,
       "description": "Grade an eval-run compare table with deterministic scorers and summarize per variant.",
       "family": "eval",
       "keywords": [],
@@ -6731,6 +6848,7 @@
     {
       "advisor_persona": null,
       "category": "Model Explainability",
+      "column_effect": null,
       "description": "Return the top-N worst-error rows for a fitted model.",
       "family": "explain",
       "keywords": [],
@@ -6782,6 +6900,7 @@
     {
       "advisor_persona": null,
       "category": "Model Explainability",
+      "column_effect": null,
       "description": "Render a reliability diagram for a fitted binary classifier.",
       "family": "explain",
       "keywords": [],
@@ -6833,6 +6952,7 @@
     {
       "advisor_persona": null,
       "category": "Model Explainability",
+      "column_effect": null,
       "description": "Render a predicted-vs-actual scatter for a fitted regression model.",
       "family": "explain",
       "keywords": [],
@@ -6874,6 +6994,7 @@
     {
       "advisor_persona": null,
       "category": "Model Explainability",
+      "column_effect": null,
       "description": "Render a predicted-vs-residual scatter for a fitted regression model.",
       "family": "explain",
       "keywords": [],
@@ -6915,6 +7036,7 @@
     {
       "advisor_persona": null,
       "category": "Model Explainability",
+      "column_effect": null,
       "description": "Render an ROC or Precision-Recall curve for a fitted binary classifier.",
       "family": "explain",
       "keywords": [],
@@ -6980,6 +7102,7 @@
     {
       "advisor_persona": null,
       "category": "Model Explainability",
+      "column_effect": null,
       "description": "Render a jittered strip plot (beeswarm approximation) of SHAP values.",
       "family": "explain",
       "keywords": [],
@@ -7012,6 +7135,7 @@
     {
       "advisor_persona": null,
       "category": "Model Explainability",
+      "column_effect": null,
       "description": "Render a ranked bar chart of mean |SHAP value| per feature.",
       "family": "explain",
       "keywords": [],
@@ -7044,6 +7168,7 @@
     {
       "advisor_persona": null,
       "category": "Model Explainability",
+      "column_effect": null,
       "description": "Render a waterfall chart explaining one row's prediction.",
       "family": "explain",
       "keywords": [],
@@ -7086,6 +7211,7 @@
     {
       "advisor_persona": null,
       "category": "Model Explainability",
+      "column_effect": null,
       "description": "Compute per-feature SHAP attributions for a fitted model.",
       "family": "explain",
       "keywords": [],
@@ -7146,6 +7272,7 @@
     {
       "advisor_persona": null,
       "category": "Organization",
+      "column_effect": null,
       "description": "A reusable container owning an extracted subgraph.",
       "family": "layout",
       "keywords": [],
@@ -7169,6 +7296,7 @@
     {
       "advisor_persona": null,
       "category": "Organization",
+      "column_effect": null,
       "description": "A visual container grouping other nodes; carries no data flow.",
       "family": "layout",
       "keywords": [],
@@ -7219,6 +7347,7 @@
     {
       "advisor_persona": null,
       "category": "LLM",
+      "column_effect": null,
       "description": "Run one completion call against a provider through the unified gateway. Use for a single completion call once you already have rendered messages.",
       "family": "llm",
       "keywords": [],
@@ -7406,6 +7535,7 @@
     {
       "advisor_persona": null,
       "category": "LLM",
+      "column_effect": null,
       "description": "Render a system + user prompt template with {{variable}} substitution. Use when you need a reusable rendered prompt to feed llm.call.",
       "family": "llm",
       "keywords": [],
@@ -7517,6 +7647,7 @@
     {
       "advisor_persona": null,
       "category": "LLM",
+      "column_effect": null,
       "description": "Read a prompt template's text from a file on disk.",
       "family": "llm",
       "keywords": [],
@@ -7561,6 +7692,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Apply a fitted Model to data via predict or score_samples.",
       "family": "ml",
       "keywords": [],
@@ -7626,6 +7758,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Fit a curated, allow-listed sklearn clustering/mixture estimator.",
       "family": "ml",
       "keywords": [],
@@ -7727,6 +7860,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Cross-validate multiple curated estimators and rank them by held-out score.",
       "family": "ml",
       "keywords": [],
@@ -7900,6 +8034,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Cross-validate a curated, fit-archetype sklearn estimator.",
       "family": "ml",
       "keywords": [],
@@ -8050,6 +8185,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Score a fitted model against labeled data.",
       "family": "ml",
       "keywords": [],
@@ -8091,6 +8227,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Fit a curated, allow-listed sklearn classifier or regressor.",
       "family": "ml",
       "keywords": [],
@@ -8223,6 +8360,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Fit a curated, allow-listed sklearn unsupervised transformer.",
       "family": "ml",
       "keywords": [],
@@ -8358,6 +8496,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Search a hyperparameter grid for a curated, fit-archetype sklearn estimator.",
       "family": "ml",
       "keywords": [],
@@ -8517,6 +8656,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Load a fitted model or transformer from a saved artifact on disk.",
       "family": "ml",
       "keywords": [],
@@ -8561,6 +8701,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Fit a curated, allow-listed sklearn outlier/novelty-detection estimator.",
       "family": "ml",
       "keywords": [],
@@ -8657,6 +8798,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Fit an ordered chain of curated estimators as one sklearn Pipeline.",
       "family": "ml",
       "keywords": [],
@@ -8739,6 +8881,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Apply a fitted model to data, producing predictions.",
       "family": "ml",
       "keywords": [],
@@ -8780,6 +8923,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Reduce numeric columns to N coordinate columns via PCA/t-SNE/UMAP.",
       "family": "ml",
       "keywords": [],
@@ -8897,6 +9041,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Save a fitted model or transformer to disk as a reusable artifact.",
       "family": "ml",
       "keywords": [],
@@ -8950,6 +9095,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Fit a curated feature-selector estimator and keep only the selected features.",
       "family": "ml",
       "keywords": [],
@@ -9075,6 +9221,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Return a structural, inspectable summary of a fitted model.",
       "family": "ml",
       "keywords": [],
@@ -9107,6 +9254,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Train a logistic-regression classifier and report evaluation metrics.",
       "family": "ml",
       "keywords": [],
@@ -9220,6 +9368,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Fit a random-forest classifier or regressor.",
       "family": "ml",
       "keywords": [],
@@ -9356,6 +9505,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Fit a linear-regression model.",
       "family": "ml",
       "keywords": [],
@@ -9429,6 +9579,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Split a DataFrame into train and test sets.",
       "family": "ml",
       "keywords": [],
@@ -9511,6 +9662,7 @@
     {
       "advisor_persona": null,
       "category": "Machine Learning",
+      "column_effect": null,
       "description": "Apply a fitted Transformer to data via transform or score_samples.",
       "family": "ml",
       "keywords": [],
@@ -9576,6 +9728,7 @@
     {
       "advisor_persona": null,
       "category": "Neural Network",
+      "column_effect": null,
       "description": "A linear (fully-connected) layer.",
       "family": "nn",
       "keywords": [],
@@ -9627,6 +9780,7 @@
     {
       "advisor_persona": null,
       "category": "Neural Network",
+      "column_effect": null,
       "description": "An nn.Module that owns a subgraph of layers.",
       "family": "nn",
       "keywords": [],
@@ -9640,6 +9794,7 @@
     {
       "advisor_persona": null,
       "category": "Neural Network",
+      "column_effect": null,
       "description": "A ReLU activation layer.",
       "family": "nn",
       "keywords": [],
@@ -9672,6 +9827,7 @@
     {
       "advisor_persona": null,
       "category": "Annotation",
+      "column_effect": null,
       "description": "A markdown note for narrating the pipeline; no data flows through it.",
       "family": "notes",
       "keywords": [],
@@ -9741,6 +9897,7 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "column_effect": null,
       "description": "Evaluate multiple fitted recommenders and rank them by NDCG@k.",
       "family": "recommend",
       "keywords": [],
@@ -9792,6 +9949,7 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "column_effect": null,
       "description": "Score a fitted recommender against held-out interactions.",
       "family": "recommend",
       "keywords": [],
@@ -9852,6 +10010,7 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "column_effect": null,
       "description": "Fit a curated, allow-listed recommender algorithm.",
       "family": "recommend",
       "keywords": [],
@@ -9939,6 +10098,7 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "column_effect": null,
       "description": "Fit a two-tower retrieval model. Optionally consumes an item-features frame (one row per item, keyed by an 'item_id' column plus numeric columns) and a user-features frame (one row per user, keyed by 'user_id' plus numeric columns).",
       "family": "recommend",
       "keywords": [],
@@ -9999,6 +10159,7 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "column_effect": null,
       "description": "Route cold-start users to one recommender and warm users to another, based on known-interaction count.",
       "family": "recommend",
       "keywords": [],
@@ -10077,6 +10238,7 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "column_effect": null,
       "description": "Blend two or more fitted recommenders' recommendations by weighted score.",
       "family": "recommend",
       "keywords": [],
@@ -10170,6 +10332,7 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "column_effect": null,
       "description": "Load a fitted recommender model from a saved artifact on disk.",
       "family": "recommend",
       "keywords": [],
@@ -10214,6 +10377,7 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "column_effect": null,
       "description": "Validate and deduplicate raw user-item interaction data into a sparse InteractionMatrix.",
       "family": "recommend",
       "keywords": [],
@@ -10405,6 +10569,7 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "column_effect": null,
       "description": "Generate top-N recommendations from a fitted recommender.",
       "family": "recommend",
       "keywords": [],
@@ -10465,6 +10630,7 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "column_effect": null,
       "description": "Content-based filtering via dense embedding similarity \u2014 fits a NearestNeighbors index on a pre-computed embedding column.",
       "family": "recommend",
       "keywords": [],
@@ -10548,6 +10714,7 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "column_effect": null,
       "description": "Save a fitted recommender model to disk as a reusable artifact.",
       "family": "recommend",
       "keywords": [],
@@ -10601,6 +10768,7 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "column_effect": null,
       "description": "Find the N most similar items to each given item.",
       "family": "recommend",
       "keywords": [],
@@ -10652,6 +10820,7 @@
     {
       "advisor_persona": null,
       "category": "Recommenders",
+      "column_effect": null,
       "description": "Split events into train/test InteractionMatrix pairs by per-user recency.",
       "family": "recommend",
       "keywords": [],
@@ -10748,6 +10917,7 @@
     {
       "advisor_persona": null,
       "category": "Reporting",
+      "column_effect": null,
       "description": "Generate an HTML profiling report summarising a DataFrame.",
       "family": "reports",
       "keywords": [],
@@ -10801,6 +10971,10 @@
     {
       "advisor_persona": null,
       "category": "Reporting",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Run declarative data-quality expectations (non-null, range, uniqueness, allowed-values, regex-match, row-count, schema) against a DataFrame; passes it through unchanged on success, raises a typed error with a violations frame on failure.",
       "family": "research",
       "keywords": [],
@@ -10854,6 +11028,7 @@
     {
       "advisor_persona": null,
       "category": "Reporting",
+      "column_effect": null,
       "description": "Compose upstream artifacts (tables, figures, model summaries, markdown/HTML text) into one multi-section report.",
       "family": "research",
       "keywords": [],
@@ -11005,6 +11180,7 @@
     {
       "advisor_persona": null,
       "category": "Custom Code",
+      "column_effect": null,
       "description": "Run a user-authored Python transform() function against an input value.",
       "family": "script",
       "keywords": [],
@@ -11058,6 +11234,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "One-way ANOVA testing a numeric column across groups.",
       "family": "stats",
       "keywords": [],
@@ -11151,6 +11328,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "One-shot exploratory data analysis: summary frames + curated plots.",
       "family": "stats",
       "keywords": [],
@@ -11258,6 +11436,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Chi-square test of independence on a contingency table.",
       "family": "stats",
       "keywords": [],
@@ -11351,6 +11530,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Cohort retention analysis over a user activity log.",
       "family": "stats",
       "keywords": [],
@@ -11448,6 +11628,10 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Apply a multiple-comparison correction (Bonferroni / Benjamini-Hochberg).",
       "family": "stats",
       "keywords": [],
@@ -11544,6 +11728,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Compute a pairwise correlation matrix.",
       "family": "stats",
       "keywords": [],
@@ -11621,6 +11806,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Cross-tabulation of two categorical columns with chi-square test.",
       "family": "stats",
       "keywords": [],
@@ -11739,6 +11925,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Auto-emit a documented schema per column: type, null rate, cardinality, range/top-values, and optional user notes.",
       "family": "stats",
       "keywords": [],
@@ -11832,6 +12019,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Compute summary statistics for numeric columns.",
       "family": "stats",
       "keywords": [],
@@ -11885,6 +12073,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Run a curated diagnostic that operates on a raw DataFrame (e.g. VIF).",
       "family": "stats",
       "keywords": [],
@@ -11949,6 +12138,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Run a curated diagnostic on a fitted StatsModel's residuals.",
       "family": "stats",
       "keywords": [],
@@ -12015,6 +12205,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Per-numeric-column quantiles and spread (min/p05/p25/p50/p75/p95/max/IQR).",
       "family": "stats",
       "keywords": [],
@@ -12068,6 +12259,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Per-column profile: dtype, missingness, cardinality, skew/kurtosis.",
       "family": "stats",
       "keywords": [],
@@ -12121,6 +12313,7 @@
     {
       "advisor_persona": "researcher",
       "category": "Statistics",
+      "column_effect": null,
       "description": "Fit a Bayesian GLM (optionally hierarchical), via bambi/PyMC, summarized with ArviZ.",
       "family": "stats",
       "keywords": [],
@@ -12296,6 +12489,7 @@
     {
       "advisor_persona": "researcher",
       "category": "Statistics",
+      "column_effect": null,
       "description": "Fit a generalized additive model: linear terms + B-spline smooth terms (statsmodels GLMGam, unpenalized).",
       "family": "stats",
       "keywords": [],
@@ -12413,6 +12607,7 @@
     {
       "advisor_persona": "researcher",
       "category": "Statistics",
+      "column_effect": null,
       "description": "Fit a generalized linear model (Gaussian/Binomial/Poisson/NegativeBinomial/Gamma, statsmodels).",
       "family": "stats",
       "keywords": [],
@@ -12541,6 +12736,7 @@
     {
       "advisor_persona": "researcher",
       "category": "Statistics",
+      "column_effect": null,
       "description": "Fit OLS/WLS/GLS linear regression (statsmodels).",
       "family": "stats",
       "keywords": [],
@@ -12658,6 +12854,7 @@
     {
       "advisor_persona": "researcher",
       "category": "Statistics",
+      "column_effect": null,
       "description": "Fit a linear mixed-effects / hierarchical model with random intercepts and slopes, grouped (statsmodels MixedLM).",
       "family": "stats",
       "keywords": [],
@@ -12771,6 +12968,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Per-step conversion and drop-off funnel over an event log.",
       "family": "stats",
       "keywords": [],
@@ -12853,6 +13051,10 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": {
+        "detail": null,
+        "kind": "aggregate"
+      },
       "description": "Split-apply-combine: group by column(s) and aggregate.",
       "family": "stats",
       "keywords": [],
@@ -12954,6 +13156,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Kruskal-Wallis H-test across two or more groups.",
       "family": "stats",
       "keywords": [],
@@ -13027,6 +13230,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Mann-Whitney U rank-sum test between two groups.",
       "family": "stats",
       "keywords": [],
@@ -13124,6 +13328,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Per-column null counts and percentages.",
       "family": "stats",
       "keywords": [],
@@ -13177,6 +13382,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Report the outlier bounds actually applied by Detect Outliers, one row per numeric column.",
       "family": "stats",
       "keywords": [],
@@ -13276,6 +13482,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Solve a power equation for effect size, sample size, or power.",
       "family": "stats",
       "keywords": [],
@@ -13380,6 +13587,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Two-proportion z-test comparing a binary outcome across two groups.",
       "family": "stats",
       "keywords": [],
@@ -13473,6 +13681,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Two-sample t-test between two groups.",
       "family": "stats",
       "keywords": [],
@@ -13586,6 +13795,7 @@
     {
       "advisor_persona": null,
       "category": "Statistics",
+      "column_effect": null,
       "description": "Wilcoxon signed-rank test for paired samples in two columns.",
       "family": "stats",
       "keywords": [],
@@ -13683,6 +13893,10 @@
     {
       "advisor_persona": null,
       "category": "Time Series",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Append first-difference and optional seasonal-difference columns.",
       "family": "timeseries",
       "keywords": [],
@@ -13776,6 +13990,10 @@
     {
       "advisor_persona": null,
       "category": "Time Series",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Append exponentially-weighted moving-average columns.",
       "family": "timeseries",
       "keywords": [],
@@ -13898,6 +14116,7 @@
     {
       "advisor_persona": "researcher",
       "category": "Time Series",
+      "column_effect": null,
       "description": "Fit a SARIMAX model and forecast future values (statsmodels).",
       "family": "timeseries",
       "keywords": [],
@@ -14018,6 +14237,7 @@
     {
       "advisor_persona": "researcher",
       "category": "Time Series",
+      "column_effect": null,
       "description": "Fit a Holt-Winters exponential smoothing model and forecast (statsmodels).",
       "family": "timeseries",
       "keywords": [],
@@ -14179,6 +14399,10 @@
     {
       "advisor_persona": null,
       "category": "Time Series",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Create lagged feature columns for time series data.",
       "family": "timeseries",
       "keywords": [],
@@ -14241,6 +14465,10 @@
     {
       "advisor_persona": null,
       "category": "Time Series",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Append rolling-window aggregate columns (mean, sum, std, min, max).",
       "family": "timeseries",
       "keywords": [],
@@ -14360,6 +14588,7 @@
     {
       "advisor_persona": "researcher",
       "category": "Time Series",
+      "column_effect": null,
       "description": "Decompose a time series into trend, seasonal, and residual components.",
       "family": "timeseries",
       "keywords": [],
@@ -14476,6 +14705,10 @@
     {
       "advisor_persona": null,
       "category": "Time Series",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Append recency-weighted aggregate columns (linear or exponential decay).",
       "family": "timeseries",
       "keywords": [],
@@ -14592,6 +14825,10 @@
     {
       "advisor_persona": null,
       "category": "Feature Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "derive"
+      },
       "description": "Discretize continuous features using a curated sklearn discretizer (KBinsDiscretizer or Binarizer).",
       "family": "transform",
       "keywords": [],
@@ -14686,6 +14923,10 @@
     {
       "advisor_persona": null,
       "category": "Feature Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "encode"
+      },
       "description": "Encode categorical features using a curated sklearn encoder (OneHotEncoder, OrdinalEncoder, or TargetEncoder).",
       "family": "transform",
       "keywords": [],
@@ -14801,6 +15042,10 @@
     {
       "advisor_persona": null,
       "category": "Feature Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "derive"
+      },
       "description": "Generate new features from existing ones using a curated sklearn feature generator (PolynomialFeatures).",
       "family": "transform",
       "keywords": [],
@@ -14894,6 +15139,10 @@
     {
       "advisor_persona": null,
       "category": "Feature Transform",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
       "description": "Scale numeric features using a curated sklearn scaler (StandardScaler, MinMaxScaler, RobustScaler, MaxAbsScaler, Normalizer, or PowerTransformer).",
       "family": "transform",
       "keywords": [],
@@ -14992,6 +15241,7 @@
     {
       "advisor_persona": null,
       "category": "Visualization",
+      "column_effect": null,
       "description": "Render a curated, allow-listed chart (plotly.express) from a DataFrame.",
       "family": "viz",
       "keywords": [],
@@ -15075,6 +15325,7 @@
     {
       "advisor_persona": null,
       "category": "Visualization",
+      "column_effect": null,
       "description": "Render an ACF or PACF bar plot of a fitted StatsModel's residuals.",
       "family": "viz",
       "keywords": [],
@@ -15140,6 +15391,7 @@
     {
       "advisor_persona": null,
       "category": "Visualization",
+      "column_effect": null,
       "description": "Render a coefficient / forest plot from a fitted StatsModel.",
       "family": "viz",
       "keywords": [],
@@ -15172,6 +15424,7 @@
     {
       "advisor_persona": null,
       "category": "Visualization",
+      "column_effect": null,
       "description": "Render a confusion-matrix heatmap for a fitted classifier.",
       "family": "viz",
       "keywords": [],
@@ -15213,6 +15466,7 @@
     {
       "advisor_persona": null,
       "category": "Visualization",
+      "column_effect": null,
       "description": "Render a heatmap from a tidy correlation matrix (stats.correlation's output).",
       "family": "viz",
       "keywords": [],
@@ -15245,6 +15499,7 @@
     {
       "advisor_persona": null,
       "category": "Visualization",
+      "column_effect": null,
       "description": "Render coverage vs. accuracy scatter to surface the accuracy/diversity trade-off.",
       "family": "viz",
       "keywords": [],
@@ -15287,6 +15542,7 @@
     {
       "advisor_persona": null,
       "category": "Visualization",
+      "column_effect": null,
       "description": "Render a grouped bar chart comparing multiple recommenders across metrics.",
       "family": "viz",
       "keywords": [],
@@ -15329,6 +15585,7 @@
     {
       "advisor_persona": null,
       "category": "Visualization",
+      "column_effect": null,
       "description": "Render recommendation frequency vs. item popularity rank (log scale).",
       "family": "viz",
       "keywords": [],
@@ -15380,6 +15637,7 @@
     {
       "advisor_persona": null,
       "category": "Visualization",
+      "column_effect": null,
       "description": "Render the precision@k/recall@k trade-off curve for a fitted recommender.",
       "family": "viz",
       "keywords": [],
@@ -15431,6 +15689,7 @@
     {
       "advisor_persona": null,
       "category": "Visualization",
+      "column_effect": null,
       "description": "Render a 2-D dimensionality-reduction projection as a scatter plot.",
       "family": "viz",
       "keywords": [],
@@ -15491,6 +15750,7 @@
     {
       "advisor_persona": null,
       "category": "Visualization",
+      "column_effect": null,
       "description": "Render a Q-Q plot of a fitted StatsModel's residuals against a normal.",
       "family": "viz",
       "keywords": [],
@@ -15523,6 +15783,7 @@
     {
       "advisor_persona": null,
       "category": "Visualization",
+      "column_effect": null,
       "description": "Render a fitted-values-vs-residuals scatter plot from a fitted StatsModel.",
       "family": "viz",
       "keywords": [],

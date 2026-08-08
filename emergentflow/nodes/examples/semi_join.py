@@ -21,7 +21,7 @@ from emergentflow.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -40,6 +40,8 @@ class SemiJoin(NodeDefinition):
         "Keep or exclude rows whose key column(s) match another DataFrame "
         "(semi-join / anti-join); never adds columns from the keys frame."
     )
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.CUSTOM)
 
     ports = [
         PortSpec(

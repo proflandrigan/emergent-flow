@@ -19,7 +19,7 @@ from emergentflow.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -38,6 +38,8 @@ class Concat(NodeDefinition):
         "Row-wise union of two or more DataFrames, schema-aligned by column name, with an "
         "optional provenance column."
     )
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.CUSTOM)
 
     ports = [
         PortSpec(

@@ -23,7 +23,7 @@ from emergentflow.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -39,6 +39,7 @@ class LoadGoogleSheet(NodeDefinition):
     label = "Load Google Sheet"
     category = "Ingest"
     description = "Load a Google Sheets tab into a pandas DataFrame over the HTTP client seam."
+    column_effect = ColumnEffect(kind=ColumnEffectKind.SOURCE)
     requires = frozenset({ClientKind.HTTP})
     advisor_persona = "data_modeller"
     cacheable = False

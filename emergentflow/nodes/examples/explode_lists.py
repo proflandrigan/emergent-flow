@@ -18,7 +18,7 @@ from emergentflow.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -37,6 +37,8 @@ class ExplodeLists(NodeDefinition):
         "Explode one or more index-aligned list columns into long rows (like pandas explode)."
     )
     keywords = ["explode", "unnest", "flatten", "expand", "list"]
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.DERIVE)
 
     ports = [
         PortSpec(

@@ -16,7 +16,7 @@ from emergentflow.timeseries import difference
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -32,6 +32,8 @@ class TsDifference(NodeDefinition):
     label = "Difference"
     category = "Time Series"
     description = "Append first-difference and optional seasonal-difference columns."
+
+    column_effect = ColumnEffect(kind=ColumnEffectKind.PASSTHROUGH)
 
     ports = [
         PortSpec(

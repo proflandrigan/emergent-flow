@@ -309,9 +309,7 @@ class TestInvertMutation:
     def test_invert_remove_node(self) -> None:
         node_a = _load_csv_node()
         node_b = _load_csv_node("b.csv")
-        node_b = node_b.model_copy(
-            update={"position": Position(x=200.0, y=200.0)}
-        )
+        node_b = node_b.model_copy(update={"position": Position(x=200.0, y=200.0)})
         graph = Graph(nodes={node_a.id: node_a, node_b.id: node_b})
         m = GraphMutation(base_version=1, remove_nodes=[node_b.id])
         forward = apply_mutation(graph, m)

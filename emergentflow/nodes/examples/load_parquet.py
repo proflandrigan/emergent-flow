@@ -18,7 +18,7 @@ from emergentflow.ir.node import Node
 
 from ..contract import CodeFragment, NodeDefinition
 from ..registry import register
-from ..spec import ParamSpec, PortSpec, ValidationHints
+from ..spec import ColumnEffect, ColumnEffectKind, ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
@@ -34,6 +34,7 @@ class LoadParquet(NodeDefinition):
     label = "Load Parquet"
     category = "Ingest"
     description = "Load a Parquet file into a pandas DataFrame."
+    column_effect = ColumnEffect(kind=ColumnEffectKind.SOURCE)
     # execute() re-reads the file at `path` on every call; the file's content can
     # change without the `path` param changing, so this is not a pure function of
     # its declared params (see NodeDefinition.cacheable's docstring).

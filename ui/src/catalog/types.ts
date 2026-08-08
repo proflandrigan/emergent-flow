@@ -50,6 +50,7 @@ export interface CatalogNode {
   ports: CatalogPort[];
   params: CatalogParam[];
   advisor_persona?: string | null;
+  column_effect?: { kind: string; detail?: string | null } | null;
 }
 
 export interface CatalogEstimatorParam {

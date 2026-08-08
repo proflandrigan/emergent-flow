@@ -17,6 +17,7 @@ import { OverlayModal } from "../ui/OverlayModal";
 import { Segmented } from "../ui/Segmented";
 import { Tooltip } from "../ui/Tooltip";
 import { CodePanel } from "./CodePanel";
+import { ColumnLineagePanel } from "./ColumnLineagePanel";
 import { ConfigForm } from "./ConfigForm";
 import { FlowParamsPanel } from "./FlowParamsPanel";
 import { LineagePanel } from "./LineagePanel";
@@ -43,6 +44,7 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
   const [tab, setTab] = useState<InspectorTab>("config");
   const [expanded, setExpanded] = useState(false);
   const [highlightVarName, setHighlightVarName] = useState<string | null>(null);
+  const [tracedColumn, setTracedColumn] = useState<string | null>(null);
   const selNodes = useSelectionStore((s) => s.nodes);
   const nodes = useGraphStore((s) => s.nodes);
   const nodeId = selectedNodeId({ nodes: selNodes });
@@ -64,6 +66,7 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
   // back open with no click on the expand button.
   useEffect(() => {
     setExpanded(false);
+    setTracedColumn(null);
   }, [nodeId]);
 
   // Shared between the docked panel and the expanded OverlayModal so the two views can
@@ -201,9 +204,17 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
         {Object.entries(nodeResults).map(([portName, payload]) => (
           <div key={portName} style={{ marginBottom: "0.5rem" }}>
             <span style={{ fontWeight: 600 }}>{portName}</span>
-            <PayloadView payload={payload} />
+            <PayloadView
+              payload={payload}
+              onColumnClick={payload.kind === "table" ? setTracedColumn : undefined}
+            />
           </div>
         ))}
+        {tracedColumn !== null ? (
+          <div data-testid="results-column-lineage" style={{ marginTop: "0.75rem" }}>
+            <ColumnLineagePanel nodeId={nodeId} column={tracedColumn} debounceMs={0} />
+          </div>
+        ) : null}
       </div>
     );
   }

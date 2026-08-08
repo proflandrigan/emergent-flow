@@ -198,6 +198,11 @@ class TargetDerivedFeature(ValidityRule):
         return any(n.type == "clean.derive_column" for n in graph.nodes.values())
 
     def check(self, graph: Graph) -> list[ValidityFinding]:
+        # Deferred import: emergentflow.validity is independent of the research/
+        # lineage families by design, and research imports back from here via the
+        # reference build report node only after both are initialized.
+        from emergentflow.research.lineage import trace_column_lineage
+
         supervised: list[tuple[str, Node]] = []
         for node in graph.nodes.values():
             if node.type not in SUPERVISED_TARGET_NODES:
@@ -210,6 +215,22 @@ class TargetDerivedFeature(ValidityRule):
         supervised.sort(key=lambda entry: entry[1].id)
         if not supervised:
             return []
+
+        def _provenance_has_target(trace: Any, target: str) -> bool:
+            """Does *target* appear anywhere in a column's derivation chain?
+
+            Column lineage (Epic 18) is exact where the old topological
+            approximation was not: a two-hop leak (target -> intermediate ->
+            feature) surfaces as a traced node (or a traced node's ``source_column``)
+            named *target*, even when no single derive expression references it.
+            """
+            for n in trace.nodes:
+                if n.column == target:
+                    return True
+                if n.source_column == target:
+                    return True
+            return False
+
         findings: list[ValidityFinding] = []
         for node in sorted(graph.nodes.values(), key=lambda n: n.id):
             if node.type != "clean.derive_column":
@@ -220,16 +241,21 @@ class TargetDerivedFeature(ValidityRule):
             for target, supervised_node in supervised:
                 if not reaches(graph, node.id, supervised_node.id):
                     continue
-                # Skip when every target-referencing derived column is explicitly
+                # Which derived columns' provenance actually includes the target?
+                tainted: list[str] = []
+                for name, _refs in derived:
+                    trace = trace_column_lineage(graph, node.id, name)
+                    if _provenance_has_target(trace, target):
+                        tainted.append(name)
+                if not tainted:
+                    continue
+                # Skip when every target-tainted derived column is explicitly
                 # excluded from the model's feature set (no leak reaches the model).
                 features = _node_params(supervised_node).get("features")
-                leaky_names = [name for name, refs in derived if target in refs]
-                if not leaky_names:
-                    continue
                 if (
                     isinstance(features, list)
                     and features
-                    and not any(col in features for col in leaky_names)
+                    and not any(col in features for col in tainted)
                 ):
                     continue
                 findings.append(

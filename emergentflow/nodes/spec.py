@@ -28,6 +28,8 @@ plus authoring metadata (``required``, ``label``, ``help``, validation ``hints``
 
 from __future__ import annotations
 
+from enum import Enum
+
 from pydantic import Field, field_validator
 
 from emergentflow.ir.common import Cardinality, Direction, IRModel, Paradigm
@@ -206,6 +208,42 @@ class ParamSpec(IRModel):
 
 
 # ---------------------------------------------------------------------------
+# ColumnEffect — optional declarative column-mapping metadata for a node *type*
+# ---------------------------------------------------------------------------
+
+
+class ColumnEffectKind(str, Enum):
+    """The kind of column mapping a node performs on its input table.
+
+    Advisory metadata surfaced through ``/catalog`` so the canvas can describe
+    how a node transforms columns. ``UNKNOWN`` is the default when a node makes
+    no declaration.
+    """
+
+    PASSTHROUGH = "passthrough"
+    SELECT = "select"
+    RENAME = "rename"
+    DERIVE = "derive"
+    AGGREGATE = "aggregate"
+    ENCODE = "encode"
+    DROP = "drop"
+    SOURCE = "source"
+    CUSTOM = "custom"
+    UNKNOWN = "unknown"
+
+
+class ColumnEffect(IRModel):
+    """Optional declarative description of a node's column mapping.
+
+    ``kind`` classifies the mapping; ``detail`` carries an optional
+    human-readable elaboration (e.g. the derived column's name).
+    """
+
+    kind: ColumnEffectKind = ColumnEffectKind.UNKNOWN
+    detail: str | None = None
+
+
+# ---------------------------------------------------------------------------
 # NodeSpec — the complete serializable descriptor of a node *type*
 # ---------------------------------------------------------------------------
 
@@ -248,6 +286,9 @@ class NodeSpec(IRModel):
         relevant to this node type; ``None`` (the default) means no persona is
         suggested.  Advisory metadata surfaced through ``/catalog`` for a
         "consult" affordance (Epic 14 Story 8).
+    column_effect:
+        Optional column-mapping declaration; absent ⇒ tracer reports "unknown",
+        never a silent passthrough guess.
     ports:
         Declared ports (templates for the instance's IR ports).
     params:
@@ -263,6 +304,7 @@ class NodeSpec(IRModel):
     keywords: list[str] = Field(default_factory=list)
     paradigm: Paradigm = Paradigm.FUNCTIONAL
     advisor_persona: str | None = None
+    column_effect: ColumnEffect | None = None
     ports: list[PortSpec] = Field(default_factory=list)
     params: list[ParamSpec] = Field(default_factory=list)
 
