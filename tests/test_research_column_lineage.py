@@ -118,6 +118,36 @@ def test_trace_column_lineage_edges_walk_chain() -> None:
     }
 
 
+def test_trace_column_lineage_case_when_derives_from_condition() -> None:
+    """A case-when derived column's lineage walks the columns in its ``when``
+    conditions, not just a bare ``expr`` (Epic 18 Story 3)."""
+    load = get("data.load_csv")().instantiate(label="load")
+    derive = get("clean.derive_column")().instantiate(
+        label="derive",
+        columns=[
+            {
+                "name": "bucket",
+                "when": [{"if": "revenue > 100", "then": "high"}],
+                "else": "low",
+            }
+        ],
+    )
+    acc: dict = {"_edges": []}
+    edges = _flow(acc, load, derive)
+    graph = Graph(
+        paradigm=Paradigm.FUNCTIONAL,
+        name="case-when-flow",
+        nodes={n.id: n for n in (load, derive)},
+        edges=edges,
+    )
+    lineage = trace_column_lineage(graph, derive.id, "bucket")
+    derived = next(n for n in lineage.nodes if n.node_type == "clean.derive_column")
+    assert derived.role == ColumnRole.DERIVED
+    assert derived.source_column == "revenue"
+    assert derived.detail and "revenue" in derived.detail
+    assert any(n.node_type == "data.load_csv" and n.column == "revenue" for n in lineage.nodes)
+
+
 def test_trace_column_lineage_unknown_boundary_for_undeclared_node() -> None:
     """A transformer with no declaration terminates as an explicit unknown."""
     load = get("data.load_csv")().instantiate(label="load")
@@ -184,3 +214,37 @@ def test_trace_column_impact_reaches_downstream() -> None:
     assert impact.nodes[0].node_type == "data.load_csv"
     assert len(impact.nodes) >= 2  # source + at least one consumer
     assert any(n.column == "revenue_log" and n.role == ColumnRole.DERIVED for n in impact.nodes)
+
+
+def test_trace_column_impact_stops_at_select_drop() -> None:
+    """Impact analysis must not propagate a seed column past a select that drops it.
+
+    load -> select(drop revenue) -> derive2(double2 = revenue*2): revenue is
+    removed by the select, so derive2's ``double2`` cannot be derived from it.
+    The blast radius terminates at the select; the downstream derive is not
+    reported as impacted (Epic 18, Story 6).
+    """
+    load = get("data.load_csv")().instantiate(label="load")
+    select = get("clean.select_columns")().instantiate(
+        label="select", columns=["revenue"], drop=True
+    )
+    derive2 = get("clean.derive_column")().instantiate(
+        label="derive2", columns=[{"name": "double2", "expr": "revenue * 2"}]
+    )
+    acc: dict = {"_edges": []}
+    edges = _flow(acc, load, select, derive2)
+    graph = Graph(
+        paradigm=Paradigm.FUNCTIONAL,
+        name="impact-drop",
+        nodes={n.id: n for n in (load, select, derive2)},
+        edges=edges,
+    )
+    impact = trace_column_impact(graph, load.id, "revenue")
+    # The seed column reaches the select's input but not its output; nothing
+    # downstream of the select is seeded by `revenue`.
+    assert not any(
+        n.node_type == "clean.derive_column" and n.column == "double2" for n in impact.nodes
+    )
+    assert not any(
+        n.node_type == "clean.derive_column" and n.column == "revenue" for n in impact.nodes
+    )

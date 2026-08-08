@@ -12,7 +12,7 @@ on non-structural metadata).
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any
@@ -295,6 +295,24 @@ def _derive_source_cols(expr: str) -> tuple[str, ...]:
     return tuple(sorted(referenced))
 
 
+def _derive_spec_source_cols(spec: Mapping[str, Any]) -> tuple[str, ...]:
+    """Every column a derive *spec* references, across ``expr`` and case-when ``when``
+    clauses (whose ``if`` conditions are expressions). Mirrors the ``expr``-only
+    ``_derive_source_cols`` for the conditional-column shape so a case-when derived
+    column's lineage walks its condition references too.
+    """
+    refs: set[str] = set()
+    expr = spec.get("expr")
+    if isinstance(expr, str):
+        refs |= set(_derive_source_cols(expr))
+    when = spec.get("when")
+    if isinstance(when, list):
+        for branch in when:
+            if isinstance(branch, Mapping) and isinstance(branch.get("if"), str):
+                refs |= set(_derive_source_cols(branch["if"]))
+    return tuple(sorted(refs))
+
+
 def _incoming_edges(graph: Graph, node_id: str) -> list[tuple[str, str, str]]:
     """(source_node_id, source_port_id, target_port_id) edges targeting *node_id*."""
     return [
@@ -365,12 +383,10 @@ def _resolve_column(
                 if isinstance(spec, dict) and isinstance(spec.get("name"), str):
                     derived.add(spec["name"])
         if column in derived:
-            expr = ""
             for spec in specs or []:
                 if isinstance(spec, dict) and spec.get("name") == column:
-                    expr = spec.get("expr") or ""
-                    break
-            return (ColumnRole.DERIVED, _derive_source_cols(expr))
+                    return (ColumnRole.DERIVED, _derive_spec_source_cols(spec))
+            return (ColumnRole.DERIVED, ())
         # Unknown/non-derived column passes through from the input table.
         if _frame_predecessor(graph, node) is not None:
             return (ColumnRole.PASSTHROUGH, (column,))
@@ -393,6 +409,27 @@ def _resolve_column(
 
 def _is_source(graph: Graph, node_id: str) -> bool:
     return not _incoming_edges(graph, node_id)
+
+
+def _surviving_columns(node: Node, incoming: Iterable[str]) -> set[str]:
+    """Which of *incoming* columns are present on *node*'s output table.
+
+    Used by impact analysis to stop propagating a seed column through a node
+    that drops it (e.g. ``clean.select_columns`` with ``drop=True``), so the
+    blast radius doesn't overstate reach past a node that eliminated the column.
+    For every node type without explicit drop semantics, the incoming columns
+    survive unchanged.
+    """
+    if node.type == "clean.select_columns":
+        values = _param_values(node)
+        chosen = values.get("columns")
+        drop = bool(values.get("drop"))
+        if isinstance(chosen, list):
+            names = {str(c) for c in chosen if isinstance(c, str)}
+            if drop:
+                return set(incoming) - names
+            return set(incoming) & names
+    return set(incoming)
 
 
 @public_op(name="ef.research.trace_column_lineage")
@@ -640,7 +677,7 @@ def trace_column_impact(
             outs = reach.get(src)
             if outs is not None:
                 collected |= outs
-        reach[nid] = set(collected)
+        reach[nid] = _surviving_columns(node, collected)
 
     nodes_by_id: dict[str, list[ColumnLineageNode]] = {}
     for nid in downstream_order:
@@ -698,10 +735,9 @@ def trace_column_impact(
                     if not isinstance(spec, dict):
                         continue
                     name = spec.get("name")
-                    expr = spec.get("expr")
-                    if not isinstance(name, str) or not isinstance(expr, str):
+                    if not isinstance(name, str):
                         continue
-                    refs = set(_derive_source_cols(expr))
+                    refs = set(_derive_spec_source_cols(spec))
                     if refs & cols:
                         produced.append(
                             ColumnLineageNode(
