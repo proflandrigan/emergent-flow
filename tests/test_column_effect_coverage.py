@@ -13,13 +13,15 @@ from scripts.check_column_effect_coverage import coverage
 
 
 def test_coverage_counts_and_groups_by_family() -> None:
-    declared, total, undeclared = coverage()
-    assert total > 0
-    assert declared >= 1
-    assert 0 <= declared <= total
+    result = coverage()
+    assert result.total > 0
+    assert result.declared >= 1
+    assert 0 <= result.declared <= result.total
+    # The tracer-resolvable subset can't exceed the declared set and is non-empty.
+    assert 0 < result.resolvable <= result.declared
     # Every undeclared entry is a real registered node type, grouped by family.
-    assert undeclared
-    for family, types in undeclared.items():
+    assert result.undeclared
+    for family, types in result.undeclared.items():
         assert family
         assert types
         for t in types:
@@ -27,6 +29,6 @@ def test_coverage_counts_and_groups_by_family() -> None:
 
 
 def test_declared_plus_undeclared_equals_total() -> None:
-    declared, total, undeclared = coverage()
-    n_undeclared = sum(len(types) for types in undeclared.values())
-    assert declared + n_undeclared == total
+    result = coverage()
+    n_undeclared = sum(len(types) for types in result.undeclared.values())
+    assert result.declared + n_undeclared == result.total
