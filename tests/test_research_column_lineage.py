@@ -248,3 +248,33 @@ def test_trace_column_impact_stops_at_select_drop() -> None:
     assert not any(
         n.node_type == "clean.derive_column" and n.column == "revenue" for n in impact.nodes
     )
+    # No edge may claim `revenue` flows into the select (it does not survive it).
+    assert not any(
+        e.target_node_id == select.id and e.source_column == "revenue" for e in impact.edges
+    )
+
+
+def test_trace_column_impact_edges_require_surviving_column() -> None:
+    """Impact edges must only be emitted for a seed column that survives into the
+    target's output. A select that drops the column is a blast-radius dead-end,
+    not a passthrough hop -- so no edge is drawn into it (Epic 18, Story 6)."""
+    load = get("data.load_csv")().instantiate(label="load")
+    derive = get("clean.derive_column")().instantiate(
+        label="derive", columns=[{"name": "revenue_log", "expr": "log1p(revenue)"}]
+    )
+    select = get("clean.select_columns")().instantiate(
+        label="select", columns=["revenue_log", "user_id"]
+    )
+    acc: dict = {"_edges": []}
+    edges = _flow(acc, load, derive, select)
+    graph = Graph(
+        paradigm=Paradigm.FUNCTIONAL,
+        name="impact-keep",
+        nodes={n.id: n for n in (load, derive, select)},
+        edges=edges,
+    )
+    impact = trace_column_impact(graph, load.id, "revenue")
+    # `revenue` reaches derive (it is the source of revenue_log) but is dropped
+    # by the select -- so the only edge is load -> derive.
+    assert {e.target_node_id for e in impact.edges} == {derive.id}
+    assert all(e.source_column == "revenue" for e in impact.edges)

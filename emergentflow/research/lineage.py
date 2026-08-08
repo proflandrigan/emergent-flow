@@ -759,7 +759,10 @@ def trace_column_impact(
         for src, _sp, _tp in _incoming_edges(graph, nid):
             if src not in reach:
                 continue
-            for sc in sorted(reach[src]):
+            # Only emit an edge for a seed column that survives into *nid*'s
+            # output: a node that drops the column (e.g. select_columns) is a
+            # blast-radius dead-end, not a passthrough hop.
+            for sc in sorted(reach[src] & reach[nid]):
                 edges.append(
                     ColumnLineageEdge(
                         source_node_id=src,
