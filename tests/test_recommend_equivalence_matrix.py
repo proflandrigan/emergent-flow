@@ -36,9 +36,7 @@ def _make_sequence_dataset() -> object:
             "session_id": ["s1", "s1", "s1", "s2", "s2", "s2", "s3", "s3", "s3"],
         }
     )
-    return build_sequences(
-        df, user_col="user_id", item_col="item_id", session_col="session_id"
-    )
+    return build_sequences(df, user_col="user_id", item_col="item_id", session_col="session_id")
 
 
 def _make_interactions() -> InteractionMatrix:
@@ -216,9 +214,7 @@ _BASE_KEYS = sorted(
 )
 _RECOMMEND_EXTRA_KEYS = _keys_requiring_extra("emergentflow[recommend]")
 _TORCH_KEYS = sorted(
-    k
-    for k in _keys_requiring_extra("torch")
-    if get_recommender_spec(k).fitter is not None
+    k for k in _keys_requiring_extra("torch") if get_recommender_spec(k).fitter is not None
 )
 _TORCH_SEQUENCE_KEYS = sorted(
     k for k in _keys_requiring_extra("torch") if get_recommender_spec(k).sequence_fitter is not None
