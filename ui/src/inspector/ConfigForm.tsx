@@ -64,6 +64,11 @@ const CURATED_PARAM_NODES: Record<string, CuratedParamConfig> = {
     source: "estimators",
   },
   "recommend.fit": { choiceParam: "algorithm", dictParam: "params", source: "recommenders" },
+  "recommend.fit_sequence": {
+    choiceParam: "algorithm",
+    dictParam: "params",
+    source: "recommenders",
+  },
 };
 
 const JOIN_KEY_NODES: Record<string, { leftPort: string; rightPort: string }> = {

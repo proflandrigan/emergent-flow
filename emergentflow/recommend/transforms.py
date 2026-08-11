@@ -105,7 +105,11 @@ def weight_interactions_by_recency(
 
     Returns
     -------
-    A new DataFrame with the original columns plus *value_col* in (0, 1].
+    A new DataFrame with the original columns plus *value_col*. With the default
+    ``reference_time`` (the newest timestamp in *df*) weights lie in (0, 1] -- the newest event
+    is 1.0 and older events decay toward 0. An explicit ``reference_time`` earlier than the
+    newest event yields weights above 1.0 (events are "younger" than the reference), so the
+    values are relative, not bounded.
     """
     missing = [col for col in (timestamp_col, user_col, item_col) if col not in df.columns]
     if missing:
@@ -123,6 +127,12 @@ def weight_interactions_by_recency(
         )
 
     timestamps = pd.to_datetime(df[timestamp_col])
+    if timestamps.isna().any():
+        bad = int(timestamps.isna().sum())
+        raise InvalidRecommenderParamsError(
+            f"timestamp_col {timestamp_col!r} contains {bad} null/NaT value(s); "
+            "recency cannot be computed for events without a timestamp."
+        )
     computed_reference = (
         pd.to_datetime(reference_time) if reference_time is not None else timestamps.max()
     )

@@ -165,10 +165,11 @@ def weight_interactions_by_recency(
     The single seam every recency-weighting node routes through (Epic 15), producing a
     ``value_col`` suitable for ``prepare_interactions``. Weights decay exponentially with event
     age measured against *reference_time* (defaulting to the newest timestamp in *df*): an event
-    *half_life_days* old is weighted ``0.5``, a brand-new event ``1.0``. Raises
+    *half_life_days* old is weighted ``0.5``. Raises
     :class:`~emergentflow.recommend.errors.InvalidRecommenderParamsError` if ``timestamp_col``,
-    ``user_col``, or ``item_col`` is absent from *df*, ``decay`` is not ``'exponential'``, or
-    ``half_life_days`` is not positive. Never mutates *df*.
+    ``user_col``, or ``item_col`` is absent from *df*, ``decay`` is not ``'exponential'``,
+    ``half_life_days`` is not positive, or ``timestamp_col`` contains null/NaT values (recency
+    is undefined for a missing timestamp). Never mutates *df*.
     """
     return _weight_interactions_by_recency(
         df,

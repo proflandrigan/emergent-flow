@@ -328,6 +328,32 @@ test("recommend.fit groups the algorithm dropdown by family and shows the select
   expect(screen.getByText(description!)).toBeInTheDocument();
 });
 
+test("recommend.fit_sequence groups the algorithm dropdown by family", () => {
+  const id = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("recommend.fit_sequence"), { x: 0, y: 0 });
+  useGraphStore.getState().setParam(id, "algorithm", "gru4rec");
+  const node = useGraphStore.getState().nodes[id];
+  render(<ConfigForm node={node} />);
+
+  const select = screen.getByTestId("param-algorithm") as HTMLSelectElement;
+  const sequential = Array.from(select.querySelectorAll("optgroup")).find(
+    (g) => g.label === "sequential",
+  );
+  expect(sequential).toBeDefined();
+  const sequentialChoices = Array.from(sequential!.querySelectorAll("option")).map(
+    (o) => o.value,
+  );
+  expect(sequentialChoices).toContain("gru4rec");
+
+  const gru4recOption = Array.from(select.querySelectorAll("option")).find(
+    (o) => o.value === "gru4rec",
+  );
+  expect(gru4recOption?.title).toBe(
+    catalog.recommenders.find((r) => r.key === "gru4rec")?.description,
+  );
+});
+
 test("editing a curated recommender kwarg writes into the recommend.fit params dict", () => {
   const id = useGraphStore
     .getState()

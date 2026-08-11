@@ -191,6 +191,15 @@ def test_non_positive_half_life_raises() -> None:
         )
 
 
+def test_null_timestamp_raises_typed_error() -> None:
+    df = _recency_frame()
+    df.loc[0, "timestamp"] = pd.NaT
+    with pytest.raises(InvalidRecommenderParamsError, match="null/NaT"):
+        weight_interactions_by_recency(
+            df, timestamp_col="timestamp", user_col="user_id", item_col="item_id"
+        )
+
+
 def test_missing_columns_raise() -> None:
     df = _recency_frame()
     with pytest.raises(InvalidRecommenderParamsError):
