@@ -200,6 +200,18 @@ def test_null_timestamp_raises_typed_error() -> None:
         )
 
 
+def test_nat_reference_time_raises_typed_error() -> None:
+    df = _recency_frame()
+    with pytest.raises(InvalidRecommenderParamsError, match="reference_time"):
+        weight_interactions_by_recency(
+            df,
+            timestamp_col="timestamp",
+            user_col="user_id",
+            item_col="item_id",
+            reference_time=pd.NaT,
+        )
+
+
 def test_missing_columns_raise() -> None:
     df = _recency_frame()
     with pytest.raises(InvalidRecommenderParamsError):

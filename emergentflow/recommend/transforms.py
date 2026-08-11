@@ -136,6 +136,11 @@ def weight_interactions_by_recency(
     computed_reference = (
         pd.to_datetime(reference_time) if reference_time is not None else timestamps.max()
     )
+    if pd.isna(computed_reference):
+        raise InvalidRecommenderParamsError(
+            f"reference_time {reference_time!r} could not be parsed to a timestamp; "
+            "recency cannot be computed against an unparseable reference."
+        )
     age_days = (computed_reference - timestamps) / pd.Timedelta(days=1)
     weights = np.exp2(-age_days.to_numpy(dtype=float) / half_life_days)
 

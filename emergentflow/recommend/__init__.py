@@ -169,7 +169,8 @@ def weight_interactions_by_recency(
     :class:`~emergentflow.recommend.errors.InvalidRecommenderParamsError` if ``timestamp_col``,
     ``user_col``, or ``item_col`` is absent from *df*, ``decay`` is not ``'exponential'``,
     ``half_life_days`` is not positive, or ``timestamp_col`` contains null/NaT values (recency
-    is undefined for a missing timestamp). Never mutates *df*.
+    is undefined for a missing timestamp). An unparseable or NaT ``reference_time`` also raises
+    (recency cannot be computed against an unparseable reference). Never mutates *df*.
     """
     return _weight_interactions_by_recency(
         df,
