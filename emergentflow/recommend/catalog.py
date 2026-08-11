@@ -29,7 +29,11 @@ from sklearn.neighbors import NearestNeighbors
 
 from emergentflow.recommend.errors import InvalidRecommenderParamsError
 from emergentflow.recommend.interactions import InteractionMatrix
-from emergentflow.recommend.models import FittedRecommender, RecommendationResult
+from emergentflow.recommend.models import (
+    FittedRecommender,
+    RecommendationResult,
+    SequenceDataset,
+)
 from emergentflow.recommend.registry import (
     RecommenderParamSpec,
     RecommenderSpec,
@@ -2298,6 +2302,8 @@ def _fit_two_tower_impl(
     seed = int(params.get("seed", 0))
     item_id_col = str(params.get("item_id_col", "item_id"))
     user_id_col = str(params.get("user_id_col", "user_id"))
+    use_user_id_embedding = bool(params.get("use_user_id_embedding", True))
+    use_item_id_embedding = bool(params.get("use_item_id_embedding", True))
 
     torch.manual_seed(seed)
     torch.use_deterministic_algorithms(True)
@@ -2332,11 +2338,24 @@ def _fit_two_tower_impl(
         user_feat_tensor = None
         user_feature_dim = 0
 
+    if not use_user_id_embedding and user_features is None:
+        raise InvalidRecommenderParamsError("use_user_id_embedding=False requires user_features")
+    if not use_item_id_embedding and item_features is None:
+        raise InvalidRecommenderParamsError("use_item_id_embedding=False requires item_features")
+
     class _Tower(nn.Module):
-        def __init__(self, n_ids, feature_dim, hidden_layers, output_dim):
+        def __init__(self, n_ids, feature_dim, hidden_layers, output_dim, use_id_embedding=True):
             super().__init__()
-            self.id_embedding = nn.Embedding(n_ids, output_dim)
-            input_dim = output_dim + feature_dim
+            self.use_id_embedding = use_id_embedding
+            if use_id_embedding:
+                self.id_embedding = nn.Embedding(n_ids, output_dim)
+                input_dim = output_dim + feature_dim
+            else:
+                if feature_dim == 0:
+                    raise InvalidRecommenderParamsError(
+                        "two_tower tower requires either id embedding or features"
+                    )
+                input_dim = feature_dim
             layers: list[nn.Module] = []
             prev_dim = input_dim
             for h in hidden_layers:
@@ -2349,12 +2368,27 @@ def _fit_two_tower_impl(
         def forward(
             self, ids: torch.LongTensor, features: torch.Tensor | None = None
         ) -> torch.Tensor:
-            emb = self.id_embedding(ids)
-            x = torch.cat([emb, features], dim=-1) if features is not None else emb
-            return self.mlp(x)
+            if self.use_id_embedding:
+                emb = self.id_embedding(ids)
+                x = torch.cat([emb, features], dim=-1) if features is not None else emb
+                return self.mlp(x)
+            assert features is not None
+            return self.mlp(features)
 
-    user_tower = _Tower(interactions.n_users, user_feature_dim, user_tower_layers, embedding_dim)
-    item_tower = _Tower(interactions.n_items, item_feature_dim, item_tower_layers, embedding_dim)
+    user_tower = _Tower(
+        interactions.n_users,
+        user_feature_dim,
+        user_tower_layers,
+        embedding_dim,
+        use_user_id_embedding,
+    )
+    item_tower = _Tower(
+        interactions.n_items,
+        item_feature_dim,
+        item_tower_layers,
+        embedding_dim,
+        use_item_id_embedding,
+    )
 
     matrix = interactions.matrix
     pos_rows, pos_cols = matrix.nonzero()
@@ -2483,6 +2517,8 @@ def _fit_two_tower_impl(
             "user_index": interactions.user_index,
             "item_index": interactions.item_index,
             "embedding_dim": embedding_dim,
+            "use_user_id_embedding": use_user_id_embedding,
+            "use_item_id_embedding": use_item_id_embedding,
         },
     )
 
@@ -2515,6 +2551,7 @@ def _recommend_two_tower(
     item_ids = model_dict["item_ids"]
     matrix = model_dict["matrix"]
     user_index = model_dict["user_index"]
+    use_user_id_embedding = model_dict.get("use_user_id_embedding", True)
 
     if user_ids is None:
         user_ids = list(user_index.keys())
@@ -2526,9 +2563,18 @@ def _recommend_two_tower(
             if uid not in user_index:
                 continue
             uid_idx = user_index[uid]
-            uid_t = torch.tensor([uid_idx], dtype=torch.long)
-            u_feat = user_feature_tensor[uid_t] if user_feature_tensor is not None else None
-            user_embedding = user_tower(uid_t, u_feat).numpy()[0]
+            if use_user_id_embedding:
+                uid_t = torch.tensor([uid_idx], dtype=torch.long)
+                u_feat = user_feature_tensor[uid_t] if user_feature_tensor is not None else None
+                user_embedding = user_tower(uid_t, u_feat).numpy()[0]
+            else:
+                if user_feature_tensor is None:
+                    raise InvalidRecommenderParamsError(
+                        "use_user_id_embedding=False requires user_features"
+                    )
+                user_embedding = user_tower(
+                    torch.zeros(1, dtype=torch.long), user_feature_tensor[uid_idx : uid_idx + 1]
+                ).numpy()[0]
 
             scores = item_embeddings @ user_embedding
             known_items: set[int] = set(matrix[uid_idx].indices) if exclude_known else set()
@@ -2589,6 +2635,8 @@ register_recommender(
             "seed",
             "item_id_col",
             "user_id_col",
+            "use_user_id_embedding",
+            "use_item_id_embedding",
             "n",
         ),
         param_metadata=(
@@ -2658,6 +2706,22 @@ register_recommender(
                 help="Column in user_features identifying each user.",
             ),
             RecommenderParamSpec(
+                name="use_user_id_embedding",
+                type="bool",
+                default=True,
+                help="Whether the user tower learns an id embedding. True (id-only, or id+features "
+                "mixed): user ids are embedded. False (metadata-only): user features alone drive "
+                "the tower and user_features must be provided.",
+            ),
+            RecommenderParamSpec(
+                name="use_item_id_embedding",
+                type="bool",
+                default=True,
+                help="Whether the item tower learns an id embedding. True (id-only, or id+features "
+                "mixed): item ids are embedded. False (metadata-only): item features alone drive "
+                "the tower and item_features must be provided.",
+            ),
+            RecommenderParamSpec(
                 name="n", type="int", default=None, help="Number of recommendations per user."
             ),
         ),
@@ -2668,5 +2732,227 @@ register_recommender(
         "scoring) -- requires the optional torch dependency. Optionally consumes item-side "
         "features via the generic node; full item+user side features via "
         "ef.recommend.fit_two_tower(). Deterministic given seed.",
+    )
+)
+
+
+# ===================================================================
+# GRU4Rec (sequential)
+# ===================================================================
+
+
+def _fit_gru4rec(sequences: SequenceDataset, params: dict[str, Any]) -> FittedRecommender:
+    """Fit a GRU4Rec next-item recommender on a :class:`SequenceDataset`.
+
+    Each session sequence ``seq`` is split into input ``seq[:-1]`` and target ``seq[1:]``.
+    Batches are padded to the longest sequence in the batch using ``n_items`` as the pad
+    index (item indices from ``build_sequences`` live in ``[0, n_items)``), and the
+    ``CrossEntropyLoss`` ignores those padding positions via ``ignore_index=n_items``.
+    """
+    import torch  # noqa: PLC0415  (lazy: torch is not a hard dependency)
+    import torch.nn as nn  # noqa: PLC0415  (lazy: torch is not a hard dependency)
+
+    class _GRU4Rec(nn.Module):
+        """GRU-based next-item recommender (Hidasi et al., 2015).
+
+        Embeds each item index, runs a GRU over the session's item sequence, and projects the
+        hidden state at every timestep to logits over the real item catalog. The embedding
+        table is sized ``n_items + 1`` so index ``n_items`` can serve as a padding token; the
+        final linear layer still emits ``n_items`` logits (real items only).
+        """
+
+        def __init__(self, n_items: int, embedding_dim: int, hidden_dim: int, num_layers: int):
+            super().__init__()
+            self.embedding = nn.Embedding(n_items + 1, embedding_dim)
+            self.gru = nn.GRU(embedding_dim, hidden_dim, num_layers, batch_first=True)
+            self.fc = nn.Linear(hidden_dim, n_items)
+
+        def forward(self, item_seq: torch.LongTensor) -> torch.Tensor:
+            emb = self.embedding(item_seq)  # (batch, seq_len, emb_dim)
+            gru_out, _ = self.gru(emb)  # (batch, seq_len, hidden_dim)
+            logits = self.fc(gru_out)  # (batch, seq_len, n_items)
+            return logits
+
+    embedding_dim = int(params.get("embedding_dim", 32))
+    hidden_dim = int(params.get("hidden_dim", 64))
+    num_layers = int(params.get("num_layers", 1))
+    epochs = int(params.get("epochs", 10))
+    batch_size = int(params.get("batch_size", 64))
+    learning_rate = float(params.get("learning_rate", 0.001))
+    seed = int(params.get("seed", 0))
+
+    n_items = len(sequences.item_ids)
+    pad_idx = n_items
+
+    torch.manual_seed(seed)
+    torch.use_deterministic_algorithms(True)
+
+    model = _GRU4Rec(n_items, embedding_dim, hidden_dim, num_layers)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    criterion = nn.CrossEntropyLoss(ignore_index=pad_idx)
+
+    final_loss = 0.0
+    for _epoch in range(epochs):
+        order = torch.randperm(len(sequences.sequences))
+        epoch_loss = 0.0
+        n_batches = 0
+        for start in range(0, len(sequences.sequences), batch_size):
+            batch_idx = order[start : start + batch_size].tolist()
+            batch_seqs = [sequences.sequences[i] for i in batch_idx]
+            batch_seqs = [s for s in batch_seqs if len(s) > 1]
+            if not batch_seqs:
+                continue
+            max_len = max(len(s) for s in batch_seqs)
+            inputs = [s[:-1] for s in batch_seqs]
+            targets = [s[1:] for s in batch_seqs]
+            input_t = torch.tensor(
+                [s + [pad_idx] * (max_len - 1 - len(s)) for s in inputs], dtype=torch.long
+            )
+            target_t = torch.tensor(
+                [t + [pad_idx] * (max_len - 1 - len(t)) for t in targets], dtype=torch.long
+            )
+            logits = model(input_t)  # (batch, max_len-1, n_items)
+            batch_loss = criterion(logits.reshape(-1, n_items), target_t.reshape(-1))
+            optimizer.zero_grad()
+            batch_loss.backward()
+            optimizer.step()
+            epoch_loss += batch_loss.item()
+            n_batches += 1
+        final_loss = epoch_loss / max(n_batches, 1)
+
+    model.eval()
+
+    return FittedRecommender(
+        algorithm="gru4rec",
+        algorithm_family="sequential",
+        n_users=len(sequences.session_ids),
+        n_items=n_items,
+        fit_stats={
+            "n_sessions": len(sequences.sequences),
+            "n_items": n_items,
+            "max_seq_len": sequences.max_seq_len,
+            "embedding_dim": embedding_dim,
+            "hidden_dim": hidden_dim,
+            "epochs": epochs,
+            "final_loss": final_loss,
+        },
+        model={
+            "model": model,
+            "sequences": sequences,
+            "session_ids": sequences.session_ids,
+            "item_ids": sequences.item_ids,
+            "item_index": sequences.item_index,
+            "max_seq_len": sequences.max_seq_len,
+            "pad_idx": pad_idx,
+        },
+    )
+
+
+def _recommend_gru4rec(
+    recommender: FittedRecommender,
+    user_ids: list[Any] | None,
+    n: int,
+    exclude_known: bool,
+) -> RecommendationResult:
+    """Recommend top-N next items per session using the fitted GRU4Rec model.
+
+    Each session's last ``max_seq_len`` item indices are fed through the model in eval mode
+    under ``torch.no_grad()``; the logits at the final timestep score every item. Sessions
+    with no history (cold-start) are skipped.
+    """
+    import torch  # noqa: PLC0415  (lazy: torch is not a hard dependency)
+
+    model_dict = recommender.model
+    torch_model = model_dict["model"]
+    sequences = model_dict["sequences"]
+    session_ids = model_dict["session_ids"]
+    item_ids = model_dict["item_ids"]
+    max_seq_len = model_dict["max_seq_len"]
+
+    if user_ids is None:
+        user_ids = list(session_ids)
+
+    session_to_seq = dict(zip(sequences.session_ids, sequences.sequences, strict=True))
+
+    torch_model.eval()
+    rows: list[dict[str, Any]] = []
+    with torch.no_grad():
+        for session_id in user_ids:
+            if session_id not in session_to_seq:
+                continue
+            seq = session_to_seq[session_id]
+            input_seq = seq[-max_seq_len:]
+            input_t = torch.tensor([input_seq], dtype=torch.long)
+            logits = torch_model(input_t)[0, -1, :]  # (n_items,)
+            scores = logits.numpy()
+
+            known_items: set[Any] = set()
+            if exclude_known:
+                known_items = {item_ids[i] for i in input_seq}
+
+            order = np.argsort(scores)[::-1]
+            rank = 0
+            for item_idx in order:
+                item_idx = int(item_idx)
+                item_id = item_ids[item_idx]
+                if item_id in known_items:
+                    continue
+                rank += 1
+                rows.append(
+                    {
+                        "user_id": session_id,
+                        "item_id": item_id,
+                        "rank": rank,
+                        "score": float(scores[item_idx]),
+                    }
+                )
+                if rank >= n:
+                    break
+
+    recommendations = pd.DataFrame(rows, columns=["user_id", "item_id", "rank", "score"])
+    return RecommendationResult(recommendations=recommendations)
+
+
+register_recommender(
+    RecommenderSpec(
+        key="gru4rec",
+        family="sequential",
+        fitter=None,
+        recommend_fn=_recommend_gru4rec,
+        similar_items_fn=None,
+        sequence_fitter=_fit_gru4rec,
+        required_params=(),
+        optional_params=(
+            "embedding_dim",
+            "hidden_dim",
+            "num_layers",
+            "epochs",
+            "batch_size",
+            "learning_rate",
+            "seed",
+        ),
+        param_metadata=(
+            RecommenderParamSpec(
+                name="embedding_dim", type="int", default=32, help="Item embedding dimension."
+            ),
+            RecommenderParamSpec(
+                name="hidden_dim", type="int", default=64, help="GRU hidden dimension."
+            ),
+            RecommenderParamSpec(
+                name="num_layers", type="int", default=1, help="Number of GRU layers."
+            ),
+            RecommenderParamSpec(name="epochs", type="int", default=10, help="Training epochs."),
+            RecommenderParamSpec(
+                name="batch_size", type="int", default=64, help="Mini-batch size."
+            ),
+            RecommenderParamSpec(
+                name="learning_rate", type="float", default=0.001, help="Adam learning rate."
+            ),
+            RecommenderParamSpec(name="seed", type="int", default=0, help="Random seed."),
+        ),
+        requires_extra="torch",
+        handles_cold_start_users=False,
+        handles_cold_start_items=False,
+        description="Session-based sequential recommender using a GRU (GRU4Rec). Requires torch.",
     )
 )

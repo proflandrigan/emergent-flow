@@ -332,6 +332,8 @@ def test_evaluate_empty_test_set():
     assert result.aggregate["mean_ndcg_at_k"] == 0.0
     assert result.aggregate["hit_rate"] == 0.0
     assert result.aggregate["map_at_k"] == 0.0
+    assert result.aggregate["mean_mrr_at_k"] == 0.0
+    assert result.aggregate["mean_auc_at_k"] == 0.0
     assert result.aggregate["coverage"] == 0.0
     assert result.aggregate["diversity"] == 0.0
     assert result.aggregate["novelty"] == 0.0
@@ -431,12 +433,12 @@ def test_system_single_user_degenerate():
     assert "novelty" in result.aggregate
 
 
-def test_evaluate_all_eight_metrics_accepted():
-    """All 8 metric names accepted; metrics=None returns all 8 aggregate keys."""
+def test_evaluate_all_ten_metrics_accepted():
+    """All 10 metric names accepted; metrics=None returns all 10 aggregate keys."""
     recommender, _ = _make_fitted_popularity()
     test = _make_test_interactions()
 
-    # Explicit list of all 8
+    # Explicit list of all 10
     result = evaluate(
         recommender,
         test,
@@ -450,6 +452,8 @@ def test_evaluate_all_eight_metrics_accepted():
             "coverage",
             "diversity",
             "novelty",
+            "mrr_at_k",
+            "auc_at_k",
         ],
     )
     expected_aggregate_keys = {
@@ -461,9 +465,11 @@ def test_evaluate_all_eight_metrics_accepted():
         "coverage",
         "diversity",
         "novelty",
+        "mean_mrr_at_k",
+        "mean_auc_at_k",
     }
     assert set(result.aggregate.keys()) == expected_aggregate_keys
-    # per_user columns unchanged — only the 5 ranking-metric columns
+    # per_user columns — the 7 ranking-metric columns
     expected_per_user_cols = {
         "user_id",
         "precision_at_k",
@@ -471,12 +477,40 @@ def test_evaluate_all_eight_metrics_accepted():
         "ndcg_at_k",
         "hit",
         "average_precision",
+        "mrr_at_k",
+        "auc_at_k",
     }
     assert set(result.per_user.columns) == expected_per_user_cols
 
-    # Default (metrics=None) also returns all 8
+    # Default (metrics=None) also returns all 10
     result_default = evaluate(recommender, test, k=2)
     assert set(result_default.aggregate.keys()) == expected_aggregate_keys
+
+
+def test_evaluate_mrr_and_auc_only():
+    """metrics=['mrr_at_k', 'auc_at_k'] returns only those per-user columns and the
+    mean_mrr_at_k / mean_auc_at_k aggregate keys."""
+    recommender, _ = _make_fitted_popularity()
+    test = _make_test_interactions()
+    result = evaluate(recommender, test, k=2, metrics=["mrr_at_k", "auc_at_k"])
+
+    assert list(result.per_user.columns) == ["user_id", "mrr_at_k", "auc_at_k"]
+    assert list(result.aggregate.keys()) == ["mean_mrr_at_k", "mean_auc_at_k"]
+
+    # k=2 with the evaluate() exclude_known=True top-2 rankings:
+    #   User 1: [C, D], relevant={C} -> MRR=1/1=1.0; AUC: rel={C}, nonrel={D} -> 1.0
+    #   User 2: [B, D], relevant={D} -> MRR=1/2=0.5; AUC: rel={D}, nonrel={B} -> 0.0
+    #   User 3: [B, C], relevant={B} -> MRR=1/1=1.0; AUC: rel={B}, nonrel={C} -> 1.0
+    pu = result.per_user.set_index("user_id")
+    assert pu.loc[1, "mrr_at_k"] == pytest.approx(1.0)
+    assert pu.loc[2, "mrr_at_k"] == pytest.approx(0.5)
+    assert pu.loc[3, "mrr_at_k"] == pytest.approx(1.0)
+    assert pu.loc[1, "auc_at_k"] == pytest.approx(1.0)
+    assert pu.loc[2, "auc_at_k"] == pytest.approx(0.0)
+    assert pu.loc[3, "auc_at_k"] == pytest.approx(1.0)
+
+    assert result.aggregate["mean_mrr_at_k"] == pytest.approx((1.0 + 0.5 + 1.0) / 3)
+    assert result.aggregate["mean_auc_at_k"] == pytest.approx((1.0 + 0.0 + 1.0) / 3)
 
 
 # ===================================================================
@@ -492,7 +526,7 @@ def _make_fitted_random() -> tuple:
     return recommender, train
 
 
-ALL_EIGHT_METRIC_COLS = {
+ALL_TEN_METRIC_COLS = {
     "mean_precision_at_k",
     "mean_recall_at_k",
     "mean_ndcg_at_k",
@@ -501,8 +535,10 @@ ALL_EIGHT_METRIC_COLS = {
     "coverage",
     "diversity",
     "novelty",
+    "mean_mrr_at_k",
+    "mean_auc_at_k",
 }
-EXPECTED_COMPARE_COLS = {"algorithm", "is_baseline"} | ALL_EIGHT_METRIC_COLS
+EXPECTED_COMPARE_COLS = {"algorithm", "is_baseline"} | ALL_TEN_METRIC_COLS
 
 
 def test_compare_with_popularity_in_list_no_auto_baseline():

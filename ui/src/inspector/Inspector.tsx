@@ -22,6 +22,7 @@ import { ConfigForm } from "./ConfigForm";
 import { FlowParamsPanel } from "./FlowParamsPanel";
 import { LineagePanel } from "./LineagePanel";
 import { PayloadView } from "./PayloadView";
+import { isRecommendationPayload, RecommendationsPanel } from "./RecommendationsPanel";
 import { StepsPanel } from "./StepsPanel";
 
 type InspectorTab = "config" | "code" | "results" | "steps" | "lineage";
@@ -201,15 +202,27 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
             last run: {formatAgo(lastRunAt)}
           </div>
         ) : null}
-        {Object.entries(nodeResults).map(([portName, payload]) => (
-          <div key={portName} style={{ marginBottom: "0.5rem" }}>
-            <span style={{ fontWeight: 600 }}>{portName}</span>
-            <PayloadView
-              payload={payload}
-              onColumnClick={payload.kind === "table" ? setTracedColumn : undefined}
-            />
-          </div>
-        ))}
+        {Object.entries(nodeResults).map(([portName, payload]) => {
+          const isRecommendation =
+            (node?.type === "recommend.recommend" ||
+              node?.type === "recommend.similar_items") &&
+            isRecommendationPayload(payload);
+          return (
+            <div key={portName} style={{ marginBottom: "0.5rem" }}>
+              <span style={{ fontWeight: 600 }}>{portName}</span>
+              {isRecommendation ? (
+                <RecommendationsPanel payload={payload} />
+              ) : (
+                <PayloadView
+                  payload={payload}
+                  onColumnClick={
+                    payload.kind === "table" ? setTracedColumn : undefined
+                  }
+                />
+              )}
+            </div>
+          );
+        })}
         {tracedColumn !== null ? (
           <div data-testid="results-column-lineage" style={{ marginTop: "0.75rem" }}>
             <ColumnLineagePanel nodeId={nodeId} column={tracedColumn} debounceMs={0} />

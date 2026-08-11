@@ -33,14 +33,15 @@ class RecommendFitTwoTower(NodeDefinition):
     Non-numeric columns are ignored."""
 
     type = "recommend.fit_two_tower"
-    version = 1
+    version = 2
     family = "recommend"
     label = "Fit Two-Tower Recommender"
     category = "Recommenders"
     description = (
         "Fit a two-tower retrieval model. Optionally consumes an item-features frame "
         "(one row per item, keyed by an 'item_id' column plus numeric columns) and a "
-        "user-features frame (one row per user, keyed by 'user_id' plus numeric columns)."
+        "user-features frame (one row per user, keyed by 'user_id' plus numeric columns). "
+        "Enable id embeddings with use_user_id_embedding / use_item_id_embedding."
     )
 
     ports = [
@@ -90,8 +91,9 @@ class RecommendFitTwoTower(NodeDefinition):
             label="Algorithm params",
             help=(
                 "Keyword arguments for the two-tower model (e.g. epochs, user_embedding_dim, "
-                "item_embedding_dim, loss). Use item_id_col / user_id_col to point at non-default "
-                "id columns in the feature frames."
+                "item_embedding_dim, loss, use_user_id_embedding, use_item_id_embedding). "
+                "Use item_id_col / user_id_col to point at non-default id columns in the "
+                "feature frames."
             ),
         ),
     ]

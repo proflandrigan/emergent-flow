@@ -69,3 +69,41 @@ def _average_precision_at_k(recommended: list[Any], relevant: set[Any], k: int) 
             n_hits += 1
             score += n_hits / (i + 1)
     return score / n_relevant_total
+
+
+def _mrr_at_k(recommended: list[Any], relevant: set[Any], k: int) -> float:
+    """Mean reciprocal rank at k: 1.0 / rank of the first relevant item in the top-k
+    recommended items (rank is 1-based). 0.0 if k <= 0, recommended is empty, relevant is
+    empty, or no relevant item appears in the top-k."""
+    if k <= 0 or not recommended or not relevant:
+        return 0.0
+    for i in range(min(k, len(recommended))):
+        if recommended[i] in relevant:
+            return 1.0 / (i + 1)
+    return 0.0
+
+
+def _auc_at_k(recommended: list[Any], relevant: set[Any], k: int) -> float:
+    """Ranking AUC over the top-k recommended items: for every pair (rel_item, nonrel_item)
+    both in the top-k, count 1 if the relevant item is ranked before the non-relevant item,
+    0.5 if tied, 0 otherwise; divide by the total number of such pairs. 0.0 when the
+    denominator is 0 (no relevant or no non-relevant items in the top-k, k <= 0, or empty
+    input)."""
+    if k <= 0 or not recommended or not relevant:
+        return 0.0
+    topk = recommended[:k]
+    relevant_in_topk = [item for item in topk if item in relevant]
+    nonrelevant_in_topk = [item for item in topk if item not in relevant]
+    denominator = len(relevant_in_topk) * len(nonrelevant_in_topk)
+    if denominator == 0:
+        return 0.0
+    score = 0.0
+    for rel_item in relevant_in_topk:
+        for nonrel_item in nonrelevant_in_topk:
+            rel_rank = topk.index(rel_item)
+            nonrel_rank = topk.index(nonrel_item)
+            if rel_rank < nonrel_rank:
+                score += 1.0
+            elif rel_rank == nonrel_rank:
+                score += 0.5
+    return score / denominator

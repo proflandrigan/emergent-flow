@@ -39,6 +39,7 @@
     "Recommender",
     "Report",
     "Schema",
+    "SequenceDataset",
     "StatsModel",
     "TTestResult",
     "Tensor",

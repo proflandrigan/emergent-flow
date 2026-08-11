@@ -603,6 +603,7 @@ function EstimatorParamsField({
 
 interface EstimatorChoiceRowProps extends ParamRowProps {
   dictParam: string;
+  source: CuratedSource;
 }
 
 // Renders the "pick an algorithm/estimator" choice param for a curated-param node type.
@@ -611,17 +612,43 @@ interface EstimatorChoiceRowProps extends ParamRowProps {
 // unrecognized "overflow" in EstimatorParamsField and gets resubmitted verbatim on the next
 // curated edit, which the backend rejects with InvalidEstimatorParamsError for the
 // newly-selected choice.
+//
+// For recommenders (`source === "recommenders"`) the choices are grouped by recommender
+// `family` via <optgroup>, every option carries its catalog `description` as a hover `title`,
+// and the selected recommender's description is shown beneath the dropdown. Estimator choices
+// stay a flat, ungrouped list.
 function EstimatorChoiceRow({
   node,
   param,
   meta,
   dictParam,
+  source,
 }: EstimatorChoiceRowProps): JSX.Element {
   const setParam = useGraphStore((s) => s.setParam);
+  const catalog = useCatalog();
   const catalogParam = resolveCatalogParam(meta, param);
   const choices = catalogParam.hints?.choices ?? [];
   const error = validateValue(catalogParam, param.value);
   const testId = `param-${param.name}`;
+  const choiceValue = formatValue(catalogParam, param.value);
+  const grouped = source === "recommenders";
+  const selectedRecommender =
+    grouped ? catalog.recommenders.find((r) => r.key === choiceValue) : undefined;
+
+  // Group recommender choices by family, preserving the catalog's declaration order.
+  const groupedFamilies: string[] = [];
+  const choicesByFamily = new Map<string, string[]>();
+  if (grouped) {
+    for (const choice of choices) {
+      const family =
+        catalog.recommenders.find((r) => r.key === choice)?.family ?? "Other";
+      if (!choicesByFamily.has(family)) {
+        choicesByFamily.set(family, []);
+        groupedFamilies.push(family);
+      }
+      choicesByFamily.get(family)!.push(choice);
+    }
+  }
 
   return (
     <div style={{ marginBottom: "0.75rem" }}>
@@ -633,7 +660,7 @@ function EstimatorChoiceRow({
       </label>
       <Select
         data-testid={testId}
-        value={formatValue(catalogParam, param.value)}
+        value={choiceValue}
         onChange={(e) => {
           const next = parseValue(catalogParam, e.target.value);
           if (next !== param.value) {
@@ -643,12 +670,39 @@ function EstimatorChoiceRow({
         }}
       >
         <option value="" />
-        {choices.map((choice) => (
-          <option key={choice} value={choice}>
-            {choice}
-          </option>
-        ))}
+        {grouped
+          ? groupedFamilies.map((family) => (
+              <optgroup key={family} label={family}>
+                {choicesByFamily.get(family)!.map((choice) => (
+                  <option
+                    key={choice}
+                    value={choice}
+                    title={
+                      catalog.recommenders.find((r) => r.key === choice)?.description
+                    }
+                  >
+                    {choice}
+                  </option>
+                ))}
+              </optgroup>
+            ))
+          : choices.map((choice) => (
+              <option
+                key={choice}
+                value={choice}
+                title={
+                  catalog.estimators.find((e) => e.key === choice)?.description
+                }
+              >
+                {choice}
+              </option>
+            ))}
       </Select>
+      {selectedRecommender?.description ? (
+        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+          {selectedRecommender.description}
+        </div>
+      ) : null}
       {meta?.help ? (
         <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{meta.help}</div>
       ) : null}
@@ -726,6 +780,7 @@ export function ConfigForm({ node }: { node: NodeModel }): JSX.Element {
               param={param}
               meta={meta}
               dictParam={curated.dictParam}
+              source={curated.source}
             />
           );
         }

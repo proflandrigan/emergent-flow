@@ -295,6 +295,39 @@ test("recommend.fit renders curated per-param widgets from catalog.recommenders 
   expect(screen.getByTestId("estimator-params-advanced-params")).toBeInTheDocument();
 });
 
+test("recommend.fit groups the algorithm dropdown by family and shows the selected description", () => {
+  const id = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("recommend.fit"), { x: 0, y: 0 });
+  useGraphStore.getState().setParam(id, "algorithm", "popularity");
+  const node = useGraphStore.getState().nodes[id];
+  render(<ConfigForm node={node} />);
+
+  const select = screen.getByTestId("param-algorithm") as HTMLSelectElement;
+  const baseline = Array.from(select.querySelectorAll("optgroup")).find(
+    (g) => g.label === "baseline",
+  );
+  expect(baseline).toBeDefined();
+  const baselineChoices = Array.from(baseline!.querySelectorAll("option")).map(
+    (o) => o.value,
+  );
+  expect(baselineChoices).toContain("popularity");
+
+  // Hovering an option exposes its catalog description.
+  const popularityOption = Array.from(select.querySelectorAll("option")).find(
+    (o) => o.value === "popularity",
+  );
+  expect(popularityOption?.title).toBe(
+    catalog.recommenders.find((r) => r.key === "popularity")?.description,
+  );
+
+  // The selected algorithm's description is rendered below the dropdown.
+  const description = catalog.recommenders.find((r) => r.key === "popularity")
+    ?.description;
+  expect(description).toBeDefined();
+  expect(screen.getByText(description!)).toBeInTheDocument();
+});
+
 test("editing a curated recommender kwarg writes into the recommend.fit params dict", () => {
   const id = useGraphStore
     .getState()

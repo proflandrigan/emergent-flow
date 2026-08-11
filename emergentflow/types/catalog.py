@@ -222,6 +222,15 @@ register_type(
 )
 register_type(
     TypeDef(
+        token="SequenceDataset",
+        description=(
+            "Session-shaped interaction data produced by ef.recommend.build_sequences: "
+            "ordered item-index sequences per session, used by sequential recommenders."
+        ),
+    )
+)
+register_type(
+    TypeDef(
         token="RecommendationResult",
         description=(
             "The terminal recommendation payload produced by "

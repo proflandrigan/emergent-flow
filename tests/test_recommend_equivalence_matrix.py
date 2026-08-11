@@ -13,7 +13,9 @@ import pandas as pd
 import pytest
 
 from emergentflow.nodes.examples.recommend_fit import RecommendFit
+from emergentflow.nodes.examples.recommend_fit_sequence import RecommendFitSequence
 from emergentflow.nodes.examples.recommend_recommend import Recommend
+from emergentflow.recommend import build_sequences
 from emergentflow.recommend.interactions import InteractionMatrix
 from emergentflow.recommend.registry import get_recommender_spec, known_recommender_keys
 
@@ -23,6 +25,20 @@ def _run_codegen(definition, node, scope):
     frag = definition.preview(node)
     exec(frag.render(), scope)  # noqa: S102 -- test-only, on our own emitted code
     return scope
+
+
+def _make_sequence_dataset() -> object:
+    """Small session dataset for sequential recommender equivalence tests."""
+    df = pd.DataFrame(
+        {
+            "user_id": ["u1", "u1", "u1", "u2", "u2", "u2", "u3", "u3", "u3"],
+            "item_id": ["i1", "i2", "i3", "i2", "i3", "i4", "i1", "i3", "i4"],
+            "session_id": ["s1", "s1", "s1", "s2", "s2", "s2", "s3", "s3", "s3"],
+        }
+    )
+    return build_sequences(
+        df, user_col="user_id", item_col="item_id", session_col="session_id"
+    )
 
 
 def _make_interactions() -> InteractionMatrix:
@@ -139,6 +155,13 @@ _PARAMS: dict[str, dict] = {
         "batch_size": 4,
         "seed": 0,
     },
+    "gru4rec": {
+        "embedding_dim": 4,
+        "hidden_dim": 8,
+        "epochs": 1,
+        "batch_size": 4,
+        "seed": 0,
+    },
 }
 
 #: Content-based keys need the item_features DataFrame; every other key fits on the
@@ -192,7 +215,14 @@ _BASE_KEYS = sorted(
     k for k in known_recommender_keys() if get_recommender_spec(k).requires_extra is None
 )
 _RECOMMEND_EXTRA_KEYS = _keys_requiring_extra("emergentflow[recommend]")
-_TORCH_KEYS = _keys_requiring_extra("torch")
+_TORCH_KEYS = sorted(
+    k
+    for k in _keys_requiring_extra("torch")
+    if get_recommender_spec(k).fitter is not None
+)
+_TORCH_SEQUENCE_KEYS = sorted(
+    k for k in _keys_requiring_extra("torch") if get_recommender_spec(k).sequence_fitter is not None
+)
 
 
 @pytest.mark.equivalence
@@ -217,3 +247,33 @@ def test_recommend_fit_recommend_equivalence_torch(algorithm: str) -> None:
     """ADR-0002, torch-backed deep keys (NCF, two-tower)."""
     pytest.importorskip("torch")
     _run_equivalence_for(algorithm)
+
+
+@pytest.mark.equivalence
+@pytest.mark.parametrize("algorithm", _TORCH_SEQUENCE_KEYS)
+def test_recommend_fit_sequence_recommend_equivalence_torch(algorithm: str) -> None:
+    """ADR-0002, torch-backed sequence keys (GRU4Rec)."""
+    pytest.importorskip("torch")
+    sequences = _make_sequence_dataset()
+    params = _PARAMS.get(algorithm, {})
+
+    fit_def = RecommendFitSequence()
+    fit_node = fit_def.instantiate(algorithm=algorithm, params=params)
+    rec_def = Recommend()
+    rec_node = rec_def.instantiate(n=_N_RECOMMENDATIONS)
+
+    fit_result = fit_def.execute(fit_node, {"sequences": sequences})
+    exec_result = rec_def.execute(rec_node, {"recommender": fit_result["recommender"]})
+
+    scope: dict = {"sequences": sequences}
+    _run_codegen(fit_def, fit_node, scope)
+    _run_codegen(rec_def, rec_node, scope)
+    codegen_result = scope["result"]
+
+    pd.testing.assert_frame_equal(
+        exec_result["result"].recommendations.reset_index(drop=True),
+        codegen_result.recommendations.reset_index(drop=True),
+        check_exact=False,
+        rtol=1e-6,
+        atol=1e-9,
+    )

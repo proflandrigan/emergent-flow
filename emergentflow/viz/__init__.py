@@ -406,6 +406,8 @@ _COMPARE_METRIC_COLUMNS = (
     "mean_ndcg_at_k",
     "hit_rate",
     "map_at_k",
+    "mean_mrr_at_k",
+    "mean_auc_at_k",
     "coverage",
     "diversity",
     "novelty",
@@ -426,7 +428,8 @@ def plot_metric_comparison(
     selects which metric columns to plot; ``None`` (the default) plots every column in
     ``comparison`` that is one of the standard compare() metric columns
     (``mean_precision_at_k``, ``mean_recall_at_k``, ``mean_ndcg_at_k``, ``hit_rate``,
-    ``map_at_k``, ``coverage``, ``diversity``, ``novelty``) and is actually present in
+    ``map_at_k``, ``mean_mrr_at_k``, ``mean_auc_at_k``, ``coverage``, ``diversity``,
+    ``novelty``) and is actually present in
     ``comparison`` (a caller may have passed a narrower ``metrics=`` subset into ``compare()``
     directly, in which case only the columns that survive are used). Raises
     :class:`~emergentflow.viz.errors.VizError` if ``comparison`` has no ``algorithm`` column,
