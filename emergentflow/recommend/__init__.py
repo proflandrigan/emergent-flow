@@ -38,19 +38,37 @@ from emergentflow.recommend.errors import (
 )
 from emergentflow.recommend.interactions import InteractionMatrix, _prepare_interactions
 from emergentflow.recommend.metrics import (
+    _auc_at_k,
     _average_precision_at_k,
     _hit,
+    _mrr_at_k,
     _ndcg_at_k,
     _precision_at_k,
     _recall_at_k,
 )
-from emergentflow.recommend.models import EvalResult, FittedRecommender, RecommendationResult
+from emergentflow.recommend.models import (
+    EvalResult,
+    FittedRecommender,
+    RecommendationResult,
+    SequenceDataset,
+)
 from emergentflow.recommend.registry import RecommenderSpec, get_recommender_spec
+from emergentflow.recommend.sequences import build_sequences as _build_sequences
+from emergentflow.recommend.transforms import (
+    encode_categorical_features as _encode_categorical_features,
+)
+from emergentflow.recommend.transforms import (
+    weight_interactions_by_recency as _weight_interactions_by_recency,
+)
 
 __all__ = [
+    "SequenceDataset",
+    "build_sequences",
     "compare",
+    "encode_categorical_features",
     "evaluate",
     "fit",
+    "fit_sequence",
     "fit_two_tower",
     "hybrid_switching",
     "hybrid_weighted",
@@ -61,6 +79,7 @@ __all__ = [
     "temporal_split",
     "save_model",
     "load_model",
+    "weight_interactions_by_recency",
 ]
 
 #: Pip extra -> probe modules whose absence means the extra is not installed, mirroring
@@ -102,6 +121,103 @@ def _validate_params(spec: RecommenderSpec, params: dict[str, Any]) -> dict[str,
     return dict(params)
 
 
+@public_op(name="ef.recommend.encode_categorical_features")
+def encode_categorical_features(
+    df: pd.DataFrame,
+    *,
+    columns: list[str],
+    id_col: str,
+    strategy: str = "onehot",
+    drop_first: bool = False,
+) -> pd.DataFrame:
+    """Encode categorical columns in a user- or item-feature frame while preserving its id column.
+
+    The dedicated transform for preparing raw categorical user/item feature frames before
+    wiring them into the two-tower seam (Epic 15, Story 11), which only consumes numeric
+    columns. ``strategy='onehot'`` produces one indicator column per category level (named
+    ``category_value``); ``strategy='ordinal'`` produces one numeric column per input column
+    (keeping the original names). ``drop_first`` (one-hot only) drops one level per input
+    column to avoid collinearity. The id column is preserved untouched as the first column of
+    the returned frame. Raises
+    :class:`~emergentflow.recommend.errors.InvalidRecommenderParamsError` if ``id_col`` or any
+    of ``columns`` is absent from *df*, or ``strategy`` is not ``'onehot'``/``'ordinal'``.
+    Never mutates *df*.
+    """
+    return _encode_categorical_features(
+        df, columns=columns, id_col=id_col, strategy=strategy, drop_first=drop_first
+    )
+
+
+@public_op(name="ef.recommend.weight_interactions_by_recency")
+def weight_interactions_by_recency(
+    df: pd.DataFrame,
+    *,
+    timestamp_col: str,
+    user_col: str,
+    item_col: str,
+    value_col: str = "weight",
+    decay: str = "exponential",
+    half_life_days: float = 30.0,
+    reference_time: pd.Timestamp | str | None = None,
+) -> pd.DataFrame:
+    """Return a copy of *df* with an added numeric *value_col* that decays with event age.
+
+    The single seam every recency-weighting node routes through (Epic 15), producing a
+    ``value_col`` suitable for ``prepare_interactions``. Weights decay exponentially with event
+    age measured against *reference_time* (defaulting to the newest timestamp in *df*): an event
+    *half_life_days* old is weighted ``0.5``. Raises
+    :class:`~emergentflow.recommend.errors.InvalidRecommenderParamsError` if ``timestamp_col``,
+    ``user_col``, or ``item_col`` is absent from *df*, ``decay`` is not ``'exponential'``,
+    ``half_life_days`` is not positive, or ``timestamp_col`` contains null/NaT values (recency
+    is undefined for a missing timestamp). An unparseable or NaT ``reference_time`` also raises
+    (recency cannot be computed against an unparseable reference). Never mutates *df*.
+    """
+    return _weight_interactions_by_recency(
+        df,
+        timestamp_col=timestamp_col,
+        user_col=user_col,
+        item_col=item_col,
+        value_col=value_col,
+        decay=decay,
+        half_life_days=half_life_days,
+        reference_time=reference_time,
+    )
+
+
+@public_op(name="ef.recommend.build_sequences")
+def build_sequences(
+    df: pd.DataFrame,
+    *,
+    user_col: str,
+    item_col: str,
+    session_col: str | None = None,
+    timestamp_col: str | None = None,
+    max_seq_len: int = 50,
+    min_seq_len: int = 2,
+) -> SequenceDataset:
+    """Build a SequenceDataset from an event DataFrame.
+
+    The single seam every sequential-recommender data-prep node routes through (Epic 15).
+    Each session becomes one chronologically-ordered sequence of item indices; when
+    ``session_col`` is None, each user is treated as one session. Sequences are sorted by
+    ``timestamp_col`` when provided, truncated to the last ``max_seq_len`` items, and
+    sequences shorter than ``min_seq_len`` are dropped. Item indices are deterministic
+    (sorted item ids) and lie in ``[0, n_items)``. Raises
+    :class:`~emergentflow.recommend.errors.InvalidRecommenderParamsError` if ``user_col``/
+    ``item_col`` (or ``session_col``/``timestamp_col`` when provided) are absent from *df*,
+    or ``max_seq_len < min_seq_len``/``min_seq_len < 2``. Never mutates *df*.
+    """
+    return _build_sequences(
+        df,
+        user_col=user_col,
+        item_col=item_col,
+        session_col=session_col,
+        timestamp_col=timestamp_col,
+        max_seq_len=max_seq_len,
+        min_seq_len=min_seq_len,
+    )
+
+
 @public_op(name="ef.recommend.fit")
 def fit(
     interactions: InteractionMatrix,
@@ -131,7 +247,30 @@ def fit(
     resolved_params = _validate_params(spec, params or {})
     if spec.requires_extra is not None:
         _require_extra(spec.requires_extra)
+    if spec.fitter is None:
+        raise InvalidRecommenderParamsError(
+            f"algorithm {algorithm!r} must be fit via ef.recommend.fit_sequence(...)."
+        )
     return spec.fitter(interactions, item_features, resolved_params)
+
+
+@public_op(name="ef.recommend.fit_sequence")
+def fit_sequence(
+    sequences: SequenceDataset,
+    *,
+    algorithm: str,
+    params: dict[str, Any] | None = None,
+) -> FittedRecommender:
+    """Fit a curated sequential recommender algorithm."""
+    spec = get_recommender_spec(algorithm)
+    resolved_params = _validate_params(spec, params or {})
+    if spec.requires_extra is not None:
+        _require_extra(spec.requires_extra)
+    if spec.sequence_fitter is None:
+        raise InvalidRecommenderParamsError(
+            f"algorithm {algorithm!r} is not a sequence model; use ef.recommend.fit(...) instead."
+        )
+    return spec.sequence_fitter(sequences, resolved_params)
 
 
 @public_op(name="ef.recommend.fit_two_tower")
@@ -220,6 +359,8 @@ _VALID_EVAL_METRICS = frozenset(
         "coverage",
         "diversity",
         "novelty",
+        "mrr_at_k",
+        "auc_at_k",
     }
 )
 
@@ -244,12 +385,12 @@ def evaluate(
     cold-start behavior.
 
     ``metrics`` selects the subset of ``{"precision_at_k", "recall_at_k", "ndcg_at_k",
-    "map_at_k", "hit_rate", "coverage", "diversity", "novelty"}`` to compute; ``None`` (the
-    default) computes all eight. Raises
+    "map_at_k", "hit_rate", "coverage", "diversity", "novelty", "mrr_at_k", "auc_at_k"}`` to
+    compute; ``None`` (the default) computes all ten. Raises
     :class:`~emergentflow.recommend.errors.InvalidRecommenderParamsError` for an unknown metric
     name or ``k <= 0``.
 
-    Three of the eight metrics are system-level (computed once across all users, never per-user):
+    Three of the ten metrics are system-level (computed once across all users, never per-user):
     coverage = fraction of catalog items appearing in any user's top-k; diversity = 1 -- mean
     pairwise cosine similarity of users' top-k item sets; novelty = mean ``-log2(popularity)`` of
     recommended items, popularity measured within ``test_interactions``. These appear only in
@@ -310,6 +451,10 @@ def evaluate(
                 row["hit"] = _hit(recommended, relevant, k)
             if "map_at_k" in requested:
                 row["average_precision"] = _average_precision_at_k(recommended, relevant, k)
+            if "mrr_at_k" in requested:
+                row["mrr_at_k"] = _mrr_at_k(recommended, relevant, k)
+            if "auc_at_k" in requested:
+                row["auc_at_k"] = _auc_at_k(recommended, relevant, k)
             rows.append(row)
 
     per_user = pd.DataFrame(rows) if rows else pd.DataFrame(columns=["user_id"])
@@ -325,6 +470,10 @@ def evaluate(
         aggregate["hit_rate"] = float(per_user["hit"].mean()) if rows else 0.0
     if "map_at_k" in requested:
         aggregate["map_at_k"] = float(per_user["average_precision"].mean()) if rows else 0.0
+    if "mrr_at_k" in requested:
+        aggregate["mean_mrr_at_k"] = float(per_user["mrr_at_k"].mean()) if rows else 0.0
+    if "auc_at_k" in requested:
+        aggregate["mean_auc_at_k"] = float(per_user["auc_at_k"].mean()) if rows else 0.0
 
     if "coverage" in requested:
         if test_users and test_interactions.n_items > 0:
@@ -380,11 +529,12 @@ def compare(
     The recommend-family analog to ``ef.ml.compare_models`` (Epic 15, Story 12). Unlike
     ``compare_models``, every candidate here arrives already fitted -- ``compare`` does not fit
     anything except the automatic popularity baseline described below. Calls the existing
-    :func:`evaluate` wrapper once per recommender (all 8 metrics -- see ``evaluate``'s
+    :func:`evaluate` wrapper once per recommender (all 10 metrics -- see ``evaluate``'s
     ``_VALID_EVAL_METRICS``), and returns a tidy comparison DataFrame: one row per recommender,
     with an ``algorithm`` column, an ``is_baseline`` bool column, and one column per evaluation
     metric (``mean_precision_at_k``, ``mean_recall_at_k``, ``mean_ndcg_at_k``, ``hit_rate``,
-    ``map_at_k``, ``coverage``, ``diversity``, ``novelty``). Sorted by ``mean_ndcg_at_k``
+    ``map_at_k``, ``coverage``, ``diversity``, ``novelty``, ``mean_mrr_at_k``, ``mean_auc_at_k``).
+    Sorted by ``mean_ndcg_at_k``
     descending -- the "baseline-to-beat" framing: the strongest recommender by ranking quality is
     always first.
 

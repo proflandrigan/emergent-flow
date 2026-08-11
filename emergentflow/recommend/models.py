@@ -21,6 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 
@@ -72,17 +73,50 @@ class EvalResult:
     algorithm: the evaluated recommender's algorithm key (``recommender.algorithm``).
     k: the cutoff used for the ranking metrics.
     per_user: tidy DataFrame with columns ``user_id``, ``precision_at_k``, ``recall_at_k``,
-        ``ndcg_at_k``, ``hit``, ``average_precision`` -- only the columns for metrics that were
-        actually requested are present (plus ``user_id``), so a caller who requested a subset via
-        ``metrics=`` gets a narrower frame.
+        ``ndcg_at_k``, ``hit``, ``average_precision``, ``mrr_at_k``, ``auc_at_k`` -- only the
+        columns for metrics that were actually requested are present (plus ``user_id``), so a
+        caller who requested a subset via ``metrics=`` gets a narrower frame.
     aggregate: JSON-native dict of system-wide metrics -- ``mean_precision_at_k``,
         ``mean_recall_at_k``, ``mean_ndcg_at_k``, ``map_at_k``, ``hit_rate`` (mean of ``per_user``
-        columns, only for requested metrics), plus keys a later story appends (coverage,
-        diversity, novelty) -- this dataclass's shape must not need to change for that, since
-        ``aggregate`` is an open dict.
+        columns, only for requested metrics), ``mean_mrr_at_k``, ``mean_auc_at_k``, plus keys a
+        later story appends (coverage, diversity, novelty) -- this dataclass's shape must not need
+        to change for that, since ``aggregate`` is an open dict.
     """
 
     algorithm: str
     k: int
     per_user: pd.DataFrame
     aggregate: dict[str, Any]
+
+
+@dataclass
+class SequenceDataset:
+    """Session-shaped interaction data for sequential recommenders.
+
+    Attributes
+    ----------
+    sequences: list of item-index lists, one per session. Each list is truncated to
+        ``max_seq_len`` and ordered chronologically where the builder had timestamps.
+    session_ids: original session identifier for each sequence (falls back to user id
+        when no session column is supplied).
+    item_ids: item identifier for each index position.
+    item_index: original item id -> index (inverse of ``item_ids``).
+    max_seq_len: the sequence length used to build/truncate the dataset.
+    """
+
+    sequences: list[list[int]]
+    session_ids: list[Any]
+    item_ids: list[Any]
+    item_index: dict[Any, int]
+    max_seq_len: int
+
+    def summary(self) -> dict[str, Any]:
+        """Tidy JSON-native summary."""
+        return {
+            "n_sessions": len(self.sequences),
+            "n_items": len(self.item_ids),
+            "max_seq_len": self.max_seq_len,
+            "mean_seq_len": (
+                float(np.mean([len(s) for s in self.sequences])) if self.sequences else 0.0
+            ),
+        }

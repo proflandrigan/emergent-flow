@@ -242,7 +242,7 @@ def test_export_catalog_includes_recommenders():
     assert artifact["catalog_version"] == CATALOG_VERSION
     assert CATALOG_VERSION == 6
     recommenders = artifact["recommenders"]
-    assert len(recommenders) == 15
+    assert len(recommenders) == 16
     keys = [e["key"] for e in recommenders]
     assert keys == sorted(keys)
     assert keys == known_recommender_keys()

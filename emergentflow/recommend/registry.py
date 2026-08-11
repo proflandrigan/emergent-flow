@@ -32,7 +32,11 @@ if TYPE_CHECKING:
     import pandas as pd
 
     from emergentflow.recommend.interactions import InteractionMatrix
-    from emergentflow.recommend.models import FittedRecommender, RecommendationResult
+    from emergentflow.recommend.models import (
+        FittedRecommender,
+        RecommendationResult,
+        SequenceDataset,
+    )
 
 __all__ = [
     "RecommenderFamily",
@@ -44,8 +48,8 @@ __all__ = [
     "keys_for_family",
 ]
 
-#: The four fixed recommender archetypes (see docs/adr/0021-recommender-systems-architecture.md).
-RecommenderFamily = Literal["baseline", "content", "collaborative", "deep"]
+#: The five fixed recommender archetypes (see docs/adr/0021-recommender-systems-architecture.md).
+RecommenderFamily = Literal["baseline", "content", "collaborative", "deep", "sequential"]
 
 #: A fitter takes the interaction matrix, an optional item-features frame (used only by the
 #: content-based family; other families receive ``None``), and an already-validated params dict,
@@ -62,6 +66,12 @@ RecommendFn = Callable[["FittedRecommender", "list[Any] | None", int, bool], "Re
 #: items per item, and returns a RecommendationResult. Not every algorithm supports item-item
 #: similarity (see RecommenderSpec.similar_items_fn).
 SimilarItemsFn = Callable[["FittedRecommender", "list[Any]", int], "RecommendationResult"]
+
+#: A sequence_fitter takes a SequenceDataset and an already-validated params dict, and returns
+#: a FittedRecommender. Used by session-based (sequential) recommender algorithms, which consume
+#: ordered per-session item sequences rather than a user-item interaction matrix -- see
+#: ``RecommendSpec.sequence_fitter``.
+SequenceFitter = Callable[["SequenceDataset", dict[str, Any]], "FittedRecommender"]
 
 
 @dataclass(frozen=True)
@@ -95,6 +105,9 @@ class RecommenderSpec:
     recommend_fn: the per-algorithm callable that generates top-N recommendations for users.
     similar_items_fn: the per-algorithm callable that finds similar items, or ``None`` if this
         algorithm does not support item-item similarity (e.g. most baselines).
+    sequence_fitter: the per-algorithm callable that fits a session-based (sequential)
+        recommender from a ``SequenceDataset`` and returns a ``FittedRecommender``, or ``None``
+        for non-sequential algorithms (which are fit via ``fitter`` instead).
     required_params: structured-param keys that MUST be present (validated by the ``ef.recommend
         .fit`` wrapper).
     optional_params: additional structured-param keys this algorithm accepts.
@@ -114,9 +127,10 @@ class RecommenderSpec:
 
     key: str
     family: RecommenderFamily
-    fitter: Fitter
     recommend_fn: RecommendFn
+    fitter: Fitter | None = None
     similar_items_fn: SimilarItemsFn | None = None
+    sequence_fitter: SequenceFitter | None = None
     required_params: tuple[str, ...] = ()
     optional_params: tuple[str, ...] = ()
     param_metadata: tuple[RecommenderParamSpec, ...] = ()

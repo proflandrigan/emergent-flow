@@ -107,10 +107,13 @@ from .power_analysis import PowerAnalysis
 from .predict import Predict
 from .prepare_interactions import PrepareInteractions
 from .query_builder import QueryBuilder
+from .recommend_build_sequences import RecommendBuildSequences
 from .recommend_by_embedding import RecommendByEmbedding
 from .recommend_compare import RecommendCompare
+from .recommend_encode_categorical_features import RecommendEncodeCategoricalFeatures
 from .recommend_evaluate import RecommendEvaluate
 from .recommend_fit import RecommendFit
+from .recommend_fit_sequence import RecommendFitSequence
 from .recommend_fit_two_tower import RecommendFitTwoTower
 from .recommend_hybrid_switching import HybridSwitching
 from .recommend_hybrid_weighted import HybridWeighted
@@ -119,6 +122,7 @@ from .recommend_recommend import Recommend
 from .recommend_save_model import RecommendSaveModel
 from .recommend_similar_items import SimilarItems
 from .recommend_temporal_split import RecommendTemporalSplit
+from .recommend_weight_interactions_by_recency import RecommendWeightInteractionsByRecency
 from .redact_pii import RedactPii
 from .reduce_dimensions import ReduceDimensions
 from .report import GenerateHtmlSummary
@@ -258,13 +262,17 @@ __all__ = [
     "QueryBuilder",
     "Recommend",
     "RecommendByEmbedding",
+    "RecommendBuildSequences",
     "RecommendCompare",
+    "RecommendEncodeCategoricalFeatures",
     "RecommendEvaluate",
     "RecommendFit",
+    "RecommendFitSequence",
     "RecommendFitTwoTower",
     "RecommendLoadModel",
     "RecommendSaveModel",
     "RecommendTemporalSplit",
+    "RecommendWeightInteractionsByRecency",
     "RedactPii",
     "ReduceDimensions",
     "Reshape",

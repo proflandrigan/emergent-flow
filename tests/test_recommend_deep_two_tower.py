@@ -260,3 +260,84 @@ def test_two_tower_node_equivalence_execute_vs_codegen():
         exec_result["result"].recommendations,
         codegen_result.recommendations,
     )
+
+
+# ---------------------------------------------------------------------------
+# Part D — id-embedding toggles (metadata-only / mixed modes)
+# ---------------------------------------------------------------------------
+
+
+def test_two_tower_user_metadata_only_with_user_features():
+    pytest.importorskip("torch")
+    import emergentflow as ef
+
+    im = _make_two_tower_fixture()
+    fitted = ef.recommend.fit_two_tower(
+        im,
+        item_features=_ITEM_FEATURES,
+        user_features=_USER_FEATURES,
+        params={**_TT_PARAMS, "use_user_id_embedding": False, "use_item_id_embedding": True},
+    )
+    assert isinstance(fitted, FittedRecommender)
+    assert fitted.fit_stats["user_feature_dim"] > 0
+    assert fitted.model["use_user_id_embedding"] is False
+    assert fitted.model["use_item_id_embedding"] is True
+
+    result = ef.recommend.recommend(fitted, user_ids=[1, 2], n=3, exclude_known=True)
+    assert isinstance(result, RecommendationResult)
+    assert len(result.recommendations) > 0
+
+
+def test_two_tower_item_metadata_only_with_item_features():
+    pytest.importorskip("torch")
+    import emergentflow as ef
+
+    im = _make_two_tower_fixture()
+    fitted = ef.recommend.fit_two_tower(
+        im,
+        item_features=_ITEM_FEATURES,
+        user_features=_USER_FEATURES,
+        params={**_TT_PARAMS, "use_user_id_embedding": True, "use_item_id_embedding": False},
+    )
+    assert isinstance(fitted, FittedRecommender)
+    assert fitted.fit_stats["item_feature_dim"] > 0
+    assert fitted.model["use_user_id_embedding"] is True
+    assert fitted.model["use_item_id_embedding"] is False
+
+    result = ef.recommend.recommend(fitted, user_ids=[1, 2], n=3, exclude_known=True)
+    assert isinstance(result, RecommendationResult)
+    assert len(result.recommendations) > 0
+
+
+def test_two_tower_metadata_only_both_towers_with_features():
+    pytest.importorskip("torch")
+    import emergentflow as ef
+
+    im = _make_two_tower_fixture()
+    fitted = ef.recommend.fit_two_tower(
+        im,
+        item_features=_ITEM_FEATURES,
+        user_features=_USER_FEATURES,
+        params={**_TT_PARAMS, "use_user_id_embedding": False, "use_item_id_embedding": False},
+    )
+    assert isinstance(fitted, FittedRecommender)
+    assert fitted.model["use_user_id_embedding"] is False
+    assert fitted.model["use_item_id_embedding"] is False
+
+    result = ef.recommend.recommend(fitted, user_ids=[1, 2], n=3, exclude_known=True)
+    assert isinstance(result, RecommendationResult)
+    assert len(result.recommendations) > 0
+
+
+def test_two_tower_user_metadata_only_without_user_features_raises():
+    pytest.importorskip("torch")
+    import emergentflow as ef
+
+    im = _make_two_tower_fixture()
+    with pytest.raises(InvalidRecommenderParamsError):
+        ef.recommend.fit_two_tower(
+            im,
+            item_features=_ITEM_FEATURES,
+            user_features=None,
+            params={**_TT_PARAMS, "use_user_id_embedding": False},
+        )

@@ -9898,6 +9898,94 @@
       "advisor_persona": null,
       "category": "Recommenders",
       "column_effect": null,
+      "description": "Build a SequenceDataset from an event DataFrame: ordered item-index sequences per session, used by sequential recommenders.",
+      "family": "recommend",
+      "keywords": [],
+      "label": "Build Sequences",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column identifying the user.",
+          "hints": null,
+          "label": "User column",
+          "name": "user_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column identifying the item.",
+          "hints": null,
+          "label": "Item column",
+          "name": "item_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column identifying the session; None means each user is one session.",
+          "hints": null,
+          "label": "Session column",
+          "name": "session_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column used to order events within each session.",
+          "hints": null,
+          "label": "Timestamp column",
+          "name": "timestamp_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 50,
+          "help": "Maximum number of items per sequence (older items truncated).",
+          "hints": null,
+          "label": "Max sequence length",
+          "name": "max_seq_len",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": 2,
+          "help": "Sequences shorter than this are dropped.",
+          "hints": null,
+          "label": "Min sequence length",
+          "name": "min_seq_len",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The events/ratings DataFrame to build sequences from.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "SequenceDataset",
+          "direction": "out",
+          "help": "The built sequence dataset ready for fit_sequence.",
+          "label": null,
+          "name": "sequences",
+          "required": true
+        }
+      ],
+      "type": "recommend.build_sequences",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
+      "column_effect": null,
       "description": "Evaluate multiple fitted recommenders and rank them by NDCG@k.",
       "family": "recommend",
       "keywords": [],
@@ -9944,6 +10032,93 @@
         }
       ],
       "type": "recommend.compare",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
+      "column_effect": {
+        "detail": null,
+        "kind": "encode"
+      },
+      "description": "Encode categorical columns in a user/item feature frame while preserving its id column. Produces numeric columns suitable for wiring into the two-tower seam.",
+      "family": "recommend",
+      "keywords": [],
+      "label": "Encode Categorical Features",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Categorical columns to encode.",
+          "hints": null,
+          "label": "Columns",
+          "name": "columns",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Column identifying the user or item (preserved untouched).",
+          "hints": null,
+          "label": "ID column",
+          "name": "id_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "onehot",
+          "help": "Encoding strategy: onehot produces indicator columns; ordinal produces numeric labels.",
+          "hints": {
+            "choices": [
+              "onehot",
+              "ordinal"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Strategy",
+          "name": "strategy",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": false,
+          "help": "Drop one level per input column (one-hot only) to avoid collinearity.",
+          "hints": null,
+          "label": "Drop first",
+          "name": "drop_first",
+          "required": false,
+          "type_token": "bool"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The user- or item-feature DataFrame with categorical columns to encode.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input frame with categorical columns encoded as numeric columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "recommend.encode_categorical_features",
       "version": 1
     },
     {
@@ -10027,6 +10202,7 @@
               "co_occurrence",
               "embedding_similarity",
               "feature_knn",
+              "gru4rec",
               "item_knn_cf",
               "ncf",
               "nmf_cf",
@@ -10099,7 +10275,72 @@
       "advisor_persona": null,
       "category": "Recommenders",
       "column_effect": null,
-      "description": "Fit a two-tower retrieval model. Optionally consumes an item-features frame (one row per item, keyed by an 'item_id' column plus numeric columns) and a user-features frame (one row per user, keyed by 'user_id' plus numeric columns).",
+      "description": "Fit a sequential (session-based) recommender algorithm from a SequenceDataset.",
+      "family": "recommend",
+      "keywords": [],
+      "label": "Fit Sequence Recommender",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which sequential recommender algorithm to fit.",
+          "hints": {
+            "choices": [
+              "gru4rec"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Algorithm",
+          "name": "algorithm",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": {},
+          "help": "Keyword arguments for the chosen sequential algorithm.",
+          "hints": null,
+          "label": "Algorithm params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "SequenceDataset",
+          "direction": "in",
+          "help": "The sequence dataset produced by build_sequences.",
+          "label": "Sequences",
+          "name": "sequences",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Recommender",
+          "direction": "out",
+          "help": "The fitted sequential recommender model.",
+          "label": null,
+          "name": "recommender",
+          "required": true
+        }
+      ],
+      "type": "recommend.fit_sequence",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
+      "column_effect": null,
+      "description": "Fit a two-tower retrieval model. Optionally consumes an item-features frame (one row per item, keyed by an 'item_id' column plus numeric columns) and a user-features frame (one row per user, keyed by 'user_id' plus numeric columns). Enable id embeddings with use_user_id_embedding / use_item_id_embedding.",
       "family": "recommend",
       "keywords": [],
       "label": "Fit Two-Tower Recommender",
@@ -10107,7 +10348,7 @@
       "params": [
         {
           "default": {},
-          "help": "Keyword arguments for the two-tower model (e.g. epochs, user_embedding_dim, item_embedding_dim, loss). Use item_id_col / user_id_col to point at non-default id columns in the feature frames.",
+          "help": "Keyword arguments for the two-tower model (e.g. epochs, user_embedding_dim, item_embedding_dim, loss, use_user_id_embedding, use_item_id_embedding). Use item_id_col / user_id_col to point at non-default id columns in the feature frames.",
           "hints": null,
           "label": "Algorithm params",
           "name": "params",
@@ -10154,7 +10395,7 @@
         }
       ],
       "type": "recommend.fit_two_tower",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -10912,6 +11153,110 @@
         }
       ],
       "type": "recommend.temporal_split",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Recommenders",
+      "column_effect": {
+        "detail": null,
+        "kind": "derive"
+      },
+      "description": "Weight event rows by recency: newer events get a higher weight value in the added column. Produces a value column suitable for prepare_interactions.",
+      "family": "recommend",
+      "keywords": [],
+      "label": "Weight Interactions by Recency",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column with event timestamps (used to compute recency).",
+          "hints": null,
+          "label": "Timestamp column",
+          "name": "timestamp_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column identifying the user.",
+          "hints": null,
+          "label": "User column",
+          "name": "user_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column identifying the item.",
+          "hints": null,
+          "label": "Item column",
+          "name": "item_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "weight",
+          "help": "Name of the added recency-weight column.",
+          "hints": null,
+          "label": "Value column name",
+          "name": "value_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "exponential",
+          "help": "The recency decay function to apply.",
+          "hints": {
+            "choices": [
+              "exponential"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Decay function",
+          "name": "decay",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 30.0,
+          "help": "Number of days after which an event's weight drops to 0.5.",
+          "hints": null,
+          "label": "Half-life (days)",
+          "name": "half_life_days",
+          "required": false,
+          "type_token": "float"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The events/ratings DataFrame with a timestamp column.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The input frame with a recency-weighted value column added.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        }
+      ],
+      "type": "recommend.weight_interactions_by_recency",
       "version": 1
     },
     {
@@ -16071,6 +16416,73 @@
       "requires_extra": null
     },
     {
+      "category": "Sequential",
+      "description": "Session-based sequential recommender using a GRU (GRU4Rec). Requires torch.",
+      "family": "sequential",
+      "key": "gru4rec",
+      "label": "Gru4rec",
+      "node_type": "recommend.fit",
+      "params": [
+        {
+          "choices": null,
+          "default": 32,
+          "help": "Item embedding dimension.",
+          "name": "embedding_dim",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 64,
+          "help": "GRU hidden dimension.",
+          "name": "hidden_dim",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 1,
+          "help": "Number of GRU layers.",
+          "name": "num_layers",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 10,
+          "help": "Training epochs.",
+          "name": "epochs",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 64,
+          "help": "Mini-batch size.",
+          "name": "batch_size",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": 0.001,
+          "help": "Adam learning rate.",
+          "name": "learning_rate",
+          "required": false,
+          "type": "float"
+        },
+        {
+          "choices": null,
+          "default": 0,
+          "help": "Random seed.",
+          "name": "seed",
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "requires_extra": "torch"
+    },
+    {
       "category": "Collaborative",
       "description": "Item-based KNN collaborative filtering -- for each item a user has interacted with, finds the K most similar items (cosine/pearson/jaccard) and scores unseen items by weighted similarity.",
       "family": "collaborative",
@@ -16544,6 +16956,22 @@
           "name": "user_id_col",
           "required": false,
           "type": "str"
+        },
+        {
+          "choices": null,
+          "default": true,
+          "help": "Whether the user tower learns an id embedding. True (id-only, or id+features mixed): user ids are embedded. False (metadata-only): user features alone drive the tower and user_features must be provided.",
+          "name": "use_user_id_embedding",
+          "required": false,
+          "type": "bool"
+        },
+        {
+          "choices": null,
+          "default": true,
+          "help": "Whether the item tower learns an id embedding. True (id-only, or id+features mixed): item ids are embedded. False (metadata-only): item features alone drive the tower and item_features must be provided.",
+          "name": "use_item_id_embedding",
+          "required": false,
+          "type": "bool"
         },
         {
           "choices": null,
