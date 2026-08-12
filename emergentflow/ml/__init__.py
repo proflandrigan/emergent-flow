@@ -102,6 +102,7 @@ __all__ = [
     "train_random_forest",
     "train_regressor",
     "train_test_split",
+    "tune_model",
     "ClassifierResult",
     "DimensionReductionResult",
     "EvaluationResult",
