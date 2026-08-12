@@ -91,6 +91,7 @@ export function App(): JSX.Element {
   const [connectionsOpen, setConnectionsOpen] = useState(false);
   const [schemaBrowserOpen, setSchemaBrowserOpen] = useState(false);
   const [runsOpen, setRunsOpen] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [recoveryToast, setRecoveryToast] = useState<string | null>(null);
   const past = useGraphStore((s) => s.past);
@@ -164,13 +165,14 @@ export function App(): JSX.Element {
   }, [inspectorWidth]);
 
   useEffect(() => {
-    if (!menuOpen && !connectionsOpen && !schemaBrowserOpen && !runsOpen) return undefined;
+    if (!menuOpen && !connectionsOpen && !schemaBrowserOpen && !runsOpen && !galleryOpen) return undefined;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setMenuOpen(false);
         setConnectionsOpen(false);
         setSchemaBrowserOpen(false);
         setRunsOpen(false);
+        setGalleryOpen(false);
       }
     }
     function onClick() {
@@ -190,7 +192,7 @@ export function App(): JSX.Element {
       window.clearTimeout(timer);
       document.removeEventListener("click", onClick);
     };
-  }, [menuOpen, connectionsOpen, schemaBrowserOpen, runsOpen]);
+  }, [menuOpen, connectionsOpen, schemaBrowserOpen, runsOpen, galleryOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -294,6 +296,14 @@ export function App(): JSX.Element {
 
   const overflowItems: MenuItem[] = [
     {
+      label: "Get started",
+      testId: "menu-get-started",
+      onSelect: () => {
+        setGalleryOpen((open) => !open);
+        setMenuOpen(false);
+      },
+    },
+    {
       label:
         theme === "dark" ? "Switch to light theme" : "Switch to dark theme",
       onSelect: () => {
@@ -360,7 +370,9 @@ export function App(): JSX.Element {
       <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
         <Canvas />
       </div>
-      <ExampleGallery />
+      {galleryOpen && (
+        <ExampleGallery onClose={() => setGalleryOpen(false)} />
+      )}
 
       <div
         className="glass"

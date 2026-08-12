@@ -73,12 +73,52 @@ function mockHealth(status: string) {
   });
 }
 
+function mockHealthWithExamples(status: string) {
+  vi.spyOn(globalThis, "fetch").mockImplementation((input) => {
+    const url = String(input);
+    let body: unknown;
+    if (url.includes("/catalog")) {
+      body = { nodes: [] };
+    } else if (url.includes("/connections")) {
+      body = { connections: [] };
+    } else if (url.includes("/examples")) {
+      body = {
+        examples: [
+          {
+            path: "examples/iris",
+            slug: "iris",
+            name: "Iris classification",
+          },
+        ],
+      };
+    } else if (url.includes("/flows")) {
+      body = { flows: [] };
+    } else {
+      body = { status };
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify(body), {
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  });
+}
+
 test("renders the canvas heading", () => {
   mockHealth("ok");
   render(<App />);
   expect(
     screen.getByRole("heading", { name: /Emergent Flow/ }),
   ).toBeInTheDocument();
+});
+
+test("does not show the Get started gallery on mount", async () => {
+  mockHealthWithExamples("ok");
+  render(<App />);
+
+  await waitFor(() => {
+    expect(screen.queryByTestId("example-iris")).not.toBeInTheDocument();
+  });
 });
 
 test("shows the server status as ok when /healthz is healthy", async () => {
@@ -161,5 +201,24 @@ test("Start chat overflow item opens the chat modal", async () => {
   });
   await waitFor(() => {
     expect(screen.getByTestId("chat-backend-picker")).toBeInTheDocument();
+  });
+});
+
+test("Get started overflow item opens the gallery and close dismisses it", async () => {
+  mockHealthWithExamples("ok");
+  render(<App />);
+
+  expect(screen.queryByTestId("gallery-close")).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Get started" }));
+
+  await waitFor(() => {
+    expect(screen.getByTestId("example-iris")).toBeInTheDocument();
+  });
+
+  fireEvent.click(screen.getByTestId("gallery-close"));
+  await waitFor(() => {
+    expect(screen.queryByTestId("example-iris")).not.toBeInTheDocument();
   });
 });
