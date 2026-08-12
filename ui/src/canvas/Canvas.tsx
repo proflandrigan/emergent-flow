@@ -512,8 +512,8 @@ export function Canvas(): JSX.Element {
       <div
         style={{
           position: "absolute",
-          bottom: 10,
-          left: 10,
+          top: 10,
+          left: 52,
           zIndex: 5,
           display: "flex",
           gap: "var(--space-1)",
