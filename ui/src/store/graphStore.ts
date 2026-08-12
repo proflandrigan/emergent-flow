@@ -89,7 +89,7 @@ export interface GraphStore extends CanvasModel {
   extractToComposite: (nodeIds: string[]) => string | null;
   removeEdge: (edgeId: string) => void;
   toIR: () => Graph;
-  loadIR: (graph: Graph) => void;
+  loadIR: (graph: Graph, options?: { reflow?: boolean }) => void;
   loadModel: (model: CanvasModel) => void;
   tidyLayout: () => void;
   reset: () => void;
@@ -153,7 +153,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       groupId: null,
     };
     set((state) => ({
-      nodes: { ...state.nodes, [nodeId]: node },
+      nodes: layeredLayout({ ...state.nodes, [nodeId]: node }, state.edges),
     }));
     return nodeId;
   },
@@ -582,13 +582,15 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     });
   },
 
-  loadIR(graph) {
+  loadIR(graph, options) {
     get().pushHistory("loadIR");
     const model = fromIR(graph);
     set({
       ...model,
       params: model.params,
-      nodes: separateOverlappingNodes(model.nodes),
+      nodes: options?.reflow
+        ? layeredLayout(model.nodes, model.edges)
+        : separateOverlappingNodes(model.nodes),
     });
     clearDerivedStores();
   },

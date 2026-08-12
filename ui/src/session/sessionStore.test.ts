@@ -310,6 +310,32 @@ describe("SSE event handling", () => {
     expect(useSessionStore.getState().version).toBe(1);
   });
 
+  test("proposal_accepted reloads the graph with reflow enabled", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+
+    vi.mocked(sessionClient.getSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 1 }),
+    );
+    const loadIRSpy = vi.spyOn(useGraphStore.getState(), "loadIR");
+
+    await capturedOnEvent?.({
+      type: "proposal_accepted",
+      session_id: "abc",
+      proposal_id: "p1",
+      version: 1,
+    });
+
+    expect(loadIRSpy).toHaveBeenCalledTimes(1);
+    expect(loadIRSpy).toHaveBeenCalledWith(
+      { paradigm: "functional", nodes: {}, edges: {} },
+      { reflow: true },
+    );
+    expect(useSessionStore.getState().version).toBe(1);
+  });
+
   test("graph_changed event reloads graph and adds agent chat turn", async () => {
     vi.mocked(sessionClient.createSession).mockResolvedValue(
       fakeSession({ id: "abc", version: 0 }),

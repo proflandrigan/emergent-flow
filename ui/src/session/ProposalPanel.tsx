@@ -67,6 +67,7 @@ function ProposalCard({ proposal }: { proposal: StoredProposal }): JSX.Element {
         ...Object.fromEntries(diff.addedEdges.map((e) => [e.id, e])),
       },
     });
+    useGraphStore.getState().tidyLayout();
     void reject(proposal.id);
   };
 

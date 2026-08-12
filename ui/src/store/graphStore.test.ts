@@ -57,6 +57,25 @@ describe("addNodeFromSpec", () => {
     expect(id1).not.toBe(id2);
     expect(Object.keys(useGraphStore.getState().nodes)).toHaveLength(2);
   });
+
+  test("addNodeFromSpec flow-lays-out the graph after adding", () => {
+    const sourceId = useGraphStore
+      .getState()
+      .addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const targetId = useGraphStore
+      .getState()
+      .addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+
+    const sourcePort = useGraphStore.getState().nodes[sourceId].ports[0];
+    const targetPort = useGraphStore.getState().nodes[targetId].ports[0];
+    useGraphStore.getState().connect(
+      { node_id: sourceId, port_id: sourcePort.id },
+      { node_id: targetId, port_id: targetPort.id },
+    );
+
+    const { nodes } = useGraphStore.getState();
+    expect(nodes[sourceId].position).not.toEqual(nodes[targetId].position);
+  });
 });
 
 describe("setParamRef", () => {
@@ -225,6 +244,42 @@ describe("loadIR", () => {
 
     const { nodes } = useGraphStore.getState();
     expect(nodes.a.position).not.toEqual(nodes.b.position);
+  });
+
+  test("loadIR with reflow option lays the graph out with layeredLayout", () => {
+    const graph: Graph = {
+      paradigm: "functional",
+      nodes: {
+        a: {
+          id: "a",
+          type: "data.load_csv",
+          paradigm: "functional",
+          params: [],
+          ports: [{ name: "out", direction: "out" }],
+          position: { x: 0, y: 0 },
+        },
+        b: {
+          id: "b",
+          type: "data.load_csv",
+          paradigm: "functional",
+          params: [],
+          ports: [{ name: "in", direction: "in" }],
+          position: { x: 0, y: 0 },
+        },
+      },
+      edges: {
+        e1: {
+          id: "e1",
+          source: { node_id: "a", port_id: "" },
+          target: { node_id: "b", port_id: "" },
+        },
+      },
+    };
+
+    useGraphStore.getState().loadIR(graph, { reflow: true });
+
+    const { nodes } = useGraphStore.getState();
+    expect(nodes.b.position.x).toBeGreaterThan(nodes.a.position.x);
   });
 });
 

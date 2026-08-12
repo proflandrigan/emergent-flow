@@ -151,7 +151,10 @@ async function refreshFromServer(
       event.type === "graph_changed" ||
       event.type === "graph_reverted"
     ) {
-      useGraphStore.getState().loadIR(session.graph);
+      useGraphStore.getState().loadIR(session.graph, {
+        reflow:
+          event.type === "proposal_accepted" || event.type === "graph_changed",
+      });
     }
   } catch (err) {
     useSessionStore.setState({ error: errorMessage(err) });
