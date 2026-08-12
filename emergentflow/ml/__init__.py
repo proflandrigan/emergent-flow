@@ -33,7 +33,19 @@ import joblib  # type: ignore[import-untyped]
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.ensemble import (
+    AdaBoostClassifier,
+    AdaBoostRegressor,
+    BaggingClassifier,
+    BaggingRegressor,
+    RandomForestClassifier,
+    RandomForestRegressor,
+    StackingClassifier,
+    StackingRegressor,
+    VotingClassifier,
+    VotingRegressor,
+)
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
@@ -41,12 +53,13 @@ from sklearn.metrics import (
     f1_score,
     mean_absolute_error,
     mean_squared_error,
+    precision_recall_curve,
     precision_score,
     r2_score,
     recall_score,
     roc_auc_score,
 )
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.model_selection import cross_validate as _sk_cross_validate
 from sklearn.model_selection import train_test_split as _sk_split
 from sklearn.pipeline import Pipeline as _SkPipeline
@@ -66,18 +79,24 @@ from emergentflow.ml.registry import get_estimator_spec, keys_for_archetype
 __all__ = [
     "FOREST_TASKS",
     "apply_estimator",
+    "blend_models",
+    "calibrate_model",
     "compare_models",
     "cross_validate",
     "evaluate",
+    "ensemble_model",
     "fit_and_detect",
     "fit_and_label",
     "fit_estimator",
     "fit_pipeline",
     "fit_transform",
+    "finalize_model",
     "grid_search",
     "predict",
+    "optimize_threshold",
     "reduce_dimensions",
     "select_features",
+    "stack_models",
     "summarize",
     "train_classifier",
     "train_random_forest",
@@ -88,6 +107,7 @@ __all__ = [
     "EvaluationResult",
     "FittedModel",
     "FittedTransformer",
+    "ThresholdResult",
     "save_model",
     "load_model",
 ]
@@ -380,6 +400,275 @@ def predict(model: FittedModel, df: pd.DataFrame) -> pd.DataFrame:
     result = df.copy()
     result["prediction"] = model.estimator.predict(df[model.feature_names])
     return result
+
+
+@public_op(name="ef.ml.ensemble_model")
+def ensemble_model(
+    model: FittedModel,
+    df: pd.DataFrame,
+    *,
+    task: str,
+    target: str,
+    features: list[str] | None = None,
+    method: str = "bagging",
+    n_estimators: int = 10,
+    random_state: int = 0,
+) -> FittedModel:
+    """Wrap a fitted estimator in a bagging/boosting ensemble and refit on ``df``.
+
+    Mirrors PyCaret's ``ensemble_model``: the base estimator is recreated fresh (its default
+    constructor) because sklearn's Bagging/AdaBoost estimators require an unfitted base clone.
+    ``method="bagging"`` maps to Bagging; ``"boosting"`` to AdaBoost. Never mutates ``df`` or
+    ``model``.
+    """
+    if method not in ("bagging", "boosting"):
+        raise ValueError(f"unknown method {method!r}; expected 'bagging' or 'boosting'.")
+    if task not in FOREST_TASKS:
+        raise ValueError(f"unknown task {task!r}; expected one of {list(FOREST_TASKS)!r}.")
+    if target not in df.columns:
+        raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+    feature_names = _resolve_features_for_fit(df, features, target=target)
+    base = type(model.estimator)()
+    if task == "classification":
+        if method == "bagging":
+            est = BaggingClassifier(
+                estimator=base, n_estimators=n_estimators, random_state=random_state
+            )
+        else:
+            est = AdaBoostClassifier(
+                estimator=base, n_estimators=n_estimators, random_state=random_state
+            )
+    else:
+        if method == "bagging":
+            est = BaggingRegressor(
+                estimator=base, n_estimators=n_estimators, random_state=random_state
+            )
+        else:
+            est = AdaBoostRegressor(
+                estimator=base, n_estimators=n_estimators, random_state=random_state
+            )
+    est.fit(df[feature_names], df[target])
+    return FittedModel(
+        estimator_type=type(est).__name__,
+        task=task,
+        feature_names=list(feature_names),
+        target=target,
+        estimator=est,
+    )
+
+
+@public_op(name="ef.ml.calibrate_model")
+def calibrate_model(
+    model: FittedModel,
+    df: pd.DataFrame,
+    *,
+    target: str,
+    features: list[str] | None = None,
+    method: str = "sigmoid",
+    cv: int = 5,
+) -> FittedModel:
+    """Probability-calibrate a fitted classifier via CalibratedClassifierCV, refit on df."""
+    if model.task != "classification":
+        raise ValueError("calibrate_model requires a classification model.")
+    if method not in ("sigmoid", "isotonic"):
+        raise ValueError(f"unknown method {method!r}; expected 'sigmoid' or 'isotonic'.")
+    if target not in df.columns:
+        raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+    if not hasattr(model.estimator, "predict_proba"):
+        raise ValueError(
+            f"{model.estimator_type} does not support predict_proba; "
+            "probability calibration requires it."
+        )
+    feature_names = _resolve_features_for_fit(df, features, target=target)
+    base = type(model.estimator)()
+    est = CalibratedClassifierCV(estimator=base, method=method, cv=cv)
+    est.fit(df[feature_names], df[target])
+    return FittedModel(
+        estimator_type=type(est).__name__,
+        task="classification",
+        feature_names=list(feature_names),
+        target=target,
+        estimator=est,
+    )
+
+
+@dataclass
+class ThresholdResult:
+    """Result of decision-threshold optimization for a binary classifier."""
+
+    best_threshold: float
+    best_f1: float
+    positive_class: str
+    metrics: pd.DataFrame
+
+
+@public_op(name="ef.ml.optimize_threshold")
+def optimize_threshold(
+    model: FittedModel,
+    df: pd.DataFrame,
+    *,
+    target: str,
+    positive_class: str | None = None,
+) -> ThresholdResult:
+    """Optimize the decision threshold of a binary classifier to maximize F1."""
+    if model.task != "classification":
+        raise ValueError("optimize_threshold requires a binary classification model.")
+    if not hasattr(model.estimator, "predict_proba"):
+        raise ValueError(f"{model.estimator_type} does not support predict_proba.")
+    if target not in df.columns:
+        raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+    missing = [c for c in model.feature_names if c not in df.columns]
+    if missing:
+        raise ValueError(f"missing feature columns {missing!r}; expected {model.feature_names!r}.")
+
+    X = df[model.feature_names]
+    y = df[target]
+    classes = model.estimator.classes_
+    if len(classes) != 2:
+        raise ValueError("optimize_threshold requires a binary (2-class) classifier.")
+    pos = positive_class if positive_class is not None else str(classes[1])
+    if pos not in {str(c) for c in classes}:
+        raise ValueError(
+            f"unknown positive_class {pos!r}; expected one of {[str(c) for c in classes]!r}."
+        )
+    pos_index = next(i for i, c in enumerate(classes) if str(c) == pos)
+
+    prob_pos = model.estimator.predict_proba(X)[:, pos_index]
+    prec, rec, thresh = precision_recall_curve(y, prob_pos, pos_label=classes[pos_index])
+
+    rows = []
+    best_t = thresh[0]
+    best_f1 = 0.0
+    for t, p, r in zip(thresh, prec, rec, strict=False):
+        f1 = 2 * p * r / (p + r) if (p + r) > 0 else 0.0
+        rows.append((float(t), float(p), float(r), f1))
+        if f1 > best_f1:
+            best_f1 = f1
+            best_t = float(t)
+
+    metrics = pd.DataFrame(rows, columns=["threshold", "precision", "recall", "f1"])
+    return ThresholdResult(
+        best_threshold=best_t,
+        best_f1=float(best_f1),
+        positive_class=pos,
+        metrics=metrics,
+    )
+
+
+@public_op(name="ef.ml.finalize_model")
+def finalize_model(
+    model: FittedModel,
+    df: pd.DataFrame,
+    *,
+    target: str | None = None,
+) -> FittedModel:
+    """Refit a fitted model on the full dataset with its fitted hyperparameters."""
+    target = target if target is not None else model.target
+    if target is None:
+        raise ValueError("finalize_model requires a target column (e.g. from the model).")
+    missing = [c for c in model.feature_names if c not in df.columns]
+    if missing:
+        raise ValueError(f"missing feature columns {missing!r}; expected {model.feature_names!r}.")
+    if target not in df.columns:
+        raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+
+    est = type(model.estimator)(**model.estimator.get_params())
+    est.fit(df[model.feature_names], df[target])
+    return FittedModel(
+        estimator_type=model.estimator_type,
+        task=model.task,
+        feature_names=list(model.feature_names),
+        target=target,
+        estimator=est,
+    )
+
+
+@public_op(name="ef.ml.blend_models")
+def blend_models(
+    models: list[FittedModel],
+    df: pd.DataFrame,
+    *,
+    task: str,
+    target: str,
+    features: list[str] | None = None,
+    voting: str = "soft",
+    weights: list[float] | None = None,
+) -> FittedModel:
+    """Blend several fitted estimators into a weighted voting ensemble, refit on ``df``.
+
+    Mirrors PyCaret's ``blend_models``: each base estimator is recreated fresh (its default
+    constructor) because sklearn's Voting estimators require unfitted base clones. ``voting``
+    only matters for classification; for regression it is validated but ignored. Never mutates
+    ``models``, any model, or ``df``.
+    """
+    if task not in FOREST_TASKS:
+        raise ValueError(f"unknown task {task!r}; expected one of {list(FOREST_TASKS)!r}.")
+    if len(models) < 2:
+        raise ValueError("blend_models requires at least two fitted models.")
+    if target not in df.columns:
+        raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+    if voting not in ("soft", "hard"):
+        raise ValueError(f"unknown voting {voting!r}; expected 'soft' or 'hard'.")
+    feature_names = _resolve_features_for_fit(df, features, target=target)
+    estimators = [(f"m{i}", type(m.estimator)()) for i, m in enumerate(models)]
+    if task == "classification":
+        est = VotingClassifier(
+            estimators=estimators,
+            voting=voting,
+            weights=weights,
+        )
+    else:
+        est = VotingRegressor(estimators=estimators, weights=weights)
+    est.fit(df[feature_names], df[target])
+    return FittedModel(
+        estimator_type=type(est).__name__,
+        task=task,
+        feature_names=list(feature_names),
+        target=target,
+        estimator=est,
+    )
+
+
+@public_op(name="ef.ml.stack_models")
+def stack_models(
+    models: list[FittedModel],
+    df: pd.DataFrame,
+    *,
+    task: str,
+    target: str,
+    features: list[str] | None = None,
+    final_estimator: str = "LogisticRegression",
+    cv: int = 5,
+) -> FittedModel:
+    """Stack several fitted estimators under a curated meta-learner, refit on ``df``.
+
+    Mirrors PyCaret's ``stack_models``: each base estimator is recreated fresh (its default
+    constructor) because sklearn's Stacking estimators require unfitted base clones, and the
+    meta-learner ``final_estimator`` is trained via ``cv``-fold cross-validation. Never mutates
+    ``models``, any model, or ``df``.
+    """
+    if task not in FOREST_TASKS:
+        raise ValueError(f"unknown task {task!r}; expected one of {list(FOREST_TASKS)!r}.")
+    if len(models) < 2:
+        raise ValueError("stack_models requires at least two fitted models.")
+    if target not in df.columns:
+        raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+    feature_names = _resolve_features_for_fit(df, features, target=target)
+    estimators = [(f"m{i}", type(m.estimator)()) for i, m in enumerate(models)]
+    meta_spec, meta_kwargs = _resolve_estimator_and_kwargs(final_estimator, None)
+    meta = meta_spec.sklearn_class(**meta_kwargs)
+    if task == "classification":
+        est = StackingClassifier(estimators=estimators, final_estimator=meta, cv=cv)
+    else:
+        est = StackingRegressor(estimators=estimators, final_estimator=meta, cv=cv)
+    est.fit(df[feature_names], df[target])
+    return FittedModel(
+        estimator_type=type(est).__name__,
+        task=task,
+        feature_names=list(feature_names),
+        target=target,
+        estimator=est,
+    )
 
 
 @public_op(name="ef.ml.train_test_split")
@@ -845,6 +1134,92 @@ def grid_search(
     cv_results = grid.cv_results_
     result_df = pd.DataFrame(
         {f"param_{name}": list(cv_results[f"param_{name}"]) for name in sorted(param_grid)}
+    )
+    result_df["mean_test_score"] = cv_results["mean_test_score"]
+    result_df["std_test_score"] = cv_results["std_test_score"]
+    result_df["rank_test_score"] = cv_results["rank_test_score"]
+    result_df["mean_fit_time"] = cv_results["mean_fit_time"]
+    result_df = result_df.sort_values("rank_test_score").reset_index(drop=True)
+
+    return model, result_df
+
+
+@public_op(name="ef.ml.tune_model")
+def tune_model(
+    df: pd.DataFrame,
+    *,
+    estimator: str,
+    param_distributions: dict[str, list[Any]],
+    target: str,
+    features: list[str] | None = None,
+    n_iter: int = 10,
+    cv: int = 5,
+    scoring: str | None = None,
+    random_state: int = 0,
+) -> tuple[FittedModel, pd.DataFrame]:
+    """Randomized hyperparameter search over a curated, ``fit``-archetype (supervised) estimator.
+
+    The ``ml.tune_model`` node's backend (Epic 8, Story 8 / ADR 0016). Thin wrapper over
+    ``sklearn.model_selection.RandomizedSearchCV``: samples ``n_iter`` combinations from
+    ``param_distributions`` via ``cv``-fold cross-validation and refits the best-scoring
+    combination on the full ``df``. Restricted to ``fit``-archetype estimators
+    (classifiers/regressors) -- clustering and transformer archetypes are out of scope for this
+    node.
+
+    ``param_distributions`` keys are validated against the estimator's ``accepted_kwargs``
+    allow-list (unknown keys raise
+    :class:`~emergentflow.ml.errors.InvalidEstimatorParamsError`), exactly like every other
+    adapter entry point; each value must be a non-empty list of candidate values for that kwarg.
+    Raises ``ValueError`` if *estimator* is not a ``fit``-archetype estimator, if
+    ``param_distributions`` is empty, or if ``target`` is missing from ``df``.
+
+    Returns ``(model, cv_results)`` where ``model`` is a :class:`FittedModel` wrapping
+    ``RandomizedSearchCV.best_estimator_`` (a real fitted instance of the estimator's own sklearn
+    class, refit on all of ``df`` -- so ``ef.ml.evaluate``/``ef.ml.summarize`` work on it
+    exactly as they would on a directly-fit estimator) and ``cv_results`` is a NEW, tidy
+    DataFrame (one row per sampled parameter combination, sorted by rank) with one
+    ``param_<name>`` column per searched kwarg plus ``mean_test_score``, ``std_test_score``,
+    ``rank_test_score``, and ``mean_fit_time``. ``df`` is never mutated.
+    """
+    spec, base_kwargs = _resolve_estimator_and_kwargs(estimator, None)
+    if spec.archetype != "fit":
+        raise ValueError(
+            f"{estimator!r} is not a fit-archetype estimator; tune_model requires a "
+            "supervised classifier/regressor."
+        )
+    if not param_distributions:
+        raise ValueError("param_distributions must not be empty.")
+    unknown_params = [k for k in param_distributions if k not in spec.accepted_kwargs]
+    if unknown_params:
+        raise InvalidEstimatorParamsError(
+            f"unknown params {unknown_params!r} for estimator {estimator!r}; "
+            f"expected one of {sorted(spec.accepted_kwargs)!r}."
+        )
+    if target not in df.columns:
+        raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
+
+    feature_names = _resolve_features_for_fit(df, features, target=target)
+    grid = RandomizedSearchCV(
+        spec.sklearn_class(**base_kwargs),
+        param_distributions=param_distributions,
+        n_iter=n_iter,
+        cv=cv,
+        scoring=scoring,
+        random_state=random_state,
+    )
+    grid.fit(df[feature_names], df[target])
+
+    model = FittedModel(
+        estimator_type=spec.key,
+        task=spec.task or "classification",
+        feature_names=list(feature_names),
+        target=target,
+        estimator=grid.best_estimator_,
+    )
+
+    cv_results = grid.cv_results_
+    result_df = pd.DataFrame(
+        {f"param_{name}": list(cv_results[f"param_{name}"]) for name in sorted(param_distributions)}
     )
     result_df["mean_test_score"] = cv_results["mean_test_score"]
     result_df["std_test_score"] = cv_results["std_test_score"]

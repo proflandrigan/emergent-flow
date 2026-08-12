@@ -7759,6 +7759,250 @@
       "advisor_persona": null,
       "category": "Machine Learning",
       "column_effect": null,
+      "description": "Blend two or more fitted models into a weighted voting ensemble, refit on data.",
+      "family": "ml",
+      "keywords": [],
+      "label": "Blend Models",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Supervised task type.",
+          "hints": {
+            "choices": [
+              "classification",
+              "regression"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Task",
+          "name": "task",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to use as features; empty/unset uses every other column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "soft",
+          "help": "Voting scheme: soft or hard.",
+          "hints": {
+            "choices": [
+              "soft",
+              "hard"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Voting",
+          "name": "voting",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "many",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "Two or more fitted models to blend.",
+          "label": "Models",
+          "name": "models",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Data (features + target) to refit the voting ensemble on.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "out",
+          "help": "The fitted voting ensemble model.",
+          "label": null,
+          "name": "model",
+          "required": true
+        }
+      ],
+      "type": "ml.blend_models",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Machine Learning",
+      "column_effect": null,
+      "description": "Probability-calibrate a fitted classifier and refit on data.",
+      "family": "ml",
+      "keywords": [],
+      "label": "Calibrate Model",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to use as features; empty/unset uses every other column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "sigmoid",
+          "help": "Calibration method: sigmoid (Platt) or isotonic.",
+          "hints": {
+            "choices": [
+              "sigmoid",
+              "isotonic"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Method",
+          "name": "method",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 5,
+          "help": "Number of cross-validation folds used for calibration.",
+          "hints": null,
+          "label": "Cross-validation folds",
+          "name": "cv",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted model to calibrate.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Data (features + target) to refit the calibrated model on.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "out",
+          "help": "The fitted probability-calibrated model.",
+          "label": null,
+          "name": "model",
+          "required": true
+        }
+      ],
+      "type": "ml.calibrate_model",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Machine Learning",
+      "column_effect": null,
       "description": "Fit a curated, allow-listed sklearn clustering/mixture estimator.",
       "family": "ml",
       "keywords": [],
@@ -8186,6 +8430,144 @@
       "advisor_persona": null,
       "category": "Machine Learning",
       "column_effect": null,
+      "description": "Wrap a fitted estimator in a bagging/boosting ensemble and refit on data.",
+      "family": "ml",
+      "keywords": [],
+      "label": "Ensemble Model",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Supervised task type.",
+          "hints": {
+            "choices": [
+              "classification",
+              "regression"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Task",
+          "name": "task",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to use as features; empty/unset uses every other column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "bagging",
+          "help": "Ensemble method: bagging or boosting.",
+          "hints": {
+            "choices": [
+              "bagging",
+              "boosting"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Method",
+          "name": "method",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 10,
+          "help": "Number of base estimators in the ensemble.",
+          "hints": null,
+          "label": "Number of estimators",
+          "name": "n_estimators",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted model to wrap in an ensemble.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Data (features + target) to refit the ensemble on.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "out",
+          "help": "The fitted bagging/boosting ensemble model.",
+          "label": null,
+          "name": "model",
+          "required": true
+        }
+      ],
+      "type": "ml.ensemble_model",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Machine Learning",
+      "column_effect": null,
       "description": "Score a fitted model against labeled data.",
       "family": "ml",
       "keywords": [],
@@ -8222,6 +8604,69 @@
         }
       ],
       "type": "ml.evaluate",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Machine Learning",
+      "column_effect": null,
+      "description": "Refit a fitted model on the full dataset with its fitted hyperparameters.",
+      "family": "ml",
+      "keywords": [],
+      "label": "Finalize Model",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Target column; defaults to the model's recorded target.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted model to refit.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Data (features + target) to refit the model on.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "out",
+          "help": "The refit final model.",
+          "label": null,
+          "name": "model",
+          "required": true
+        }
+      ],
+      "type": "ml.finalize_model",
       "version": 1
     },
     {
@@ -8696,6 +9141,89 @@
         }
       ],
       "type": "ml.load_model",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Machine Learning",
+      "column_effect": null,
+      "description": "Optimize the decision threshold of a binary classifier to maximize F1.",
+      "family": "ml",
+      "keywords": [],
+      "label": "Optimize Threshold",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Class to treat as positive; defaults to the second class.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Positive class",
+          "name": "positive_class",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "The fitted binary classifier.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Data (features + target) to evaluate thresholds on.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "any",
+          "direction": "out",
+          "help": "The threshold-optimization result.",
+          "label": "Result",
+          "name": "threshold_result",
+          "required": true
+        }
+      ],
+      "type": "ml.optimize_threshold",
       "version": 1
     },
     {
@@ -9222,6 +9750,130 @@
       "advisor_persona": null,
       "category": "Machine Learning",
       "column_effect": null,
+      "description": "Stack two or more fitted models under a curated meta-learner, refit on data.",
+      "family": "ml",
+      "keywords": [],
+      "label": "Stack Models",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Supervised task type.",
+          "hints": {
+            "choices": [
+              "classification",
+              "regression"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Task",
+          "name": "task",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to use as features; empty/unset uses every other column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "LogisticRegression",
+          "help": "Curated meta-learner key.",
+          "hints": null,
+          "label": "Meta-learner",
+          "name": "final_estimator",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 5,
+          "help": "Number of cross-validation folds for the meta-learner.",
+          "hints": null,
+          "label": "CV folds",
+          "name": "cv",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "many",
+          "data_type": "Model",
+          "direction": "in",
+          "help": "Two or more fitted base models.",
+          "label": "Models",
+          "name": "models",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Data (features + target) to refit the stack on.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "out",
+          "help": "The fitted stacking ensemble model.",
+          "label": null,
+          "name": "model",
+          "required": true
+        }
+      ],
+      "type": "ml.stack_models",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Machine Learning",
+      "column_effect": null,
       "description": "Return a structural, inspectable summary of a fitted model.",
       "family": "ml",
       "keywords": [],
@@ -9723,6 +10375,175 @@
         }
       ],
       "type": "ml.transform",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Machine Learning",
+      "column_effect": null,
+      "description": "Randomized hyperparameter search for a curated, fit-archetype sklearn estimator.",
+      "family": "ml",
+      "keywords": [],
+      "label": "Tune Model",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Which allow-listed sklearn classifier/regressor to search.",
+          "hints": {
+            "choices": [
+              "AdaBoostClassifier",
+              "AdaBoostRegressor",
+              "BaggingClassifier",
+              "BaggingRegressor",
+              "DecisionTreeClassifier",
+              "DecisionTreeRegressor",
+              "ElasticNet",
+              "ExtraTreesClassifier",
+              "ExtraTreesRegressor",
+              "GaussianNB",
+              "GradientBoostingClassifier",
+              "GradientBoostingRegressor",
+              "HistGradientBoostingClassifier",
+              "HistGradientBoostingRegressor",
+              "KNeighborsClassifier",
+              "KNeighborsRegressor",
+              "Lasso",
+              "LinearDiscriminantAnalysis",
+              "LinearSVC",
+              "LogisticRegression",
+              "MultinomialNB",
+              "QuadraticDiscriminantAnalysis",
+              "RandomForestClassifier",
+              "RandomForestRegressor",
+              "Ridge",
+              "SGDClassifier",
+              "SGDRegressor",
+              "SVC",
+              "SVR"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Estimator",
+          "name": "estimator",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Constructor kwarg name -> list of candidate values to sample from.",
+          "hints": null,
+          "label": "Parameter distributions",
+          "name": "param_distributions",
+          "required": true,
+          "type_token": "dict[str, list[any]]"
+        },
+        {
+          "default": null,
+          "help": "Column to predict.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Target column",
+          "name": "target",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to use as features; empty/unset uses every other column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Feature columns",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": 10,
+          "help": "Number of parameter-distribution samples to evaluate.",
+          "hints": null,
+          "label": "Sampling iterations",
+          "name": "n_iter",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": 5,
+          "help": "Number of cross-validation folds.",
+          "hints": null,
+          "label": "CV folds",
+          "name": "cv",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "sklearn scoring string (e.g. 'accuracy', 'r2'); unset uses the estimator's default scorer.",
+          "hints": null,
+          "label": "Scoring metric",
+          "name": "scoring",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame containing features and the target column.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "Model",
+          "direction": "out",
+          "help": "The best-scoring fitted model, refit on the full input frame.",
+          "label": null,
+          "name": "model",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "One row per sampled parameter combination, sorted by rank.",
+          "label": null,
+          "name": "cv_results",
+          "required": true
+        }
+      ],
+      "type": "ml.tune_model",
       "version": 1
     },
     {
