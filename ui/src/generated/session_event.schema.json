@@ -2,6 +2,30 @@
   "additionalProperties": false,
   "description": "The shape of every event `SessionStore` publishes on a session's SSE stream.",
   "properties": {
+    "author": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Author"
+    },
+    "checkpoint_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Checkpoint Id"
+    },
     "comment_id": {
       "anyOf": [
         {
@@ -25,6 +49,18 @@
       ],
       "default": null,
       "title": "Decision Id"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
     },
     "gate_id": {
       "anyOf": [
@@ -62,6 +98,18 @@
       "default": null,
       "title": "Proposal Id"
     },
+    "reverted_checkpoint_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reverted Checkpoint Id"
+    },
     "review_id": {
       "anyOf": [
         {
@@ -93,6 +141,8 @@
     "type": {
       "enum": [
         "graph_replaced",
+        "graph_changed",
+        "graph_reverted",
         "proposal_added",
         "proposal_accepted",
         "proposal_rejected",

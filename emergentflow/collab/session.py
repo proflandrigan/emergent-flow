@@ -41,6 +41,7 @@ from emergentflow.collab.chat import (
     ChatTurnStatus,
     UnknownChatTurnError,
 )
+from emergentflow.collab.checkpoints import Checkpoint, CheckpointKind
 from emergentflow.collab.gates import (
     Decision,
     Gate,
@@ -57,7 +58,12 @@ from emergentflow.collab.review import (
 )
 from emergentflow.ir.common import new_id
 from emergentflow.ir.graph import Graph
-from emergentflow.ir.mutation import GraphMutation, apply_mutation, propose_diagnostics
+from emergentflow.ir.mutation import (
+    GraphMutation,
+    apply_mutation,
+    invert_mutation,
+    propose_diagnostics,
+)
 
 
 class SessionError(Exception):
@@ -112,6 +118,10 @@ class OpenGatesError(SessionError):
 
 class UnknownReviewError(SessionError):
     """Raised when a review thread id does not exist on a session."""
+
+
+class UnknownCheckpointError(SessionError):
+    """Raised when a checkpoint id does not exist on a session."""
 
 
 class ProposalStatus(str, Enum):
@@ -393,6 +403,114 @@ class SessionStore:
             self._publish(
                 session_id,
                 {"type": "proposal_rejected", "session_id": session_id, "proposal_id": proposal_id},
+            )
+            return session
+
+    def apply_direct_mutation(
+        self,
+        session_id: str,
+        mutation: GraphMutation,
+        *,
+        author: str = "agent",
+        description: str = "",
+    ) -> tuple[GraphSession, Checkpoint]:
+        """Validate, apply, and checkpoint a mutation directly.
+
+        Raises the same errors as add_proposal (UnknownSessionError,
+        StaleVersionError) plus MutationError if the mutation cannot be applied.
+        Bumps the session version by 1, stores a Checkpoint of kind EDIT, and
+        publishes a ``graph_changed`` event.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            if mutation.base_version != session.version:
+                raise StaleVersionError(
+                    f"session {session_id!r}: mutation base_version "
+                    f"{mutation.base_version} does not match the session's current "
+                    f"version {session.version}."
+                )
+            previous_graph = session.graph
+            previous_version = session.version
+            new_graph = apply_mutation(session.graph, mutation)
+            session.graph = new_graph
+            session.version += 1
+            checkpoint = Checkpoint(
+                kind=CheckpointKind.EDIT,
+                author=author,
+                description=description or mutation.description,
+                base_version=previous_version,
+                mutation=mutation,
+                previous_graph=previous_graph,
+                resulting_version=session.version,
+            )
+            session.collab.checkpoints[checkpoint.id] = checkpoint
+            self._publish(
+                session_id,
+                {
+                    "type": "graph_changed",
+                    "session_id": session_id,
+                    "version": session.version,
+                    "checkpoint_id": checkpoint.id,
+                    "author": checkpoint.author,
+                    "description": checkpoint.description,
+                },
+            )
+            return session, checkpoint
+
+    def revert_checkpoint(self, session_id: str, checkpoint_id: str) -> GraphSession:
+        """Restore the graph snapshot stored in *checkpoint_id*.
+
+        Bumps the session version by 1, creates a new REVERT checkpoint, and
+        publishes a ``graph_reverted`` event.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        UnknownCheckpointError
+            If no checkpoint with that id exists on the session.
+        MutationError
+            (from ``emergentflow.ir.mutation``) if the checkpoint's forward
+            mutation is not invertible -- not caught here, propagates to the
+            caller.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            checkpoint = session.collab.checkpoints.get(checkpoint_id)
+            if checkpoint is None:
+                raise UnknownCheckpointError(
+                    f"session {session_id!r} has no checkpoint {checkpoint_id!r}."
+                )
+            previous_graph = session.graph
+            previous_version = session.version
+            session.graph = checkpoint.previous_graph.model_copy(deep=True)
+            session.version += 1
+            inverse_mutation = invert_mutation(previous_graph, checkpoint.mutation)
+            revert_checkpoint = Checkpoint(
+                kind=CheckpointKind.REVERT,
+                author=checkpoint.author,
+                description=f"Revert: {checkpoint.description}",
+                base_version=previous_version,
+                mutation=inverse_mutation,
+                previous_graph=previous_graph,
+                resulting_version=session.version,
+            )
+            session.collab.checkpoints[revert_checkpoint.id] = revert_checkpoint
+            self._publish(
+                session_id,
+                {
+                    "type": "graph_reverted",
+                    "session_id": session_id,
+                    "version": session.version,
+                    "checkpoint_id": revert_checkpoint.id,
+                    "reverted_checkpoint_id": checkpoint_id,
+                    "author": revert_checkpoint.author,
+                    "description": revert_checkpoint.description,
+                },
             )
             return session
 

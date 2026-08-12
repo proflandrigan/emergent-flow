@@ -1,15 +1,21 @@
 /* AUTO-GENERATED from session_event.schema.json by `npm run gen:types`. Do not edit. */
 
+export type Author = string | null;
+export type CheckpointId = string | null;
 export type CommentId = string | null;
 export type DecisionId = string | null;
+export type Description = string | null;
 export type GateId = string | null;
 export type Persona = string | null;
 export type ProposalId = string | null;
+export type RevertedCheckpointId = string | null;
 export type ReviewId = string | null;
 export type SessionId = string;
 export type TurnId = string | null;
 export type Type =
   | "graph_replaced"
+  | "graph_changed"
+  | "graph_reverted"
   | "proposal_added"
   | "proposal_accepted"
   | "proposal_rejected"
@@ -32,11 +38,15 @@ export type Version = number | null;
  * The shape of every event `SessionStore` publishes on a session's SSE stream.
  */
 export interface SessionEvent {
+  author?: Author;
+  checkpoint_id?: CheckpointId;
   comment_id?: CommentId;
   decision_id?: DecisionId;
+  description?: Description;
   gate_id?: GateId;
   persona?: Persona;
   proposal_id?: ProposalId;
+  reverted_checkpoint_id?: RevertedCheckpointId;
   review_id?: ReviewId;
   session_id: SessionId;
   turn_id?: TurnId;

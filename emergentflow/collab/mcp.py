@@ -52,10 +52,15 @@ def create_mcp_server() -> Any:
     from emergentflow.collab.review import ReviewThread
     from emergentflow.collab.session import OpenGatesError, UnknownProposalError
     from emergentflow.collab.session import get_default_store as get_default_session_store
+    from emergentflow.ir.common import new_id
+    from emergentflow.ir.edge import Edge, PortRef
     from emergentflow.ir.mutation import GraphMutation
+    from emergentflow.ir.node import Position
+    from emergentflow.nodes import registry as default_node_registry
     from emergentflow.server.service import (
         compile_graph,
         compile_session,  # ADD
+        execute_node,  # ADD
         execute_session,  # ADD
         get_catalog,
         get_knowledge_entry,
@@ -198,6 +203,51 @@ def create_mcp_server() -> Any:
             }
         except UnknownRunError:
             return {"error": f"Run {run_id!r} not found"}
+
+    @mcp.tool()
+    def execute_node_tool(
+        session_id: str,
+        node_id: str,
+        inputs: dict[str, Any] | None = None,
+    ) -> dict:
+        """Execute a single node in *session_id*'s graph (same as POST /execute_node).
+
+        Runs only that node's ``execute()`` with caller-supplied upstream ``inputs``
+        (keyed by IN-port name) and returns the same ``{"payload_version", "results",
+        "statuses"}`` shape as the HTTP route. Raises ``UnknownSessionError`` for an
+        unknown session and ``CodegenError`` for a bad envelope / unknown node id /
+        non-FUNCTIONAL node.
+        """
+        session = get_default_session_store().get(session_id)
+        payload = {
+            "graph": session.graph.model_dump(mode="json"),
+            "run_node": node_id,
+            "inputs": inputs if inputs is not None else {},
+        }
+        return execute_node(payload)
+
+    @mcp.tool()
+    def get_node_outputs(
+        run_id: str,
+        node_ids: list[str],
+    ) -> dict:
+        """Fetch raw execution payloads for specific nodes in a run.
+
+        Returns ``{"run_id", "outputs": {node_id: {port_name: payload}}}`` for the
+        requested ``node_ids`` that exist in the run, so the agent can read scalars
+        and tables directly without parsing the whole result payload. Returns
+        ``{"error": ...}`` if *run_id* doesn't exist.
+        """
+        from emergentflow.server.runs import UnknownRunError, get_default_runs
+
+        try:
+            payloads = get_default_runs().get_payloads(run_id)
+        except UnknownRunError:
+            return {"error": f"Run {run_id!r} not found"}
+        return {
+            "run_id": run_id,
+            "outputs": {node_id: payloads[node_id] for node_id in node_ids if node_id in payloads},
+        }
 
     @mcp.tool()
     def fetch_artifact(handle: str) -> dict:
@@ -397,5 +447,278 @@ def create_mcp_server() -> Any:
                     return {"status": event["type"].removeprefix("proposal_"), **event}
         finally:
             store.unsubscribe(session_id, q)
+
+    # ------------------------------------------------------------------
+    # Fine-grained graph-editing tools (Task 03)
+    #
+    # Each tool builds a GraphMutation and applies it directly through
+    # SessionStore.apply_direct_mutation, so the UI sees a graph_changed
+    # event and a checkpoint is recorded automatically. Every success
+    # response carries the common shape {session_id, version,
+    # checkpoint_id} plus tool-specific id fields. Validation/session
+    # errors (UnknownSessionError, StaleVersionError, MutationError,
+    # KeyError for unknown node types) propagate so FastMCP surfaces a
+    # ToolError; only expected "not found" port lookups are caught and
+    # re-raised as ValueError.
+    # ------------------------------------------------------------------
+
+    def _find_port(node, port_name: str):
+        """Return the port on *node* named *port_name*, else raise ValueError."""
+        for port in node.ports:
+            if port.name == port_name:
+                return port
+        raise ValueError(
+            f"node {node.id!r} ({node.type}) has no port named {port_name!r}; "
+            f"available ports: {sorted(p.name for p in node.ports)!r}"
+        )
+
+    @mcp.tool()
+    def add_node(
+        session_id: str,
+        node_type: str,
+        *,
+        label: str | None = None,
+        params: dict[str, Any] | None = None,
+        position: dict[str, float] | None = None,
+        author: str = "agent",
+        reason: str = "",
+    ) -> dict:
+        """Add a node of *node_type* to *session_id*'s graph.
+
+        *params* are JSON-native param overrides passed straight to the node
+        definition's ``instantiate``. *position* optionally overrides the
+        node's canvas coordinates. Returns the common success shape plus the
+        new ``node_id``.
+        """
+        definition_cls = default_node_registry.get(node_type)
+        node = definition_cls().instantiate(label=label or definition_cls.label, **(params or {}))
+        if position is not None:
+            node.position = Position(x=position["x"], y=position["y"])
+        store = get_default_session_store()
+        session = store.get(session_id)
+        mutation = GraphMutation(
+            base_version=session.version,
+            add_nodes=[node],
+            description=reason,
+            author=author,
+        )
+        session, checkpoint = store.apply_direct_mutation(
+            session_id, mutation, author=author, description=reason
+        )
+        return {
+            "session_id": session_id,
+            "version": session.version,
+            "checkpoint_id": checkpoint.id,
+            "node_id": node.id,
+        }
+
+    @mcp.tool()
+    def connect_ports(
+        session_id: str,
+        source_node_id: str,
+        source_port_name: str,
+        target_node_id: str,
+        target_port_name: str,
+        *,
+        author: str = "agent",
+        reason: str = "",
+    ) -> dict:
+        """Connect an OUT port on *source_node_id* to an IN port on *target_node_id*.
+
+        Port names are resolved to their IR port ids before the edge is built.
+        Returns the common success shape plus the new ``edge_id``.
+        """
+        store = get_default_session_store()
+        session = store.get(session_id)
+        graph = session.graph
+        source_node = graph.nodes[source_node_id]
+        target_node = graph.nodes[target_node_id]
+        source_port = _find_port(source_node, source_port_name)
+        target_port = _find_port(target_node, target_port_name)
+        edge = Edge(
+            id=new_id(),
+            source=PortRef(node_id=source_node_id, port_id=source_port.id),
+            target=PortRef(node_id=target_node_id, port_id=target_port.id),
+        )
+        mutation = GraphMutation(
+            base_version=session.version,
+            add_edges=[edge],
+            description=reason,
+            author=author,
+        )
+        session, checkpoint = store.apply_direct_mutation(
+            session_id, mutation, author=author, description=reason
+        )
+        return {
+            "session_id": session_id,
+            "version": session.version,
+            "checkpoint_id": checkpoint.id,
+            "edge_id": edge.id,
+        }
+
+    @mcp.tool()
+    def set_param(
+        session_id: str,
+        node_id: str,
+        param_name: str,
+        value: Any,
+        *,
+        author: str = "agent",
+        reason: str = "",
+    ) -> dict:
+        """Set *param_name* to *value* on *node_id* in *session_id*'s graph.
+
+        Returns the common success shape plus the edited ``node_id``.
+        """
+        store = get_default_session_store()
+        session = store.get(session_id)
+        mutation = GraphMutation(
+            base_version=session.version,
+            set_params={node_id: {param_name: value}},
+            description=reason,
+            author=author,
+        )
+        session, checkpoint = store.apply_direct_mutation(
+            session_id, mutation, author=author, description=reason
+        )
+        return {
+            "session_id": session_id,
+            "version": session.version,
+            "checkpoint_id": checkpoint.id,
+            "node_id": node_id,
+        }
+
+    @mcp.tool()
+    def delete_node(
+        session_id: str,
+        node_id: str,
+        *,
+        author: str = "agent",
+        reason: str = "",
+    ) -> dict:
+        """Delete *node_id* from *session_id*'s graph, along with every incident edge.
+
+        Returns the common success shape plus the removed ``node_id``.
+        """
+        store = get_default_session_store()
+        session = store.get(session_id)
+        graph = session.graph
+        edge_ids = [
+            edge_id
+            for edge_id, edge in graph.edges.items()
+            if edge.source.node_id == node_id or edge.target.node_id == node_id
+        ]
+        mutation = GraphMutation(
+            base_version=session.version,
+            remove_nodes=[node_id],
+            remove_edges=edge_ids,
+            description=reason,
+            author=author,
+        )
+        session, checkpoint = store.apply_direct_mutation(
+            session_id, mutation, author=author, description=reason
+        )
+        return {
+            "session_id": session_id,
+            "version": session.version,
+            "checkpoint_id": checkpoint.id,
+            "node_id": node_id,
+        }
+
+    @mcp.tool()
+    def delete_edge(
+        session_id: str,
+        edge_id: str,
+        *,
+        author: str = "agent",
+        reason: str = "",
+    ) -> dict:
+        """Delete *edge_id* from *session_id*'s graph.
+
+        Returns the common success shape plus the removed ``edge_id``.
+        """
+        store = get_default_session_store()
+        session = store.get(session_id)
+        mutation = GraphMutation(
+            base_version=session.version,
+            remove_edges=[edge_id],
+            description=reason,
+            author=author,
+        )
+        session, checkpoint = store.apply_direct_mutation(
+            session_id, mutation, author=author, description=reason
+        )
+        return {
+            "session_id": session_id,
+            "version": session.version,
+            "checkpoint_id": checkpoint.id,
+            "edge_id": edge_id,
+        }
+
+    @mcp.tool()
+    def add_note(
+        session_id: str,
+        content: str,
+        *,
+        anchor_id: str | None = None,
+        color: str = "yellow",
+        author: str = "agent",
+        reason: str = "",
+    ) -> dict:
+        """Add a ``notes.markdown`` annotation node to *session_id*'s graph.
+
+        Returns the common success shape plus the new ``node_id``.
+        """
+        note = default_node_registry.get("notes.markdown")().instantiate(
+            content=content, anchor_id=anchor_id, color=color
+        )
+        store = get_default_session_store()
+        session = store.get(session_id)
+        description = reason or f"Added note: {content[:80]}"
+        mutation = GraphMutation(
+            base_version=session.version,
+            add_nodes=[note],
+            description=description,
+            author=author,
+        )
+        session, checkpoint = store.apply_direct_mutation(
+            session_id, mutation, author=author, description=description
+        )
+        return {
+            "session_id": session_id,
+            "version": session.version,
+            "checkpoint_id": checkpoint.id,
+            "node_id": note.id,
+        }
+
+    @mcp.tool()
+    def delete_note(
+        session_id: str,
+        note_node_id: str,
+        *,
+        author: str = "agent",
+        reason: str = "",
+    ) -> dict:
+        """Delete the ``notes.markdown`` node *note_node_id* from *session_id*'s graph.
+
+        Returns the common success shape plus the removed ``node_id``.
+        """
+        store = get_default_session_store()
+        session = store.get(session_id)
+        mutation = GraphMutation(
+            base_version=session.version,
+            remove_nodes=[note_node_id],
+            description=reason,
+            author=author,
+        )
+        session, checkpoint = store.apply_direct_mutation(
+            session_id, mutation, author=author, description=reason
+        )
+        return {
+            "session_id": session_id,
+            "version": session.version,
+            "checkpoint_id": checkpoint.id,
+            "node_id": note_node_id,
+        }
 
     return mcp

@@ -101,6 +101,24 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Emit the full Diagnostics result as JSON (machine-readable).",
     )
+
+    p = sub.add_parser(
+        "mcp",
+        help="Run the stdio MCP bridge that forwards to a local server.",
+    )
+    p.add_argument(
+        "--base-url",
+        default="http://127.0.0.1:8765",
+        help="Base URL of the local server (default: http://127.0.0.1:8765).",
+    )
+    p.add_argument(
+        "--session-token",
+        default=None,
+        help=(
+            "Bearer token for the server's session/MCP routes "
+            "(default: $EMERGENTFLOW_SESSION_TOKEN)."
+        ),
+    )
     return parser
 
 
@@ -332,6 +350,35 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.strict:
             errors = [d for d in filtered.diagnostics if d.severity.value == "error"]
             return 1 if errors else 0
+        return 0
+
+    if args.command == "mcp":
+        import asyncio
+        import os
+
+        try:
+            from emergentflow.collab.mcp_bridge import create_bridge_mcp_server
+        except ModuleNotFoundError as exc:
+            # fastmcp/httpx ship in the optional `mcp` extra. A bare
+            # `pip install emergentflow` omits them; guide the user rather
+            # than surfacing a raw ModuleNotFoundError traceback.
+            print(
+                f"`emergentflow mcp` needs the mcp extra "
+                f"(missing dependency: {exc.name}).\n"
+                "Install it with:  pip install 'emergentflow[mcp]'",
+                file=sys.stderr,
+            )
+            return 1
+
+        token = args.session_token or os.environ.get("EMERGENTFLOW_SESSION_TOKEN")
+        try:
+            # mcp.run(transport="stdio") is blocking and runs its own event loop,
+            # so build the server (which does the catalog fetch) up front.
+            mcp = asyncio.run(create_bridge_mcp_server(args.base_url, token=token))
+        except RuntimeError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+        mcp.run(transport="stdio")
         return 0
 
     parser.print_help()
