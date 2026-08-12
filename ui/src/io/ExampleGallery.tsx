@@ -1,5 +1,7 @@
-// Starter gallery shown on an empty canvas -- lets a new user open a bundled example instead
-// of staring at a blank grid. Renders nothing once the canvas has any nodes.
+// Starter gallery -- lets a new user open a bundled example instead of staring at a blank grid.
+// Reached only from the command bar's overflow menu ("Get started"); it does not auto-open on
+// launch and stays open until the user closes it (close button or Escape), even if the canvas
+// already has nodes. Renders nothing only when there are no examples to show.
 
 import { useEffect } from "react";
 
