@@ -90,7 +90,7 @@ export interface GraphStore extends CanvasModel {
   removeEdge: (edgeId: string) => void;
   toIR: () => Graph;
   loadIR: (graph: Graph, options?: { reflow?: boolean }) => void;
-  loadModel: (model: CanvasModel) => void;
+  loadModel: (model: CanvasModel, options?: { reflow?: boolean }) => void;
   tidyLayout: () => void;
   reset: () => void;
   pushHistory: (txn: string) => void;
@@ -272,6 +272,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const edge: EdgeModel = { id: edgeId, source, target };
     set((state) => ({
       edges: { ...state.edges, [edgeId]: edge },
+      nodes: layeredLayout(state.nodes, { ...state.edges, [edgeId]: edge }),
     }));
     return edgeId;
   },
@@ -595,13 +596,15 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     clearDerivedStores();
   },
 
-  loadModel(model) {
+  loadModel(model, options) {
     get().pushHistory("loadModel");
     set({
       schemaVersion: model.schemaVersion,
       name: model.name,
       paradigm: model.paradigm,
-      nodes: model.nodes,
+      nodes: options?.reflow
+        ? layeredLayout(model.nodes, model.edges)
+        : model.nodes,
       edges: model.edges,
       groupMeta: model.groupMeta ?? {},
       params: model.params,

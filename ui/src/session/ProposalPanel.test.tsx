@@ -174,7 +174,7 @@ test("Edit into own merges the mutation's added nodes into the canvas graph and 
   });
 });
 
-test("edit-into-own re-flows the merged graph with tidyLayout", async () => {
+test("edit-into-own re-flows the merged graph via loadModel reflow", async () => {
   vi.mocked(sessionClient.rejectProposal).mockResolvedValue({
     id: "abc",
     graph: { paradigm: "functional", nodes: {}, edges: {} },
@@ -182,13 +182,11 @@ test("edit-into-own re-flows the merged graph with tidyLayout", async () => {
     proposals: {},
   });
   const loadModel = vi.fn();
-  const tidyLayout = vi.fn();
   const getStateSpy = vi
     .spyOn(useGraphStore, "getState")
     .mockReturnValue({
       ...useGraphStore.getState(),
       loadModel,
-      tidyLayout,
     });
   const proposal = pendingProposal({
     mutation: {
@@ -207,9 +205,9 @@ test("edit-into-own re-flows the merged graph with tidyLayout", async () => {
   fireEvent.click(screen.getByTestId("proposal-edit-into-own"));
 
   expect(loadModel).toHaveBeenCalled();
-  expect(tidyLayout).toHaveBeenCalled();
-  expect(loadModel.mock.invocationCallOrder[0]).toBeLessThan(
-    tidyLayout.mock.invocationCallOrder[0],
+  expect(loadModel).toHaveBeenCalledWith(
+    expect.any(Object),
+    { reflow: true },
   );
 
   getStateSpy.mockRestore();
