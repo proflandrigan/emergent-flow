@@ -485,11 +485,18 @@ class SessionStore:
                 raise UnknownCheckpointError(
                     f"session {session_id!r} has no checkpoint {checkpoint_id!r}."
                 )
+            # Derive the inverse of the checkpoint's FORWARD mutation against the graph it
+            # was computed on (checkpoint.previous_graph), NOT against the current graph:
+            # invert_mutation needs the pre-edit node list and original param values to
+            # build a faithful inverse, and a remove_nodes forward edit must still find the
+            # removed node there. Doing this BEFORE any state mutation also keeps the
+            # session untouched if the forward mutation turns out not to be invertible
+            # (MutationError propagates with no partial revert applied).
+            inverse_mutation = invert_mutation(checkpoint.previous_graph, checkpoint.mutation)
             previous_graph = session.graph
             previous_version = session.version
             session.graph = checkpoint.previous_graph.model_copy(deep=True)
             session.version += 1
-            inverse_mutation = invert_mutation(previous_graph, checkpoint.mutation)
             revert_checkpoint = Checkpoint(
                 kind=CheckpointKind.REVERT,
                 author=checkpoint.author,

@@ -164,3 +164,57 @@ class TestRevertCheckpoint:
         store = SessionStore()
         with pytest.raises(UnknownSessionError):
             store.revert_checkpoint("no-such-session", "whatever")
+
+    def test_revert_checkpoint_mutation_is_the_faithful_inverse(self) -> None:
+        """The REVERT checkpoint's mutation must undo the forward edit.
+
+        For a set_params forward edit, the stored inverse must restore the ORIGINAL
+        (pre-edit) param value -- not re-record the forward value. The inverse must be
+        derived against the checkpoint's pre-mutation graph snapshot.
+        """
+        store = SessionStore()
+        session = store.create()
+        node = _load_csv_node()
+        add = GraphMutation(base_version=0, add_nodes=[node])
+        _, _ = store.apply_direct_mutation(session.id, add)
+        setp = GraphMutation(
+            base_version=1, set_params={node.id: {"path": "changed.csv"}}, author="agent"
+        )
+        _, edit_cp = store.apply_direct_mutation(session.id, setp)
+
+        result = store.revert_checkpoint(session.id, edit_cp.id)
+        revert = next(
+            cp for cp in result.collab.checkpoints.values() if cp.kind == CheckpointKind.REVERT
+        )
+        assert revert.mutation.set_params == {node.id: {"path": "a.csv"}}
+        restored_path = next(
+            p.value for p in result.graph.nodes[node.id].params if p.name == "path"
+        )
+        assert restored_path == "a.csv"
+
+    def test_revert_remove_nodes_edit_succeeds_and_leaves_session_consistent(self) -> None:
+        """Reverting a remove_nodes forward edit must not raise and must not mutate
+        session state halfway. The inverse must be computed against the pre-edit graph
+        (which still contains the removed node) BEFORE any state change, so a failure
+        could never leave the graph reverted without a checkpoint/event.
+        """
+        store = SessionStore()
+        session = store.create()
+        n1 = _load_csv_node()
+        store.apply_direct_mutation(session.id, GraphMutation(base_version=0, add_nodes=[n1]))
+        n2 = _load_csv_node()
+        store.apply_direct_mutation(session.id, GraphMutation(base_version=1, add_nodes=[n2]))
+        deln = GraphMutation(
+            base_version=2, remove_nodes=[n1.id], author="agent", description="del"
+        )
+        _, edit_cp = store.apply_direct_mutation(session.id, deln)
+        assert n1.id not in store.get(session.id).graph.nodes
+
+        result = store.revert_checkpoint(session.id, edit_cp.id)
+        assert n1.id in result.graph.nodes
+        revert = next(
+            cp for cp in result.collab.checkpoints.values() if cp.kind == CheckpointKind.REVERT
+        )
+        assert revert.previous_graph is not None
+        assert edit_cp.id in result.collab.checkpoints
+        assert edit_cp.id != revert.id
