@@ -212,10 +212,17 @@ export function App(): JSX.Element {
   }, []);
 
   // Runs once on mount: start tracking canvas-dirty state, warm the examples list, and
-  // recover any localStorage-persisted session left behind by a refresh/crash.
+  // recover any localStorage-persisted session left behind by a refresh/crash -- or, if the
+  // URL carries a ?session=<id>, join that collaboration session instead (the agent-driven
+  // MCP workflow) so the human lands directly on the shared graph.
   useEffect(() => {
     startDirtyTracking();
     useFlowStore.getState().fetchExamples();
+    const urlSession = new URLSearchParams(window.location.search).get("session");
+    if (urlSession) {
+      void useSessionStore.getState().join(urlSession);
+      return;
+    }
     const recovered = recoverSession();
     if (recovered) {
       useGraphStore.getState().loadIR(recovered.graph);
