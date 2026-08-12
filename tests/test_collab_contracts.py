@@ -21,6 +21,27 @@ def test_session_event_matches_every_publish_call_shape() -> None:
     must validate against SessionEvent -- this is the drift guard the contracts.py docstring
     promises."""
     SessionEvent.model_validate({"type": "graph_replaced", "session_id": "s1", "version": 1})
+    SessionEvent.model_validate(
+        {
+            "type": "graph_changed",
+            "session_id": "s1",
+            "version": 2,
+            "checkpoint_id": "cp1",
+            "author": "alice",
+            "description": "updated the model",
+        }
+    )
+    SessionEvent.model_validate(
+        {
+            "type": "graph_reverted",
+            "session_id": "s1",
+            "version": 3,
+            "checkpoint_id": "cp2",
+            "reverted_checkpoint_id": "cp1",
+            "author": "alice",
+            "description": "reverted to a prior checkpoint",
+        }
+    )
     SessionEvent.model_validate({"type": "proposal_added", "session_id": "s1", "proposal_id": "p1"})
     SessionEvent.model_validate(
         {"type": "proposal_accepted", "session_id": "s1", "proposal_id": "p1", "version": 2}

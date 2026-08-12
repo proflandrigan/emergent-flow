@@ -22,6 +22,7 @@ import remarkGfm from "remark-gfm";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
 import { Select } from "../ui/Select";
+import { Segmented } from "../ui/Segmented";
 import { COMMAND_BAR_CLEARANCE } from "../App";
 import { OverlayModal } from "../ui/OverlayModal";
 
@@ -29,6 +30,7 @@ import { getAvailableAgents, type ChatTurn } from "./sessionClient";
 import { useSessionStore } from "./sessionStore";
 import { usePersonas } from "./usePersonas";
 import { ChatComposer } from "./ChatComposer";
+import { CheckpointPanel } from "./CheckpointPanel";
 
 export interface ChatModalProps {
   onClose: () => void;
@@ -457,8 +459,11 @@ function ActiveChat({ backend }: { backend: string }): JSX.Element {
   );
 }
 
+type ChatTab = "chat" | "checkpoints";
+
 function ChatModalContent(): JSX.Element {
   const backend = useSessionStore((s) => s.chat.backend);
+  const [activeTab, setActiveTab] = useState<ChatTab>("chat");
   return (
     <div
       data-testid="chat-modal-content"
@@ -469,7 +474,32 @@ function ChatModalContent(): JSX.Element {
         minHeight: 0,
       }}
     >
-      {backend === null ? <BackendPicker /> : <ActiveChat backend={backend} />}
+      {backend === null ? (
+        <BackendPicker />
+      ) : (
+        <>
+          <div style={{ flexShrink: 0, marginBottom: "var(--space-2)" }}>
+            <Segmented<ChatTab>
+              aria-label="Chat view"
+              value={activeTab}
+              onChange={setActiveTab}
+              options={[
+                { value: "chat", label: "Chat", testId: "chat-tab-chat" },
+                {
+                  value: "checkpoints",
+                  label: "Checkpoints",
+                  testId: "chat-tab-checkpoints",
+                },
+              ]}
+            />
+          </div>
+          {activeTab === "chat" ? (
+            <ActiveChat backend={backend} />
+          ) : (
+            <CheckpointPanel />
+          )}
+        </>
+      )}
     </div>
   );
 }

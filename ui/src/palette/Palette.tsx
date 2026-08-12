@@ -252,9 +252,7 @@ export function Palette(): JSX.Element {
                             )
                           }
                           onClick={() => {
-                            const n = Object.keys(useGraphStore.getState().nodes).length;
-                            const position = { x: 80 + (n % 8) * 24, y: 80 + (n % 8) * 24 };
-                            addNodeFromSpec(node, position);
+                            addNodeFromSpec(node, { x: 0, y: 0 });
                           }}
                           style={{
                             display: "block",

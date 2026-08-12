@@ -14,6 +14,7 @@ import type { SessionEvent } from "../generated/session_event";
 import {
   acceptProposal,
   addReviewComment,
+  applyDirectMutation,
   closeGateRequest,
   compileSession,
   consultSession,
@@ -23,10 +24,12 @@ import {
   endChat as endChatRequest,
   executeSession,
   getSession,
+  listCheckpoints,
   postGateDecision,
   proposeMutation,
   rejectProposal,
   replaceSessionGraph,
+  revertCheckpoint,
   skipGateRequest,
   startChat as startChatRequest,
   stopChatTurn as stopChatTurnRequest,
@@ -34,6 +37,7 @@ import {
   type Attempt,
   type ChatState,
   type ChatTurn,
+  type Checkpoint,
   type ConsultInput,
   type CreateGateInput,
   type CreateReviewInput,
@@ -60,6 +64,7 @@ export interface SessionStoreState {
   gates: Record<string, Gate>;
   chat: ChatState;
   attempts: Record<string, Attempt>;
+  checkpoints: Record<string, Checkpoint>;
   status: SessionConnectionStatus;
   error: string | null;
   // Set when a PUT .../graph call is rejected for a stale expected_version (someone else's
@@ -93,6 +98,13 @@ export interface SessionStoreState {
   startChat: (backend: string, message: string) => Promise<ChatTurn>;
   stopChat: (turnId: string) => Promise<void>;
   endChat: () => Promise<void>;
+  applyDirectMutation: (
+    mutation: GraphMutation,
+    author?: string,
+    reason?: string,
+  ) => Promise<void>;
+  revertCheckpoint: (checkpointId: string) => Promise<void>;
+  listCheckpoints: () => Promise<void>;
   compileSession: () => Promise<{ code: string }>;
   executeSession: (scope?: ExecuteSessionScope) => Promise<ExecuteSessionResult>;
 }
@@ -106,34 +118,64 @@ function errorMessage(err: unknown): string {
 }
 
 // Refreshes the proposal list + version from the server (cheap correctness over cleverness --
-// one GET), and ONLY reloads the canvas's graph for the two event types that actually change
-// the accepted graph server-side (graph_replaced, proposal_accepted). proposal_added/
-// proposal_rejected update the proposal list without touching the canvas, so an in-progress
-// local edit is never stomped by someone else's proposal arriving. The six chat_* event types
-// (chat_turn_started, chat_narration_added, chat_turn_completed, chat_turn_failed,
-// chat_turn_interrupted, chat_ended) need no special case here -- they flow through this same
-// full refetch, which is how live narration/replies actually reach the UI as a spawned chat
-// backend streams output in the background.
+// one GET), and ONLY reloads the canvas's graph for the event types that actually change
+// the accepted graph server-side (graph_replaced, proposal_accepted, graph_changed,
+// graph_reverted). proposal_added/proposal_rejected update the proposal list without touching
+// the canvas, so an in-progress local edit is never stomped by someone else's proposal arriving.
+// The six chat_* event types (chat_turn_started, chat_narration_added, chat_turn_completed,
+// chat_turn_failed, chat_turn_interrupted, chat_ended) need no special case here -- they flow
+// through this same full refetch, which is how live narration/replies actually reach the UI as
+// a spawned chat backend streams output in the background.
 async function refreshFromServer(
   sessionId: string,
   event: SessionEvent,
 ): Promise<void> {
   try {
     const session = await getSession(sessionId);
+    const chat =
+      event.type === "graph_changed" || event.type === "graph_reverted"
+        ? appendAgentTurn(session.collab?.chat ?? idleChatState, event)
+        : session.collab?.chat ?? idleChatState;
     useSessionStore.setState({
       version: session.version,
       proposals: session.proposals,
       reviews: session.collab?.reviews ?? {},
       gates: session.collab?.gates ?? {},
-      chat: session.collab?.chat ?? idleChatState,
+      chat,
       attempts: session.collab?.attempts ?? {},
+      checkpoints: session.collab?.checkpoints ?? {},
     });
-    if (event.type === "graph_replaced" || event.type === "proposal_accepted") {
-      useGraphStore.getState().loadIR(session.graph);
+    if (
+      event.type === "graph_replaced" ||
+      event.type === "proposal_accepted" ||
+      event.type === "graph_changed" ||
+      event.type === "graph_reverted"
+    ) {
+      useGraphStore.getState().loadIR(session.graph, {
+        reflow:
+          event.type === "proposal_accepted" || event.type === "graph_changed",
+      });
     }
   } catch (err) {
     useSessionStore.setState({ error: errorMessage(err) });
   }
+}
+
+// Surfaces a live agent edit (graph_changed / graph_reverted) as an attributed message in the
+// session chat panel. The turn is synthetic -- the server does not emit a chat turn for a direct
+// mutation -- so it is appended to the freshly-fetched session's chat state, never to local state.
+function appendAgentTurn(chat: ChatState, event: SessionEvent): ChatState {
+  const turn: ChatTurn = {
+    id: `agent-${event.checkpoint_id ?? Date.now()}`,
+    backend: "agent",
+    user_message: "",
+    narration: [],
+    agent_message:
+      event.description || `${event.author ?? "agent"} applied a graph change.`,
+    status: "completed",
+    error: null,
+  };
+  return { ...chat, turns: [...chat.turns, turn] };
 }
 
 // Single-flight + trailing coalescing: a burst of SSE/poll events arriving faster than the
@@ -198,6 +240,9 @@ type ConnectionState = Omit<
   | "startChat"
   | "stopChat"
   | "endChat"
+  | "applyDirectMutation"
+  | "revertCheckpoint"
+  | "listCheckpoints"
   | "compileSession"
   | "executeSession"
 >;
@@ -217,6 +262,7 @@ const idleConnectionState: ConnectionState = {
   gates: {},
   chat: idleChatState,
   attempts: {},
+  checkpoints: {},
   status: "idle",
   error: null,
   rebaseNeeded: false,
@@ -239,6 +285,7 @@ function applySession(session: GraphSession): ConnectionState {
     gates: session.collab?.gates ?? {},
     chat: session.collab?.chat ?? idleChatState,
     attempts: session.collab?.attempts ?? {},
+    checkpoints: session.collab?.checkpoints ?? {},
     status: "connected",
   };
 }
@@ -497,6 +544,61 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
         reviews: session.collab?.reviews ?? {},
         gates: session.collab?.gates ?? {},
         chat: session.collab?.chat ?? idleChatState,
+      });
+    } catch (err) {
+      set({ error: errorMessage(err) });
+    }
+  },
+
+  async applyDirectMutation(mutation, author, reason) {
+    const state = get();
+    if (state.sessionId === null) {
+      throw new Error("cannot apply a mutation: no active session");
+    }
+    try {
+      const session = await applyDirectMutation(
+        state.sessionId,
+        mutation,
+        author,
+        reason,
+      );
+      useGraphStore.getState().loadIR(session.graph);
+      set(applySession(session));
+    } catch (err) {
+      const message = errorMessage(err);
+      if (message.startsWith("stale_version")) {
+        set({ rebaseNeeded: true, rebaseMessage: message });
+      } else {
+        set({ error: message });
+      }
+    }
+  },
+
+  async revertCheckpoint(checkpointId) {
+    const state = get();
+    if (state.sessionId === null) {
+      throw new Error("cannot revert a checkpoint: no active session");
+    }
+    try {
+      const session = await revertCheckpoint(state.sessionId, checkpointId);
+      useGraphStore.getState().loadIR(session.graph);
+      set(applySession(session));
+    } catch (err) {
+      set({ error: errorMessage(err) });
+    }
+  },
+
+  async listCheckpoints() {
+    const state = get();
+    if (state.sessionId === null) {
+      throw new Error("cannot list checkpoints: no active session");
+    }
+    try {
+      const { checkpoints } = await listCheckpoints(state.sessionId);
+      set({
+        checkpoints: Object.fromEntries(
+          checkpoints.map((c) => [c.id, c]),
+        ),
       });
     } catch (err) {
       set({ error: errorMessage(err) });

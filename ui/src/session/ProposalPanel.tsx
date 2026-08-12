@@ -56,17 +56,20 @@ function ProposalCard({ proposal }: { proposal: StoredProposal }): JSX.Element {
   const handleEditIntoOwn = () => {
     const model = snapshot(useGraphStore.getState());
     const diff = computeGhostDiff(model, proposal.mutation);
-    useGraphStore.getState().loadModel({
-      ...model,
-      nodes: {
-        ...model.nodes,
-        ...Object.fromEntries(diff.addedNodes.map((n) => [n.id, n])),
+    useGraphStore.getState().loadModel(
+      {
+        ...model,
+        nodes: {
+          ...model.nodes,
+          ...Object.fromEntries(diff.addedNodes.map((n) => [n.id, n])),
+        },
+        edges: {
+          ...model.edges,
+          ...Object.fromEntries(diff.addedEdges.map((e) => [e.id, e])),
+        },
       },
-      edges: {
-        ...model.edges,
-        ...Object.fromEntries(diff.addedEdges.map((e) => [e.id, e])),
-      },
-    });
+      { reflow: true },
+    );
     void reject(proposal.id);
   };
 

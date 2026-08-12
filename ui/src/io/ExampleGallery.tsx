@@ -1,22 +1,28 @@
-// Starter gallery shown on an empty canvas -- lets a new user open a bundled example instead
-// of staring at a blank grid. Renders nothing once the canvas has any nodes.
+// Starter gallery -- lets a new user open a bundled example instead of staring at a blank grid.
+// Reached only from the command bar's overflow menu ("Get started"); it does not auto-open on
+// launch and stays open until the user closes it (close button or Escape), even if the canvas
+// already has nodes. Renders nothing only when there are no examples to show.
 
 import { useEffect } from "react";
+
+import { X } from "lucide-react";
 
 import type { Graph } from "../generated/ir";
 import { useGraphStore } from "../store/graphStore";
 import { useFlowStore } from "./flowStore";
 
-export function ExampleGallery(): JSX.Element | null {
-  const nodeCount = useGraphStore((s) => Object.keys(s.nodes).length);
+export function ExampleGallery({
+  onClose,
+}: {
+  onClose: () => void;
+}): JSX.Element | null {
   const examples = useFlowStore((s) => s.examples);
 
   useEffect(() => {
     useFlowStore.getState().fetchExamples();
   }, []);
 
-  // Only show when the canvas is empty
-  if (nodeCount > 0 || examples.length === 0) return null;
+  if (examples.length === 0) return null;
 
   async function handleOpen(path: string) {
     try {
@@ -48,26 +54,53 @@ export function ExampleGallery(): JSX.Element | null {
           gap: "var(--space-4)",
         }}
       >
-        <div>
-          <h2
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: "var(--space-2)",
+          }}
+        >
+          <div>
+            <h2
+              style={{
+                fontSize: "var(--text-xl)",
+                fontWeight: 600,
+                margin: 0,
+                color: "var(--text-primary)",
+              }}
+            >
+              Get started
+            </h2>
+            <p
+              style={{
+                fontSize: "var(--text-sm)",
+                color: "var(--text-secondary)",
+                margin: "var(--space-1) 0 0",
+              }}
+            >
+              Open an example to explore, or start from scratch.
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Close"
+            data-testid="gallery-close"
+            onClick={onClose}
             style={{
-              fontSize: "var(--text-xl)",
-              fontWeight: 600,
-              margin: 0,
-              color: "var(--text-primary)",
-            }}
-          >
-            Get started
-          </h2>
-          <p
-            style={{
-              fontSize: "var(--text-sm)",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
               color: "var(--text-secondary)",
-              margin: "var(--space-1) 0 0",
+              padding: "var(--space-1)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            Open an example to explore, or start from scratch.
-          </p>
+            <X size={16} />
+          </button>
         </div>
         <div
           style={{

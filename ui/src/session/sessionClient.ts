@@ -100,6 +100,19 @@ export interface ChatState {
   active_persona: string | null;
 }
 
+export type CheckpointKind = "edit" | "revert";
+
+export interface Checkpoint {
+  id: string;
+  kind: CheckpointKind;
+  author: string;
+  description: string;
+  timestamp: number;
+  base_version: number;
+  resulting_version: number;
+  mutation: GraphMutation;
+}
+
 export interface GraphSession {
   id: string;
   graph: Graph;
@@ -110,6 +123,7 @@ export interface GraphSession {
     gates: Record<string, Gate>;
     chat: ChatState;
     attempts?: Record<string, Attempt>;
+    checkpoints?: Record<string, Checkpoint>;
   };
 }
 
@@ -305,6 +319,40 @@ export async function stopChatTurn(
 export async function endChat(sessionId: string): Promise<GraphSession> {
   const res = await postJson(`/sessions/${sessionId}/chat/end`, {});
   return (await res.json()) as GraphSession;
+}
+
+export async function applyDirectMutation(
+  sessionId: string,
+  mutation: GraphMutation,
+  author?: string,
+  reason?: string,
+): Promise<GraphSession> {
+  const res = await postJson(`/sessions/${sessionId}/apply`, {
+    mutation,
+    ...(author !== undefined ? { author } : {}),
+    ...(reason !== undefined ? { reason } : {}),
+  });
+  return (await res.json()) as GraphSession;
+}
+
+export async function revertCheckpoint(
+  sessionId: string,
+  checkpointId: string,
+): Promise<GraphSession> {
+  const res = await postJson(
+    `/sessions/${sessionId}/checkpoints/${checkpointId}/revert`,
+    {},
+  );
+  return (await res.json()) as GraphSession;
+}
+
+export async function listCheckpoints(
+  sessionId: string,
+): Promise<{ checkpoints: Checkpoint[] }> {
+  const res = await requestJson(`/sessions/${sessionId}/checkpoints`, {
+    method: "GET",
+  });
+  return (await res.json()) as { checkpoints: Checkpoint[] };
 }
 
 export async function getAvailableAgents(): Promise<string[]> {

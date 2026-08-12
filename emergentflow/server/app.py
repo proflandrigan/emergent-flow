@@ -81,6 +81,7 @@ from emergentflow.collab.session import (
     OpenGatesError,
     ProposalAlreadyResolvedError,
     StaleVersionError,
+    UnknownCheckpointError,
     UnknownProposalError,
     UnknownReviewError,
     UnknownSessionError,
@@ -287,6 +288,7 @@ async def _session_json(fn: Callable[[], dict[str, Any]]) -> Response:
         UnknownReviewError,
         UnknownGateError,
         UnknownChatTurnError,
+        UnknownCheckpointError,
     ) as exc:
         return _error_json(404, str(exc))
     except StaleVersionError as exc:
@@ -974,6 +976,50 @@ def create_app() -> FastAPI:
 
         return await _session_json(_end)
 
+    @application.post("/sessions/{session_id}/apply", dependencies=[Depends(_require_session_auth)])
+    async def apply_direct_mutation_route(session_id: str, request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        def _apply() -> dict[str, Any]:
+            mutation = GraphMutation.model_validate(body["mutation"])
+            author = body.get("author", "agent")
+            reason = body.get("reason", "")
+            session, _ = get_default_session_store().apply_direct_mutation(
+                session_id, mutation, author=author, description=reason
+            )
+            return session.model_dump(mode="json")
+
+        return await _session_json(_apply)
+
+    @application.post(
+        "/sessions/{session_id}/checkpoints/{checkpoint_id}/revert",
+        dependencies=[Depends(_require_session_auth)],
+    )
+    async def revert_checkpoint_route(session_id: str, checkpoint_id: str) -> Response:
+        def _revert() -> dict[str, Any]:
+            session = get_default_session_store().revert_checkpoint(session_id, checkpoint_id)
+            return session.model_dump(mode="json")
+
+        return await _session_json(_revert)
+
+    @application.get(
+        "/sessions/{session_id}/checkpoints", dependencies=[Depends(_require_session_auth)]
+    )
+    async def list_checkpoints(session_id: str) -> Response:
+        def _list() -> dict[str, Any]:
+            session = get_default_session_store().get(session_id)
+            return {
+                "checkpoints": [
+                    cp.model_dump(mode="json", exclude={"previous_graph"})
+                    for cp in session.collab.checkpoints.values()
+                ]
+            }
+
+        return await _session_json(_list)
+
     # -- Flow store routes (issue #114) ------------------------------------------
 
     @application.get("/flows")
@@ -1151,6 +1197,61 @@ def create_app() -> FastAPI:
         except Exception as exc:  # noqa: BLE001 - never crash the server on a store failure
             return _error_json(422, f"{type(exc).__name__}: {exc}")
         return JSONResponse(content=result)
+
+    # -- MCP tool surface (Task 06a) ------------------------------------------
+    # Expose the in-process FastMCP tool surface over HTTP so a remote stdio
+    # MCP bridge can reuse it without duplicating tool logic. The
+    # create_mcp_server() import is lazy so this module stays importable when
+    # fastmcp (the `mcp` extra) is not installed. Both routes are protected by
+    # the same bearer-token gate as /sessions*.
+
+    @application.get("/mcp/tools", dependencies=[Depends(_require_session_auth)])
+    async def mcp_tools() -> Response:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        mcp = create_mcp_server()
+        tools = await mcp.list_tools()
+        return JSONResponse(
+            {
+                "tools": [
+                    {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "inputSchema": tool.parameters,
+                    }
+                    for tool in tools
+                ]
+            }
+        )
+
+    @application.post("/mcp/invoke", dependencies=[Depends(_require_session_auth)])
+    async def mcp_invoke(request: Request) -> Response:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+
+        tool_name = body.get("tool_name")
+        arguments = body.get("arguments") or {}
+        if not isinstance(tool_name, str) or not tool_name:
+            return _error_json(400, "'tool_name' is required")
+        if not isinstance(arguments, dict):
+            return _error_json(400, "'arguments' must be an object")
+
+        try:
+            mcp = create_mcp_server()
+            result = await mcp.call_tool(tool_name, arguments)
+        except Exception as exc:  # noqa: BLE001
+            return _error_json(422, f"{type(exc).__name__}: {exc}")
+
+        if result.is_error:
+            # Return the error text so the bridge can raise a ToolError.
+            texts = [c.text for c in result.content if getattr(c, "text", None) is not None]
+            return _error_json(422, "\n".join(texts) if texts else "tool error")
+
+        return JSONResponse(result.structured_content)
 
     # Catch-all GET: serves static asset -> demo page (for "/" and "/index.html") -> 404.
     # Declared last so the explicit GET routes above take precedence.

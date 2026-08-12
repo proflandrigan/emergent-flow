@@ -89,8 +89,8 @@ export interface GraphStore extends CanvasModel {
   extractToComposite: (nodeIds: string[]) => string | null;
   removeEdge: (edgeId: string) => void;
   toIR: () => Graph;
-  loadIR: (graph: Graph) => void;
-  loadModel: (model: CanvasModel) => void;
+  loadIR: (graph: Graph, options?: { reflow?: boolean }) => void;
+  loadModel: (model: CanvasModel, options?: { reflow?: boolean }) => void;
   tidyLayout: () => void;
   reset: () => void;
   pushHistory: (txn: string) => void;
@@ -153,7 +153,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       groupId: null,
     };
     set((state) => ({
-      nodes: { ...state.nodes, [nodeId]: node },
+      nodes: layeredLayout({ ...state.nodes, [nodeId]: node }, state.edges),
     }));
     return nodeId;
   },
@@ -272,6 +272,7 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     const edge: EdgeModel = { id: edgeId, source, target };
     set((state) => ({
       edges: { ...state.edges, [edgeId]: edge },
+      nodes: layeredLayout(state.nodes, { ...state.edges, [edgeId]: edge }),
     }));
     return edgeId;
   },
@@ -582,24 +583,28 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     });
   },
 
-  loadIR(graph) {
+  loadIR(graph, options) {
     get().pushHistory("loadIR");
     const model = fromIR(graph);
     set({
       ...model,
       params: model.params,
-      nodes: separateOverlappingNodes(model.nodes),
+      nodes: options?.reflow
+        ? layeredLayout(model.nodes, model.edges)
+        : separateOverlappingNodes(model.nodes),
     });
     clearDerivedStores();
   },
 
-  loadModel(model) {
+  loadModel(model, options) {
     get().pushHistory("loadModel");
     set({
       schemaVersion: model.schemaVersion,
       name: model.name,
       paradigm: model.paradigm,
-      nodes: model.nodes,
+      nodes: options?.reflow
+        ? layeredLayout(model.nodes, model.edges)
+        : model.nodes,
       edges: model.edges,
       groupMeta: model.groupMeta ?? {},
       params: model.params,

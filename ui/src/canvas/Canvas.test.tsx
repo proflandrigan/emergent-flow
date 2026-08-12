@@ -527,4 +527,31 @@ describe("Canvas", () => {
     // Breadcrumb bar hides when back at top level
     expect(screen.queryByTestId("subgraph-breadcrumb")).toBeNull();
   });
+
+  test("clicking the graph overview toggle opens the overview overlay", async () => {
+    render(<Canvas />);
+
+    fireEvent.click(screen.getByTestId("minimap-toggle"));
+
+    const closeBtn = await screen.findByTestId("overlay-modal-close");
+    expect(closeBtn).toBeInTheDocument();
+  });
+
+  test("clicking the overview tile then its close button dismisses it", async () => {
+    render(<Canvas />);
+
+    fireEvent.click(screen.getByTestId("minimap-toggle"));
+
+    expect(
+      await screen.findByTestId("overlay-modal-close"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("overlay-modal-close"));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("overlay-modal-close"),
+      ).not.toBeInTheDocument(),
+    );
+  });
 });

@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from emergentflow.codegen.validation import Diagnostic
 from emergentflow.collab.chat import ChatState
+from emergentflow.collab.checkpoints import Checkpoint
 from emergentflow.collab.gates import Gate
 from emergentflow.ir.common import new_id
 from emergentflow.ir.graph import Graph
@@ -112,6 +113,7 @@ class CollaborationState(BaseModel):
     gates: dict[str, Gate] = Field(default_factory=dict)
     chat: ChatState = Field(default_factory=ChatState)
     attempts: dict[str, Attempt] = Field(default_factory=dict)
+    checkpoints: dict[str, Checkpoint] = Field(default_factory=dict)
 
 
 def validate_anchors(graph: Graph, findings: list[Diagnostic]) -> None:

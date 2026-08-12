@@ -4,6 +4,7 @@ import type { CatalogNode } from "../catalog/types";
 import type { Graph } from "../generated/ir";
 import catalog from "../generated/catalog.json";
 import { useGraphStore } from "./graphStore";
+import type { CanvasModel } from "./model";
 
 const catalogNodes = (catalog as unknown as { nodes: CatalogNode[] }).nodes;
 
@@ -56,6 +57,25 @@ describe("addNodeFromSpec", () => {
 
     expect(id1).not.toBe(id2);
     expect(Object.keys(useGraphStore.getState().nodes)).toHaveLength(2);
+  });
+
+  test("addNodeFromSpec flow-lays-out the graph after adding", () => {
+    const sourceId = useGraphStore
+      .getState()
+      .addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+    const targetId = useGraphStore
+      .getState()
+      .addNodeFromSpec(loadCsv, { x: 0, y: 0 });
+
+    const sourcePort = useGraphStore.getState().nodes[sourceId].ports[0];
+    const targetPort = useGraphStore.getState().nodes[targetId].ports[0];
+    useGraphStore.getState().connect(
+      { node_id: sourceId, port_id: sourcePort.id },
+      { node_id: targetId, port_id: targetPort.id },
+    );
+
+    const { nodes } = useGraphStore.getState();
+    expect(nodes[sourceId].position).not.toEqual(nodes[targetId].position);
   });
 });
 
@@ -135,6 +155,16 @@ describe("connect", () => {
     expect(firstId).not.toBeNull();
     expect(secondId).toBeNull();
     expect(Object.keys(useGraphStore.getState().edges)).toHaveLength(1);
+  });
+
+  test("connect re-flows the graph so the target sits downstream of the source", () => {
+    const { source, target } = addTwoConnectableNodes();
+
+    useGraphStore.getState().connect(source, target);
+
+    const sourceNode = useGraphStore.getState().nodes[source.node_id];
+    const targetNode = useGraphStore.getState().nodes[target.node_id];
+    expect(targetNode.position.x).toBeGreaterThan(sourceNode.position.x);
   });
 });
 
@@ -225,6 +255,100 @@ describe("loadIR", () => {
 
     const { nodes } = useGraphStore.getState();
     expect(nodes.a.position).not.toEqual(nodes.b.position);
+  });
+
+  test("loadIR with reflow option lays the graph out with layeredLayout", () => {
+    const graph: Graph = {
+      paradigm: "functional",
+      nodes: {
+        a: {
+          id: "a",
+          type: "data.load_csv",
+          paradigm: "functional",
+          params: [],
+          ports: [{ name: "out", direction: "out" }],
+          position: { x: 0, y: 0 },
+        },
+        b: {
+          id: "b",
+          type: "data.load_csv",
+          paradigm: "functional",
+          params: [],
+          ports: [{ name: "in", direction: "in" }],
+          position: { x: 0, y: 0 },
+        },
+      },
+      edges: {
+        e1: {
+          id: "e1",
+          source: { node_id: "a", port_id: "" },
+          target: { node_id: "b", port_id: "" },
+        },
+      },
+    };
+
+    useGraphStore.getState().loadIR(graph, { reflow: true });
+
+    const { nodes } = useGraphStore.getState();
+    expect(nodes.b.position.x).toBeGreaterThan(nodes.a.position.x);
+  });
+
+  test("loadModel with reflow option lays the graph out with layeredLayout", () => {
+    const model: CanvasModel = {
+      schemaVersion: 2,
+      name: "reflow",
+      paradigm: "functional",
+      nodes: {
+        a: {
+          id: "a",
+          type: "data.load_csv",
+          label: "a",
+          paradigm: "functional",
+          position: { x: 0, y: 0 },
+          ports: [
+            {
+              id: "a-out",
+              name: "out",
+              direction: "out",
+              dataType: "any",
+              cardinality: "one",
+            },
+          ],
+          params: [],
+        },
+        b: {
+          id: "b",
+          type: "data.load_csv",
+          label: "b",
+          paradigm: "functional",
+          position: { x: 0, y: 0 },
+          ports: [
+            {
+              id: "b-in",
+              name: "in",
+              direction: "in",
+              dataType: "any",
+              cardinality: "one",
+            },
+          ],
+          params: [],
+        },
+      },
+      edges: {
+        e1: {
+          id: "e1",
+          source: { node_id: "a", port_id: "a-out" },
+          target: { node_id: "b", port_id: "b-in" },
+        },
+      },
+      groupMeta: {},
+      params: {},
+    };
+
+    useGraphStore.getState().loadModel(model, { reflow: true });
+
+    const { nodes } = useGraphStore.getState();
+    expect(nodes.b.position.x).toBeGreaterThan(nodes.a.position.x);
   });
 });
 

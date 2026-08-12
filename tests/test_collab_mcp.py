@@ -503,3 +503,325 @@ class TestTools:
         assert len(attempts) == 1
         stored = next(iter(attempts.values()))
         assert stored.mutation_id == "m1"
+
+
+class TestEditingTools:
+    """Exercise the fine-grained graph-editing tools (Task 03)."""
+
+    def _add_node(
+        self, mcp, session_id: str, node_type: str, params: dict[str, Any] | None = None
+    ) -> dict:
+        arguments: dict[str, Any] = {"session_id": session_id, "node_type": node_type}
+        if params is not None:
+            arguments["params"] = params
+        return _run_async(_call_tool(mcp, "add_node", arguments))
+
+    def test_add_node(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        result = self._add_node(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+        assert result["session_id"] == session.id
+        assert result["version"] == 1
+        assert "checkpoint_id" in result
+        assert "node_id" in result
+
+        stored = session_mod.get_default_store().get(session.id)
+        assert result["node_id"] in stored.graph.nodes
+        assert stored.graph.nodes[result["node_id"]].type == "data.load_csv"
+
+    def test_connect_ports(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        source = self._add_node(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+        target = self._add_node(
+            mcp,
+            session.id,
+            "script.custom_code",
+            {"code": "def transform(value):\n    return value"},
+        )
+
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "connect_ports",
+                {
+                    "session_id": session.id,
+                    "source_node_id": source["node_id"],
+                    "source_port_name": "frame",
+                    "target_node_id": target["node_id"],
+                    "target_port_name": "value",
+                },
+            )
+        )
+        assert result["session_id"] == session.id
+        assert "checkpoint_id" in result
+        assert "edge_id" in result
+
+        stored = session_mod.get_default_store().get(session.id)
+        assert result["edge_id"] in stored.graph.edges
+        edge = stored.graph.edges[result["edge_id"]]
+        assert edge.source.node_id == source["node_id"]
+        assert edge.target.node_id == target["node_id"]
+
+    def test_set_param(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        added = self._add_node(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+        node_id = added["node_id"]
+
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "set_param",
+                {
+                    "session_id": session.id,
+                    "node_id": node_id,
+                    "param_name": "encoding",
+                    "value": "latin-1",
+                },
+            )
+        )
+        assert result["version"] == 2
+        assert result["node_id"] == node_id
+
+        stored = session_mod.get_default_store().get(session.id)
+        node = stored.graph.nodes[node_id]
+        params = {p.name: p.value for p in node.params}
+        assert params["encoding"] == "latin-1"
+
+    def test_delete_node(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        source = self._add_node(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+        target = self._add_node(
+            mcp,
+            session.id,
+            "script.custom_code",
+            {"code": "def transform(value):\n    return value"},
+        )
+        conn = _run_async(
+            _call_tool(
+                mcp,
+                "connect_ports",
+                {
+                    "session_id": session.id,
+                    "source_node_id": source["node_id"],
+                    "source_port_name": "frame",
+                    "target_node_id": target["node_id"],
+                    "target_port_name": "value",
+                },
+            )
+        )
+
+        result = _run_async(
+            _call_tool(mcp, "delete_node", {"session_id": session.id, "node_id": source["node_id"]})
+        )
+        assert result["node_id"] == source["node_id"]
+
+        stored = session_mod.get_default_store().get(session.id)
+        assert source["node_id"] not in stored.graph.nodes
+        assert conn["edge_id"] not in stored.graph.edges
+        # The target node survives.
+        assert target["node_id"] in stored.graph.nodes
+
+    def test_add_note(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        anchor = self._add_node(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "add_note",
+                {
+                    "session_id": session.id,
+                    "content": "hello note",
+                    "anchor_id": anchor["node_id"],
+                },
+            )
+        )
+        assert result["session_id"] == session.id
+        assert "checkpoint_id" in result
+        assert "node_id" in result
+
+        stored = session_mod.get_default_store().get(session.id)
+        note = stored.graph.nodes[result["node_id"]]
+        assert note.type == "notes.markdown"
+        params = {p.name: p.value for p in note.params}
+        assert params["content"] == "hello note"
+        assert params["anchor_id"] == anchor["node_id"]
+        assert params["color"] == "yellow"
+
+    def test_delete_edge(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        source = self._add_node(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+        target = self._add_node(
+            mcp,
+            session.id,
+            "script.custom_code",
+            {"code": "def transform(value):\n    return value"},
+        )
+        conn = _run_async(
+            _call_tool(
+                mcp,
+                "connect_ports",
+                {
+                    "session_id": session.id,
+                    "source_node_id": source["node_id"],
+                    "source_port_name": "frame",
+                    "target_node_id": target["node_id"],
+                    "target_port_name": "value",
+                },
+            )
+        )
+
+        result = _run_async(
+            _call_tool(mcp, "delete_edge", {"session_id": session.id, "edge_id": conn["edge_id"]})
+        )
+        assert result["edge_id"] == conn["edge_id"]
+
+        stored = session_mod.get_default_store().get(session.id)
+        assert conn["edge_id"] not in stored.graph.edges
+        # Both nodes survive.
+        assert source["node_id"] in stored.graph.nodes
+        assert target["node_id"] in stored.graph.nodes
+
+    def test_delete_note(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        added = _run_async(
+            _call_tool(
+                mcp,
+                "add_note",
+                {"session_id": session.id, "content": "to be removed"},
+            )
+        )
+
+        result = _run_async(
+            _call_tool(
+                mcp, "delete_note", {"session_id": session.id, "note_node_id": added["node_id"]}
+            )
+        )
+        assert result["node_id"] == added["node_id"]
+
+        stored = session_mod.get_default_store().get(session.id)
+        assert added["node_id"] not in stored.graph.nodes
+
+    def test_add_node_unknown_type_fails(self) -> None:
+        from fastmcp.exceptions import ToolError
+
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        with pytest.raises(ToolError):
+            _run_async(
+                _call_tool(
+                    mcp, "add_node", {"session_id": session.id, "node_type": "does.not.exist"}
+                )
+            )
+
+
+class TestExecutionTools:
+    """Exercise the execution/introspection tools (Task 04)."""
+
+    def test_execute_node_tool_runs_single_node(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        added = _run_async(
+            _call_tool(
+                mcp,
+                "add_node",
+                {
+                    "session_id": session.id,
+                    "node_type": "data.load_csv",
+                    "params": {"path": "a.csv"},
+                },
+            )
+        )
+
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "execute_node_tool",
+                {"session_id": session.id, "node_id": added["node_id"]},
+            )
+        )
+        assert "payload_version" in result
+        assert "results" in result
+        assert "statuses" in result
+
+    def test_execute_node_tool_unknown_session_fails(self) -> None:
+        from fastmcp.exceptions import ToolError
+
+        from emergentflow.collab.mcp import create_mcp_server
+
+        mcp = create_mcp_server()
+        with pytest.raises(ToolError):
+            _run_async(
+                _call_tool(
+                    mcp,
+                    "execute_node_tool",
+                    {"session_id": "does-not-exist", "node_id": "n1"},
+                )
+            )
+
+    def test_get_node_outputs_filters_payloads(self, tmp_path: Path) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+        from emergentflow.server.runs import get_default_runs
+
+        run_id = get_default_runs().save(
+            {"tag": "x", "graph_name": "g", "started_at": 1.0},
+            {"name": "g"},
+            {
+                "n1": {"metric": {"kind": "scalar", "value": 1.5}},
+                "n2": {"metric": {"kind": "scalar", "value": 2.5}},
+            },
+        )
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(mcp, "get_node_outputs", {"run_id": run_id, "node_ids": ["n1"]})
+        )
+        assert result["run_id"] == run_id
+        assert set(result["outputs"].keys()) == {"n1"}
+        assert result["outputs"]["n1"]["metric"]["value"] == 1.5
+
+    def test_get_node_outputs_unknown_run_returns_error(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "get_node_outputs",
+                {"run_id": "2026-07-30T14-02-11Z-0000", "node_ids": ["n1"]},
+            )
+        )
+        assert result == {"error": "Run '2026-07-30T14-02-11Z-0000' not found"}

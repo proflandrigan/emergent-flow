@@ -27,6 +27,8 @@ class SessionEvent(BaseModel):
 
     type: Literal[
         "graph_replaced",
+        "graph_changed",
+        "graph_reverted",
         "proposal_added",
         "proposal_accepted",
         "proposal_rejected",
@@ -53,6 +55,10 @@ class SessionEvent(BaseModel):
     decision_id: str | None = None
     turn_id: str | None = None
     persona: str | None = None
+    checkpoint_id: str | None = None
+    reverted_checkpoint_id: str | None = None
+    author: str | None = None
+    description: str | None = None
 
 
 def mutation_json_schema() -> dict[str, Any]:
