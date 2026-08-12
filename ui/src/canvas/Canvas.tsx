@@ -9,7 +9,6 @@ import "@xyflow/react/dist/style.css";
 import {
   Background,
   Controls,
-  MiniMap,
   ReactFlow,
   type Connection,
   type EdgeChange,
@@ -29,7 +28,6 @@ import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
 import { useLiveValidation } from "../store/useLiveValidation";
 import { useValidationStore } from "../store/validationStore";
-import { familyMeta } from "../theme/family";
 import { IconButton } from "../ui/IconButton";
 import { Tooltip } from "../ui/Tooltip";
 import { runGraph } from "../exec/runGraph";
@@ -42,6 +40,7 @@ import { FindNodeModal } from "./FindNodeModal";
 import { ProblemsPanel } from "./ProblemsPanel";
 import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeInfoPanel } from "./NodeInfoPanel";
+import { GraphOverview } from "./GraphOverview";
 import { NoteAnchorOverlay } from "./NoteAnchorOverlay";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { SubgraphBreadcrumb } from "./SubgraphBreadcrumb";
@@ -266,23 +265,9 @@ export function Canvas(): JSX.Element {
   const [infoNodeId, setInfoNodeId] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<NodeModel[] | null>(null);
   const [findModalOpen, setFindModalOpen] = useState(false);
-  const [minimapCollapsed, setMinimapCollapsed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("ef-minimap-collapsed") === "true";
-    } catch {
-      return false;
-    }
-  });
+  const [overviewOpen, setOverviewOpen] = useState<boolean>(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const reactFlowInstance = useRef<any>(null);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("ef-minimap-collapsed", String(minimapCollapsed));
-    } catch {
-      // ignore write errors
-    }
-  }, [minimapCollapsed]);
 
   const infoCatalogNode = infoNodeId
     ? catalog.nodes.find((n) => n.type === nodes[infoNodeId]?.type)
@@ -310,6 +295,14 @@ export function Canvas(): JSX.Element {
       });
     },
     [nodes],
+  );
+
+  const handleOverviewNavigate = useCallback(
+    (nodeId: string) => {
+      navigateToNode(nodeId);
+      setOverviewOpen(false);
+    },
+    [navigateToNode],
   );
 
   useEffect(() => {
@@ -442,29 +435,6 @@ export function Canvas(): JSX.Element {
             } as CSSProperties
           }
         />
-        {!minimapCollapsed && (
-          <MiniMap
-            className="glass"
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            nodeColor={(node: any) => {
-              const family = node.data?.family as string | undefined;
-              if (family) return familyMeta(family).color;
-              return "var(--text-tertiary)";
-            }}
-            nodeStrokeColor="var(--border-strong)"
-            maskColor="var(--glass-fill)"
-            style={{
-              width: 180,
-              height: 140,
-              bottom: 10,
-              left: 10,
-              border: "1px solid var(--border-subtle)",
-              borderRadius: "var(--radius-sm)",
-            }}
-            pannable
-            zoomable
-          />
-        )}
       </ReactFlow>
       {(selectedNodeIds.length > 1 || canUngroup) && (
         <SelectionToolbar
@@ -508,6 +478,16 @@ export function Canvas(): JSX.Element {
           onNavigate={navigateToNode}
         />
       )}
+      {overviewOpen && (
+        <GraphOverview
+          nodes={rfNodes}
+          edges={rfEdges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          onNavigate={handleOverviewNavigate}
+          onClose={() => setOverviewOpen(false)}
+        />
+      )}
       <ProblemsPanel onNavigate={navigateToNode} />
       <div
         style={{
@@ -519,11 +499,11 @@ export function Canvas(): JSX.Element {
           gap: "var(--space-1)",
         }}
       >
-        <Tooltip label={minimapCollapsed ? "Show minimap" : "Hide minimap"}>
+        <Tooltip label="Graph overview">
           <IconButton
-            aria-label={minimapCollapsed ? "Show minimap" : "Hide minimap"}
+            aria-label="Open graph overview"
             data-testid="minimap-toggle"
-            onClick={() => setMinimapCollapsed((c) => !c)}
+            onClick={() => setOverviewOpen(true)}
             style={{
               background: "var(--surface-1)",
               border: "1px solid var(--border-subtle)",
