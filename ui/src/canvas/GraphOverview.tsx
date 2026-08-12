@@ -36,31 +36,29 @@ export function GraphOverview({
 
   return (
     <OverlayModal width={860} onClose={onClose}>
-      <div style={{ width: "100%", height: "100%" }}>
-        <ReactFlowProvider>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            fitView
-            nodesDraggable={false}
-            nodesConnectable={false}
-            elementsSelectable={false}
-            deleteKeyCode={[]}
-            minZoom={0.1}
-            maxZoom={2.5}
-            onInit={(inst) => {
-              instanceRef.current = inst;
-              readyRef.current = true;
-            }}
-            onNodeClick={(_event, node) => {
-              onNavigate(node.id);
-            }}
-            style={{ width: "100%", height: 480 }}
-          />
-        </ReactFlowProvider>
-      </div>
+      <ReactFlowProvider>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          fitView
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable={false}
+          deleteKeyCode={[]}
+          minZoom={0.1}
+          maxZoom={2.5}
+          onInit={(inst) => {
+            instanceRef.current = inst;
+            readyRef.current = true;
+          }}
+          onNodeClick={(_event, node) => {
+            onNavigate(node.id);
+          }}
+          style={{ width: "100%", height: 480 }}
+        />
+      </ReactFlowProvider>
     </OverlayModal>
   );
 }
