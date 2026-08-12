@@ -194,3 +194,27 @@ def test_finalize_model_node_execute_and_codegen_equivalent():
     codegen_model = scope["model"]
     codegen_preds = codegen_model.estimator.predict(df[["x1", "x2"]])
     assert (exec_preds == codegen_preds).all()
+
+
+def test_finalize_model_refits_ensemble_and_calibrated_estimators():
+    from emergentflow.ml import (
+        blend_models,
+        calibrate_model,
+        ensemble_model,
+        stack_models,
+    )
+
+    df = _binary_df()
+    base = _binary_classifier(df)
+    rf = fit_estimator(df, estimator="RandomForestClassifier", target="label")
+    meta_models = [
+        calibrate_model(base, df, target="label"),
+        blend_models([base, rf], df, task="classification", target="label"),
+        stack_models([base, rf], df, task="classification", target="label"),
+        ensemble_model(base, df, task="classification", target="label"),
+    ]
+    for m in meta_models:
+        f = finalize_model(m, df)
+        assert type(f.estimator).__name__ == type(m.estimator).__name__
+        preds = f.estimator.predict(df[["x1", "x2"]])
+        assert preds.shape == (len(df),)

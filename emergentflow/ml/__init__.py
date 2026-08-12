@@ -573,7 +573,7 @@ def finalize_model(
     if target not in df.columns:
         raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
 
-    est = type(model.estimator)(**model.estimator.get_params())
+    est = type(model.estimator)(**model.estimator.get_params(deep=False))
     est.fit(df[model.feature_names], df[target])
     return FittedModel(
         estimator_type=model.estimator_type,
@@ -638,14 +638,16 @@ def stack_models(
     task: str,
     target: str,
     features: list[str] | None = None,
-    final_estimator: str = "LogisticRegression",
+    final_estimator: str | None = None,
     cv: int = 5,
 ) -> FittedModel:
     """Stack several fitted estimators under a curated meta-learner, refit on ``df``.
 
     Mirrors PyCaret's ``stack_models``: each base estimator is recreated fresh (its default
     constructor) because sklearn's Stacking estimators require unfitted base clones, and the
-    meta-learner ``final_estimator`` is trained via ``cv``-fold cross-validation. Never mutates
+    meta-learner ``final_estimator`` is trained via ``cv``-fold cross-validation. When
+    ``final_estimator`` is ``None`` a task-appropriate meta-learner is chosen automatically
+    (``LogisticRegression`` for classification, ``Ridge`` for regression). Never mutates
     ``models``, any model, or ``df``.
     """
     if task not in FOREST_TASKS:
@@ -656,7 +658,17 @@ def stack_models(
         raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
     feature_names = _resolve_features_for_fit(df, features, target=target)
     estimators = [(f"m{i}", type(m.estimator)()) for i, m in enumerate(models)]
-    meta_spec, meta_kwargs = _resolve_estimator_and_kwargs(final_estimator, None)
+    meta_key = (
+        final_estimator
+        if final_estimator is not None
+        else ("LogisticRegression" if task == "classification" else "Ridge")
+    )
+    meta_spec, meta_kwargs = _resolve_estimator_and_kwargs(meta_key, None)
+    if meta_spec.task is not None and meta_spec.task != task:
+        raise ValueError(
+            f"final_estimator {meta_key!r} is a {meta_spec.task} model, but the stack "
+            f"task is {task!r}; choose a {task} meta-learner."
+        )
     meta = meta_spec.sklearn_class(**meta_kwargs)
     if task == "classification":
         est = StackingClassifier(estimators=estimators, final_estimator=meta, cv=cv)

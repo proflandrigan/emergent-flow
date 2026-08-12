@@ -169,6 +169,32 @@ def test_stack_models_regression_custom_meta():
     s = stack_models([r1, r2], df, task="regression", target="y", final_estimator="Ridge")
     assert type(s.estimator).__name__ == "StackingRegressor"
 
+    s_default = stack_models([r1, r2], df, task="regression", target="y")
+    assert type(s_default.estimator).__name__ == "StackingRegressor"
+    assert s_default.estimator.predict(df[["x1", "x2"]]).shape == (len(df),)
+
+    s_clf = stack_models(
+        [_fitted_classifier(_classification_df()), _second_classifier(_classification_df())],
+        _classification_df(),
+        task="classification",
+        target="label",
+    )
+    assert type(s_clf.estimator).__name__ == "StackingClassifier"
+
+
+def test_stack_models_rejects_task_mismatched_meta():
+    df = _regression_df()
+    r1 = fit_estimator(df, estimator="Ridge", target="y")
+    r2 = fit_estimator(df, estimator="RandomForestRegressor", target="y")
+    with pytest.raises(ValueError, match="final_estimator"):
+        stack_models(
+            [r1, r2],
+            df,
+            task="regression",
+            target="y",
+            final_estimator="LogisticRegression",
+        )
+
 
 def test_stack_models_requires_two_models():
     df = _classification_df()

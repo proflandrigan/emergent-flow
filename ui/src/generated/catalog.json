@@ -9820,8 +9820,8 @@
           "type_token": "list[str]"
         },
         {
-          "default": "LogisticRegression",
-          "help": "Curated meta-learner key.",
+          "default": null,
+          "help": "Curated meta-learner key; unset picks a task-appropriate default (LogisticRegression for classification, Ridge for regression).",
           "hints": null,
           "label": "Meta-learner",
           "name": "final_estimator",

@@ -83,9 +83,10 @@ class StackModels(NodeDefinition):
         ParamSpec(
             name="final_estimator",
             type_token="str",
-            default="LogisticRegression",
+            default=None,
             label="Meta-learner",
-            help="Curated meta-learner key.",
+            help="Curated meta-learner key; unset picks a task-appropriate default "
+            "(LogisticRegression for classification, Ridge for regression).",
         ),
         ParamSpec(
             name="cv",
@@ -96,18 +97,18 @@ class StackModels(NodeDefinition):
         ),
     ]
 
-    def _args(self, node: Node) -> tuple[str, str, list[str] | None, str, int]:
+    def _args(self, node: Node) -> tuple[str, str, list[str] | None, str | None, int]:
         values = {p.name: p.value for p in node.params}
         task = values.get("task")
         target = values.get("target")
         features = values.get("features")
-        final_estimator = values.get("final_estimator", "LogisticRegression")
+        final_estimator = values.get("final_estimator")
         cv = values.get("cv", 5)
         return (
             cast(str, task),
             cast(str, target),
             cast("list[str] | None", features),
-            cast(str, final_estimator),
+            cast("str | None", final_estimator),
             cast(int, cv),
         )
 
