@@ -121,6 +121,27 @@ def test_optimize_threshold_backend():
     assert r.positive_class == "low"
 
 
+def test_optimize_threshold_metrics_cover_full_precision_recall_curve():
+    # precision_recall_curve returns precision/recall arrays one element longer than its
+    # thresholds; every operating point (including the trailing "predict everything positive"
+    # point at decision threshold 0) must appear in the reported metrics.
+    from sklearn.metrics import precision_recall_curve
+
+    df = _binary_df()
+    base = _binary_classifier(df)
+    r = optimize_threshold(base, df, target="label")
+    prec, rec, thresh = precision_recall_curve(
+        df["label"],
+        base.estimator.predict_proba(df[["x1", "x2"]])[:, 1],
+        pos_label=base.estimator.classes_[1],
+    )
+    assert len(r.metrics) == len(prec) == len(rec)
+    assert len(r.metrics) == len(thresh) + 1
+    assert r.metrics["threshold"].iloc[-1] == 0.0
+    assert r.metrics["precision"].iloc[-1] == prec[-1]
+    assert r.metrics["recall"].iloc[-1] == rec[-1]
+
+
 def test_optimize_threshold_respects_positive_class():
     df = _binary_df()
     base = _binary_classifier(df)

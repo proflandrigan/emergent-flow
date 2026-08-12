@@ -33,6 +33,7 @@ import joblib  # type: ignore[import-untyped]
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
+from sklearn.base import clone
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import (
     AdaBoostClassifier,
@@ -417,8 +418,9 @@ def ensemble_model(
 ) -> FittedModel:
     """Wrap a fitted estimator in a bagging/boosting ensemble and refit on ``df``.
 
-    Mirrors PyCaret's ``ensemble_model``: the base estimator is recreated fresh (its default
-    constructor) because sklearn's Bagging/AdaBoost estimators require an unfitted base clone.
+    Mirrors PyCaret's ``ensemble_model``: the base estimator is recreated as an unfitted clone
+    of the fitted model (via ``sklearn.base.clone``) because sklearn's Bagging/AdaBoost
+    estimators require an unfitted base, then refit on ``df``.
     ``method="bagging"`` maps to Bagging; ``"boosting"`` to AdaBoost. Never mutates ``df`` or
     ``model``.
     """
@@ -429,7 +431,7 @@ def ensemble_model(
     if target not in df.columns:
         raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
     feature_names = _resolve_features_for_fit(df, features, target=target)
-    base = type(model.estimator)()
+    base = clone(model.estimator)
     if task == "classification":
         if method == "bagging":
             est = BaggingClassifier(
@@ -481,7 +483,7 @@ def calibrate_model(
             "probability calibration requires it."
         )
     feature_names = _resolve_features_for_fit(df, features, target=target)
-    base = type(model.estimator)()
+    base = clone(model.estimator)
     est = CalibratedClassifierCV(estimator=base, method=method, cv=cv)
     est.fit(df[feature_names], df[target])
     return FittedModel(
@@ -535,17 +537,23 @@ def optimize_threshold(
     pos_index = next(i for i, c in enumerate(classes) if str(c) == pos)
 
     prob_pos = model.estimator.predict_proba(X)[:, pos_index]
+    # ``precision_recall_curve`` returns precision/recall arrays that are one element longer
+    # than ``thresholds``: the trailing precision/recall is the "predict everything positive"
+    # operating point (decision threshold of 0). Zipping against ``thresh`` alone would drop it,
+    # so evaluate every operating point using threshold ``0`` for that final entry.
     prec, rec, thresh = precision_recall_curve(y, prob_pos, pos_label=classes[pos_index])
 
     rows = []
-    best_t = thresh[0]
+    best_t = 0.0
     best_f1 = 0.0
-    for t, p, r in zip(thresh, prec, rec, strict=False):
+    n_thresh = len(thresh)
+    for i, (p, r) in enumerate(zip(prec, rec, strict=True)):
         f1 = 2 * p * r / (p + r) if (p + r) > 0 else 0.0
-        rows.append((float(t), float(p), float(r), f1))
+        t = float(thresh[i]) if i < n_thresh else 0.0
+        rows.append((t, float(p), float(r), f1))
         if f1 > best_f1:
             best_f1 = f1
-            best_t = float(t)
+            best_t = t
 
     metrics = pd.DataFrame(rows, columns=["threshold", "precision", "recall", "f1"])
     return ThresholdResult(
@@ -597,8 +605,9 @@ def blend_models(
 ) -> FittedModel:
     """Blend several fitted estimators into a weighted voting ensemble, refit on ``df``.
 
-    Mirrors PyCaret's ``blend_models``: each base estimator is recreated fresh (its default
-    constructor) because sklearn's Voting estimators require unfitted base clones. ``voting``
+    Mirrors PyCaret's ``blend_models``: each base estimator is recreated as an unfitted clone
+    of the fitted model (via ``sklearn.base.clone``) because sklearn's Voting estimators require
+    unfitted base clones. ``voting``
     only matters for classification; for regression it is validated but ignored. Never mutates
     ``models``, any model, or ``df``.
     """
@@ -611,7 +620,7 @@ def blend_models(
     if voting not in ("soft", "hard"):
         raise ValueError(f"unknown voting {voting!r}; expected 'soft' or 'hard'.")
     feature_names = _resolve_features_for_fit(df, features, target=target)
-    estimators = [(f"m{i}", type(m.estimator)()) for i, m in enumerate(models)]
+    estimators = [(f"m{i}", clone(m.estimator)) for i, m in enumerate(models)]
     if task == "classification":
         est = VotingClassifier(
             estimators=estimators,
@@ -643,8 +652,9 @@ def stack_models(
 ) -> FittedModel:
     """Stack several fitted estimators under a curated meta-learner, refit on ``df``.
 
-    Mirrors PyCaret's ``stack_models``: each base estimator is recreated fresh (its default
-    constructor) because sklearn's Stacking estimators require unfitted base clones, and the
+    Mirrors PyCaret's ``stack_models``: each base estimator is recreated as an unfitted clone
+    of the fitted model (via ``sklearn.base.clone``) because sklearn's Stacking estimators
+    require unfitted base clones, and the
     meta-learner ``final_estimator`` is trained via ``cv``-fold cross-validation. When
     ``final_estimator`` is ``None`` a task-appropriate meta-learner is chosen automatically
     (``LogisticRegression`` for classification, ``Ridge`` for regression). Never mutates
@@ -657,7 +667,7 @@ def stack_models(
     if target not in df.columns:
         raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
     feature_names = _resolve_features_for_fit(df, features, target=target)
-    estimators = [(f"m{i}", type(m.estimator)()) for i, m in enumerate(models)]
+    estimators = [(f"m{i}", clone(m.estimator)) for i, m in enumerate(models)]
     meta_key = (
         final_estimator
         if final_estimator is not None

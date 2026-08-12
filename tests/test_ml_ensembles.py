@@ -81,6 +81,43 @@ def _second_classifier(df):
 # ---------------------------------------------------------------------------
 
 
+def test_ensemble_model_preserves_base_hyperparameters():
+    # The base must be an *unfitted clone* that preserves the fitted model's hyperparameters
+    # (sklearn.base.clone), not a factory-default re-construction that silently drops them.
+    df = _classification_df()
+    base = fit_estimator(
+        df,
+        estimator="RandomForestClassifier",
+        target="label",
+        features=["x1", "x2"],
+        params={"max_depth": 3, "n_estimators": 25, "random_state": 7},
+    )
+    e = ensemble_model(base, df, task="classification", target="label")
+    inner = e.estimator.estimator
+    assert type(inner).__name__ == "RandomForestClassifier"
+    assert inner.max_depth == 3
+    assert inner.n_estimators == 25
+
+
+def test_blend_and_stack_preserve_base_hyperparameters():
+    df = _classification_df()
+    base = fit_estimator(
+        df,
+        estimator="RandomForestClassifier",
+        target="label",
+        features=["x1", "x2"],
+        params={"max_depth": 3, "n_estimators": 25, "random_state": 7},
+    )
+    other = fit_estimator(df, estimator="LogisticRegression", target="label", features=["x1", "x2"])
+    blend = blend_models([base, other], df, task="classification", target="label")
+    stack = stack_models([base, other], df, task="classification", target="label")
+    for ensemble in (blend, stack):
+        inner = [e for _, e in ensemble.estimator.estimators if hasattr(e, "max_depth")]
+        assert inner, "expected a RandomForestClassifier base in the ensemble"
+        assert inner[0].max_depth == 3
+        assert inner[0].n_estimators == 25
+
+
 def test_ensemble_model_bagging_classification():
     df = _classification_df()
     base = _fitted_classifier(df)
