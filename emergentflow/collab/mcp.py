@@ -472,6 +472,34 @@ def create_mcp_server() -> Any:
             f"available ports: {sorted(p.name for p in node.ports)!r}"
         )
 
+    def _apply_mutation(
+        session_id: str,
+        mutation: GraphMutation,
+        *,
+        extra: dict[str, Any] | None = None,
+    ) -> dict:
+        """Apply *mutation* directly to *session_id* and return the common success shape.
+
+        *mutation* carries its own ``author``/``description`` and a ``base_version``
+        that ``apply_direct_mutation`` checks against the session's current version.
+        Returns ``{session_id, version, checkpoint_id}`` plus any tool-specific
+        ``extra`` id fields.
+        """
+        session, checkpoint = get_default_session_store().apply_direct_mutation(
+            session_id,
+            mutation,
+            author=mutation.author,
+            description=mutation.description,
+        )
+        result: dict[str, Any] = {
+            "session_id": session_id,
+            "version": session.version,
+            "checkpoint_id": checkpoint.id,
+        }
+        if extra:
+            result.update(extra)
+        return result
+
     @mcp.tool()
     def add_node(
         session_id: str,
@@ -490,27 +518,19 @@ def create_mcp_server() -> Any:
         node's canvas coordinates. Returns the common success shape plus the
         new ``node_id``.
         """
+        store = get_default_session_store()
+        session = store.get(session_id)
         definition_cls = default_node_registry.get(node_type)
         node = definition_cls().instantiate(label=label or definition_cls.label, **(params or {}))
         if position is not None:
             node.position = Position(x=position["x"], y=position["y"])
-        store = get_default_session_store()
-        session = store.get(session_id)
         mutation = GraphMutation(
             base_version=session.version,
             add_nodes=[node],
             description=reason,
             author=author,
         )
-        session, checkpoint = store.apply_direct_mutation(
-            session_id, mutation, author=author, description=reason
-        )
-        return {
-            "session_id": session_id,
-            "version": session.version,
-            "checkpoint_id": checkpoint.id,
-            "node_id": node.id,
-        }
+        return _apply_mutation(session_id, mutation, extra={"node_id": node.id})
 
     @mcp.tool()
     def connect_ports(
@@ -546,15 +566,7 @@ def create_mcp_server() -> Any:
             description=reason,
             author=author,
         )
-        session, checkpoint = store.apply_direct_mutation(
-            session_id, mutation, author=author, description=reason
-        )
-        return {
-            "session_id": session_id,
-            "version": session.version,
-            "checkpoint_id": checkpoint.id,
-            "edge_id": edge.id,
-        }
+        return _apply_mutation(session_id, mutation, extra={"edge_id": edge.id})
 
     @mcp.tool()
     def set_param(
@@ -578,15 +590,7 @@ def create_mcp_server() -> Any:
             description=reason,
             author=author,
         )
-        session, checkpoint = store.apply_direct_mutation(
-            session_id, mutation, author=author, description=reason
-        )
-        return {
-            "session_id": session_id,
-            "version": session.version,
-            "checkpoint_id": checkpoint.id,
-            "node_id": node_id,
-        }
+        return _apply_mutation(session_id, mutation, extra={"node_id": node_id})
 
     @mcp.tool()
     def delete_node(
@@ -615,15 +619,7 @@ def create_mcp_server() -> Any:
             description=reason,
             author=author,
         )
-        session, checkpoint = store.apply_direct_mutation(
-            session_id, mutation, author=author, description=reason
-        )
-        return {
-            "session_id": session_id,
-            "version": session.version,
-            "checkpoint_id": checkpoint.id,
-            "node_id": node_id,
-        }
+        return _apply_mutation(session_id, mutation, extra={"node_id": node_id})
 
     @mcp.tool()
     def delete_edge(
@@ -645,15 +641,7 @@ def create_mcp_server() -> Any:
             description=reason,
             author=author,
         )
-        session, checkpoint = store.apply_direct_mutation(
-            session_id, mutation, author=author, description=reason
-        )
-        return {
-            "session_id": session_id,
-            "version": session.version,
-            "checkpoint_id": checkpoint.id,
-            "edge_id": edge_id,
-        }
+        return _apply_mutation(session_id, mutation, extra={"edge_id": edge_id})
 
     @mcp.tool()
     def add_note(
@@ -669,11 +657,11 @@ def create_mcp_server() -> Any:
 
         Returns the common success shape plus the new ``node_id``.
         """
+        store = get_default_session_store()
+        session = store.get(session_id)
         note = default_node_registry.get("notes.markdown")().instantiate(
             content=content, anchor_id=anchor_id, color=color
         )
-        store = get_default_session_store()
-        session = store.get(session_id)
         description = reason or f"Added note: {content[:80]}"
         mutation = GraphMutation(
             base_version=session.version,
@@ -681,15 +669,7 @@ def create_mcp_server() -> Any:
             description=description,
             author=author,
         )
-        session, checkpoint = store.apply_direct_mutation(
-            session_id, mutation, author=author, description=description
-        )
-        return {
-            "session_id": session_id,
-            "version": session.version,
-            "checkpoint_id": checkpoint.id,
-            "node_id": note.id,
-        }
+        return _apply_mutation(session_id, mutation, extra={"node_id": note.id})
 
     @mcp.tool()
     def delete_note(
@@ -711,14 +691,6 @@ def create_mcp_server() -> Any:
             description=reason,
             author=author,
         )
-        session, checkpoint = store.apply_direct_mutation(
-            session_id, mutation, author=author, description=reason
-        )
-        return {
-            "session_id": session_id,
-            "version": session.version,
-            "checkpoint_id": checkpoint.id,
-            "node_id": note_node_id,
-        }
+        return _apply_mutation(session_id, mutation, extra={"node_id": note_node_id})
 
     return mcp

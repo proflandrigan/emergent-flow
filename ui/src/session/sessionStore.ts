@@ -168,7 +168,7 @@ function appendAgentTurn(chat: ChatState, event: SessionEvent): ChatState {
     user_message: "",
     narration: [],
     agent_message:
-      event.description || `${event.author} applied a graph change.`,
+      event.description || `${event.author ?? "agent"} applied a graph change.`,
     status: "completed",
     error: null,
   };
@@ -560,15 +560,7 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
         reason,
       );
       useGraphStore.getState().loadIR(session.graph);
-      set({
-        version: session.version,
-        proposals: session.proposals,
-        reviews: session.collab?.reviews ?? {},
-        gates: session.collab?.gates ?? {},
-        chat: session.collab?.chat ?? idleChatState,
-        attempts: session.collab?.attempts ?? {},
-        checkpoints: session.collab?.checkpoints ?? {},
-      });
+      set(applySession(session));
     } catch (err) {
       const message = errorMessage(err);
       if (message.startsWith("stale_version")) {
@@ -587,15 +579,7 @@ export const useSessionStore = create<SessionStoreState>((set, get) => ({
     try {
       const session = await revertCheckpoint(state.sessionId, checkpointId);
       useGraphStore.getState().loadIR(session.graph);
-      set({
-        version: session.version,
-        proposals: session.proposals,
-        reviews: session.collab?.reviews ?? {},
-        gates: session.collab?.gates ?? {},
-        chat: session.collab?.chat ?? idleChatState,
-        attempts: session.collab?.attempts ?? {},
-        checkpoints: session.collab?.checkpoints ?? {},
-      });
+      set(applySession(session));
     } catch (err) {
       set({ error: errorMessage(err) });
     }

@@ -32,11 +32,13 @@ def _make_wrapper(
     """Build an async wrapper whose signature mirrors a tool's ``inputSchema``.
 
     Required parameters get no default; optional parameters default to ``None``.
-    The body forwards only non-``None`` arguments to *invoke* (so optional params
-    the caller omitted are simply dropped, letting the server apply its own
-    defaults). ``exec`` is used to synthesize the signature because it cannot be
-    expressed with a fixed ``def``; the generated function closes over *invoke*
-    through its globals.
+    The body forwards every argument to *invoke* EXCEPT ``None`` values on
+    optional parameters (which the caller omitted and the server should apply
+    its own default to); an explicitly-``None`` value for a REQUIRED parameter
+    is preserved so callers can still pass a meaningful ``null``. ``exec`` is
+    used to synthesize the signature because it cannot be expressed with a
+    fixed ``def``; the generated function closes over *invoke* through its
+    globals.
     """
     params: list[str] = []
     for name in param_names:
@@ -47,10 +49,11 @@ def _make_wrapper(
     signature = ", ".join(params)
     source = (
         f"async def wrapper({signature}):\n"
-        f"    args = {{k: v for k, v in locals().items() if v is not None}}\n"
+        f"    args = {{k: v for k, v in locals().items() "
+        f"if v is not None or k in _required}}\n"
         f"    return await _invoke({tool_name!r}, args)\n"
     )
-    namespace: dict[str, Any] = {"_invoke": invoke, "Any": Any}
+    namespace: dict[str, Any] = {"_invoke": invoke, "_required": required, "Any": Any}
     exec(source, namespace)
     return namespace["wrapper"]
 

@@ -15,6 +15,7 @@ or ``emergentflow/ir/graph.py``.
 
 from __future__ import annotations
 
+import time
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -46,7 +47,7 @@ class Checkpoint(BaseModel):
     kind: CheckpointKind
     author: str = "agent"
     description: str = ""
-    timestamp: float = Field(default_factory=lambda: __import__("time").time())
+    timestamp: float = Field(default_factory=time.time)
     base_version: int
     mutation: GraphMutation
     previous_graph: Graph

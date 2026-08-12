@@ -14,7 +14,9 @@ inside ``main`` so ``import emergentflow.cli`` stays cheap.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
+import os
 import sys
 from collections.abc import Sequence
 from typing import Any
@@ -353,9 +355,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     if args.command == "mcp":
-        import asyncio
-        import os
-
         try:
             from emergentflow.collab.mcp_bridge import create_bridge_mcp_server
         except ModuleNotFoundError as exc:

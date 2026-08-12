@@ -94,3 +94,63 @@ def test_bridge_forwards_tool_error() -> None:
 
     with pytest.raises(ToolError):
         asyncio.run(_scenario())
+
+
+def test_bridge_forwards_explicit_none_for_required_param() -> None:
+    """A ``None`` value for a REQUIRED param is forwarded, not dropped.
+
+    Required params must reach the server verbatim (e.g. ``set_param``'s
+    ``value``), otherwise an agent clearing a param to ``null`` would silently
+    lose the argument. Only *optional* params that default to ``None`` are
+    dropped to let the server apply its own defaults.
+    """
+    from emergentflow.collab.mcp_bridge import _make_wrapper
+
+    received: dict[str, object] = {}
+
+    async def invoke(tool_name: str, arguments: dict[str, object]) -> object:
+        assert tool_name == "set_param"
+        received["arguments"] = arguments
+        return {}
+
+    wrapper = _make_wrapper(
+        "set_param",
+        ["session_id", "node_id", "param_name", "value", "author", "reason"],
+        {"session_id", "node_id", "param_name", "value"},
+        invoke,
+    )
+
+    async def _scenario() -> None:
+        await wrapper("s1", "n1", "encoding", None)
+
+    asyncio.run(_scenario())
+    args = received["arguments"]
+    # Required ``value`` preserved as None; optional ``author``/``reason`` dropped
+    # from their defaults so the server applies its own.
+    assert args["value"] is None
+    assert "author" not in args
+    assert "reason" not in args
+
+
+def test_bridge_drops_none_optional_param() -> None:
+    """An optional param left at its ``None`` default is dropped, not sent."""
+    from emergentflow.collab.mcp_bridge import _make_wrapper
+
+    received: dict[str, object] = {}
+
+    async def invoke(tool_name: str, arguments: dict[str, object]) -> object:
+        received["arguments"] = arguments
+        return {}
+
+    wrapper = _make_wrapper(
+        "add_note",
+        ["session_id", "content", "anchor_id", "color"],
+        {"session_id", "content"},
+        invoke,
+    )
+
+    async def _scenario() -> None:
+        await wrapper("s1", "hello")
+
+    asyncio.run(_scenario())
+    assert received["arguments"] == {"session_id": "s1", "content": "hello"}
