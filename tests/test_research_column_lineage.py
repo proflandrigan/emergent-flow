@@ -20,6 +20,7 @@ from emergentflow.nodes.registry import get
 from emergentflow.research.errors import UnknownNodeError
 from emergentflow.research.lineage import (
     ColumnRole,
+    _derive_source_cols,
     trace_column_impact,
     trace_column_lineage,
 )
@@ -255,9 +256,11 @@ def test_trace_column_impact_stops_at_select_drop() -> None:
 
 
 def test_trace_column_impact_edges_require_surviving_column() -> None:
-    """Impact edges must only be emitted for a seed column that survives into the
-    target's output. A select that drops the column is a blast-radius dead-end,
-    not a passthrough hop -- so no edge is drawn into it (Epic 18, Story 6)."""
+    """Impact edges must only be emitted for a column that survives into the
+    target's output. `revenue` reaches derive (it is the source of revenue_log)
+    but is dropped by the select -- so no edge carries `revenue` into the
+    select. The derived `revenue_log` is kept by the select, so it legitimately
+    passes through it (a derived column preserved by the node survives)."""
     load = get("data.load_csv")().instantiate(label="load")
     derive = get("clean.derive_column")().instantiate(
         label="derive", columns=[{"name": "revenue_log", "expr": "log1p(revenue)"}]
@@ -274,7 +277,62 @@ def test_trace_column_impact_edges_require_surviving_column() -> None:
         edges=edges,
     )
     impact = trace_column_impact(graph, load.id, "revenue")
-    # `revenue` reaches derive (it is the source of revenue_log) but is dropped
-    # by the select -- so the only edge is load -> derive.
-    assert {e.target_node_id for e in impact.edges} == {derive.id}
-    assert all(e.source_column == "revenue" for e in impact.edges)
+    # The seed `revenue` is dropped by the select: no edge carries it into the
+    # select. The derived `revenue_log` survives the select, so it does flow
+    # through it.
+    assert not any(
+        e.target_node_id == select.id and e.source_column == "revenue" for e in impact.edges
+    )
+    assert {e.source_column for e in impact.edges if e.target_node_id == derive.id} == {"revenue"}
+    assert {e.source_column for e in impact.edges if e.target_node_id == select.id} == {
+        "revenue_log"
+    }
+
+
+# ---------------------------------------------------------------------------
+# Regression tests
+# ---------------------------------------------------------------------------
+
+
+def test_derive_source_cols_excludes_module_base_of_qualified_call() -> None:
+    """A qualified call's module base (``np`` in ``np.sqrt``) is an operator,
+    not a column reference (bug 2)."""
+    assert _derive_source_cols("np.sqrt(c) + a") == ("a", "c")
+    # ``np`` is the base of a bare function call, not an operand column.
+    assert "np" not in _derive_source_cols("np.sqrt(c) + a")
+    assert _derive_source_cols("np.log1p(x)") == ("x",)
+    assert "np" not in _derive_source_cols("np.log1p(x)")
+    # A bare function call name is likewise excluded, not a column.
+    assert _derive_source_cols("log1p(x)") == ("x",)
+
+
+def test_trace_column_impact_flows_through_derived_column() -> None:
+    """Impact seeded at `x` must flow through a derived column `y` so a
+    transitive consumer `z = y + 1` is reported as impacted (bug 1)."""
+    load = get("data.load_csv")().instantiate(label="load")
+    der = get("clean.derive_column")().instantiate(
+        label="der", columns=[{"name": "y", "expr": "x * 2"}]
+    )
+    down = get("clean.derive_column")().instantiate(
+        label="down", columns=[{"name": "z", "expr": "y + 1"}]
+    )
+    acc: dict = {"_edges": []}
+    edges = _flow(acc, load, der, down)
+    graph = Graph(
+        paradigm=Paradigm.FUNCTIONAL,
+        name="impact-multihop",
+        nodes={n.id: n for n in (load, der, down)},
+        edges=edges,
+    )
+    impact = trace_column_impact(graph, load.id, "x")
+    # `down.z` is derived from `y`, which is itself derived from `x` -- so it
+    # must be reported as impacted with a DERIVED role.
+    assert any(
+        n.node_type == "clean.derive_column" and n.column == "z" and n.role == ColumnRole.DERIVED
+        for n in impact.nodes
+    )
+    # The intermediate derived column `y` is reported as impacted too.
+    assert any(
+        n.node_type == "clean.derive_column" and n.column == "y" and n.role == ColumnRole.DERIVED
+        for n in impact.nodes
+    )

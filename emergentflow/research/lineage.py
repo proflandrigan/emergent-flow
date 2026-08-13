@@ -286,12 +286,23 @@ def _derive_source_cols(expr: str) -> tuple[str, ...]:
         tree = _ast.parse(expr, mode="eval")
     except SyntaxError:
         return ()
-    called: set[str] = {
-        node.func.id
-        for node in _ast.walk(tree)
-        if isinstance(node, _ast.Call) and isinstance(node.func, _ast.Name)
+    excluded: set[str] = set()
+    for node in _ast.walk(tree):
+        if isinstance(node, _ast.Call):
+            # A qualified call like `np.sqrt(...)` / `np.linalg.norm(...)` is an
+            # operator, not a column: exclude the base of its attribute chain
+            # (`np`) so it isn't mistaken for an operand column.
+            func = node.func
+            while isinstance(func, _ast.Attribute):
+                func = func.value
+            if isinstance(func, _ast.Name):
+                excluded.add(func.id)
+            # Bare function names (e.g. `log1p` in `log1p(...)`) are operators.
+            if isinstance(node.func, _ast.Name):
+                excluded.add(node.func.id)
+    referenced = {
+        n.id for n in _ast.walk(tree) if isinstance(n, _ast.Name) and n.id not in excluded
     }
-    referenced = {n.id for n in _ast.walk(tree) if isinstance(n, _ast.Name) and n.id not in called}
     return tuple(sorted(referenced))
 
 
@@ -678,6 +689,22 @@ def trace_column_impact(
             if outs is not None:
                 collected |= outs
         reach[nid] = _surviving_columns(node, collected)
+        # A derived column whose expression references a reaching seed column is
+        # itself impacted and must propagate forward so transitive consumers
+        # (e.g. a node deriving from *it*) are reported as impacted too.
+        if node.type == "clean.derive_column":
+            values = _param_values(node)
+            specs = values.get("columns")
+            if isinstance(specs, list):
+                for spec in specs:
+                    if not isinstance(spec, dict):
+                        continue
+                    name = spec.get("name")
+                    if not isinstance(name, str):
+                        continue
+                    refs = set(_derive_spec_source_cols(spec))
+                    if refs & reach[nid]:
+                        reach[nid].add(name)
 
     nodes_by_id: dict[str, list[ColumnLineageNode]] = {}
     for nid in downstream_order:

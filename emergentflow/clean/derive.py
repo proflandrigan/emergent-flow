@@ -144,7 +144,9 @@ def _case_when(frame: pd.DataFrame, name: str, spec: dict[str, Any]) -> Any:
     all_values: list[Any] = [*choices, default]
     has_str = any(isinstance(v, str) for v in all_values)
     has_non_str = any(not isinstance(v, str) and v is not None for v in all_values)
-    if has_str and has_non_str:
+    has_bool = any(isinstance(v, bool) for v in all_values)
+    is_mixed_bool = has_bool and any(v is not None and not isinstance(v, bool) for v in all_values)
+    if (has_str and has_non_str) or is_mixed_bool:
         choices = [np.full(len(frame), choice, dtype=object) for choice in choices]
         default = np.array(default, dtype=object)
 

@@ -159,12 +159,13 @@ def _melt(
         )
 
     collisions = [name for name in (var_name, value_name) if name in (id_vars or [])]
+    collisions += [name for name in (var_name, value_name) if name in (value_vars or [])]
     if var_name == value_name and var_name not in collisions:
         collisions.append(var_name)
     if collisions:
         raise ColumnCollisionError(
-            f"melt output column(s) {collisions!r} collide with existing id_vars column(s) or "
-            "with each other; choose a different var_name/value_name."
+            f"melt output column(s) {list(dict.fromkeys(collisions))!r} collide with an id_vars/"
+            "value_vars column or with each other; choose a different var_name/value_name."
         )
 
     result = df.melt(
