@@ -37,11 +37,17 @@ def _ndcg_at_k(recommended: list[Any], relevant: set[Any], k: int) -> float:
     Returns DCG / IDCG, or 0.0 if IDCG is 0 (no relevant items)."""
     if k <= 0 or not recommended:
         return 0.0
+    n_positions = min(k, len(recommended))
     dcg = 0.0
-    for i in range(min(k, len(recommended))):
+    for i in range(n_positions):
         if recommended[i] in relevant:
             dcg += 1.0 / math.log2(i + 2)
-    n_rel = min(len(relevant), k)
+    # The ideal DCG is bounded by the number of positions actually scored
+    # (``n_positions``): a short recommended list cannot place more than that many
+    # relevant items, so scoring it against an IDCG built from the whole relevant
+    # set (or k) would underrate an otherwise-perfect list whenever
+    # ``len(recommended) < len(relevant)``.
+    n_rel = min(len(relevant), n_positions)
     if n_rel == 0:
         return 0.0
     idcg = sum(1.0 / math.log2(i + 2) for i in range(n_rel))
