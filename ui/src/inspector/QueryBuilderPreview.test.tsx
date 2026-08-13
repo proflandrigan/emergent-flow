@@ -5,6 +5,7 @@ import catalogJson from "../generated/catalog.json";
 import type { Catalog, CatalogNode } from "../catalog/types";
 import { useGraphStore } from "../store/graphStore";
 import { ConfigForm } from "./ConfigForm";
+import { QueryBuilderPreview } from "./QueryBuilderPreview";
 
 const catalog = catalogJson as unknown as Catalog;
 
@@ -133,4 +134,42 @@ test("data.sql_query does NOT render query-builder-specific elements", () => {
   expect(
     screen.queryByTestId("query-builder-estimate-cost"),
   ).not.toBeInTheDocument();
+});
+
+test("switching between query_builder nodes with identical params re-compiles SQL", async () => {
+  const compileCalls: string[] = [];
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+    const urlStr = typeof url === "string" ? url : "";
+    if (urlStr.includes("/compile-spec")) {
+      compileCalls.push(urlStr);
+      return new Response(JSON.stringify({ sql: "SELECT name FROM sales" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({}), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  });
+
+  const idA = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("data.query_builder"), { x: 0, y: 0 });
+  useGraphStore.getState().setParam(idA, "source", "sales");
+  const idB = useGraphStore
+    .getState()
+    .addNodeFromSpec(spec("data.query_builder"), { x: 0, y: 0 });
+  useGraphStore.getState().setParam(idB, "source", "sales");
+
+  const nodeA = useGraphStore.getState().nodes[idA];
+  const nodeB = useGraphStore.getState().nodes[idB];
+
+  const { rerender } = render(<QueryBuilderPreview node={nodeA} />);
+  await waitFor(() => expect(compileCalls).toHaveLength(1));
+
+  rerender(<QueryBuilderPreview node={nodeB} />);
+  await waitFor(() =>
+    expect(compileCalls).toHaveLength(2),
+  );
 });

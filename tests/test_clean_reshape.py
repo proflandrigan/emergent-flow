@@ -163,6 +163,31 @@ def test_melt_name_collision_raises() -> None:
         )
 
 
+def test_melt_value_name_collides_with_value_vars_raises() -> None:
+    """value_name/var_name colliding with a *melted* value_vars column must raise the same
+    typed ColumnCollisionError as an id_vars collision, not pandas' bare ValueError."""
+    df = _wide_df()
+    with pytest.raises(ColumnCollisionError, match="collide"):
+        reshape(
+            df,
+            mode="melt",
+            id_vars=["date"],
+            value_vars=["clicks", "views"],
+            value_name="clicks",
+        )
+    with pytest.raises(ColumnCollisionError, match="collide"):
+        reshape(
+            df,
+            mode="melt",
+            id_vars=["date"],
+            value_vars=["clicks", "views"],
+            var_name="clicks",
+        )
+    # A valid melt still works after the extended pre-check.
+    result = reshape(df, mode="melt", id_vars=["date"], value_vars=["clicks", "views"])
+    assert not result.empty
+
+
 def test_melt_unknown_column_raises() -> None:
     df = _wide_df()
     with pytest.raises(UnknownColumnError):

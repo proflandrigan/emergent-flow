@@ -50,6 +50,20 @@ def test_capture_run_collects_seeds():
     assert capture.seeds == {"sample": 7}
 
 
+def test_capture_run_collects_float_seeds():
+    node = Node(
+        id="n1",
+        type="clean.sample_rows",
+        params=[Param(name="random_state", type_token="float", value=42.0)],
+        ports=[
+            Port(id="p1", name="frame", direction=Direction.IN, data_type="DataFrame"),
+            Port(id="p2", name="frame", direction=Direction.OUT, data_type="DataFrame"),
+        ],
+    )
+    capture = capture_run(Graph(nodes={"n1": node}, edges={}))
+    assert capture.seeds == {"n1": 42.0}
+
+
 def test_capture_run_collects_content_hashes_for_data_nodes_only():
     capture = capture_run(_sample_graph())
     assert "load" in capture.content_hashes

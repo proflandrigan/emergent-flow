@@ -235,6 +235,32 @@ def test_plot_correlation_heatmap_equivalence() -> None:
     assert executed.spec == scope["plot"].spec
 
 
+def test_plot_acf_too_few_residuals_raises_typed_error() -> None:
+    """A single-observation residual series must raise a typed VizError, not leak
+    statsmodels' IndexError/ValueError."""
+    import numpy as np
+    import pandas as pd
+
+    from emergentflow.stats.models import FittedStatsModel
+    from emergentflow.viz.errors import VizError
+
+    class _ResidOnly:
+        resid = np.array([0.0])
+
+    model = FittedStatsModel(
+        model="OLS",
+        spec={},
+        coefficients=pd.DataFrame(),
+        diagnostics=pd.DataFrame(),
+        results=_ResidOnly(),
+    )
+    defn = VizPlotAcf()
+    node = defn.instantiate(kind="acf", nlags=5, label="Plot ACF")
+
+    with pytest.raises(VizError):
+        defn.execute(node, inputs={"model": model})
+
+
 @pytest.mark.equivalence
 def test_plot_confusion_matrix_equivalence() -> None:
     model, df = _fit_classifier()

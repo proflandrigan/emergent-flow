@@ -111,3 +111,42 @@ def test_gam_equivalence() -> None:
     assert executed_model.fit_stats == codegen_model.fit_stats
     assert executed_model.model == codegen_model.model == "GAM"
     assert "s(x2)" in set(executed_model.coefficients["term"])
+
+
+def test_gam_constant_linear_term_coefficients_are_true() -> None:
+    """A constant linear term must not misalign the coefficient frame (regression).
+
+    ``sm.add_constant`` with its default ``has_constant="skip"`` lets a constant linear
+    column absorb the intercept slot (no separate 'const' column), which used to shift every
+    coefficient onto the wrong row. The frame must instead report a real "Intercept" row plus
+    one row per linear term, each mapping to the true model coefficient.
+    """
+    rng = np.random.default_rng(0)
+    x_s = np.linspace(-3.0, 3.0, 120)
+    df = pd.DataFrame(
+        {
+            "x_lin": np.tile([3.0], 120),  # constant linear term
+            "x_s": x_s,
+            "y": 1.0 + np.sin(x_s) + rng.normal(scale=0.2, size=120),
+        }
+    )
+    fit_kwargs = {
+        "target": "y",
+        "linear_terms": ["x_lin"],
+        "smooth_terms": [{"column": "x_s", "df": 6, "degree": 3}],
+    }
+
+    defn = FitGAM()
+    model = defn.execute(defn.instantiate(**fit_kwargs), inputs={"frame": df})["model"]
+
+    frame = model.coefficients
+    linear = frame.loc[~frame["term"].str.startswith("s(")]
+    results = model.results
+    # The constant column must NOT absorb the intercept slot: a separate "Intercept" row is
+    # still produced, and the linear row count matches the real number of linear params.
+    assert linear["term"].tolist() == ["Intercept", "x_lin"]
+    assert len(linear) == int(results.model.k_exog_linear)
+    # Each labeled row maps to the true coefficient for that quantity from ``params``.
+    assert list(linear["estimate"]) == pytest.approx(
+        [float(v) for v in results.params.iloc[: len(linear)]]
+    )

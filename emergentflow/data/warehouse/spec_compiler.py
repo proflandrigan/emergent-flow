@@ -128,6 +128,12 @@ def _build_predicate(pred: dict) -> exp.Expression:
             raise SpecValidationError(
                 f"IN predicate requires a list value, got {type(value).__name__}"
             )
+        if not value:
+            raise SpecValidationError(
+                "IN predicate requires a non-empty list of values; its "
+                "membership set cannot be empty (an empty set would compile "
+                "to invalid SQL like `x IN ()`)."
+            )
         literals = [
             exp.Literal.number(v) if isinstance(v, (int, float)) else exp.Literal.string(str(v))
             for v in value

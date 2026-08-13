@@ -142,6 +142,38 @@ describe("flow name", () => {
     render(<IRToolbar />);
     expect(screen.getByTestId("flow-name")).toHaveTextContent("My Flow");
   });
+
+  // Regression test: pressing Escape while renaming unmounts the input, which fires its
+  // onBlur -> commitName(). Without a cancel guard that blur would persist the (unintended)
+  // typed draft to the graph and save the flow, so Escape would "cancel" but actually commit.
+  test("pressing Escape while renaming cancels without committing the draft", () => {
+    useGraphStore.getState().setName("Original");
+    useFlowStore.setState({ currentSlug: "my-flow" });
+    render(<IRToolbar />);
+
+    fireEvent.click(screen.getByTestId("flow-name"));
+    const input = screen.getByTestId("flow-name-input");
+    fireEvent.change(input, { target: { value: "Typed Draft" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(useGraphStore.getState().name).toBe("Original");
+    expect(screen.getByTestId("flow-name")).toHaveTextContent("Original");
+  });
+
+  // Guard against regressing the cancel guard: Enter must still commit the draft.
+  test("pressing Enter while renaming commits the draft", () => {
+    useGraphStore.getState().setName("Original");
+    useFlowStore.setState({ currentSlug: "my-flow" });
+    render(<IRToolbar />);
+
+    fireEvent.click(screen.getByTestId("flow-name"));
+    const input = screen.getByTestId("flow-name-input");
+    fireEvent.change(input, { target: { value: "Renamed" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(useGraphStore.getState().name).toBe("Renamed");
+    expect(screen.getByTestId("flow-name")).toHaveTextContent("Renamed");
+  });
 });
 
 describe("dirty indicator", () => {

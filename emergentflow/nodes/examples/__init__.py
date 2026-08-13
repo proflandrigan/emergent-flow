@@ -18,7 +18,9 @@ from .anova import Anova
 from .apply_estimator import ApplyEstimator
 from .assert_data import AssertData
 from .auto_eda import AutoEda
+from .blend_models import BlendModels
 from .build_report import BuildReport
+from .calibrate_model import CalibrateModel
 from .cast_types import CastTypes
 from .chi_square import ChiSquare
 from .clean_text import CleanText
@@ -47,6 +49,7 @@ from .eda_profile import EdaProfile
 from .embed_text import EmbedText
 from .encode_categorical import EncodeCategorical
 from .encode_lists import EncodeLists
+from .ensemble_model import EnsembleModel
 from .eval_judge import EvalJudge
 from .eval_label import EvalLabel
 from .eval_run import EvalRun
@@ -63,6 +66,7 @@ from .explain_plot_shap_waterfall import ExplainPlotShapWaterfall
 from .explain_shap_values import ExplainShapValues
 from .explode_lists import ExplodeLists
 from .filter_rows import FilterRows
+from .finalize_model import FinalizeModel
 from .fit_bayesian_model import FitBayesianModel
 from .fit_estimator import FitEstimator
 from .fit_gam import FitGAM
@@ -99,6 +103,7 @@ from .missingness import Missingness
 from .nn_linear import NnLinear
 from .nn_module import NnModule
 from .nn_relu import NnReLU
+from .optimize_threshold import OptimizeThreshold
 from .outlier_detect import OutlierDetect
 from .outlier_summary import OutlierSummary
 from .parse_dates import ParseDates
@@ -136,6 +141,7 @@ from .select_features import SelectFeatures
 from .semi_join import SemiJoin
 from .sort import Sort
 from .sql_query import SqlQuery
+from .stack_models import StackModels
 from .summarize import Summarize
 from .test_proportions import TestProportions
 from .train import TrainClassifier
@@ -149,6 +155,7 @@ from .ts_lag_features import TsLagFeatures
 from .ts_rolling_aggregate import TsRollingAggregate
 from .ts_time_weighted_aggregate import TsTimeWeightedAggregate
 from .ttest import TTest
+from .tune_model import TuneModel
 from .viz_plot import VizPlot
 from .viz_plot_acf import VizPlotAcf
 from .viz_plot_coefficients import VizPlotCoefficients
@@ -168,7 +175,9 @@ __all__ = [
     "ApplyEstimator",
     "AssertData",
     "AutoEda",
+    "BlendModels",
     "BuildReport",
+    "CalibrateModel",
     "CastTypes",
     "ChiSquare",
     "CleanText",
@@ -197,6 +206,7 @@ __all__ = [
     "EmbedText",
     "EncodeCategorical",
     "EncodeLists",
+    "EnsembleModel",
     "EvalJudge",
     "EvalLabel",
     "EvalRun",
@@ -213,6 +223,7 @@ __all__ = [
     "ExplainShapValues",
     "ExplodeLists",
     "FilterRows",
+    "FinalizeModel",
     "FitBayesianModel",
     "FitEstimator",
     "FitGAM",
@@ -252,6 +263,7 @@ __all__ = [
     "NnLinear",
     "NnModule",
     "NnReLU",
+    "OptimizeThreshold",
     "OutlierDetect",
     "OutlierSummary",
     "ParseDates",
@@ -286,6 +298,7 @@ __all__ = [
     "SimilarItems",
     "Sort",
     "SqlQuery",
+    "StackModels",
     "Summarize",
     "TestProportions",
     "TrainClassifier",
@@ -299,6 +312,7 @@ __all__ = [
     "TsRollingAggregate",
     "TsTimeWeightedAggregate",
     "TTest",
+    "TuneModel",
     "VizPlot",
     "VizPlotAcf",
     "VizPlotCoefficients",

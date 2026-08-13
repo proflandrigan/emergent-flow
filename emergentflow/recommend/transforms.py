@@ -141,6 +141,19 @@ def weight_interactions_by_recency(
             f"reference_time {reference_time!r} could not be parsed to a timestamp; "
             "recency cannot be computed against an unparseable reference."
         )
+    # Subtracting a tz-aware reference from tz-naive timestamps (or vice-versa) raises
+    # a bare pandas ``TypeError`` that escapes as an untyped crash. Surface the mismatch
+    # as the typed InvalidRecommenderParamsError used for every other bad-input case.
+    if (computed_reference.tzinfo is None) != (timestamps.dt.tz is None):
+        ref_kind = "naive" if computed_reference.tzinfo is None else "timezone-aware"
+        data_kind = "naive" if timestamps.dt.tz is None else "timezone-aware"
+        raise InvalidRecommenderParamsError(
+            "reference_time is "
+            + ref_kind
+            + " but timestamp_col contains "
+            + data_kind
+            + " timestamps; recency cannot be computed across mixed timezones."
+        )
     age_days = (computed_reference - timestamps) / pd.Timedelta(days=1)
     weights = np.exp2(-age_days.to_numpy(dtype=float) / half_life_days)
 

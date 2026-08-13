@@ -42,6 +42,7 @@ export function IRToolbar(): JSX.Element {
   const [openPanelOpen, setOpenPanelOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
+  const cancelRename = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const fileMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -99,7 +100,9 @@ export function IRToolbar(): JSX.Element {
     const filename = slugify(useGraphStore.getState().name || "graph");
     anchor.download = `${filename}.json`;
     anchor.click();
-    URL.revokeObjectURL(url);
+    // Revoke asynchronously: revoking synchronously right after click() can cancel the
+    // download before the browser picks up the blob (observed in Firefox).
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
     setFileMenuOpen(false);
   }
 
@@ -235,11 +238,19 @@ export function IRToolbar(): JSX.Element {
   }
 
   function startEditingName() {
+    cancelRename.current = false;
     setNameDraft(useGraphStore.getState().name || "");
     setEditingName(true);
   }
 
   function commitName() {
+    // A blur triggered by Escape cancels instead of committing -- the input is unmounted on
+    // Escape, firing onBlur, which would otherwise persist the (unintended) typed draft.
+    if (cancelRename.current) {
+      cancelRename.current = false;
+      setEditingName(false);
+      return;
+    }
     setEditingName(false);
     const trimmed = nameDraft.trim();
     useGraphStore.getState().setName(trimmed);
@@ -439,6 +450,7 @@ export function IRToolbar(): JSX.Element {
                   commitName();
                 } else if (e.key === "Escape") {
                   e.preventDefault();
+                  cancelRename.current = true;
                   setEditingName(false);
                 }
               }}

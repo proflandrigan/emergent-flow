@@ -60,7 +60,9 @@ export function QueryBuilderPreview({
 
   const dialect = String(findParamValue(node, "dialect") ?? "duckdb");
   const spec = buildSpec(node);
-  const specKey = JSON.stringify({ spec, dialect });
+  // Include node.id: two query_builder nodes with identical params must still recompile when
+  // the user switches selection between them, otherwise the preview shows the previous node's SQL.
+  const specKey = JSON.stringify({ id: node.id, spec, dialect });
 
   useEffect(() => {
     let cancelled = false;

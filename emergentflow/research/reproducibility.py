@@ -63,7 +63,7 @@ class ReproducibilityCapture:
         stored param values when not supplied.
     """
 
-    seeds: dict[str, int] = field(default_factory=dict)
+    seeds: dict[str, int | float] = field(default_factory=dict)
     content_hashes: dict[str, str] = field(default_factory=dict)
     dependency_versions: dict[str, str] = field(default_factory=dict)
     params: dict[str, Any] = field(default_factory=dict)
@@ -101,13 +101,17 @@ def capture_run(
         ``params`` as supplied (the graph's stored values if not given). Node iteration is in
         sorted node-id order for determinism.
     """
-    seeds: dict[str, int] = {}
+    seeds: dict[str, int | float] = {}
     content_hashes: dict[str, str] = {}
 
     for node_id in sorted(graph.nodes):
         node = graph.nodes[node_id]
         for param in node.params:
-            if param.name in SEED_PARAM_NAMES and isinstance(param.value, int):
+            if (
+                param.name in SEED_PARAM_NAMES
+                and isinstance(param.value, (int, float))
+                and not isinstance(param.value, bool)
+            ):
                 seeds[node_id] = param.value
 
         if node.type.startswith("data."):

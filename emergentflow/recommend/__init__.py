@@ -477,10 +477,18 @@ def evaluate(
 
     if "coverage" in requested:
         if test_users and test_interactions.n_items > 0:
+            # Recommended items come from the recommender's FULL catalog (the train side),
+            # which is typically a strict superset of ``test_interactions.item_ids`` after a
+            # train/test split. Without restricting the union to the test catalog, coverage
+            # (a fraction, by definition in [0, 1]) could exceed 1.0 whenever a recommended
+            # item does not appear in the test set -- intersections keep the fraction bounded.
+            test_item_set = set(test_interactions.item_ids)
             recommended_union: set[Any] = set()
             for items in recs_by_user.values():
                 recommended_union.update(items[:k])
-            aggregate["coverage"] = len(recommended_union) / test_interactions.n_items
+            aggregate["coverage"] = (
+                len(recommended_union & test_item_set) / test_interactions.n_items
+            )
         else:
             aggregate["coverage"] = 0.0
 
@@ -835,12 +843,18 @@ def temporal_split(
     test_parts = []
     for _, group in df.groupby(user_col, sort=False):
         ordered = group.sort_values(timestamp_col, kind="stable")
-        n_test = round(len(ordered) * test_ratio)
-        if n_test > 0:
-            test_parts.append(ordered.iloc[-n_test:])
-            train_parts.append(ordered.iloc[:-n_test])
-        else:
-            train_parts.append(ordered)
+        # ``round()`` applies banker's rounding, so ``n_test`` alone can empty a half. A user
+        # whose ``len * test_ratio`` lands on a half boundary (2 interactions at 0.25 -> 0.5)
+        # rounds DOWN to 0, silently abandoning their newest interaction to train; and at the
+        # other end ``round()`` can round UP to the whole group (2 at 0.75 -> 1.5 -> 2), draining
+        # the user's entire train slice. Holding out at least the newest interaction
+        # (``n_test >= 1``) and at most ``len - 1`` (``n_test <= len - 1``) keeps both halves
+        # non-empty for any user with >= 2 interactions, per the documented "recent goes to
+        # test" contract. A single-interaction user (no half to split) keeps their row in train.
+        n = len(ordered)
+        n_test = max(1, min(n - 1, round(n * test_ratio))) if n >= 2 else 0
+        test_parts.append(ordered.iloc[-n_test:])
+        train_parts.append(ordered.iloc[:-n_test])
 
     train_df = pd.concat(train_parts, ignore_index=True) if train_parts else df.iloc[0:0]
     test_df = pd.concat(test_parts, ignore_index=True) if test_parts else df.iloc[0:0]
@@ -889,7 +903,12 @@ def random_split(
 
     rng = np.random.default_rng(seed)
     shuffled_index = rng.permutation(len(df))
-    n_test = round(len(df) * test_ratio)
+    # Clamp ``n_test`` to ``[1, n_rows - 1]`` so both halves stay non-empty whenever there
+    # are at least two rows: banker's-rounding alone can empty one half entirely -- e.g.
+    # ``round(0.5) = 0`` on a 1-row frame empties test, while ``round(1.5) = 2`` on a 2-row
+    # frame at 0.75 empties train -- silently yielding a degenerate split you cannot fit on.
+    n_rows = len(df)
+    n_test = max(1, min(n_rows - 1, round(n_rows * test_ratio))) if n_rows >= 2 else 0
     test_positions = shuffled_index[:n_test]
     train_positions = shuffled_index[n_test:]
 

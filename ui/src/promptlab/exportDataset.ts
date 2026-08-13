@@ -34,5 +34,7 @@ export async function downloadDataset(
   document.body.appendChild(anchor);
   anchor.click();
   document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
+  // Revoke asynchronously: revoking synchronously right after click() can cancel the
+  // download before the browser picks up the blob (observed in Firefox).
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }

@@ -96,11 +96,14 @@ class DuckDBAdapter:
     ) -> CostEstimate:
         conn = self._connect(credentials)
         try:
-            explained = conn.execute(f"EXPLAIN {request.sql}").fetchdf()
-            estimated_rows = len(explained)
+            # DuckDB's EXPLAIN returns one row per execution-plan operator; its length has
+            # nothing to do with how many rows the query would scan or return, so it must not
+            # be surfaced as an ``estimated_rows`` cost estimate. No row estimate is available
+            # without running the query, so report None (honest) rather than a misleading count.
+            conn.execute(f"EXPLAIN {request.sql}").fetchdf()
             return CostEstimate(
                 dialect="duckdb",
-                estimated_rows=estimated_rows,
+                estimated_rows=None,
             )
         finally:
             conn.close()

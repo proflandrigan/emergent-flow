@@ -242,3 +242,42 @@ def test_case_when_mixes_string_and_numeric_literals() -> None:
     )
     assert result["x"].tolist() == [100, "unknown", 0]
     assert [type(v).__name__ for v in result["x"]] == ["int", "str", "int"]
+
+
+def test_case_when_bool_mixed_with_int_literal_keeps_python_bools() -> None:
+    """A bool literal mixed with an int literal must keep real Python booleans.
+
+    numpy.select promotes booleans to 0/1 ints when combined with a numeric literal, so a
+    boolean flag column would silently become int64. The object-dtype branch must trigger
+    for a bool/non-bool scalar mix so each value keeps its original Python type.
+    """
+    df = pd.DataFrame({"score": [85, 40, 12, 60]})
+    result = derive_column(
+        df,
+        columns=[{"name": "grade", "when": [{"if": "score>=50", "then": True}], "else": 100}],
+    )
+    assert result["grade"].tolist() == [True, 100, 100, True]
+    assert result["grade"].iloc[0] is True
+
+
+def test_case_when_bool_mixed_with_float_literal_keeps_python_types() -> None:
+    """A bool literal mixed with a float literal keeps both original Python types."""
+    df = pd.DataFrame({"score": [85, 40, 12, 60]})
+    result = derive_column(
+        df,
+        columns=[{"name": "grade", "when": [{"if": "score>=50", "then": True}], "else": 50.5}],
+    )
+    assert result["grade"].tolist() == [True, 50.5, 50.5, True]
+    assert result["grade"].iloc[0] is True
+    assert result["grade"].iloc[1] == 50.5
+
+
+def test_case_when_pure_bool_literals_keep_booleans() -> None:
+    """A pure-bool case-when (no numeric/string literal) still yields real booleans."""
+    df = pd.DataFrame({"score": [85, 40, 12, 60]})
+    result = derive_column(
+        df,
+        columns=[{"name": "grade", "when": [{"if": "score>=50", "then": True}], "else": False}],
+    )
+    assert result["grade"].tolist() == [True, False, False, True]
+    assert all(v is True or v is False for v in result["grade"])

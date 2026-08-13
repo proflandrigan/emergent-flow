@@ -28,7 +28,9 @@ from emergentflow.nodes.examples import (
     FitLinearRegression,
     LoadSample,
 )
+from emergentflow.stats import diagnostic, fit_model
 from emergentflow.stats.diagnostics import get_diagnostic_spec, known_diagnostic_keys
+from emergentflow.stats.errors import InvalidModelSpecError
 
 _FRAME_DIAGNOSTIC_KEYS = [k for k in known_diagnostic_keys() if get_diagnostic_spec(k).needs_frame]
 _MODEL_DIAGNOSTIC_KEYS = [k for k in known_diagnostic_keys() if get_diagnostic_spec(k).needs_model]
@@ -150,3 +152,49 @@ def test_diagnostic_model_equivalence_matrix(diagnostic_key: str) -> None:
     executed = defn.execute(node, inputs={"model": fitted_model})["diagnostics"]
     scope = _run_codegen(defn, node, {"model": fitted_model})
     pd.testing.assert_frame_equal(executed, scope["diagnostics"])
+
+
+# ---------------------------------------------------------------------------
+# 3. Regression tests: typed errors instead of raw numpy/statsmodels leaks.
+# ---------------------------------------------------------------------------
+
+
+def test_vif_rejects_non_numeric_columns() -> None:
+    df = _regression_df()
+    df["cat"] = np.where(df["x1"] > 0, "high", "low")
+
+    with pytest.raises(InvalidModelSpecError):
+        diagnostic(df, diagnostic="vif", spec={"columns": ["x1", "cat"]})
+
+    # The valid numeric-only path still works and returns a tidy DataFrame.
+    result = diagnostic(df, diagnostic="vif", spec={"columns": ["x1", "x2"]})
+    assert isinstance(result, pd.DataFrame)
+    assert list(result.columns) == [
+        "diagnostic",
+        "statistic",
+        "p_value",
+        "detail",
+    ]
+
+
+def test_heteroscedasticity_rejects_intercept_only_model() -> None:
+    df = _regression_df()
+
+    intercept_only = fit_model(df[["y"]], model="OLS", spec={"target": "y"})
+    with pytest.raises(InvalidModelSpecError):
+        diagnostic(
+            None,
+            diagnostic="heteroscedasticity",
+            model=intercept_only,
+        )
+
+    # A valid multi-feature model still returns a tidy DataFrame.
+    fitted = fit_model(df, model="OLS", spec={"target": "y", "fixed_effects": ["x1", "x2"]})
+    result = diagnostic(None, diagnostic="heteroscedasticity", model=fitted)
+    assert isinstance(result, pd.DataFrame)
+    assert list(result.columns) == [
+        "diagnostic",
+        "statistic",
+        "p_value",
+        "detail",
+    ]

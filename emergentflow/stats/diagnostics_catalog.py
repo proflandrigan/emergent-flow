@@ -50,6 +50,12 @@ def _vif(
     if df is None:
         raise InvalidModelSpecError("diagnostic 'vif' requires a DataFrame input.")
     columns = spec.get("columns") or list(df.select_dtypes(include="number").columns)
+    numeric_cols = set(df.select_dtypes(include="number").columns)
+    non_numeric = [col for col in columns if col not in numeric_cols]
+    if non_numeric:
+        raise InvalidModelSpecError(
+            f"diagnostic 'vif' requires numeric columns; got non-numeric column(s) {non_numeric!r}."
+        )
     threshold = float(spec.get("threshold", 5.0))
     exog = sm.add_constant(df[columns], has_constant="add").to_numpy()
     rows = []
@@ -115,6 +121,12 @@ def _heteroscedasticity(
         )
     resid = _model_resid(model)
     exog = model.results.model.exog
+    if exog.shape[1] < 2:
+        raise InvalidModelSpecError(
+            "diagnostic 'heteroscedasticity' requires a model with at least one "
+            "regressor; the fitted model has only an intercept, so the Breusch-Pagan "
+            "test cannot be computed."
+        )
     lm_stat, lm_pvalue, f_stat, f_pvalue = het_breuschpagan(resid, exog)
     row = {
         "diagnostic": "Breusch-Pagan",

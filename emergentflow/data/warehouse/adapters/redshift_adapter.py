@@ -114,13 +114,15 @@ class RedshiftAdapter:
         conn = self._connect(credentials)
         try:
             cursor = conn.cursor()
+            # Redshift EXPLAIN returns one row per execution-plan operator; its length is a
+            # count of plan nodes, not an estimate of the rows the query would scan or return.
+            # A real row estimate would require parsing the per-operator ``rows=N`` plan text,
+            # so report None (honest) rather than a misleading count.
             cursor.execute(f"EXPLAIN {request.sql}")
-            rows = cursor.fetchall()
-            # Parse estimated row count from the EXPLAIN output
-            estimated_rows = len(rows)
+            cursor.fetchall()
             return CostEstimate(
                 dialect="redshift",
-                estimated_rows=estimated_rows,
+                estimated_rows=None,
             )
         finally:
             conn.close()

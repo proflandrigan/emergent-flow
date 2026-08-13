@@ -365,6 +365,47 @@ def test_system_coverage():
     assert result.aggregate["coverage"] == 1.0
 
 
+def test_system_coverage_never_exceeds_one_when_catalog_skewed():
+    """Coverage must stay a fraction in [0, 1] even when the recommender's catalog is a
+    strict superset of the test set's catalog (the norm after a train/split: recommended
+    items include train-only items absent from the held-out test matrix).
+
+    Regression for a bug where coverage could exceed 1.0 (e.g. 1.5) because the
+    recommended-item union was divided by test n_items without restricting it to the
+    test catalog.
+    """
+    trained = InteractionMatrix.from_dataframe(
+        pd.DataFrame(
+            {
+                "user_id": [1, 1, 1, 2, 2, 2],
+                "item_id": ["A", "B", "C", "A", "B", "C"],
+                "value": [1, 1, 1, 1, 1, 1],
+            }
+        ),
+        user_col="user_id",
+        item_col="item_id",
+        value_col="value",
+    )
+    test = InteractionMatrix.from_dataframe(
+        pd.DataFrame(
+            {
+                "user_id": [1, 2],
+                "item_id": ["B", "C"],
+                "value": [1, 1],
+            }
+        ),
+        user_col="user_id",
+        item_col="item_id",
+        value_col="value",
+    )
+    spec = get_recommender_spec("popularity")
+    recommender = spec.fitter(trained, None, {"score_type": "count"})
+
+    result = evaluate(recommender, test, k=2, metrics=["coverage"])
+
+    assert 0.0 <= result.aggregate["coverage"] <= 1.0
+
+
 def test_system_diversity():
     """Diversity = 1 - mean pairwise cosine similarity of users' top-k sets.
 

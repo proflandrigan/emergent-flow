@@ -325,7 +325,14 @@ def _fit_gam(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
     x_spline = df[smooth_columns].to_numpy()
     bs = BSplines(x_spline, df=smooth_dfs, degree=smooth_degrees)
     if linear_terms:
-        exog_linear = sm.add_constant(df[linear_terms])
+        # Always build an explicit intercept plus one column per linear term. Using
+        # ``sm.add_constant`` with its default ``has_constant="skip"`` would let a
+        # constant linear column absorb the intercept slot (no separate 'const'
+        # column), which misaligns every coefficient in the tidy frame.
+        exog_lin = pd.DataFrame({"const": np.ones(len(df))}, index=df.index)
+        for term in linear_terms:
+            exog_lin[term] = df[term].to_numpy()
+        exog_linear = exog_lin
     else:
         exog_linear = pd.DataFrame({"const": np.ones(len(df))}, index=df.index)
 

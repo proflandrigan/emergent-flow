@@ -130,7 +130,20 @@ def test_random_default_seed():
     pd.testing.assert_frame_equal(r1.recommendations, r2.recommendations)
 
 
-def test_random_cold_start():
+def test_empty_recommendation_result_has_canonical_columns():
+    # Popularity with exclude_known=True against a user who has already interacted with
+    # EVERY known item yields zero recommendations. The result must still expose the
+    # documented user_id/item_id/rank/score columns (an (0,0) column-less frame crashed
+    # downstream consumers such as ef.recommend.evaluate with KeyError('user_id')).
+    df = pd.DataFrame({"user_id": [1, 2, 1, 2], "item_id": ["A", "A", "B", "B"], "value": 1})
+    im = InteractionMatrix.from_dataframe(
+        df, user_col="user_id", item_col="item_id", value_col="value"
+    )
+    spec = _reg.get_recommender_spec("popularity")
+    fitted = spec.fitter(im, None, {})
+    result = spec.recommend_fn(fitted, [1], 10, exclude_known=True)
+    assert len(result.recommendations) == 0
+    assert list(result.recommendations.columns) == ["user_id", "item_id", "rank", "score"]
     """Random recommender handles unknown users."""
     im = _make_small_interactions()
     spec = _reg.get_recommender_spec("random")

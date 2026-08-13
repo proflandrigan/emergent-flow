@@ -142,6 +142,25 @@ password_env = "PGPASSWORD"
     assert profile.dialect == "postgres"
 
 
+def test_load_profiles_table_key_wins_over_body_name(tmp_path: Path) -> None:
+    """A `name` field inside a table body must not override the TOML table key."""
+    toml_text = """
+[aliased]
+kind = "llm"
+provider = "openai"
+api_key_env = "OPENAI_API_KEY"
+name = "sneaky"
+""".strip()
+    path = tmp_path / "connections.toml"
+    path.write_text(toml_text)
+
+    store = load_profiles(path)
+    profile = store.get("aliased")
+    assert profile.name == "aliased"
+    with pytest.raises(UnknownConnectionError):
+        store.get("sneaky")
+
+
 def test_load_profiles_llm_profile(tmp_path: Path) -> None:
     toml_text = """
 [my_openai_key]

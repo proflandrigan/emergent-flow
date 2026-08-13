@@ -211,6 +211,17 @@ def _execute_functional(
                 continue
             sources = wiring_map.upstream(node.id, port.id)
             if port.cardinality == Cardinality.MANY:
+                # A composite's dangling (boundary) MANY IN port is seeded with the
+                # composite's own IN-port value by `_execute_composite`; honor it before
+                # the sources-only path, exactly as the ONE-cardinality branch does below.
+                # Without this, a MANY boundary port has no intra-subgraph source, so the
+                # lines below would hand the node an empty list, silently dropping the
+                # seeded outer value (an ADR-0002 divergence from compile_to_code, which
+                # threads the same value through as a positional arg).
+                seed_key = (node.id, port.name)
+                if seed_inputs is not None and seed_key in seed_inputs:
+                    inputs[port.name] = seed_inputs[seed_key]
+                    continue
                 values: list[Any] = []
                 for src in sources:
                     src_node = graph.nodes[src.node_id]

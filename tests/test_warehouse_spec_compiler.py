@@ -155,6 +155,15 @@ def test_in_predicate() -> None:
     assert "IN (1, 2, 3)" in result
 
 
+def test_empty_in_predicate_raises() -> None:
+    """An empty IN member list would compile to invalid SQL (`IN ()`), so it must be rejected."""
+    with pytest.raises(SpecValidationError):
+        compile_spec(
+            {"source": "t", "where": [{"column": "status", "op": "IN", "value": []}]},
+            "duckdb",
+        )
+
+
 def test_is_null_predicate() -> None:
     """IS NULL predicate compiles correctly."""
     result = compile_spec(

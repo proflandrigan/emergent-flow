@@ -218,3 +218,33 @@ class TestRevertCheckpoint:
         assert revert.previous_graph is not None
         assert edit_cp.id in result.collab.checkpoints
         assert edit_cp.id != revert.id
+
+
+class TestAcceptProposalCheckpoint:
+    def test_accept_proposal_records_an_edit_checkpoint(self) -> None:
+        """Regression test: a mutation applied by ACCEPTING a proposal must create an EDIT
+        checkpoint (and be revertible), exactly like apply_direct_mutation. Previously
+        accept_proposal applied the mutation and bumped the version but recorded no
+        checkpoint, so human-accepted edits silently vanished from the revert ledger."""
+        store = SessionStore()
+        session = store.create()
+        node = _load_csv_node()
+        apply = GraphMutation(base_version=0, add_nodes=[node], description="add csv")
+
+        proposal = store.add_proposal(session.id, apply)
+        session = store.accept_proposal(session.id, proposal.id)
+
+        assert session.version == 1
+        edit_cps = [
+            cp for cp in session.collab.checkpoints.values() if cp.kind == CheckpointKind.EDIT
+        ]
+        assert len(edit_cps) == 1
+        cp = edit_cps[0]
+        assert cp.description == "add csv"
+        assert cp.base_version == 0
+        assert cp.resulting_version == 1
+        assert node.id not in cp.previous_graph.nodes
+        assert node.id in session.graph.nodes
+        # the accepted edit must be revertible
+        reverted = store.revert_checkpoint(session.id, cp.id)
+        assert node.id not in reverted.graph.nodes

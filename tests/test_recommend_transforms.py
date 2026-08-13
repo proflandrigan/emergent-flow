@@ -212,6 +212,32 @@ def test_nat_reference_time_raises_typed_error() -> None:
         )
 
 
+def test_tz_mismatched_reference_raises_typed_error() -> None:
+    """A tz-aware reference against tz-naive data (or vice-versa) must raise the typed
+    InvalidRecommenderParamsError, not the bare pandas ``TypeError`` that the raw
+    timestamp subtraction would throw."""
+    df = _recency_frame()
+    with pytest.raises(InvalidRecommenderParamsError, match="mixed timezones"):
+        weight_interactions_by_recency(
+            df,
+            timestamp_col="timestamp",
+            user_col="user_id",
+            item_col="item_id",
+            reference_time="2026-01-11T00:00:00+00:00",
+        )
+
+    tz_aware = _recency_frame().copy()
+    tz_aware["timestamp"] = pd.to_datetime("2026-01-10").tz_localize("UTC")
+    with pytest.raises(InvalidRecommenderParamsError, match="mixed timezones"):
+        weight_interactions_by_recency(
+            tz_aware,
+            timestamp_col="timestamp",
+            user_col="user_id",
+            item_col="item_id",
+            reference_time="2026-01-11",
+        )
+
+
 def test_missing_columns_raise() -> None:
     df = _recency_frame()
     with pytest.raises(InvalidRecommenderParamsError):

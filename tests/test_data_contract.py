@@ -44,6 +44,21 @@ def test_allow_extra_columns_false_raises() -> None:
         validate_schema(frame, expect_columns=["a", "b"], allow_extra_columns=False)
 
 
+def test_dtype_expected_column_not_flagged_extra() -> None:
+    """A column required via ``expect_dtypes`` must not be reported "extra" when
+    ``allow_extra_columns=False`` even if omitted from ``expect_columns``."""
+    frame = pd.DataFrame({"a": [1, 2], "b": [1.5, 2.5]})
+
+    result = validate_schema(
+        frame,
+        expect_columns=["a"],
+        expect_dtypes={"a": "int64", "b": "float64"},
+        allow_extra_columns=False,
+    )
+
+    assert result is frame
+
+
 def test_allow_extra_columns_true_by_default() -> None:
     frame = pd.DataFrame({"a": [1], "b": [2], "extra": [3]})
 

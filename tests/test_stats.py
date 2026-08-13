@@ -170,6 +170,31 @@ def test_mann_whitney_deterministic() -> None:
     assert first["p_value"].iloc[0] == second["p_value"].iloc[0]
 
 
+def test_mann_whitney_nan_values_are_excluded() -> None:
+    """NaN value rows must not inflate n_a/n_b or poison the statistic to NaN.
+
+    Regression: scipy's mannwhitneyu strips NaN internally, so passing NaN rows
+    through made both `statistic` and `p_value` come back NaN (a silently useless
+    result) while n_a/n_b still counted the NaN rows -- the exact inconsistency
+    `ttest` was fixed for.
+    """
+    df = pd.DataFrame(
+        {
+            "grp": ["a", "a", "a", "b", "b", "b"],
+            "score": [1.0, 2.0, float("nan"), 4.0, 5.0, 6.0],
+        }
+    )
+
+    result = mann_whitney(df, group_col="grp", value_col="score")
+
+    row = result.iloc[0]
+    assert row["n_a"] == 2
+    assert row["n_b"] == 3
+    assert not pd.isna(row["statistic"])
+    assert not pd.isna(row["p_value"])
+    assert 0.0 <= row["p_value"] <= 1.0
+
+
 def test_mann_whitney_registered_as_public_op() -> None:
     from emergentflow.api import PUBLIC_OPS
 
@@ -656,6 +681,24 @@ def test_ttest_effect_size_large_for_strongly_separated_groups() -> None:
     result = ttest(df, group_col="grp", value_col="score")
 
     assert result.effect_size > 1.0
+
+
+def test_ttest_nan_values_are_excluded_from_sample_sizes() -> None:
+    """NaN value rows must not inflate n_a/n_b or the reported means (regression)."""
+    df = pd.DataFrame(
+        {
+            "grp": ["a", "a", "a", "b", "b", "b"],
+            "score": [1.0, 2.0, float("nan"), 5.0, 6.0, 7.0],
+        }
+    )
+
+    result = ttest(df, group_col="grp", value_col="score")
+
+    # Group a has 3 rows but only 2 non-NaN values; group b has 3 non-NaN values.
+    assert result.n_a == 2
+    assert result.n_b == 3
+    assert result.mean_a == 1.5
+    assert result.mean_b == 6.0
 
 
 # ---------------------------------------------------------------------------
