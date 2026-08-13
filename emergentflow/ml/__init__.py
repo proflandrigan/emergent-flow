@@ -537,19 +537,28 @@ def optimize_threshold(
     pos_index = next(i for i, c in enumerate(classes) if str(c) == pos)
 
     prob_pos = model.estimator.predict_proba(X)[:, pos_index]
-    # ``precision_recall_curve`` returns precision/recall arrays that are one element longer
-    # than ``thresholds``: the trailing precision/recall is the "predict everything positive"
-    # operating point (decision threshold of 0). Zipping against ``thresh`` alone would drop it,
-    # so evaluate every operating point using threshold ``0`` for that final entry.
+    # ``precision_recall_curve`` returns precision/recall arrays that are one element longer than
+    # ``thresholds``. That trailing entry is the synthetic "predict nothing positive" operating
+    # point (precision=1, recall=0), which corresponds to an infinite threshold and carries no
+    # useful F1; it is NOT the "predict everything positive" point at decision threshold 0.
+    # Zipping against ``thresh`` alone would drop it, so replace that final operating point with
+    # the genuinely well-defined threshold-0 point (predict everything positive), whose precision
+    # is the positive-class prevalence and whose recall is 1.0.
     prec, rec, thresh = precision_recall_curve(y, prob_pos, pos_label=classes[pos_index])
 
+    n_thresh = len(thresh)
+    positive_fraction = float((y == classes[pos_index]).sum()) / len(y)
     rows = []
     best_t = 0.0
     best_f1 = 0.0
-    n_thresh = len(thresh)
     for i, (p, r) in enumerate(zip(prec, rec, strict=True)):
+        if i < n_thresh:
+            t = float(thresh[i])
+        else:
+            t = 0.0
+            p = positive_fraction
+            r = 1.0
         f1 = 2 * p * r / (p + r) if (p + r) > 0 else 0.0
-        t = float(thresh[i]) if i < n_thresh else 0.0
         rows.append((t, float(p), float(r), f1))
         if f1 > best_f1:
             best_f1 = f1

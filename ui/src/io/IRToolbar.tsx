@@ -100,7 +100,9 @@ export function IRToolbar(): JSX.Element {
     const filename = slugify(useGraphStore.getState().name || "graph");
     anchor.download = `${filename}.json`;
     anchor.click();
-    URL.revokeObjectURL(url);
+    // Revoke asynchronously: revoking synchronously right after click() can cancel the
+    // download before the browser picks up the blob (observed in Firefox).
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
     setFileMenuOpen(false);
   }
 
