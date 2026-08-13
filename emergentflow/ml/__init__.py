@@ -529,7 +529,7 @@ def optimize_threshold(
     classes = model.estimator.classes_
     if len(classes) != 2:
         raise ValueError("optimize_threshold requires a binary (2-class) classifier.")
-    pos = positive_class if positive_class is not None else str(classes[1])
+    pos = str(positive_class) if positive_class is not None else str(classes[1])
     if pos not in {str(c) for c in classes}:
         raise ValueError(
             f"unknown positive_class {pos!r}; expected one of {[str(c) for c in classes]!r}."

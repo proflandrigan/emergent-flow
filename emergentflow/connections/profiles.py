@@ -262,7 +262,7 @@ def load_profiles(path: str | os.PathLike[str] | None = None) -> ProfileStore:
             raise ProfileValidationError(
                 f"Top-level entry {name!r} in {file_path} must be a table (a profile)."
             )
-        payload = {"name": name, **body}
+        payload = {**body, "name": name}
         payload.setdefault("kind", "warehouse")
         try:
             profile = _PROFILE_ADAPTER.validate_python(payload)

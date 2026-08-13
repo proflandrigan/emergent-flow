@@ -154,6 +154,16 @@ def test_optimize_threshold_respects_positive_class():
     assert r.positive_class == "low"
 
 
+def test_optimize_threshold_accepts_numeric_positive_class():
+    """A numeric class label passed as positive_class (not its str form) must not be rejected."""
+    _df = _binary_df()
+    df = _df.copy()
+    df["label"] = [1 if v == "high" else 0 for v in _df["label"]]
+    base = fit_estimator(df, estimator="LogisticRegression", target="label")
+    r = optimize_threshold(base, df, target="label", positive_class=1)
+    assert r.positive_class == "1"
+
+
 def test_optimize_threshold_rejects_multi_class():
     df = _multi_class_df()
     base = fit_estimator(df, estimator="LogisticRegression", target="label")
