@@ -477,10 +477,18 @@ def evaluate(
 
     if "coverage" in requested:
         if test_users and test_interactions.n_items > 0:
+            # Recommended items come from the recommender's FULL catalog (the train side),
+            # which is typically a strict superset of ``test_interactions.item_ids`` after a
+            # train/test split. Without restricting the union to the test catalog, coverage
+            # (a fraction, by definition in [0, 1]) could exceed 1.0 whenever a recommended
+            # item does not appear in the test set -- intersections keep the fraction bounded.
+            test_item_set = set(test_interactions.item_ids)
             recommended_union: set[Any] = set()
             for items in recs_by_user.values():
                 recommended_union.update(items[:k])
-            aggregate["coverage"] = len(recommended_union) / test_interactions.n_items
+            aggregate["coverage"] = (
+                len(recommended_union & test_item_set) / test_interactions.n_items
+            )
         else:
             aggregate["coverage"] = 0.0
 
