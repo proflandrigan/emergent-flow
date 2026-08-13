@@ -835,13 +835,16 @@ def temporal_split(
     test_parts = []
     for _, group in df.groupby(user_col, sort=False):
         ordered = group.sort_values(timestamp_col, kind="stable")
-        # ``round()`` applies banker's rounding, so a user whose ``len * test_ratio`` lands
-        # exactly on a half boundary (e.g. 2 interactions at 0.25 -> 0.5) rounds DOWN to 0 and
-        # contributes nothing to the test set -- their newest interaction is silently never held
-        # out, biasing recall/precision estimates toward heavier users. Holding out at least the
-        # newest interaction for any user with data (``n_test >= 1``) preserves the documented
-        # "each user's recent interactions go to test" contract.
-        n_test = max(1, round(len(ordered) * test_ratio))
+        # ``round()`` applies banker's rounding, so ``n_test`` alone can empty a half. A user
+        # whose ``len * test_ratio`` lands on a half boundary (2 interactions at 0.25 -> 0.5)
+        # rounds DOWN to 0, silently abandoning their newest interaction to train; and at the
+        # other end ``round()`` can round UP to the whole group (2 at 0.75 -> 1.5 -> 2), draining
+        # the user's entire train slice. Holding out at least the newest interaction
+        # (``n_test >= 1``) and at most ``len - 1`` (``n_test <= len - 1``) keeps both halves
+        # non-empty for any user with >= 2 interactions, per the documented "recent goes to
+        # test" contract. A single-interaction user (no half to split) keeps their row in train.
+        n = len(ordered)
+        n_test = max(1, min(n - 1, round(n * test_ratio))) if n >= 2 else 0
         test_parts.append(ordered.iloc[-n_test:])
         train_parts.append(ordered.iloc[:-n_test])
 
@@ -892,7 +895,12 @@ def random_split(
 
     rng = np.random.default_rng(seed)
     shuffled_index = rng.permutation(len(df))
-    n_test = round(len(df) * test_ratio)
+    # Clamp ``n_test`` to ``[1, n_rows - 1]`` so both halves stay non-empty whenever there
+    # are at least two rows: banker's-rounding alone can empty one half entirely -- e.g.
+    # ``round(0.5) = 0`` on a 1-row frame empties test, while ``round(1.5) = 2`` on a 2-row
+    # frame at 0.75 empties train -- silently yielding a degenerate split you cannot fit on.
+    n_rows = len(df)
+    n_test = max(1, min(n_rows - 1, round(n_rows * test_ratio))) if n_rows >= 2 else 0
     test_positions = shuffled_index[:n_test]
     train_positions = shuffled_index[n_test:]
 

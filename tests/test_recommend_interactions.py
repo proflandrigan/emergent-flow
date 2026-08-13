@@ -284,6 +284,33 @@ def test_random_split_bad_test_ratio_raises(bad_ratio: float) -> None:
         )
 
 
+def test_random_split_never_empties_a_half_for_multiple_rows() -> None:
+    # Banker's rounding round(1.5) = 2 on a 2-row frame at 0.75 used to move every row to test,
+    # leaving an empty train the caller cannot fit on; round(0.5) = 0 on a tiny frame emptied
+    # test. Both halves must stay non-empty for any multi-row frame.
+    df = pd.DataFrame({"user": ["u1", "u1"], "item": ["a", "b"]})
+    for ratio in (0.25, 0.5, 0.75):
+        train, test = random_split(
+            df, user_col="user", item_col="item", test_ratio=ratio, seed=0
+        )
+        assert train.n_interactions > 0, f"ratio {ratio}: train half empty"
+        assert test.n_interactions > 0, f"ratio {ratio}: test half empty"
+
+
+def test_temporal_split_never_empties_a_half_for_a_multi_event_user() -> None:
+    # A user with 2 events at 0.75 gives round(1.5) = 2, which used to move the whole slice to
+    # test, draining their train half. Both halves must stay non-empty for a >=2-event user.
+    df = pd.DataFrame(
+        {"user": ["u1", "u1"], "item": ["a", "b"], "ts": [0, 1]}
+    )
+    for ratio in (0.25, 0.5, 0.75):
+        train, test = temporal_split(
+            df, user_col="user", item_col="item", timestamp_col="ts", test_ratio=ratio
+        )
+        assert train.n_interactions > 0, f"ratio {ratio}: train half empty"
+        assert test.n_interactions > 0, f"ratio {ratio}: test half empty"
+
+
 # ---------------------------------------------------------------------------
 # Part C — Type-token compatibility tests for Recommender / InteractionMatrix
 # ---------------------------------------------------------------------------

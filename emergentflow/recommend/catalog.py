@@ -1577,8 +1577,21 @@ def _fit_svd_cf(
     seed = int(params.get("seed", 0))
     matrix = interactions.matrix
 
+    # sklearn's TruncatedSVD requires ``n_components < min(n_samples, n_features)``; when the
+    # smaller interaction-matrix dimension is <= 1 there is no latent space to extract (a 1-item
+    # catalog, or a matrix with a single row/column), so the fit cannot be performed at all. The
+    # previous ``else 1`` fallback fed n_components=1 to TruncatedSVD, which raised a raw
+    # ``ValueError: ... a minimum of 2 is required by TruncatedSVD`` on any single-dimension
+    # matrix -- an untyped crash that skipped even the sibling nmf_cf handles. Surface it as the
+    # same typed InvalidRecommenderParamsError used across the family instead.
+    if min(matrix.shape) < 2:
+        raise InvalidRecommenderParamsError(
+            "algorithm 'svd_cf' requires at least 2 users and 2 items to factorize; "
+            f"got shape {matrix.shape}."
+        )
+
     max_components = min(matrix.shape) - 1
-    n_components = max(1, min(n_components, max_components)) if max_components > 0 else 1
+    n_components = max(1, min(n_components, max_components))
 
     svd = TruncatedSVD(n_components=n_components, random_state=seed)
     user_factors = svd.fit_transform(matrix)

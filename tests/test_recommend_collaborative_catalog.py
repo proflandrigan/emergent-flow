@@ -498,6 +498,24 @@ def test_svd_cf_n_components_clamped_on_tiny_matrix():
     assert result.fit_stats["n_components"] <= min(im.n_users, im.n_items) - 1
 
 
+def test_svd_cf_single_dimension_matrix_raises_typed_error():
+    """A matrix whose smaller dimension is 1 (e.g. a 1-item catalog) cannot be factorized
+    by TruncatedSVD; the fit must surface a typed InvalidRecommenderParamsError rather than
+    leaking sklearn's raw ValueError (n_components=1 is not < min(shape)=1)."""
+    import pytest
+
+    from emergentflow.recommend.errors import InvalidRecommenderParamsError
+
+    spec = _reg.get_recommender_spec("svd_cf")
+    # 2x1 (two users, single-item catalog) and 1x1 (single user + item) shapes: the smaller
+    # dimension is 1, so TruncatedSVD has no latent space to extract.
+    for rows in ({"user": ["u1", "u2"], "item": ["a", "a"]}, {"user": ["u1"], "item": ["a"]}):
+        df = pd.DataFrame(rows)
+        im = InteractionMatrix.from_dataframe(df, user_col="user", item_col="item")
+        with pytest.raises(InvalidRecommenderParamsError):
+            spec.fitter(im, None, {"n_components": 10, "seed": 0})
+
+
 def test_svd_cf_codegen_is_parseable():
     """Rendered codegen snippet for svd_cf must be syntactically valid Python."""
     fit_def = RecommendFit()
