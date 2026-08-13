@@ -362,10 +362,22 @@ class SessionStore:
                     f"against version {proposal.mutation.base_version}, but the "
                     f"session is now at version {session.version}."
                 )
+            previous_graph = session.graph
+            previous_version = session.version
             new_graph = apply_mutation(session.graph, proposal.mutation)
             session.graph = new_graph
             session.version += 1
             proposal.status = ProposalStatus.ACCEPTED
+            checkpoint = Checkpoint(
+                kind=CheckpointKind.EDIT,
+                author="human",
+                description=proposal.mutation.description,
+                base_version=previous_version,
+                mutation=proposal.mutation,
+                previous_graph=previous_graph,
+                resulting_version=session.version,
+            )
+            session.collab.checkpoints[checkpoint.id] = checkpoint
             self._publish(
                 session_id,
                 {
@@ -373,6 +385,7 @@ class SessionStore:
                     "session_id": session_id,
                     "proposal_id": proposal_id,
                     "version": session.version,
+                    "checkpoint_id": checkpoint.id,
                 },
             )
             return session

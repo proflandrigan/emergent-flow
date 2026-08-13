@@ -34,6 +34,12 @@ _SLOW_SCRIPT = "import time\ntime.sleep(30)\n"
 
 _ECHO_SCRIPT_TEMPLATE = "import json\nprint(json.dumps({{'type': 'text', 'text': {prompt!r}}}))\n"
 
+_CRASH_SCRIPT = (
+    "import json\n"
+    "print(json.dumps({'type': 'thread_id', 'text': 'thread-xyz'}))\n"
+    "print('__PARSE_BOMB__')\n"
+)
+
 
 class _FakeChatAdapter(AgentAdapter):
     """Base for test-only adapters: spawns `python -c <SCRIPT>` and parses simple
@@ -97,6 +103,20 @@ class _EchoChatAdapter(AgentAdapter):
         return AdapterEvent(kind=data["type"], text=data["text"])
 
 
+@register_adapter
+class _BombChatAdapter(_FakeChatAdapter):
+    """An adapter whose ``parse_line`` raises mid-stream (a plugin bug): the reader thread
+    must fail the turn rather than leave it stuck in RUNNING forever."""
+
+    name: ClassVar[str] = "fake-chat-bomb"
+    SCRIPT: ClassVar[str] = _CRASH_SCRIPT
+
+    def parse_line(self, raw_line: str) -> AdapterEvent | None:
+        if raw_line.strip() == "__PARSE_BOMB__":
+            raise RuntimeError("adapter.parse_line exploded")
+        return super().parse_line(raw_line)
+
+
 def _wait_for_status(
     store: SessionStore, session_id: str, turn_id: str, timeout: float = 5.0
 ) -> ChatTurnStatus:
@@ -150,6 +170,34 @@ class TestStartChatTurn:
         resolved = store.get(session.id).collab.chat.turns[0]
         assert resolved.error is not None
         assert "boom" in resolved.error
+
+    def test_mid_stream_parse_exception_fails_turn_not_leaves_it_running(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Regression test: a plug-in adapter whose parse_line raises mid-stream must resolve
+        the turn as FAILED, not strand it in RUNNING. Previously the exception escaped the
+        background thread (printing a traceback and dying), leaving the turn RUNNING forever --
+        which permanently blocks every later start_chat_turn via ChatAlreadyActiveError."""
+        store = SessionStore()
+        monkeypatch.setattr(chat_runner, "get_default_store", lambda: store)
+        session = store.create()
+
+        turn = chat_runner.start_chat_turn(
+            session.id, "fake-chat-bomb", "hello", base_url="http://127.0.0.1:8765"
+        )
+
+        status = _wait_for_status(store, session.id, turn.id)
+        assert status == ChatTurnStatus.FAILED
+        resolved = store.get(session.id).collab.chat.turns[0]
+        assert resolved.error is not None
+        assert "reader failed" in resolved.error
+
+        # A session whose turn failed must still accept a fresh turn (not be blocked).
+        second = chat_runner.start_chat_turn(
+            session.id, "fake-chat-bomb", "again", base_url="http://127.0.0.1:8765"
+        )
+        # starting the second turn did not raise ChatAlreadyActiveError (it is not stuck)
+        assert _wait_for_status(store, session.id, second.id) == ChatTurnStatus.FAILED
 
     def test_first_turn_prompt_includes_protocol_and_session_context(
         self, monkeypatch: pytest.MonkeyPatch

@@ -44,7 +44,11 @@ from typing import IO
 
 from emergentflow.collab.agents import AgentAdapter, get_adapter, list_available_adapter_names
 from emergentflow.collab.chat import ChatTurn, ChatTurnAlreadyResolvedError
-from emergentflow.collab.session import SessionStore, get_default_store
+from emergentflow.collab.session import (
+    SessionStore,
+    UnknownSessionError,
+    get_default_store,
+)
 
 
 def _resolve_agents_dir() -> pathlib.Path:
@@ -213,13 +217,29 @@ def _read_stream(
         if event is None:
             continue
         if event.kind == "thread_id":
-            store.set_chat_thread_id(session_id, event.text)
+            # A session deleted mid-turn must not crash the reader and strand the turn RUNNING.
+            with contextlib.suppress(UnknownSessionError):
+                store.set_chat_thread_id(session_id, event.text)
         elif event.kind == "tool_call":
             with contextlib.suppress(ChatTurnAlreadyResolvedError):
                 store.append_chat_narration(session_id, turn.id, event.text)
         elif event.kind == "text":
             text_chunks.append(event.text)
     return text_chunks
+
+
+def _settle_turn_registry(turn_id: str) -> None:
+    """Drop *turn_id*'s subprocess/stop registrations, if any (idempotent)."""
+    with _PROCESS_LOCK:
+        _RUNNING_PROCESSES.pop(turn_id, None)
+        _STOP_REQUESTED.pop(turn_id, None)
+
+
+def _fail_turn(store: SessionStore, session_id: str, turn: ChatTurn, *, error: str) -> None:
+    """Resolve *turn* as FAILED, tolerating a concurrently-resolved or deleted session."""
+    with contextlib.suppress(ChatTurnAlreadyResolvedError, UnknownSessionError):
+        store.fail_chat_turn(session_id, turn.id, error=error)
+    _settle_turn_registry(turn.id)
 
 
 def _run_turn(
@@ -231,8 +251,16 @@ def _run_turn(
     resume_id: str | None,
     stop_event: threading.Event,
 ) -> None:
-    adapter = get_adapter(backend)
-    argv = adapter.build_command(prompt=prompt, resume_id=resume_id)
+    try:
+        adapter = get_adapter(backend)
+    except Exception as exc:  # noqa: BLE001 - plugin code (getters) can raise anything
+        _fail_turn(store, session_id, turn, error=f"backend {backend!r} unavailable: {exc}")
+        return
+    try:
+        argv = adapter.build_command(prompt=prompt, resume_id=resume_id)
+    except Exception as exc:  # noqa: BLE001 - plugin code (build_command) can raise anything
+        _fail_turn(store, session_id, turn, error=f"building command for {backend!r} failed: {exc}")
+        return
     try:
         proc = subprocess.Popen(
             argv,
@@ -242,10 +270,7 @@ def _run_turn(
             bufsize=1,
         )
     except OSError as exc:
-        with _PROCESS_LOCK:
-            _STOP_REQUESTED.pop(turn.id, None)
-        with contextlib.suppress(ChatTurnAlreadyResolvedError):
-            store.fail_chat_turn(session_id, turn.id, error=f"failed to start {backend!r}: {exc}")
+        _fail_turn(store, session_id, turn, error=f"failed to start {backend!r}: {exc}")
         return
 
     with _PROCESS_LOCK:
@@ -261,10 +286,11 @@ def _run_turn(
         text_chunks = _read_stream(proc.stdout, adapter, session_id, turn, store)
         stderr_output = proc.stderr.read() if proc.stderr is not None else ""
         exit_code = proc.wait()
+    except Exception as exc:  # noqa: BLE001 - any read/parse failure must fail the turn, not strand it
+        _fail_turn(store, session_id, turn, error=f"chat turn reader failed: {exc}")
+        return
     finally:
-        with _PROCESS_LOCK:
-            _RUNNING_PROCESSES.pop(turn.id, None)
-            _STOP_REQUESTED.pop(turn.id, None)
+        _settle_turn_registry(turn.id)
 
     try:
         if exit_code != 0:
