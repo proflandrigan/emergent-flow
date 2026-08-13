@@ -281,7 +281,7 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
         <div
           style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0.5rem" }}
         >
-          {renderBody()}
+          {!expanded && renderBody()}
         </div>
       </aside>
       {expanded ? (
@@ -298,7 +298,7 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
               padding: "0.5rem",
             }}
           >
-            {renderBody()}
+            {expanded && renderBody()}
           </div>
         </OverlayModal>
       ) : null}

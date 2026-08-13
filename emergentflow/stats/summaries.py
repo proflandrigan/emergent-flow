@@ -189,13 +189,20 @@ def gam_coefficient_frame(
 
     ``results.params``/``.bse``/``.tvalues``/``.pvalues``/``.conf_int()`` are ordered
     ``[const, *linear_terms, <smooth-term basis coefficients...>]`` (statsmodels concatenates the
-    linear exog then the spline basis columns) -- the first ``1 + len(linear_terms)`` entries are
+    linear exog then the spline basis columns): the first ``1 + len(linear_terms)`` entries are
     the real, interpretable linear-term stats; everything after that is spline basis coefficients
     with no single interpretable point estimate per smooth term (see the GAM fitter's docstring
     for why this is deferred to Story 9's smooth-plot node, not fabricated here).
+
+    The linear row count is the first ``1 + len(linear_terms)`` params. ``_fit_gam`` always builds
+    the linear exog as ``[const, *linear_terms]`` (never relying on ``sm.add_constant``'s
+    ``has_constant="skip"``), and ``GLMGam``'s ``WLS.fit()`` (via ``pinv``) never drops collinear
+    columns, so every linear column keeps a parameter position and the ``"Intercept"``/term
+    labels map to the true coefficients at the same indices.
     """
     conf = results.conf_int()
-    names = ["Intercept", *linear_terms]
+    n_linear = min(1 + len(linear_terms), results.params.shape[0])
+    names = ["Intercept", *linear_terms][:n_linear]
     rows = []
     for i, term in enumerate(names):
         rows.append(

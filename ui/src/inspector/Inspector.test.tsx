@@ -123,6 +123,21 @@ test("Expand button is visible even without results", () => {
   expect(screen.getByTestId("inspector-expand-btn")).toBeInTheDocument();
 });
 
+// Regression test: the docked body used to render unconditionally while the expanded
+// OverlayModal rendered it again, mounting the active tab's component twice (duplicate
+// /compile, /compile-spec, /lineage, /inspect fetches and duplicated state/inputs). When
+// expanded, the docked body must unmount so the body renders in exactly one place.
+test("expanding the inspector mounts the active tab body only once", () => {
+  const id = useGraphStore.getState().addNodeFromSpec(fakeSpec, { x: 0, y: 0 });
+  useSelectionStore.getState().setNodeSelected(id, true);
+
+  render(<Inspector />);
+  fireEvent.click(screen.getByTestId("inspector-expand-btn"));
+
+  // The config form renders only in the modal, not also in the docked aside.
+  expect(screen.getAllByTestId("config-form")).toHaveLength(1);
+});
+
 test("Steps tab shows the empty state when no nodes exist", () => {
   render(<Inspector />);
   fireEvent.click(screen.getByTestId("inspector-tab-steps"));

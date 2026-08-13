@@ -188,8 +188,11 @@ def ttest(
             f"found {len(groups)}."
         )
     a_label, b_label = groups[0], groups[1]
-    a = df.loc[df[group_col].astype(str) == a_label, value_col]
-    b = df.loc[df[group_col].astype(str) == b_label, value_col]
+    # Drop NaN value rows so n_a/n_b, means, variances, and scipy's ttest all operate on the
+    # same consistent subset (scipy and pandas mean/var drop NaN, so counting them inflated
+    # the reported sample sizes and the pooled-variance weight).
+    a = df.loc[df[group_col].astype(str) == a_label, value_col].dropna()
+    b = df.loc[df[group_col].astype(str) == b_label, value_col].dropna()
     res = ttest_ind(a, b, equal_var=equal_var)
     n_a_count = int(a.shape[0])
     n_b_count = int(b.shape[0])

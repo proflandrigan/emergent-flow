@@ -658,6 +658,24 @@ def test_ttest_effect_size_large_for_strongly_separated_groups() -> None:
     assert result.effect_size > 1.0
 
 
+def test_ttest_nan_values_are_excluded_from_sample_sizes() -> None:
+    """NaN value rows must not inflate n_a/n_b or the reported means (regression)."""
+    df = pd.DataFrame(
+        {
+            "grp": ["a", "a", "a", "b", "b", "b"],
+            "score": [1.0, 2.0, float("nan"), 5.0, 6.0, 7.0],
+        }
+    )
+
+    result = ttest(df, group_col="grp", value_col="score")
+
+    # Group a has 3 rows but only 2 non-NaN values; group b has 3 non-NaN values.
+    assert result.n_a == 2
+    assert result.n_b == 3
+    assert result.mean_a == 1.5
+    assert result.mean_b == 6.0
+
+
 # ---------------------------------------------------------------------------
 # ANOVA CI tests
 # ---------------------------------------------------------------------------
