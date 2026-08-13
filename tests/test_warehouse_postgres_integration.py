@@ -95,7 +95,8 @@ class TestPostgresIntegration:
         )
         estimate = inst.dry_run(request, creds)
         assert estimate.dialect == "postgres"
-        assert estimate.estimated_rows >= 0
+        # dry_run reports no row estimate (EXPLAIN gives plan lines, not a row count).
+        assert estimate.estimated_rows is None
 
     def test_list_relations(self, adapter):
         inst, creds = adapter

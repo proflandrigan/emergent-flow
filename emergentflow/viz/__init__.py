@@ -204,6 +204,15 @@ def plot_acf(model: FittedStatsModel, *, kind: str = "acf", nlags: int = 20) -> 
         raise VizError(f"kind must be 'acf' or 'pacf', got {kind!r}.")
 
     resid = model_residuals(model)
+    if len(resid) < 2:
+        # statsmodels acf/pacf require more than one observation (nobs must exceed the
+        # requested lag count); a single residual cannot yield any autocorrelation lag. Raise
+        # the module's typed, catchable error instead of leaking statsmodels' raw IndexError
+        # or ValueError up to the caller.
+        raise VizError(
+            f"{kind.upper()} requires at least two residual observations to compute; "
+            f"the fitted model produced {len(resid)}."
+        )
     max_lags = max(1, len(resid) // 2 - 1)
     lags = min(nlags, max_lags)
     fn = _acf if kind == "acf" else _pacf

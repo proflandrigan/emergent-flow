@@ -50,7 +50,12 @@ def detect_schema_violations(
     missing: set[str] = (expected_columns | dtype_columns) - present_columns
     extra: set[str] = set()
     if not allow_extra_columns and expect_columns is not None:
-        extra = present_columns - expected_columns
+        # A column named in ``expect_dtypes`` is explicitly expected (the ``missing``
+        # computation above unions it in), so it must never also be flagged as "extra" when
+        # ``allow_extra_columns=False`` merely because it was listed in ``expect_dtypes``
+        # rather than ``expect_columns`` -- otherwise a dtype-required, correctly-typed
+        # column is simultaneously accepted and rejected.
+        extra = present_columns - (expected_columns | dtype_columns)
 
     mistyped: list[str] = []
     if expect_dtypes:

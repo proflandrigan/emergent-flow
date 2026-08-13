@@ -124,12 +124,14 @@ class PostgresAdapter:
         _require_driver()
         engine = self._engine(credentials)
         with engine.connect() as conn:
-            result = conn.execute(_sa.text(f"EXPLAIN {request.sql}"))
-            rows = result.fetchall()
-        estimated_rows = len(rows)
+            # Postgres EXPLAIN returns one row per execution-plan operator; its length is a
+            # count of plan nodes, not an estimate of the rows the query would scan or return.
+            # A real row estimate would require parsing the per-operator ``rows=N`` in the
+            # plan text, so report None (honest) rather than a misleading count.
+            conn.execute(_sa.text(f"EXPLAIN {request.sql}"))
         return CostEstimate(
             dialect="postgres",
-            estimated_rows=estimated_rows,
+            estimated_rows=None,
         )
 
     def list_relations(
