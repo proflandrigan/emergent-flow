@@ -534,6 +534,67 @@ def test_composite_compiles_and_runs():
     assert execute(outer_graph)["composite1"]["out0"] == compiled_value
 
 
+def test_composite_many_dangling_boundary_in_port_seeds_value() -> None:
+    """A composite whose subgraph leaves a MANY IN port dangling (a boundary port) must
+    thread the outer value through -- not hand the node an empty list.
+
+    Regression for an ADR-0002 divergence: `compile_to_code` rebound the MANY boundary
+    port to a positional arg and passed the outer value through, but the executor's MANY
+    branch only looked at intra-subgraph sources (none, since the port is dangling) and
+    so delivered `[]`, silently dropping the seeded value.
+    """
+    inner = Node(
+        id="inner_fan",
+        type=_ExecFanIn.type,
+        label=_ExecFanIn.label,
+        ports=[
+            Port(
+                id="inner_fan-in",
+                name="in_",
+                direction=Direction.IN,
+                data_type="int",
+                cardinality=Cardinality.MANY,
+            ),
+            Port(id="inner_fan-out", name="out", direction=Direction.OUT, data_type="int"),
+        ],
+    )
+    subgraph = _graph([inner])
+    # Mirror the MANY cardinality on the composite's exposed IN port so the boundary
+    # value flows through as a list on both paths (compile_to_code emits `[src_out]`).
+    composite = Node(
+        id="composite1",
+        type=COMPOSITE_NODE_TYPE,
+        label="Composite",
+        ports=[
+            Port(
+                id="composite1-in0",
+                name="in0",
+                direction=Direction.IN,
+                data_type="int",
+                cardinality=Cardinality.MANY,
+            ),
+            Port(id="composite1-out0", name="out0", direction=Direction.OUT, data_type="int"),
+        ],
+        subgraph=subgraph,
+    )
+
+    outer_src = _source_node()
+    edge = Edge(
+        source=PortRef(node_id=outer_src.id, port_id=_out_port(outer_src, "out").id),
+        target=PortRef(node_id=composite.id, port_id=_in_port(composite, "in0").id),
+    )
+    outer_graph = _graph([outer_src, composite], [edge])
+
+    executed = execute(outer_graph)
+    assert executed["composite1"]["out0"] == [1]  # src emits 1 -> MANY in0 -> [1]
+
+    code = compile_to_code(outer_graph)
+    namespace: dict[str, Any] = {}
+    exec(compile(code, "<generated>", "exec"), namespace)
+    compiled_value = next(iter(namespace["main"]().values()))
+    assert compiled_value == executed["composite1"]["out0"] == [1]
+
+
 def test_composite_codegen_no_subgraph_raises():
     composite = Node(
         id="composite1",

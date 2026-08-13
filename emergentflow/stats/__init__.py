@@ -338,8 +338,12 @@ def mann_whitney(
             f"unknown alternative {alternative!r}; expected 'two-sided', 'less', or 'greater'."
         )
     a_label, b_label = groups[0], groups[1]
-    a = df.loc[df[group_col].astype(str) == a_label, value_col]
-    b = df.loc[df[group_col].astype(str) == b_label, value_col]
+    # Drop NaN value rows so n_a/n_b and the rank-biserial denominator operate on the
+    # same consistent subset scipy uses internally (scipy strips NaN, so counting them
+    # inflated the reported sample sizes and the effect-size denominator). Mirrors the
+    # dropna already applied in `ttest` for the same case.
+    a = df.loc[df[group_col].astype(str) == a_label, value_col].dropna()
+    b = df.loc[df[group_col].astype(str) == b_label, value_col].dropna()
     n_a, n_b = int(a.shape[0]), int(b.shape[0])
     res = mannwhitneyu(a, b, alternative=alternative)
     u_stat = float(res.statistic)
