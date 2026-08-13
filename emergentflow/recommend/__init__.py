@@ -835,12 +835,15 @@ def temporal_split(
     test_parts = []
     for _, group in df.groupby(user_col, sort=False):
         ordered = group.sort_values(timestamp_col, kind="stable")
-        n_test = round(len(ordered) * test_ratio)
-        if n_test > 0:
-            test_parts.append(ordered.iloc[-n_test:])
-            train_parts.append(ordered.iloc[:-n_test])
-        else:
-            train_parts.append(ordered)
+        # ``round()`` applies banker's rounding, so a user whose ``len * test_ratio`` lands
+        # exactly on a half boundary (e.g. 2 interactions at 0.25 -> 0.5) rounds DOWN to 0 and
+        # contributes nothing to the test set -- their newest interaction is silently never held
+        # out, biasing recall/precision estimates toward heavier users. Holding out at least the
+        # newest interaction for any user with data (``n_test >= 1``) preserves the documented
+        # "each user's recent interactions go to test" contract.
+        n_test = max(1, round(len(ordered) * test_ratio))
+        test_parts.append(ordered.iloc[-n_test:])
+        train_parts.append(ordered.iloc[:-n_test])
 
     train_df = pd.concat(train_parts, ignore_index=True) if train_parts else df.iloc[0:0]
     test_df = pd.concat(test_parts, ignore_index=True) if test_parts else df.iloc[0:0]

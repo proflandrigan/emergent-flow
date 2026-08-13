@@ -63,6 +63,18 @@ class RecommendationResult:
 
     recommendations: pd.DataFrame
 
+    def __post_init__(self) -> None:
+        # Every recommend_fn builds its result with ``pd.DataFrame(rows)``; when the algorithm
+        # produces NO recommendations (e.g. ``exclude_known=True`` while every target user has
+        # already interacted with every item, or ``n=0``), that yields an ``(0, 0)`` frame with no
+        # columns. Downstream code (evaluate's ``result.recommendations["user_id"]``, the hybrid
+        # blend/split layers, the canvas payload contract) indexes these columns unconditionally,
+        # so a column-less empty frame raises ``KeyError``. Normalize the empty frame to the
+        # documented ``user_id``/``item_id``/``rank``/``score`` columns so an empty result is a
+        # well-formed table rather than a silent crash.
+        if self.recommendations.empty:
+            self.recommendations = pd.DataFrame(columns=["user_id", "item_id", "rank", "score"])
+
 
 @dataclass
 class EvalResult:
