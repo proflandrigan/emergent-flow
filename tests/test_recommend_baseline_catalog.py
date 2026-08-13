@@ -135,9 +135,7 @@ def test_empty_recommendation_result_has_canonical_columns():
     # EVERY known item yields zero recommendations. The result must still expose the
     # documented user_id/item_id/rank/score columns (an (0,0) column-less frame crashed
     # downstream consumers such as ef.recommend.evaluate with KeyError('user_id')).
-    df = pd.DataFrame(
-        {"user_id": [1, 2, 1, 2], "item_id": ["A", "A", "B", "B"], "value": 1}
-    )
+    df = pd.DataFrame({"user_id": [1, 2, 1, 2], "item_id": ["A", "A", "B", "B"], "value": 1})
     im = InteractionMatrix.from_dataframe(
         df, user_col="user_id", item_col="item_id", value_col="value"
     )
