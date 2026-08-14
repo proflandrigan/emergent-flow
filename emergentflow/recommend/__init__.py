@@ -898,9 +898,13 @@ def temporal_split(
         # non-empty for any user with >= 2 interactions, per the documented "recent goes to
         # test" contract. A single-interaction user (no half to split) keeps their row in train.
         n = len(ordered)
-        n_test = max(1, min(n - 1, round(n * test_ratio))) if n >= 2 else 0
-        test_parts.append(ordered.iloc[-n_test:])
-        train_parts.append(ordered.iloc[:-n_test])
+        if n >= 2:
+            n_test = max(1, min(n - 1, round(n * test_ratio)))
+            test_parts.append(ordered.iloc[-n_test:])
+            train_parts.append(ordered.iloc[:-n_test])
+        else:
+            # A single-interaction user (no half to split) keeps their row in train.
+            train_parts.append(ordered)
 
     train_df = pd.concat(train_parts, ignore_index=True) if train_parts else df.iloc[0:0]
     test_df = pd.concat(test_parts, ignore_index=True) if test_parts else df.iloc[0:0]

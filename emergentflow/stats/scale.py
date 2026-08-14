@@ -48,7 +48,7 @@ def enforce_dense_square_guard(n: int, max_footprint_bytes: int | None, what: st
         raise StatsScaleError(
             f"{what} on {n} columns would need ~{estimate / (1024**3):.1f} GiB (a dense "
             f"{n} x {n} pair matrix); this exceeds the configured cap "
-            f"({estimate / (1024**3):.1f} > {cap / (1024**3):.1f} GiB). Refusing to protect the "
-            f"shared server from OOM. Pass max_footprint_bytes higher (or very large) to allow "
-            f"it, or restrict `columns`/reduce the column count."
+            f"({estimate / (1024**3):.1f} > {cap / (1024**3):.1f} GiB). Refusing the operation "
+            f"to protect the shared server from OOM. Pass max_footprint_bytes higher (or very "
+            f"large) to allow it, or restrict `columns`/reduce the column count."
         )

@@ -141,6 +141,9 @@ def co_missingness(
         unknown = [c for c in columns if c not in df.columns]
         if unknown:
             raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
+        # `columns` may contain duplicates; dedupe (preserving first-seen order) so the mask
+        # doesn't end up with duplicate labels (matches `correlation`'s behavior).
+        columns = list(dict.fromkeys(columns))
         target = df[columns]
     else:
         target = df

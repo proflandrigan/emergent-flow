@@ -237,8 +237,9 @@ def evaluate(model: FittedModel, df: pd.DataFrame) -> EvaluationResult:
             metrics["f1"] = float(f1_score(y_true, y_pred, zero_division=0, pos_label=pos_label))
             if hasattr(model.estimator, "predict_proba"):
                 proba = model.estimator.predict_proba(df[model.feature_names])
-                with contextlib.suppress(ValueError):
-                    metrics["roc_auc"] = float(roc_auc_score(y_true, proba[:, 1]))
+                if y_true.nunique() >= 2:
+                    with contextlib.suppress(ValueError):
+                        metrics["roc_auc"] = float(roc_auc_score(y_true, proba[:, 1]))
         # else: fewer than 2 classes in `classes_` (a degenerate single-class fit) --
         # precision/recall/f1/roc_auc are undefined, so only `accuracy` is reported.
     return EvaluationResult(task=model.task, n=int(df.shape[0]), metrics=metrics)

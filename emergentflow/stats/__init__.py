@@ -947,7 +947,13 @@ def correlation(
         unknown = [c for c in columns if c not in df.columns]
         if unknown:
             raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
-        target = df[columns]
+        target = df[columns].select_dtypes(include="number")
+        dropped = [c for c in columns if c not in target.columns]
+        if dropped:
+            raise ValueError(
+                f"columns {dropped!r} are not numeric and cannot be correlated; "
+                f"pass only numeric columns."
+            )
     else:
         target = df.select_dtypes(include="number")
     enforce_dense_square_guard(target.shape[1], max_footprint_bytes, "correlation")

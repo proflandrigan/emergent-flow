@@ -32,7 +32,12 @@ from emergentflow.ir.common import Direction
 from emergentflow.ir.edge import Edge, PortRef
 from emergentflow.ir.graph import Graph
 from emergentflow.nodes.examples import LoadSample, PrepareInteractions
-from emergentflow.recommend import prepare_interactions, random_split, temporal_split
+from emergentflow.recommend import (
+    InteractionMatrix,
+    prepare_interactions,
+    random_split,
+    temporal_split,
+)
 from emergentflow.recommend.errors import InvalidRecommenderParamsError
 from emergentflow.types import registry
 from emergentflow.types.compatibility import Compatibility, is_compatible
@@ -307,9 +312,41 @@ def test_temporal_split_never_empties_a_half_for_a_multi_event_user() -> None:
         assert test.n_interactions > 0, f"ratio {ratio}: test half empty"
 
 
+def test_temporal_split_single_interaction_user_keeps_row_in_train() -> None:
+    # A single-interaction user (no half to split) must keep their row in train, not
+    # test -- previously the split routed every such user to test, emptying train.
+    df = pd.DataFrame(
+        {
+            "user": ["u1", "u2", "u3"],
+            "item": ["x", "y", "z"],
+            "rating": [5.0, 4.0, 3.0],
+            "ts": [1, 2, 3],
+        }
+    )
+    train, test = temporal_split(
+        df,
+        user_col="user",
+        item_col="item",
+        value_col="rating",
+        timestamp_col="ts",
+        test_ratio=0.5,
+    )
+    # Every single-interaction user's row is kept in train; test is empty.
+    assert train.n_interactions == 3
+    assert test.n_interactions == 0
+    assert set(train.user_ids) == {"u1", "u2", "u3"}
+    assert test.user_ids == []
+
+
 # ---------------------------------------------------------------------------
 # Part C — Type-token compatibility tests for Recommender / InteractionMatrix
 # ---------------------------------------------------------------------------
+
+
+def test_from_dataframe_mixed_type_ids_raises_typed_error() -> None:
+    df = pd.DataFrame({"user": [1, "u2", 3], "item": ["i1", "i2", "i3"], "rating": [1.0, 2.0, 3.0]})
+    with pytest.raises(InvalidRecommenderParamsError):
+        InteractionMatrix.from_dataframe(df, user_col="user", item_col="item", value_col="rating")
 
 
 def test_recommender_and_interaction_matrix_tokens_registered() -> None:

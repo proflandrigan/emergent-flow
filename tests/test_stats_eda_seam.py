@@ -142,6 +142,13 @@ def test_co_missingness_unknown_column_raises():
         co_missingness(df, columns=["nope"])
 
 
+def test_co_missingness_duplicate_columns_dedupe():
+    df = _make_df()
+    result = co_missingness(df, columns=["a", "a"])
+    assert result.columns.tolist() == ["column", "a"]
+    assert result.equals(co_missingness(df, columns=["a"]))
+
+
 def test_co_missingness_scale_guard_raises():
     df = _make_df()
     with pytest.raises(StatsScaleError):

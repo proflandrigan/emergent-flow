@@ -141,6 +141,18 @@ def test_delete_unknown_name_is_422(tmp_path, monkeypatch) -> None:
     assert "No connection profile" in resp.json()["error"]
 
 
+def test_test_route_rejects_llm_profile_with_clear_message(tmp_path, monkeypatch) -> None:
+    client = _test_client(tmp_path / "connections.toml", monkeypatch)
+    client.post(
+        "/connections",
+        json={"name": "my_llm", "kind": "llm", "provider": "openai", "api_key_env": "OPENAI_API_KEY"},
+    )
+    resp = client.post("/connections/my_llm/test")
+    assert resp.status_code == 422
+    assert "not a warehouse profile" in resp.json()["error"]
+
+
+
 def test_persistence_on_disk(tmp_path, monkeypatch) -> None:
     toml_path = tmp_path / "connections.toml"
     client = _test_client(toml_path, monkeypatch)

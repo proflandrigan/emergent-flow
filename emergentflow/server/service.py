@@ -1400,10 +1400,19 @@ def list_connections() -> dict[str, Any]:
 
 def test_connection_route(name: str) -> dict[str, Any]:
     """Probe one named connection profile (POST /connections/{name}/test)."""
-    from emergentflow.data.warehouse.profiles import load_profiles, test_connection
+    from emergentflow.connections.profiles import (
+        WarehouseConnectionProfile,
+        load_profiles,
+    )
+    from emergentflow.data.warehouse.profiles import test_connection
 
     store = load_profiles()
-    profile = store.get(name)  # raises UnknownConnectionError -> 422 if absent
+    profile = store.get(name)  # raises the typed connection error if absent
+    # Only warehouse profiles can be probed; reject LLM profiles with a clear message.
+    if not isinstance(profile, WarehouseConnectionProfile):
+        raise ValueError(
+            f"connection profile {name!r} is not a warehouse profile and cannot be tested"
+        )
     client = _get_warehouse_client()
     result = test_connection(profile, client=client)
     return result.model_dump(mode="json")
