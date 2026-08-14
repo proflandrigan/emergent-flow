@@ -22,6 +22,64 @@ MAX_TABLE_HEAD_ROWS = 5  # Rows to keep in table digests
 MAX_JSON_CHARS = 1024  # JSON payloads larger than this get truncated
 
 
+def _truncate_json(value: Any, target_bytes: int) -> Any:
+    """Return a *bounded* version of a JSON-native *value* that serializes to at most
+    *target_bytes*.
+
+    Truncation recurses into dicts/lists and shortens leaf strings, keeping *value* a valid
+    JSON-object type (never an invalid-JSON byte prefix -- the prior defect). A measurement
+    loop tightens the per-node budget until the whole result is verified to fit, so the byte
+    cap is guaranteed even for deeply nested or many-element payloads. Scalars are returned
+    verbatim (they are already small). ``target_bytes`` must be positive.
+
+    Used by ``digest_payload`` to honor ``MAX_JSON_CHARS``: without this, an oversized JSON
+    value was flagged ``truncated: True`` yet carried through in full, defeating the per-kind
+    boundary and forcing ``digest_results``'s later hard cap to drop the whole node.
+    """
+
+    def _serialized_len(obj: Any) -> int:
+        return len(json.dumps(obj, separators=(",", ":")))
+
+    def _shrink(obj: Any, budget: int) -> Any:
+        if budget <= 4:
+            return None
+        if isinstance(obj, str):
+            keep = min(len(obj), budget - 2)
+            return obj[:keep]
+        if isinstance(obj, dict):
+            out: dict[str, Any] = {}
+            for key, child in obj.items():
+                key_overhead = _serialized_len(key) + 1  # +1 for the following colon
+                if budget - key_overhead <= 4:
+                    break
+                out[key] = _shrink(child, budget - key_overhead)
+                budget -= key_overhead
+                if _serialized_len(out) >= budget:
+                    break
+            return out
+        if isinstance(obj, list):
+            out_list: list[Any] = []
+            for child in obj:
+                child_budget = max(0, budget - 8)  # element terminator/overhead allowance
+                if child_budget <= 4:
+                    break
+                out_list.append(_shrink(child, child_budget))
+                budget -= 8
+            return out_list
+        return obj
+
+    if _serialized_len(value) <= target_bytes:
+        return value
+    budget = target_bytes
+    while True:
+        candidate = _shrink(value, budget)
+        if _serialized_len(candidate) <= target_bytes:
+            return candidate
+        budget = int(budget * 0.5)
+        if budget < 8:
+            return None
+
+
 def digest_payload(payload: dict[str, Any]) -> dict[str, Any]:
     """Reduce a single payload to a bounded digest for agent consumption.
 
@@ -66,7 +124,7 @@ def digest_payload(payload: dict[str, Any]) -> dict[str, Any]:
             return payload
         return {
             "kind": "json",
-            "value": value,
+            "value": _truncate_json(value, MAX_JSON_CHARS),
             "truncated": True,
             "original_bytes": len(serialized),
         }

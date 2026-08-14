@@ -10,7 +10,12 @@ Covers the two defects found in the 2026-08-14 follow-up bug hunt:
 
 import json
 
-from emergentflow.collab.digest import MAX_DIGEST_BYTES, digest_payload, digest_results
+from emergentflow.collab.digest import (
+    MAX_DIGEST_BYTES,
+    MAX_JSON_CHARS,
+    digest_payload,
+    digest_results,
+)
 
 
 def test_json_truncation_keeps_value_as_json_object() -> None:
@@ -19,6 +24,19 @@ def test_json_truncation_keeps_value_as_json_object() -> None:
     assert isinstance(digested["value"], dict)
     assert digested.get("truncated") is True
     assert digested["original_bytes"] == len(json.dumps(payload["value"], separators=(",", ":")))
+    # The value must actually be bounded, not carried through in full behind a
+    # truncated flag (digest_payload's JSON contract: payloads over MAX_JSON_CHARS
+    # get truncated).
+    assert len(json.dumps(digested["value"], separators=(",", ":"))) <= MAX_JSON_CHARS
+
+
+def test_json_truncation_bounds_value_not_just_flags_it() -> None:
+    huge = {"deep": {"nested": "x" * (MAX_JSON_CHARS * 10)}}
+    digested = digest_payload({"kind": "json", "value": huge})
+    assert digested.get("truncated") is True
+    assert isinstance(digested["value"], dict)
+    # Bound must hold for the whole retained value, not just the outer dict.
+    assert len(json.dumps(digested["value"], separators=(",", ":"))) <= MAX_JSON_CHARS
 
 
 def test_small_json_passthrough() -> None:
