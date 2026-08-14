@@ -70,6 +70,7 @@ class TestSessionLifecycle:
         assert body["version"] == 0
         assert body["graph"]["nodes"] == {}
         assert body["proposals"] == {}
+        assert body["open_in_ui"] == f"http://127.0.0.1:8765/?session={body['id']}"
 
     def test_create_session_with_seed_graph(self, client: TestClient) -> None:
         r = client.post("/sessions", json={"graph": _seed_graph()})

@@ -52,7 +52,7 @@ def create_mcp_server() -> Any:
     from emergentflow.collab.review import ReviewThread
     from emergentflow.collab.session import OpenGatesError, UnknownProposalError
     from emergentflow.collab.session import get_default_store as get_default_session_store
-    from emergentflow.ir.common import new_id
+    from emergentflow.ir.common import Direction, new_id
     from emergentflow.ir.edge import Edge, PortRef
     from emergentflow.ir.mutation import GraphMutation
     from emergentflow.ir.node import Position
@@ -80,6 +80,25 @@ def create_mcp_server() -> Any:
         """List every active session (same as GET /sessions)."""
         sessions = get_default_session_store().list()
         return {"sessions": [s.model_dump(mode="json") for s in sessions]}
+
+    @mcp.tool()
+    def create_session(graph: dict | None = None) -> dict:
+        """Create a collaboration session, optionally seeded with an IR *graph* dict.
+
+        Returns the session document plus ``open_in_ui``: a ready-to-open browser URL of the
+        form ``http://127.0.0.1:8765/?session=<id>`` that a human can click to view this
+        session on the canvas. Use this rather than a raw ``POST /sessions`` when building a
+        new flow through MCP.
+        """
+        import json
+
+        from emergentflow.ir import deserialize_graph
+
+        graph_obj = deserialize_graph(json.dumps(graph)) if graph is not None else None
+        session = get_default_session_store().create(graph_obj)
+        doc = session.model_dump(mode="json")
+        doc["open_in_ui"] = f"http://127.0.0.1:8765/?session={session.id}"
+        return doc
 
     @mcp.tool()
     def get_catalog_tool() -> dict:
@@ -411,8 +430,12 @@ def create_mcp_server() -> Any:
         if the proposal already has a verdict (e.g. it was resolved before this tool was
         called) or when a matching event arrives, else ``{"status": "timeout", ...}``
         once the deadline is exceeded. Raises ``UnknownProposalError`` immediately for an
-        unknown *proposal_id* rather than blocking for the full timeout.
+        unknown *proposal_id* rather than blocking for the full timeout. The wait is
+        capped at 600 seconds, and a negative *timeout_seconds* raises ``ValueError``.
         """
+        if timeout_seconds < 0:
+            raise ValueError("timeout_seconds must be non-negative")
+        timeout_seconds = min(timeout_seconds, 600.0)
         store = get_default_session_store()
         q = store.subscribe(session_id)
         start = time.monotonic()
@@ -462,8 +485,18 @@ def create_mcp_server() -> Any:
     # re-raised as ValueError.
     # ------------------------------------------------------------------
 
-    def _find_port(node, port_name: str):
-        """Return the port on *node* named *port_name*, else raise ValueError."""
+    def _find_port(node, port_name: str, direction: Direction | None = None):
+        """Return the port on *node* named *port_name*, preferring *direction* if given.
+
+        Some node types expose an in-port and an out-port with the same name (e.g.
+        ``clean.explode_lists`` has an in ``frame`` and an out ``frame``), so a bare name
+        match is ambiguous. When *direction* is supplied, prefer a port whose name AND
+        direction match; fall back to a same-name port of any direction only if needed.
+        """
+        if direction is not None:
+            for port in node.ports:
+                if port.name == port_name and port.direction == direction:
+                    return port
         for port in node.ports:
             if port.name == port_name:
                 return port
@@ -553,8 +586,8 @@ def create_mcp_server() -> Any:
         graph = session.graph
         source_node = graph.nodes[source_node_id]
         target_node = graph.nodes[target_node_id]
-        source_port = _find_port(source_node, source_port_name)
-        target_port = _find_port(target_node, target_port_name)
+        source_port = _find_port(source_node, source_port_name, Direction.OUT)
+        target_port = _find_port(target_node, target_port_name, Direction.IN)
         edge = Edge(
             id=new_id(),
             source=PortRef(node_id=source_node_id, port_id=source_port.id),

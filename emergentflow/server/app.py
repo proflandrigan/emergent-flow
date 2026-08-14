@@ -649,7 +649,9 @@ def create_app() -> FastAPI:
                 _graph_from_session_payload(graph_payload) if graph_payload is not None else None
             )
             session = get_default_session_store().create(graph)
-            return session.model_dump(mode="json")
+            doc = session.model_dump(mode="json")
+            doc["open_in_ui"] = f"http://127.0.0.1:8765/?session={session.id}"
+            return doc
 
         return await _session_json(_create)
 
@@ -1372,6 +1374,7 @@ def serve(
     resolved_runs_keep = runs_keep if runs_keep is not None else DEFAULT_RUNS_KEEP
     configure_runs(runs_root, keep=resolved_runs_keep)
 
+    token_hint = ""
     if host == "127.0.0.1":
         configure_session_auth(required=False)
     else:
@@ -1383,6 +1386,10 @@ def serve(
                 "EMERGENTFLOW_SESSION_TOKEN environment variable."
             )
         configure_session_auth(required=True, token=resolved_token)
+        token_hint = (
+            f"\nSession bearer token: {resolved_token}"
+            "  (pass it to the agent as its Authorization: Bearer <token> header)"
+        )
 
     from emergentflow.collab.persona_defs import register_builtin_personas
 
@@ -1390,7 +1397,7 @@ def serve(
 
     browse_host = "127.0.0.1" if host == "0.0.0.0" else host  # noqa: S104
     url = f"http://{browse_host}:{port}"
-    print(f"Emergent Flow - serving the local canvas at {url}  (Ctrl-C to stop)")
+    print(f"Emergent Flow - serving the local canvas at {url}  (Ctrl-C to stop){token_hint}")
     if open_browser:
         threading.Thread(
             target=_open_browser_when_ready, args=(browse_host, port, url), daemon=True

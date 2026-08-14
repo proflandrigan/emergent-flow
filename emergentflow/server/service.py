@@ -836,7 +836,8 @@ def _save_run_record(
     node_elapsed: dict[str, int] | None = None,
     started_at: float | None = None,
     params: dict[str, Any] | None = None,
-) -> None:
+) -> str | None:
+    """Returns the generated ``run_id``, or ``None`` if saving failed."""
     graph_hash = hashlib.sha256(json.dumps(graph_payload, sort_keys=True).encode()).hexdigest()
     finished_at = time.time()
     run_data = {
@@ -908,8 +909,10 @@ def _save_run_record(
             if payload.get("kind") in _PERSISTED_KINDS:
                 payloads_data[node_id][port_name] = payload
 
-    with contextlib.suppress(Exception):
-        get_default_runs().save(run_data, graph_payload, payloads_data)
+    try:
+        return get_default_runs().save(run_data, graph_payload, payloads_data)
+    except Exception:
+        return None
 
 
 def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
@@ -932,11 +935,16 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     ``run_from`` (issue #105) runs the targets and everything downstream, reusing
     the previous run's stored outputs for the targets' own IN ports. ``run_only``
     runs exactly the listed nodes, likewise reusing stored outputs where available.
+
+    ``run_id`` is included in the response when a full (non-partial) run was
+    persisted; it is ``null`` for partial scopes (``run_to``/``run_from``/``run_only``)
+    or if saving failed.
     """
     graph_payload, scope, params = _split_request(payload)
     graph = _to_graph(graph_payload)
     validate_api_keys_present(graph)
     started_at = time.time()
+    run_id: str | None = None
     if graph.paradigm is Paradigm.FUNCTIONAL:
         # Resolve graph-level parameter overrides into the graph the walk reads
         # (ref'd node params baked to their resolved values) so the server-side
@@ -948,7 +956,7 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
             graph, only=only, wiring_map=wiring_map
         )
         if not scope:
-            _save_run_record(
+            run_id = _save_run_record(
                 graph,
                 graph_payload,
                 results,
@@ -961,6 +969,7 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
             "payload_version": PAYLOAD_CONTRACT_VERSION,
             "results": _results_to_payloads(results),
             "statuses": statuses,
+            "run_id": run_id,
         }
     if scope:
         raise CodegenError("partial-run scopes are only supported for FUNCTIONAL graphs")
@@ -970,13 +979,19 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
     results = execute(graph, params=params)
     statuses = {node_id: {"status": _STATUS_OK} for node_id in results}
     if not scope:
-        _save_run_record(
-            graph, graph_payload, results, statuses, started_at=started_at, params=params
+        run_id = _save_run_record(
+            graph,
+            graph_payload,
+            results,
+            statuses,
+            started_at=started_at,
+            params=params,
         )
     return {
         "payload_version": PAYLOAD_CONTRACT_VERSION,
         "results": _results_to_payloads(results),
         "statuses": statuses,
+        "run_id": run_id,
     }
 
 
@@ -1050,7 +1065,13 @@ def execute_session(session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         return budget_result
 
     scope = {k: payload[k] for k in _SCOPE_KEYS if payload.get(k) is not None}
-    return execute_graph({"graph": graph_dict, **scope})
+    result = execute_graph({"graph": graph_dict, **scope})
+    run_id = result.get("run_id")
+    if run_id:
+        with contextlib.suppress(Exception):
+            # the run is persisted; a failed publish must not fail the execute
+            store.record_run(session_id, run_id)
+    return result
 
 
 def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], None, None]:

@@ -17346,6 +17346,14 @@
           "name": "min_common_users",
           "required": false,
           "type": "int"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Pre-flight cap (bytes) on the estimated dense n x n KNN footprint; fits above it raise RecommendationScaleError. Set very large to disable.",
+          "name": "max_footprint_bytes",
+          "required": false,
+          "type": "int"
         }
       ],
       "requires_extra": null
@@ -17846,6 +17854,14 @@
           "default": 1,
           "help": "Minimum shared interacted items required for a neighbor to count.",
           "name": "min_common_items",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Pre-flight cap (bytes) on the estimated dense n x n KNN footprint; fits above it raise RecommendationScaleError. Set very large to disable.",
+          "name": "max_footprint_bytes",
           "required": false,
           "type": "int"
         }

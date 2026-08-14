@@ -142,6 +142,27 @@ class TestTools:
         assert "id" in result["sessions"][0]
         assert "graph" in result["sessions"][0]
 
+    def test_create_session_bare(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        mcp = create_mcp_server()
+        result = _run_async(_call_tool(mcp, "create_session", {}))
+        assert isinstance(result["id"], str) and result["id"]
+        assert result["open_in_ui"] == f"http://127.0.0.1:8765/?session={result['id']}"
+        assert session_mod.get_default_store().get(result["id"]) is not None
+
+    def test_create_session_seeded_with_graph(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        trivial: dict[str, Any] = {"nodes": {}, "edges": {}}
+
+        mcp = create_mcp_server()
+        result = _run_async(_call_tool(mcp, "create_session", {"graph": trivial}))
+        assert isinstance(result["id"], str) and result["id"]
+        session = session_mod.get_default_store().get(result["id"])
+        assert session is not None
+        assert session.graph.model_dump()["nodes"] == {}
+
     def test_get_graph(self) -> None:
         from emergentflow.collab.mcp import create_mcp_server
 
@@ -224,6 +245,37 @@ class TestTools:
         assert isinstance(result, dict)
         assert "results" in result
         assert "statuses" in result
+        assert result.get("run_id")
+
+        # A full (non-partial) run is persisted, so the agent can read its results
+        # back by run_id -- confirming the run_id is real, not a placeholder.
+        readback = _run_async(_call_tool(mcp, "get_results", {"run_id": result["run_id"]}))
+        assert readback["run_id"] == result["run_id"]
+        assert "results" in readback
+        assert "error" not in readback
+
+    def test_execute_session_tool_publishes_run_completed(self) -> None:
+        """Executing a session run publishes a ``run_completed`` SSE event with the run_id."""
+        from emergentflow.collab.mcp import create_mcp_server
+
+        store = session_mod.get_default_store()
+        session = store.create()
+        q = store.subscribe(session.id)
+
+        mcp = create_mcp_server()
+        result = _run_async(_call_tool(mcp, "execute_session_tool", {"session_id": session.id}))
+        assert isinstance(result, dict)
+        assert result.get("run_id")
+
+        # Drain the subscriber queue until a run_completed event for this run arrives.
+        matches = None
+        for _ in range(5):
+            event = q.get(timeout=1.0)
+            if event.get("type") == "run_completed":
+                matches = event
+                break
+        assert matches is not None
+        assert matches["run_id"] == result["run_id"]
 
     def test_execute_session_tool_blocked_by_gates(self) -> None:
         """execute_session_tool returns {"blocked_by_gates": [...]} when gates are OPEN."""
@@ -362,6 +414,50 @@ class TestTools:
                 mcp,
                 "await_verdict",
                 {"session_id": session.id, "proposal_id": proposal.id, "timeout_seconds": 0.2},
+            )
+        )
+        assert isinstance(result, dict)
+        assert result["status"] == "timeout"
+        assert result["proposal_id"] == proposal.id
+
+    def test_await_verdict_rejects_negative_timeout(self) -> None:
+        """A negative timeout_seconds must be rejected up front (surfaced as ToolError)."""
+        from fastmcp.exceptions import ToolError
+
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mutation = GraphMutation(base_version=0)
+        proposal = session_mod.get_default_store().add_proposal(session.id, mutation)
+
+        mcp = create_mcp_server()
+        with pytest.raises(ToolError):
+            _run_async(
+                _call_tool(
+                    mcp,
+                    "await_verdict",
+                    {
+                        "session_id": session.id,
+                        "proposal_id": proposal.id,
+                        "timeout_seconds": -1,
+                    },
+                )
+            )
+
+    def test_await_verdict_times_out_immediately_on_zero_deadline(self) -> None:
+        """A timeout_seconds of 0.0 on an unresolved proposal times out immediately."""
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mutation = GraphMutation(base_version=0)
+        proposal = session_mod.get_default_store().add_proposal(session.id, mutation)
+
+        mcp = create_mcp_server()
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "await_verdict",
+                {"session_id": session.id, "proposal_id": proposal.id, "timeout_seconds": 0.0},
             )
         )
         assert isinstance(result, dict)
@@ -567,6 +663,50 @@ class TestEditingTools:
         assert result["edge_id"] in stored.graph.edges
         edge = stored.graph.edges[result["edge_id"]]
         assert edge.source.node_id == source["node_id"]
+        assert edge.target.node_id == target["node_id"]
+
+    def test_connect_ports_prefers_out_for_source_same_named_ports(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+        from emergentflow.ir.common import Direction
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        source = self._add_node(mcp, session.id, "clean.explode_lists", {"columns": ["items"]})
+        target = self._add_node(
+            mcp,
+            session.id,
+            "script.custom_code",
+            {"code": "def transform(value):\n    return value"},
+        )
+
+        stored = session_mod.get_default_store().get(session.id)
+        source_node = stored.graph.nodes[source["node_id"]]
+        frame_out_port = next(
+            p for p in source_node.ports if p.name == "frame" and p.direction == Direction.OUT
+        )
+
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "connect_ports",
+                {
+                    "session_id": session.id,
+                    "source_node_id": source["node_id"],
+                    "source_port_name": "frame",
+                    "target_node_id": target["node_id"],
+                    "target_port_name": "value",
+                },
+            )
+        )
+        assert result["session_id"] == session.id
+        assert "checkpoint_id" in result
+        assert "edge_id" in result
+
+        stored = session_mod.get_default_store().get(session.id)
+        edge = stored.graph.edges[result["edge_id"]]
+        assert edge.source.node_id == source["node_id"]
+        assert edge.source.port_id == frame_out_port.id
         assert edge.target.node_id == target["node_id"]
 
     def test_set_param(self) -> None:

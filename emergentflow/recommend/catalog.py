@@ -27,7 +27,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.neighbors import NearestNeighbors
 
-from emergentflow.recommend.errors import InvalidRecommenderParamsError
+from emergentflow.recommend.errors import (
+    InvalidRecommenderParamsError,
+    RecommendationScaleError,
+)
 from emergentflow.recommend.interactions import InteractionMatrix
 from emergentflow.recommend.models import (
     FittedRecommender,
@@ -1172,70 +1175,93 @@ register_recommender(
 # Shared helpers for memory-based collaborative filtering (Story 7)
 # ===================================================================
 
+_DEFAULT_MAX_KNN_FOOTPRINT_BYTES = 2 * 1024**3  # 2 GiB
+"""Default cap on the estimated dense n x n footprint of a KNN fit, in bytes."""
 
-def _similarity_matrix(matrix, similarity: str) -> np.ndarray:
-    """Dense n x n similarity matrix between the rows of a sparse (n, m) matrix.
 
-    cosine: sklearn cosine_similarity (sparse-aware).
-    pearson: adjusted/mean-centered cosine similarity -- each row's nonzero
-        entries are centered on that row's own mean (computed only over its
-        observed/nonzero entries) before cosine similarity is applied; this is
-        the standard sparse approximation to Pearson correlation for rating
-        matrices.
-    jaccard: intersection-over-union of each row's nonzero column-index sets.
+def _estimate_footprint_bytes(matrix) -> int:
+    """Conservative estimate (bytes) of the dense n x n similarity array a full KNN fit
+    would need, where n = number of rows (users for user_knn_cf, items for item_knn_cf)."""
+    n = matrix.shape[0]
+    return int(n) * int(n) * 8  # float64
+
+
+def _enforce_knn_footprint(matrix, params: dict[str, Any]) -> None:
+    """Raise RecommendationScaleError if the KNN fit's dense n x n footprint estimate exceeds
+    the cap in *params* (``max_footprint_bytes``) or the module default.
+
+    The block-wise implementation never actually allocates the dense n x n, but refusing fits
+    above the cap prevents an *expected* OOM on this hardware and keeps the in-process server
+    alive for the other sessions. ``max_footprint_bytes`` caps the estimate; set it very large
+    to disable.
     """
-    if similarity == "cosine":
-        return cosine_similarity(matrix)
-    if similarity == "pearson":
-        centered = matrix.tocsr(copy=True).astype(float)
-        row_start = centered.indptr[:-1]
-        row_end = centered.indptr[1:]
-        for i in range(centered.shape[0]):
-            start, end = row_start[i], row_end[i]
-            if end > start:
-                row_mean = centered.data[start:end].mean()
-                centered.data[start:end] -= row_mean
-        return cosine_similarity(centered)
-    if similarity == "jaccard":
-        binary = (matrix > 0).astype(float)
-        intersection = np.asarray((binary @ binary.T).todense())
-        row_sums = np.asarray(binary.sum(axis=1)).ravel()
-        union = row_sums[:, None] + row_sums[None, :] - intersection
-        with np.errstate(divide="ignore", invalid="ignore"):
-            sim = np.divide(intersection, union, out=np.zeros_like(intersection), where=union > 0)
-        return sim
-    raise InvalidRecommenderParamsError(f"unknown similarity: {similarity!r}")
+    cap = params.get("max_footprint_bytes", _DEFAULT_MAX_KNN_FOOTPRINT_BYTES)
+    estimate = _estimate_footprint_bytes(matrix)
+    if estimate > 0 and estimate > int(cap):
+        n = matrix.shape[0]
+        raise RecommendationScaleError(
+            f"KNN fit would need ~{estimate / (1024**3):.1f} GiB (a dense {n} x {n} "
+            f"similarity array); this exceeds the configured cap "
+            f"({estimate / (1024**3):.1f} > {cap / (1024**3):.1f} GiB). Refusing to protect the "
+            f"shared server from OOM. Set params max_footprint_bytes higher (or very large) "
+            f"to allow it, or reduce the item/user count."
+        )
 
 
-def _common_counts(matrix) -> np.ndarray:
-    """n x n matrix of the number of shared nonzero columns between each pair of rows."""
-    binary = (matrix > 0).astype(float)
-    return np.asarray((binary @ binary.T).todense())
-
-
-def _top_k_sparse(
-    sim: np.ndarray, k: int, common: np.ndarray, min_common: int
+def _build_knn_similarity(
+    matrix, similarity: str, k: int, min_common: int, block_rows: int = 256
 ) -> sparse.csr_matrix:
-    """Threshold *sim* to the top-k neighbors per row (excluding self and any
-    pair below *min_common* shared observations), returned as a sparse CSR matrix."""
-    n = sim.shape[0]
-    masked = sim.copy()
-    np.fill_diagonal(masked, -np.inf)
-    masked[common < min_common] = -np.inf
+    """Top-k (per row) similarity as a sparse CSR, computed block-wise so peak memory is
+    one ``(block_rows x n)`` block rather than a dense ``n x n``. Excludes self and any
+    pair with fewer than *min_common* shared nonzeros, exactly matching the previous dense
+    implementation's top-k selection (stable ``argsort``, same tie-breaking)."""
+    n = matrix.shape[0]
+    full = matrix.tocsr()
+    binary_full = (full > 0).astype(float).tocsr()
+    centered_full: sparse.csr_matrix | None = None
+    if similarity == "pearson":
+        centered_full = full.tocsr(copy=True).astype(float)
+        for row in range(n):
+            start, end = centered_full.indptr[row], centered_full.indptr[row + 1]
+            if end > start:
+                row_mean = centered_full.data[start:end].mean()
+                centered_full.data[start:end] -= row_mean
 
     rows: list[int] = []
     cols: list[int] = []
     data: list[float] = []
-    for i in range(n):
-        row = masked[i]
-        valid = np.where(row > -np.inf)[0]
-        if valid.size == 0:
-            continue
-        top = valid[np.argsort(-row[valid])[:k]]
-        for j in top:
-            rows.append(i)
-            cols.append(int(j))
-            data.append(float(row[j]))
+    for start in range(0, n, block_rows):
+        end = min(start + block_rows, n)
+        blk = full[start:end].tocsr()
+        if similarity == "cosine":
+            sim_blk = cosine_similarity(blk, full, dense_output=True)
+        elif similarity == "pearson":
+            assert centered_full is not None
+            sim_blk = cosine_similarity(centered_full[start:end], centered_full, dense_output=True)
+        elif similarity == "jaccard":
+            blk_bin = binary_full[start:end]
+            inter = (blk_bin @ binary_full.T).toarray()
+            row_sums_blk = np.asarray(blk_bin.sum(axis=1)).ravel()
+            row_sums_all = np.asarray(binary_full.sum(axis=1)).ravel()
+            union = row_sums_blk[:, None] + row_sums_all[None, :] - inter
+            with np.errstate(divide="ignore", invalid="ignore"):
+                sim_blk = np.divide(inter, union, out=np.zeros_like(inter), where=union > 0)
+        else:
+            raise InvalidRecommenderParamsError(f"unknown similarity: {similarity!r}")
+        common_blk = (binary_full[start:end] @ binary_full.T).toarray()
+        for i_local in range(end - start):
+            i_global = start + i_local
+            row = sim_blk[i_local].copy()
+            row[i_global] = -np.inf
+            row[common_blk[i_local] < min_common] = -np.inf
+            valid = np.where(row > -np.inf)[0]
+            if valid.size == 0:
+                continue
+            top = valid[np.argsort(-row[valid])[:k]]
+            for j in top:
+                rows.append(i_global)
+                cols.append(int(j))
+                data.append(float(row[j]))
     return sparse.csr_matrix((data, (rows, cols)), shape=(n, n))
 
 
@@ -1254,9 +1280,9 @@ def _fit_user_knn_cf(
     min_common_items = int(params.get("min_common_items", 1))
     matrix = interactions.matrix
 
-    sim = _similarity_matrix(matrix, similarity)
-    common = _common_counts(matrix)
-    sim_topk = _top_k_sparse(sim, k, common, min_common_items)
+    _enforce_knn_footprint(matrix, params)
+
+    sim_topk = _build_knn_similarity(matrix, similarity, k, min_common_items)
 
     neighborhood_sizes = np.diff(sim_topk.indptr)
 
@@ -1345,7 +1371,7 @@ register_recommender(
         recommend_fn=_recommend_user_knn_cf,
         similar_items_fn=None,
         required_params=(),
-        optional_params=("k", "similarity", "n", "min_common_items"),
+        optional_params=("k", "similarity", "n", "min_common_items", "max_footprint_bytes"),
         param_metadata=(
             RecommenderParamSpec(
                 name="k", type="int", default=5, help="Number of nearest neighbor users to use."
@@ -1365,6 +1391,13 @@ register_recommender(
                 type="int",
                 default=1,
                 help="Minimum shared interacted items required for a neighbor to count.",
+            ),
+            RecommenderParamSpec(
+                name="max_footprint_bytes",
+                type="int",
+                default=None,
+                help="Pre-flight cap (bytes) on the estimated dense n x n KNN footprint; "
+                "fits above it raise RecommendationScaleError. Set very large to disable.",
             ),
         ),
         handles_cold_start_users=False,
@@ -1392,9 +1425,9 @@ def _fit_item_knn_cf(
     matrix = interactions.matrix
     item_matrix = matrix.T.tocsr()
 
-    sim = _similarity_matrix(item_matrix, similarity)
-    common = _common_counts(item_matrix)
-    sim_topk = _top_k_sparse(sim, k, common, min_common_users)
+    _enforce_knn_footprint(item_matrix, params)
+
+    sim_topk = _build_knn_similarity(item_matrix, similarity, k, min_common_users)
 
     neighborhood_sizes = np.diff(sim_topk.indptr)
 
@@ -1482,7 +1515,7 @@ register_recommender(
         recommend_fn=_recommend_item_knn_cf,
         similar_items_fn=None,
         required_params=(),
-        optional_params=("k", "similarity", "n", "min_common_users"),
+        optional_params=("k", "similarity", "n", "min_common_users", "max_footprint_bytes"),
         param_metadata=(
             RecommenderParamSpec(
                 name="k", type="int", default=5, help="Number of nearest neighbor items to use."
@@ -1502,6 +1535,13 @@ register_recommender(
                 type="int",
                 default=1,
                 help="Minimum shared interacting users required for a neighbor to count.",
+            ),
+            RecommenderParamSpec(
+                name="max_footprint_bytes",
+                type="int",
+                default=None,
+                help="Pre-flight cap (bytes) on the estimated dense n x n KNN footprint; "
+                "fits above it raise RecommendationScaleError. Set very large to disable.",
             ),
         ),
         handles_cold_start_users=False,

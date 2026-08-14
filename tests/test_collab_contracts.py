@@ -84,6 +84,7 @@ def test_session_event_matches_every_publish_call_shape() -> None:
     SessionEvent.model_validate(
         {"type": "persona_changed", "session_id": "s1", "persona": "data_scientist"}
     )
+    SessionEvent.model_validate({"type": "run_completed", "session_id": "s1", "run_id": "r1"})
 
 
 def test_mutation_json_schema_has_expected_top_level_shape() -> None:

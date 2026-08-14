@@ -15,6 +15,7 @@ __all__ = [
     "RecommendError",
     "UnknownAlgorithmError",
     "InvalidRecommenderParamsError",
+    "RecommendationScaleError",
     "MissingOptionalDependencyError",
 ]
 
@@ -30,6 +31,11 @@ class UnknownAlgorithmError(RecommendError):
 class InvalidRecommenderParamsError(RecommendError):
     """Raised when a recommender's structured params are invalid (unknown/missing param,
     a column reference not present on the input data, etc.)."""
+
+
+class RecommendationScaleError(RecommendError):
+    """Raised when a recommender fit's estimated dense memory footprint would be too large to
+    run safely in-process (a pre-flight guard against OOM/SIGKILL of the shared server)."""
 
 
 class MissingOptionalDependencyError(RecommendError):
