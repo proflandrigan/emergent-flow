@@ -649,7 +649,10 @@ class TestCorrelation:
         node = defn.instantiate(method="pearson")
         frag = defn.preview(node)
         assert frag.imports == ["import emergentflow as ef"]
-        assert frag.body == "matrix = ef.stats.correlation(frame, method='pearson', columns=None, max_footprint_bytes=None)"
+        assert (
+            frag.body == "matrix = ef.stats.correlation(frame, method='pearson', columns=None, "
+            "max_footprint_bytes=None)"
+        )
 
     def test_codegen_matches_execute(self):
         """ADR 0002: execute == result of running the emitted code."""

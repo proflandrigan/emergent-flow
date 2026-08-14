@@ -16,6 +16,7 @@ See ``docs/public-api-conventions.md`` and ``docs/sdk-design-philosophy.md``.
 from __future__ import annotations
 
 import importlib.util
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -583,8 +584,8 @@ def test_proportions(
     if not df[success_col].dropna().isin([0, 1, True, False]).all():
         raise ValueError(f"success_col {success_col!r} must contain only 0/1/True/False values.")
     a_label, b_label = groups[0], groups[1]
-    a = df.loc[df[group_col].astype(str) == a_label, success_col]
-    b = df.loc[df[group_col].astype(str) == b_label, success_col]
+    a = df.loc[df[group_col].astype(str) == a_label, success_col].dropna()
+    b = df.loc[df[group_col].astype(str) == b_label, success_col].dropna()
     n_a, n_b = int(a.shape[0]), int(b.shape[0])
     count_a, count_b = int(a.sum()), int(b.sum())
     p_a = count_a / n_a if n_a > 0 else float("nan")
@@ -594,7 +595,7 @@ def test_proportions(
         count_b, n_b, count_a, n_a, compare="diff", alpha=alpha
     )
     diff = p_b - p_a
-    relative_uplift = diff / p_a if p_a not in (0, float("nan")) and p_a != 0 else float("nan")
+    relative_uplift = diff / p_a if not (p_a == 0 or math.isnan(p_a)) else float("nan")
     return pd.DataFrame(
         [
             {
