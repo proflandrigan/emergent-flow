@@ -1,6 +1,6 @@
 """
-emergentflow.nodes.examples.test_proportions
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+emergentflow.nodes.examples.proportions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Reference node: ``stats.test_proportions`` — a *transform* node (1 in, 1 out).
 
 Real, statsmodels-backed two-proportion z-test (Epic 6). ``execute`` calls

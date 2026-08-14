@@ -303,7 +303,7 @@ def _coerce_labels(value: Any, sep: str | None) -> list[Any]:
     """
     if isinstance(value, (list, tuple, set)):
         return list(value)
-    if value is None or (isinstance(value, float) and pd.isna(value)):
+    if value is None or _is_empty_list_cell(value):
         return []
     if sep is not None and isinstance(value, str):
         return [part for part in value.split(sep) if part != ""]

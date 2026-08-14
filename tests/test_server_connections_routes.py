@@ -113,13 +113,13 @@ def test_put_omits_kind_keeps_existing(tmp_path, monkeypatch) -> None:
     assert data["api_key_env"] == "NEW_ENV"
 
 
-def test_put_unknown_name_is_422(tmp_path, monkeypatch) -> None:
+def test_put_unknown_name_is_404(tmp_path, monkeypatch) -> None:
     client = _test_client(tmp_path / "connections.toml", monkeypatch)
     resp = client.put(
         "/connections/nonexistent",
         json={"dialect": "duckdb"},
     )
-    assert resp.status_code == 422
+    assert resp.status_code == 404
     assert "No connection profile" in resp.json()["error"]
 
 
@@ -134,10 +134,10 @@ def test_delete_removes(tmp_path, monkeypatch) -> None:
     assert get_resp.json() == {"connections": []}
 
 
-def test_delete_unknown_name_is_422(tmp_path, monkeypatch) -> None:
+def test_delete_unknown_name_is_404(tmp_path, monkeypatch) -> None:
     client = _test_client(tmp_path / "connections.toml", monkeypatch)
     resp = client.delete("/connections/ghost")
-    assert resp.status_code == 422
+    assert resp.status_code == 404
     assert "No connection profile" in resp.json()["error"]
 
 

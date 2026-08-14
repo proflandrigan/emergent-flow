@@ -175,6 +175,21 @@ def _build_predicate(pred: dict) -> exp.Expression:
     return cmp_cls(this=col_expr, expression=val_expr)
 
 
+_JOIN_TYPES = {"LEFT", "RIGHT", "FULL", "INNER", "CROSS"}
+
+
+def _normalize_join_type(join_type: str) -> str:
+    normalized = join_type.upper().strip()
+    if normalized.endswith(" OUTER"):
+        normalized = normalized.split()[0]
+    if normalized not in _JOIN_TYPES:
+        raise SpecValidationError(
+            f"unsupported join type {join_type!r}; expected one of "
+            f"{sorted(_JOIN_TYPES)} (optionally with an OUTER suffix)"
+        )
+    return normalized
+
+
 def _build_join(
     join_spec: dict, *, join_type: str = "INNER"
 ) -> tuple[exp.Expression, exp.Expression | None]:
@@ -255,7 +270,7 @@ def compile_spec(spec: dict[str, Any], dialect: str) -> str:
 
     # JOINs
     for join_spec in spec.get("join", []):
-        join_type = join_spec.get("type", "INNER").upper()
+        join_type = _normalize_join_type(join_spec.get("type", "INNER"))
         table_expr, on_cond = _build_join(join_spec, join_type=join_type)
 
         # Map join type strings to sqlglot join kwargs. A CROSS JOIN cannot carry an

@@ -258,8 +258,12 @@ async def _run_sync(fn: Callable[[], Any]) -> Any:
 
 async def _safe_json(fn: Callable[[], dict[str, Any]]) -> Response:
     """Run *fn* off the event loop; map any exception to the project's 422 contract."""
+    from emergentflow.connections.profiles import UnknownConnectionError as _conn_unknown
+
     try:
         result = await _run_sync(fn)
+    except _conn_unknown as exc:
+        return _error_json(404, str(exc))
     except Exception as exc:  # noqa: BLE001 - any ef.* failure -> 422, never crash the server
         return _error_json(422, f"{type(exc).__name__}: {exc}")
     return JSONResponse(content=result)

@@ -66,7 +66,7 @@ def digest_payload(payload: dict[str, Any]) -> dict[str, Any]:
             return payload
         return {
             "kind": "json",
-            "value": serialized[:MAX_JSON_CHARS],
+            "value": value,
             "truncated": True,
             "original_bytes": len(serialized),
         }
@@ -114,24 +114,38 @@ def digest_results(
     digested: dict[str, dict[str, dict[str, Any]]] = {}
     total_bytes = 0
 
+    _MARKER = {
+        "kind": "truncated",
+        "reason": "digest size limit exceeded",
+    }
+
     for node_id, ports in results.items():
         digested_ports: dict[str, dict[str, Any]] = {}
         for port_name, payload in ports.items():
-            if total_bytes >= MAX_DIGEST_BYTES:
-                # Hard cap exceeded: add truncation marker
-                digested_ports[port_name] = {
-                    "kind": "truncated",
-                    "reason": "digest size limit exceeded",
-                }
+            framing = len(node_id) + len(port_name) + 16
+            if total_bytes + framing >= MAX_DIGEST_BYTES:
+                digested_ports[port_name] = dict(_MARKER)
                 continue
 
             digested_payload = digest_payload(payload)
-            digested_ports[port_name] = digested_payload
-
-            # Estimate size
             serialized = json.dumps(digested_payload, separators=(",", ":"))
+
+            if total_bytes + len(serialized) + framing > MAX_DIGEST_BYTES:
+                digested_ports[port_name] = dict(_MARKER)
+                continue
+
+            digested_ports[port_name] = digested_payload
             total_bytes += len(serialized)
 
         digested[node_id] = digested_ports
+
+    # Guarantee the hard cap: drop trailing nodes until the fully-serialized document
+    # is at or under MAX_DIGEST_BYTES. Marker framing and key lengths are not cheap to
+    # estimate during the walk, so verify against the real size as the final authority.
+    while (
+        digested
+        and len(json.dumps(digested, separators=(",", ":")).encode("utf-8")) > MAX_DIGEST_BYTES
+    ):
+        del digested[next(reversed(digested))]
 
     return digested

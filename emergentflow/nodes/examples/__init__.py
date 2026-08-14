@@ -111,6 +111,7 @@ from .pipeline import Pipeline
 from .power_analysis import PowerAnalysis
 from .predict import Predict
 from .prepare_interactions import PrepareInteractions
+from .proportions import TestProportions
 from .query_builder import QueryBuilder
 from .recommend_build_sequences import RecommendBuildSequences
 from .recommend_by_embedding import RecommendByEmbedding
@@ -143,7 +144,6 @@ from .sort import Sort
 from .sql_query import SqlQuery
 from .stack_models import StackModels
 from .summarize import Summarize
-from .test_proportions import TestProportions
 from .train import TrainClassifier
 from .train_random_forest import TrainRandomForest
 from .train_regressor import TrainRegressor
