@@ -58,6 +58,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
+import emergentflow.collab.mcp as _mcp
 from emergentflow.collab.agents import list_available_adapter_names
 from emergentflow.collab.chat import (
     ChatAlreadyActiveError,
@@ -650,7 +651,7 @@ def create_app() -> FastAPI:
             )
             session = get_default_session_store().create(graph)
             doc = session.model_dump(mode="json")
-            doc["open_in_ui"] = f"http://127.0.0.1:8765/?session={session.id}"
+            doc["open_in_ui"] = f"{_mcp.OPEN_IN_UI_BASE}/?session={session.id}"
             return doc
 
         return await _session_json(_create)
@@ -1397,6 +1398,10 @@ def serve(
 
     browse_host = "127.0.0.1" if host == "0.0.0.0" else host  # noqa: S104
     url = f"http://{browse_host}:{port}"
+    # Point the shared open_in_ui base at the real bind so agent-created sessions get
+    # a working browser link even on a non-default host/port. Runs before any session
+    # is created (the first tool call / request happens only after uvicorn binds).
+    _mcp.OPEN_IN_UI_BASE = url
     print(f"Emergent Flow - serving the local canvas at {url}  (Ctrl-C to stop){token_hint}")
     if open_browser:
         threading.Thread(

@@ -25,6 +25,13 @@ import queue
 import time
 from typing import Any
 
+# Shared base URL used to build the ``open_in_ui`` browser links on agent-created
+# sessions. ``emergentflow.server.app`` imports this same value so the HTTP and MCP
+# paths agree, and ``serve()`` overwrites it with the real bind host/port when a
+# live server starts on a non-default address. The default matches the localhost
+# bind the canvas normally runs on.
+OPEN_IN_UI_BASE = "http://127.0.0.1:8765"
+
 
 def _import_fastmcp() -> Any:
     """Import fastmcp lazily; raise ModuleNotFoundError with an install hint if absent."""
@@ -97,7 +104,7 @@ def create_mcp_server() -> Any:
         graph_obj = deserialize_graph(json.dumps(graph)) if graph is not None else None
         session = get_default_session_store().create(graph_obj)
         doc = session.model_dump(mode="json")
-        doc["open_in_ui"] = f"http://127.0.0.1:8765/?session={session.id}"
+        doc["open_in_ui"] = f"{OPEN_IN_UI_BASE}/?session={session.id}"
         return doc
 
     @mcp.tool()

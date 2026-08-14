@@ -283,6 +283,19 @@ def test_user_knn_cf_max_footprint_bytes_valid_through_fit():
         fit(im, algorithm="user_knn_cf", params={"k": 2, "max_footprint_bytes": 1})
 
 
+def test_knn_cf_max_footprint_bytes_none_uses_default():
+    """max_footprint_bytes=None (the documented default) must be treated as the module
+    default cap, not crash with a TypeError (regression: int(None)). Both user_knn_cf and
+    item_knn_cf fits must succeed with that explicit None param."""
+    from emergentflow.recommend import fit
+
+    im = _make_small_interactions()
+    for algo in ("user_knn_cf", "item_knn_cf"):
+        fitted = fit(im, algorithm=algo, params={"k": 2, "max_footprint_bytes": None})
+        assert isinstance(fitted, FittedRecommender)
+        assert fitted.algorithm == algo
+
+
 # ---------------------------------------------------------------------------
 # item_knn_cf
 # ---------------------------------------------------------------------------

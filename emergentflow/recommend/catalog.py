@@ -1195,7 +1195,9 @@ def _enforce_knn_footprint(matrix, params: dict[str, Any]) -> None:
     alive for the other sessions. ``max_footprint_bytes`` caps the estimate; set it very large
     to disable.
     """
-    cap = params.get("max_footprint_bytes", _DEFAULT_MAX_KNN_FOOTPRINT_BYTES)
+    cap = params.get("max_footprint_bytes")
+    if cap is None:
+        cap = _DEFAULT_MAX_KNN_FOOTPRINT_BYTES
     estimate = _estimate_footprint_bytes(matrix)
     if estimate > 0 and estimate > int(cap):
         n = matrix.shape[0]
