@@ -20,6 +20,7 @@ from emergentflow.stats import (
     missingness,
     profile,
 )
+from emergentflow.stats.errors import StatsScaleError
 
 
 def _make_df() -> pd.DataFrame:
@@ -139,6 +140,24 @@ def test_co_missingness_unknown_column_raises():
     df = _make_df()
     with pytest.raises(ValueError):
         co_missingness(df, columns=["nope"])
+
+
+def test_co_missingness_scale_guard_raises():
+    df = _make_df()
+    with pytest.raises(StatsScaleError):
+        co_missingness(df, max_footprint_bytes=1)
+
+
+def test_co_missingness_scale_guard_pass_large_cap():
+    df = _make_df()
+    result = co_missingness(df, max_footprint_bytes=1 << 60)
+    assert result.equals(co_missingness(df))
+
+
+def test_co_missingness_default_guard_does_not_trigger():
+    df = _make_df()
+    result = co_missingness(df)
+    assert result.equals(co_missingness(df, max_footprint_bytes=1 << 60))
 
 
 def test_distribution_summary_unknown_column_raises():

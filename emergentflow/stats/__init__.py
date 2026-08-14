@@ -58,11 +58,13 @@ from emergentflow.stats.errors import (
     InvalidModelSpecError,
     MissingOptionalDependencyError,
     StatsError,
+    StatsScaleError,
     UnknownDiagnosticError,
     UnknownModelError,
 )
 from emergentflow.stats.models import FittedStatsModel
 from emergentflow.stats.registry import ModelSpec, keys_for_archetype, known_model_keys
+from emergentflow.stats.scale import enforce_dense_square_guard
 from emergentflow.stats.spec import _prepare_diagnostic_spec, _prepare_model_spec
 
 __all__ = [
@@ -103,6 +105,7 @@ __all__ = [
     "UnknownModelError",
     "InvalidModelSpecError",
     "MissingOptionalDependencyError",
+    "StatsScaleError",
     "known_diagnostic_keys",
     "known_model_keys",
     "keys_for_archetype",
@@ -927,12 +930,16 @@ def correlation(
     *,
     method: str = "pearson",
     columns: list[str] | None = None,
+    max_footprint_bytes: int | None = None,
 ) -> pd.DataFrame:
     """Compute a pairwise correlation matrix, returned as a tidy DataFrame.
 
     Thin wrapper over ``pandas.DataFrame.corr``. ``method`` is one of pearson/spearman/kendall.
     With ``columns`` given, only those columns are correlated (each must exist). The row labels
     are moved into a leading ``column`` field so the matrix is tidy/serializable.
+    ``max_footprint_bytes`` caps the estimated dense D x D footprint (default 2 GiB, see
+    ``emergentflow.stats.scale``); ``correlation`` refuses to run above the cap to protect the
+    shared in-process server from OOM. Pass a very large value to effectively disable the guard.
     """
     if method not in CORR_METHODS:
         raise ValueError(f"unknown method {method!r}; expected one of {list(CORR_METHODS)!r}.")
@@ -943,6 +950,7 @@ def correlation(
         target = df[columns]
     else:
         target = df.select_dtypes(include="number")
+    enforce_dense_square_guard(target.shape[1], max_footprint_bytes, "correlation")
     result = target.corr(method=method).reset_index(names="column")
     return result
 

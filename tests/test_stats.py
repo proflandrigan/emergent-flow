@@ -25,6 +25,7 @@ from emergentflow.stats import (
     ttest,
     wilcoxon,
 )
+from emergentflow.stats.errors import StatsScaleError
 
 # pytest collects top-level ``test_`` names; mark this imported function
 # so pytest skips it (it is not an actual test case).
@@ -520,6 +521,31 @@ def test_correlation_does_not_mutate_input() -> None:
     correlation(df)
 
     assert list(df.columns) == original_cols
+
+
+def test_correlation_scale_guard_raises() -> None:
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0], "c": [3.0, 6.0, 9.0]})
+
+    with pytest.raises(StatsScaleError):
+        correlation(df, max_footprint_bytes=1)
+
+
+def test_correlation_scale_guard_pass_large_cap() -> None:
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0], "c": [3.0, 6.0, 9.0]})
+
+    result = correlation(df, max_footprint_bytes=1 << 60)
+
+    assert isinstance(result, pd.DataFrame)
+    assert set(result.columns) == {"column", "a", "b", "c"}
+
+
+def test_correlation_default_guard_does_not_trigger() -> None:
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0], "c": [3.0, 6.0, 9.0]})
+
+    result = correlation(df)
+
+    assert isinstance(result, pd.DataFrame)
+    assert set(result.columns) == {"column", "a", "b", "c"}
 
 
 def test_correlation_registered_as_public_op() -> None:

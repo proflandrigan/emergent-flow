@@ -28,8 +28,10 @@ adopted and what is planned.
 - Bounded/approximate system metrics: deterministic `diversity` sampling + `compare` `metrics` override.
 - A typed pre-flight memory guard on the KNN fit path (this task) that estimates the n² footprint and raises `RecommendationScaleError` above a configurable cap rather than letting the process OOM.
 
+### Adopted (follow-up, stats D² guards)
+- Pre-flight `StatsScaleError` guards on the other O(D²) paths (`stats.correlation`, `stats.co_missingness`): each estimates the dense D×D footprint and refuses to run above `max_footprint_bytes` (default 2 GiB) rather than OOM-killing the shared server. Shared helper lives in `emergentflow/stats/scale.py`; the D² output of both ops is inherently quadratic, so these are guards (refuse up front), not block-wise reductions like recommend KNN.
+
 ### Proposed (documented, not yet implemented)
-- **Pre-flight guards** in other O(D²) paths (correlation, co_missingness) — estimate D² and warn/refuse or require an explicit opt-in. Design: shared helper + typed error, default cap, `OPT_IN`/cap param, mirror the recommend guard.
 - **Subprocess / worker isolation** with a memory ceiling so one node's blowup returns an error status instead of killing the server and other sessions (this is the long-term fix; aligns with Epic 6 sandboxing). It should live behind the executor seam (`emergentflow.codegen`), not inline in `execute`/`compile_to_code` (which must stay pure).
 - **Session persistence / snapshots** to disk so an unexpected process death doesn't lose in-progress graphs (ties to the run/`RunStore` persistence added for issue #8).
 - **Multi-model compare at scale:** because `compare` runs each candidate's `evaluate`, the Task 10 `metrics` default (seven cheap metrics) + Task 9 sparse KNN fit combine so several recommenders can be fit and compared on one canvas; default `compare` to per-model top-k evaluate, and run the full bounded metric set only when explicitly requested.
@@ -44,7 +46,7 @@ adopted and what is planned.
 |---|---|---|---|---|
 | Dense n×n similarity/common/top-k | recommend item/user KNN | High | Block-wise top-k sparse + pre-flight guard | Task 9 / 11 |
 | Diversity O(U²) all-pairs | recommend evaluate/compare | High | Deterministic sampling + compare metrics default | Task 10 |
-| Dense D×D correlation | stats.correlation | Medium | Pre-flight D² guard (proposed) | proposed |
-| Dense D×D co_missingness | stats.co_missingness | Medium | Pre-flight D² guard (proposed) | proposed |
+| Dense D×D correlation | stats.correlation | Medium | Pre-flight D² guard (`StatsScaleError`) | follow-up |
+| Dense D×D co_missingness | stats.co_missingness | Medium | Pre-flight D² guard (`StatsScaleError`) | follow-up |
 | Sparse-but-growing item-pair product | recommend co_occurrence | Low | Keep CSR; avoid .todense() | proposed |
 | Embedding matrix of N rows | embed.text | Medium | Chunking for large corpora | proposed |

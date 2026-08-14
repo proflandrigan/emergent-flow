@@ -21,6 +21,7 @@ from pandas.api.types import is_numeric_dtype
 
 from emergentflow.api import public_op
 from emergentflow.clean.outliers import check_outlier_rule, is_outlier_eligible, outlier_bounds
+from emergentflow.stats.scale import enforce_dense_square_guard
 
 # ``PlotSpec`` (emergentflow.viz.models) is a standalone dataclass that imports nothing from
 # ``emergentflow.stats``, so importing it here is cycle-free -- unlike ``emergentflow.viz`` itself
@@ -118,12 +119,23 @@ def missingness(df: pd.DataFrame, *, columns: list[str] | None = None) -> pd.Dat
 
 
 @public_op(name="ef.stats.co_missingness")
-def co_missingness(df: pd.DataFrame, *, columns: list[str] | None = None) -> pd.DataFrame:
+def co_missingness(
+    df: pd.DataFrame,
+    *,
+    columns: list[str] | None = None,
+    max_footprint_bytes: int | None = None,
+) -> pd.DataFrame:
     """Pairwise co-missingness matrix, tidy like ``correlation``'s output.
 
     With ``columns`` given, only those columns are included (each must exist). Cell (i, j) is the
     fraction of rows where both column i and column j are null; the diagonal is each column's own
     missing fraction. Row labels are moved into a leading ``column`` field. Never mutates ``df``.
+
+    The output is an inherently dense D x D matrix, so a pre-flight guard refuses footprints above
+    ``max_footprint_bytes`` (default
+    :data:`~emergentflow.stats.scale.DEFAULT_MAX_DENSE_FOOTPRINT_BYTES`)
+    to protect the shared in-process server from OOM; pass a very large value to effectively
+    disable the guard.
     """
     if columns is not None:
         unknown = [c for c in columns if c not in df.columns]
@@ -132,6 +144,8 @@ def co_missingness(df: pd.DataFrame, *, columns: list[str] | None = None) -> pd.
         target = df[columns]
     else:
         target = df
+
+    enforce_dense_square_guard(target.shape[1], max_footprint_bytes, "co_missingness")
 
     mask = target.isna()
     cols = list(target.columns)

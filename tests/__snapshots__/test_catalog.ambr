@@ -4922,6 +4922,15 @@
             'required': False,
             'type_token': 'list[str]',
           }),
+          dict({
+            'default': None,
+            'help': 'Refuse a dense D x D correlation above this cap (bytes); unset uses a 2 GiB default.',
+            'hints': None,
+            'label': 'Max footprint (bytes)',
+            'name': 'max_footprint_bytes',
+            'required': False,
+            'type_token': 'int',
+          }),
         ]),
         'ports': list([
           dict({
@@ -4944,7 +4953,7 @@
           }),
         ]),
         'type': 'stats.correlation',
-        'version': 1,
+        'version': 2,
       }),
       dict({
         'advisor_persona': None,
