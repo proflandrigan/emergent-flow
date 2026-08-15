@@ -130,6 +130,43 @@ class TestDuckDBAdapter:
         col_names = [c.name for c in result.columns]
         assert col_names == ["id", "name", "value"]
 
+    def test_columns_schema_nullable(self):
+        """Nullability reflects actual nulls when the result has rows."""
+        from emergentflow.data.warehouse.adapters.duckdb_adapter import DuckDBAdapter
+
+        adapter = DuckDBAdapter()
+        request = QueryRequest(
+            sql="SELECT 1 AS id, NULL AS nullable_col",
+            dialect="duckdb",
+            connection="test",
+        )
+        result = adapter.execute(request, {})
+        by_name = {c.name: c for c in result.columns}
+        assert by_name["id"].nullable is False
+        assert by_name["nullable_col"].nullable is True
+
+    def test_empty_result_reports_nullable_for_unknown(self):
+        """An empty result set cannot prove nullability, so it must not claim `nullable=False`.
+
+        Regression test: the adapter derived `nullable` as ``bool(df[col].isna().any())``,
+        which on a 0-row frame is ``False`` for every column -- a [[NULLABLE]]-column query
+        that returns no rows was mislabeled as non-nullable. Unknown nullability is reported
+        conservatively as ``True`` instead.
+        """
+        from emergentflow.data.warehouse.adapters.duckdb_adapter import DuckDBAdapter
+
+        adapter = DuckDBAdapter()
+        request = QueryRequest(
+            sql="SELECT NULLABLE_COL_A, NULLABLE_COL_B FROM ("
+            "SELECT 1 AS NULLABLE_COL_A, NULL AS NULLABLE_COL_B) WHERE 1 = 0",
+            dialect="duckdb",
+            connection="test",
+        )
+        result = adapter.execute(request, {})
+        assert result.row_count == 0
+        assert len(result.columns) == 2
+        assert all(c.nullable is True for c in result.columns)
+
     def test_describe_relation_rejects_sql_injection_attempt(self):
         """A relation name containing a quote must not break out of the literal.
 
