@@ -307,6 +307,12 @@ def group_by_aggregate(
     else:
         if columns is not None:
             agg = {k: v for k, v in agg.items() if k in columns}
+        unknown_agg = [k for k in agg if k not in df.columns]
+        if unknown_agg:
+            raise ValueError(
+                f"unknown aggregation column(s) {unknown_agg!r}; "
+                f"expected one of {list(df.columns)!r}."
+            )
         target = df[by_cols + list(agg.keys())]
     grouped = target.groupby(by_cols).agg(agg)
     if isinstance(grouped.columns, pd.MultiIndex):

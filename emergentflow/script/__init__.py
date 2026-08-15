@@ -57,7 +57,7 @@ def run_code(code: str, value: Any) -> Any:
     """
     try:
         compiled = compile(code, "<custom_code>", "exec")
-    except SyntaxError as exc:
+    except (SyntaxError, ValueError, TypeError) as exc:
         raise CustomCodeError(f"custom code failed to compile: {exc}") from exc
 
     namespace: dict[str, Any] = {}

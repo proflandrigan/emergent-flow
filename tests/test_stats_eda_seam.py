@@ -185,6 +185,14 @@ def test_group_by_aggregate_unknown_value_column_raises():
         group_by_aggregate(df, by="b", agg="mean", columns=["nope"])
 
 
+def test_group_by_aggregate_unknown_dict_agg_key_raises():
+    df = _make_df()
+    with pytest.raises(ValueError, match="unknown aggregation column"):
+        group_by_aggregate(df, by="b", agg={"nope": "mean"})
+    with pytest.raises(ValueError, match="unknown aggregation column"):
+        group_by_aggregate(df, by="b", agg={"a": "mean", "nope": "sum"})
+
+
 def test_missingness_pct_value():
     df = _make_df()
     result = missingness(df).set_index("column")

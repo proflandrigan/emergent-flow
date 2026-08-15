@@ -197,9 +197,19 @@ def ttest(
     # the reported sample sizes and the pooled-variance weight).
     a = df.loc[df[group_col].astype(str) == a_label, value_col].dropna()
     b = df.loc[df[group_col].astype(str) == b_label, value_col].dropna()
-    res = ttest_ind(a, b, equal_var=equal_var)
     n_a_count = int(a.shape[0])
     n_b_count = int(b.shape[0])
+    if n_a_count == 0 or n_b_count == 0:
+        raise ValueError(
+            f"two-sample t-test needs at least one non-null {value_col!r} value in each of "
+            f"groups {a_label!r} and {b_label!r}; found {n_a_count} and {n_b_count}."
+        )
+    if n_a_count + n_b_count <= 2:
+        raise ValueError(
+            f"two-sample t-test needs more than one total observation to compute a pooled "
+            f"variance; groups {a_label!r}/{b_label!r} had {n_a_count} and {n_b_count}."
+        )
+    res = ttest_ind(a, b, equal_var=equal_var)
     var_a = float(a.var(ddof=1))
     var_b = float(b.var(ddof=1))
     pooled_sd = (
@@ -587,6 +597,11 @@ def test_proportions(
     a = df.loc[df[group_col].astype(str) == a_label, success_col].dropna()
     b = df.loc[df[group_col].astype(str) == b_label, success_col].dropna()
     n_a, n_b = int(a.shape[0]), int(b.shape[0])
+    if n_a == 0 or n_b == 0:
+        raise ValueError(
+            f"two-proportion z-test needs at least one non-null {success_col!r} value in each of "
+            f"groups {a_label!r} and {b_label!r}; found {n_a} and {n_b}."
+        )
     count_a, count_b = int(a.sum()), int(b.sum())
     p_a = count_a / n_a if n_a > 0 else float("nan")
     p_b = count_b / n_b if n_b > 0 else float("nan")

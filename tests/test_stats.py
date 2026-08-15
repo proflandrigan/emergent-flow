@@ -658,6 +658,20 @@ def test_ttest_does_not_mutate_input() -> None:
     assert list(df.columns) == original_cols
 
 
+def test_ttest_all_nan_group_raises() -> None:
+    df = pd.DataFrame({"grp": ["a", "a", "b", "b"], "score": [None, None, 5.0, 7.0]})
+
+    with pytest.raises(ValueError, match="at least one non-null"):
+        ttest(df, group_col="grp", value_col="score")
+
+
+def test_ttest_single_observation_per_group_raises() -> None:
+    df = pd.DataFrame({"grp": ["a", "b"], "score": [1.0, 2.0]})
+
+    with pytest.raises(ValueError, match="more than one total observation"):
+        ttest(df, group_col="grp", value_col="score")
+
+
 def test_ttest_deterministic() -> None:
     df = _two_group_df()
 
@@ -867,6 +881,13 @@ def test_test_proportions_single_group_raises() -> None:
 def test_test_proportions_three_groups_raises() -> None:
     df = pd.DataFrame({"grp": ["a", "b", "c"], "ok": [1, 0, 1]})
     with pytest.raises(ValueError, match="exactly 2 distinct groups"):
+        test_proportions(df, group_col="grp", success_col="ok")
+
+
+def test_test_proportions_all_nan_success_group_raises() -> None:
+    df = pd.DataFrame({"grp": ["a", "a", "a", "b", "b", "b"], "ok": [0, 1, 1, None, None, None]})
+
+    with pytest.raises(ValueError, match="at least one non-null"):
         test_proportions(df, group_col="grp", success_col="ok")
 
 
