@@ -446,6 +446,14 @@ def kruskal(
             f"Kruskal-Wallis needs at least 2 distinct groups in {group_col!r}; found {n_groups}."
         )
     samples = [g[value_col].dropna().to_numpy() for _, g in df.groupby(group_col, sort=True)]
+    empty_groups = [
+        str(k) for k, g in df.groupby(group_col, sort=True) if g[value_col].dropna().empty
+    ]
+    if empty_groups:
+        raise ValueError(
+            f"Kruskal-Wallis found group(s) with no non-null values in {value_col!r}: "
+            f"{empty_groups}. Drop or impute those groups before testing."
+        )
     n_total = int(sum(len(s) for s in samples))
     res = scipy_kruskal(*samples)
     h_stat = float(res.statistic)

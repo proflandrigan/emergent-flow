@@ -334,6 +334,14 @@ def test_kruskal_deterministic() -> None:
     assert first["p_value"].iloc[0] == second["p_value"].iloc[0]
 
 
+def test_kruskal_group_with_no_non_null_values_raises() -> None:
+    """A group whose value column is entirely NaN would pass scipy an empty sample
+    and silently yield a NaN statistic/p-value; it must raise a typed error instead."""
+    df = pd.DataFrame({"grp": ["a", "a", "b", "b"], "score": [1.0, 2.0, None, None]})
+    with pytest.raises(ValueError, match="no non-null values"):
+        kruskal(df, group_col="grp", value_col="score")
+
+
 def test_kruskal_registered_as_public_op() -> None:
     from emergentflow.api import PUBLIC_OPS
 
