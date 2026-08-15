@@ -838,7 +838,18 @@ def _save_run_record(
     params: dict[str, Any] | None = None,
 ) -> str | None:
     """Returns the generated ``run_id``, or ``None`` if saving failed."""
-    graph_hash = hashlib.sha256(json.dumps(graph_payload, sort_keys=True).encode()).hexdigest()
+    # Hash the graph payload together with any RESOLVED graph-level param
+    # overrides, so two runs that share a graph but apply different --param /
+    # ?params values get distinct hashes. Otherwise the run store (and the "run
+    # replaced this graph" summary the canvas shows by diffing graph_hash) would
+    # report two behaviourally-different runs as "identical graphs".
+    resolved_params = resolve_graph_params(graph, overrides=params) if params else None
+    hash_source = graph_payload
+    if resolved_params:
+        hash_source = {**graph_payload, "resolved_params": resolved_params}
+    graph_hash = hashlib.sha256(
+        json.dumps(hash_source, sort_keys=True, default=str).encode()
+    ).hexdigest()
     finished_at = time.time()
     run_data = {
         "run_id": "",  # filled by RunStore.save()

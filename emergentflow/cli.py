@@ -274,7 +274,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         results = execute(graph, params=params)
         finished_at = time_mod.time()
 
-        graph_hash = hashlib.sha256(json.dumps(graph_dict, sort_keys=True).encode()).hexdigest()
+        # Hash the graph together with any RESOLVED --param overrides so two runs
+        # that share a graph but apply different params get distinct hashes; two
+        # behaviourally-different runs should not be reported as "identical graphs".
+        resolved_params = resolve_graph_params(graph, overrides=params) if params else None
+        hash_source = graph_dict
+        if resolved_params:
+            hash_source = {**graph_dict, "resolved_params": resolved_params}
+        graph_hash = hashlib.sha256(
+            json.dumps(hash_source, sort_keys=True, default=str).encode()
+        ).hexdigest()
 
         run_data = {
             "run_id": "",
