@@ -80,7 +80,7 @@ class BigQueryAdapter:
             ColumnSchema(
                 name=col,
                 dtype=str(df[col].dtype),
-                nullable=bool(df[col].isna().any()),
+                nullable=bool(df[col].isna().any()) if len(df) else True,
             )
             for col in df.columns
         )

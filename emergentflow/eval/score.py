@@ -15,6 +15,7 @@ can render directly.
 from __future__ import annotations
 
 import json
+import numbers
 import re
 from typing import Any
 
@@ -71,6 +72,24 @@ _TYPE_MAP: dict[str, type | tuple[type, ...]] = {
 }
 
 
+def _is_integer(data: Any) -> bool:
+    """True when *data* is a JSON-Schema integer (a number with no fractional part).
+
+    Handles the two scalar shapes that break a bare ``isinstance(data, int)``: a
+    float carrying an integral value (``json.loads("3.0")`` yields ``3.0``, which
+    JSON Schema treats as an integer) and numpy integral/real scalars from a
+    pandas row (``np.int64`` is not a ``isinstance``-subclass of ``int``).
+    """
+    if isinstance(data, numbers.Integral):
+        return True
+    if isinstance(data, numbers.Real):
+        try:
+            return float(data).is_integer()
+        except (TypeError, ValueError):
+            return False
+    return False
+
+
 def _json_schema_violations(data: Any, schema: dict[str, Any]) -> list[str]:
     """A minimal structural JSON-Schema subset check: type/properties/required/items.
 
@@ -81,9 +100,22 @@ def _json_schema_violations(data: Any, schema: dict[str, Any]) -> list[str]:
     if schema_type is not None:
         expected = _TYPE_MAP.get(schema_type)
         if expected is not None:
-            if schema_type in ("integer", "number") and isinstance(data, bool):
-                return [f"expected type {schema_type!r}, got bool"]
-            if not isinstance(data, expected):
+            if isinstance(data, bool):
+                # bool is a subclass of int in Python, so a bare isinstance would
+                # accept True/False for `integer`/`number`; a JSON schema declares
+                # them as booleans, which must be rejected for numeric types.
+                if schema_type != "boolean":
+                    return [f"expected type {schema_type!r}, got bool"]
+            elif schema_type == "integer":
+                # JSON-Schema `integer` is a number with a zero fractional part
+                # (so json.loads("3.0") -> 3.0 passes) and also covers numpy
+                # integral scalars that aren't isinstance-subclasses of int.
+                if not _is_integer(data):
+                    return [f"expected type {schema_type!r}, got {type(data).__name__}"]
+            elif schema_type == "number" and not isinstance(data, numbers.Real):
+                # `number` covers numpy real scalars too, not just python int/float.
+                return [f"expected type {schema_type!r}, got {type(data).__name__}"]
+            elif schema_type not in ("integer", "number") and not isinstance(data, expected):
                 return [f"expected type {schema_type!r}, got {type(data).__name__}"]
 
     errors: list[str] = []

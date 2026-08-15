@@ -250,11 +250,40 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"Error: --param {key!r}: {exc}", file=sys.stderr)
                 return 1
 
+        # Reject graphs with effectful (requires_client) nodes up front: the CLI does not
+        # inject live clients, so such a node would fail mid-execution with a cryptic
+        # MissingClientError instead of a clear, actionable message.
+        from emergentflow.nodes import registry as _node_registry
+
+        effectful = []
+        for node in graph.nodes.values():
+            definition_cls = _node_registry.try_get(node.type)
+            if definition_cls is not None and definition_cls.required_client_kinds():
+                effectful.append(node.id)
+        if effectful:
+            print(
+                f"Error: graph contains node(s) {effectful!r} that require an injected "
+                f"client (LLM call / warehouse / http); the `run` command does not "
+                f"inject live clients yet — use `emergentflow serve` and execute via "
+                f"the server instead.",
+                file=sys.stderr,
+            )
+            return 1
+
         started_at = time_mod.time()
         results = execute(graph, params=params)
         finished_at = time_mod.time()
 
-        graph_hash = hashlib.sha256(json.dumps(graph_dict, sort_keys=True).encode()).hexdigest()
+        # Hash the graph together with any RESOLVED --param overrides so two runs
+        # that share a graph but apply different params get distinct hashes; two
+        # behaviourally-different runs should not be reported as "identical graphs".
+        resolved_params = resolve_graph_params(graph, overrides=params) if params else None
+        hash_source = graph_dict
+        if resolved_params:
+            hash_source = {**graph_dict, "resolved_params": resolved_params}
+        graph_hash = hashlib.sha256(
+            json.dumps(hash_source, sort_keys=True, default=str).encode()
+        ).hexdigest()
 
         run_data = {
             "run_id": "",

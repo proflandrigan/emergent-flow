@@ -18,6 +18,7 @@ from emergentflow.timeseries import (
     seasonal_decompose,
     time_weighted_aggregate,
 )
+from emergentflow.timeseries.errors import TimeseriesError
 
 
 @pytest.fixture
@@ -115,6 +116,13 @@ def test_seasonal_decompose_basic(ts_df):
 def test_seasonal_decompose_no_period(ts_df):
     with pytest.raises(ValueError):
         seasonal_decompose(ts_df, target="value")
+
+
+def test_seasonal_decompose_period_too_large_raises_typed_error(ts_df):
+    # A period needing more than two cycles than the series holds must surface as
+    # the family's typed TimeseriesError, not a raw statsmodels ValueError.
+    with pytest.raises(TimeseriesError, match="at least 2 complete cycles"):
+        seasonal_decompose(ts_df, target="value", period=len(ts_df))
 
 
 def test_seasonal_decompose_invalid_model(ts_df):

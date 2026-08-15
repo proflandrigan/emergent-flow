@@ -155,6 +155,12 @@ def text(
     if column not in data.columns:
         raise EmbedError(f"Column {column!r} not found in DataFrame.")
 
+    if output_column in data.columns and output_column != column:
+        raise EmbedError(
+            f"output_column {output_column!r} already exists as a column in the input; "
+            f"ef.embed.text never overwrites an existing column — choose a different name."
+        )
+
     if batch_size <= 0:
         raise EmbedError(f"batch_size must be a positive integer, got {batch_size!r}.")
 

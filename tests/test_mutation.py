@@ -361,6 +361,37 @@ class TestApplyMutationPurity:
         assert result_a.model_dump(mode="json") == result_b.model_dump(mode="json")
 
 
+class TestApplyMutationPreservesGraphParams:
+    def test_graph_level_params_survive_a_mutation(self) -> None:
+        # issue #116 graph-level params are a real Graph field; a mutation that
+        # adds a node/edge or edits node params must not silently drop them
+        # (regression: the reconstructed Graph omitted `params`).
+        graph = Graph(
+            nodes={node.id: node for node in [_load_csv_node()]},
+            params={
+                "epochs": Param(name="epochs", type_token="int", value=10, default=1),
+            },
+        )
+        node_id = next(iter(graph.nodes))
+        m = GraphMutation(
+            base_version=1,
+            add_nodes=[CastTypes().instantiate(dtypes={})],
+            set_params={node_id: {"path": "b.csv"}},
+        )
+        result = apply_mutation(graph, m)
+        assert result.params == graph.params
+
+    def test_graph_level_params_survive_a_noop_mutation(self) -> None:
+        graph = Graph(
+            nodes={node.id: node for node in [_load_csv_node()]},
+            params={
+                "seed": Param(name="seed", type_token="int", value=42, default=0),
+            },
+        )
+        result = apply_mutation(graph, GraphMutation(base_version=1))
+        assert result.params == graph.params
+
+
 # ---------------------------------------------------------------------------
 # JSON round-trip (agents send JSON)
 # ---------------------------------------------------------------------------

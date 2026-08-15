@@ -51,7 +51,7 @@ def _prepare_chart_spec(
     columns = set(df.columns)
     for key, value in encoding.items():
         if isinstance(value, dict):
-            refs: list[Any] = list(value.keys())
+            refs = [value.get("field")] if "field" in value else list(value.keys())
         elif isinstance(value, (list, tuple)):
             refs = list(value)
         else:

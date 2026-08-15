@@ -8,6 +8,7 @@ import ast
 from typing import Any
 
 import pandas as pd
+import pytest
 
 from emergentflow.nodes.examples.recommend_fit import RecommendFit
 from emergentflow.nodes.examples.recommend_recommend import Recommend
@@ -96,6 +97,17 @@ def test_user_knn_cf_fit_returns_fitted_recommender():
     assert result.algorithm_family == "collaborative"
     assert "similarity_matrix_density" in result.fit_stats
     assert "mean_neighborhood_size" in result.fit_stats
+
+
+def test_user_knn_cf_similarity_is_sparse_csr():
+    im = _make_small_interactions()
+    spec = _reg.get_recommender_spec("user_knn_cf")
+    fitted = spec.fitter(im, None, {"k": 2, "similarity": "jaccard"})
+    sim = fitted.model["similarity"]
+    import scipy.sparse as _sp
+
+    assert _sp.issparse(sim)
+    assert _sp.isspmatrix_csr(sim)
 
 
 def test_user_knn_cf_recommend_hand_verified():
@@ -235,6 +247,53 @@ def test_user_knn_cf_equivalence_execute_vs_codegen():
         exec_result["result"].recommendations,
         codegen_result.recommendations,
     )
+
+
+def test_user_knn_cf_pre_flight_footprint_guard():
+    from emergentflow.recommend.errors import RecommendationScaleError
+
+    im = _make_small_interactions()
+    spec = _reg.get_recommender_spec("user_knn_cf")
+
+    # A ridiculously low cap must refuse the fit with the typed error.
+    with pytest.raises(RecommendationScaleError):
+        spec.fitter(im, None, {"k": 2, "max_footprint_bytes": 1})
+
+    # A generous cap (or none) allows the fit.
+    fitted = spec.fitter(im, None, {"k": 2, "max_footprint_bytes": 1 << 40})
+    assert isinstance(fitted, FittedRecommender)
+
+
+def test_user_knn_cf_guard_absent_uses_module_default():
+    """No max_footprint_bytes param -> the default 2 GiB cap applies and small fits pass."""
+    im = _make_small_interactions()
+    spec = _reg.get_recommender_spec("user_knn_cf")
+    fitted = spec.fitter(im, None, {"k": 2})
+    assert isinstance(fitted, FittedRecommender)
+
+
+def test_user_knn_cf_max_footprint_bytes_valid_through_fit():
+    """max_footprint_bytes is an allowed optional param through the public fit() seam (not
+    rejected as unknown), and a low cap raises RecommendationScaleError."""
+    from emergentflow.recommend import fit
+    from emergentflow.recommend.errors import RecommendationScaleError
+
+    im = _make_small_interactions()
+    with pytest.raises(RecommendationScaleError):
+        fit(im, algorithm="user_knn_cf", params={"k": 2, "max_footprint_bytes": 1})
+
+
+def test_knn_cf_max_footprint_bytes_none_uses_default():
+    """max_footprint_bytes=None (the documented default) must be treated as the module
+    default cap, not crash with a TypeError (regression: int(None)). Both user_knn_cf and
+    item_knn_cf fits must succeed with that explicit None param."""
+    from emergentflow.recommend import fit
+
+    im = _make_small_interactions()
+    for algo in ("user_knn_cf", "item_knn_cf"):
+        fitted = fit(im, algorithm=algo, params={"k": 2, "max_footprint_bytes": None})
+        assert isinstance(fitted, FittedRecommender)
+        assert fitted.algorithm == algo
 
 
 # ---------------------------------------------------------------------------

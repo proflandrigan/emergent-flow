@@ -25,6 +25,7 @@ from emergentflow.stats import (
     ttest,
     wilcoxon,
 )
+from emergentflow.stats.errors import StatsScaleError
 
 # pytest collects top-level ``test_`` names; mark this imported function
 # so pytest skips it (it is not an actual test case).
@@ -333,6 +334,14 @@ def test_kruskal_deterministic() -> None:
     assert first["p_value"].iloc[0] == second["p_value"].iloc[0]
 
 
+def test_kruskal_group_with_no_non_null_values_raises() -> None:
+    """A group whose value column is entirely NaN would pass scipy an empty sample
+    and silently yield a NaN statistic/p-value; it must raise a typed error instead."""
+    df = pd.DataFrame({"grp": ["a", "a", "b", "b"], "score": [1.0, 2.0, None, None]})
+    with pytest.raises(ValueError, match="no non-null values"):
+        kruskal(df, group_col="grp", value_col="score")
+
+
 def test_kruskal_registered_as_public_op() -> None:
     from emergentflow.api import PUBLIC_OPS
 
@@ -522,6 +531,31 @@ def test_correlation_does_not_mutate_input() -> None:
     assert list(df.columns) == original_cols
 
 
+def test_correlation_scale_guard_raises() -> None:
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0], "c": [3.0, 6.0, 9.0]})
+
+    with pytest.raises(StatsScaleError):
+        correlation(df, max_footprint_bytes=1)
+
+
+def test_correlation_scale_guard_pass_large_cap() -> None:
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0], "c": [3.0, 6.0, 9.0]})
+
+    result = correlation(df, max_footprint_bytes=1 << 60)
+
+    assert isinstance(result, pd.DataFrame)
+    assert set(result.columns) == {"column", "a", "b", "c"}
+
+
+def test_correlation_default_guard_does_not_trigger() -> None:
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0], "c": [3.0, 6.0, 9.0]})
+
+    result = correlation(df)
+
+    assert isinstance(result, pd.DataFrame)
+    assert set(result.columns) == {"column", "a", "b", "c"}
+
+
 def test_correlation_registered_as_public_op() -> None:
     from emergentflow.api import PUBLIC_OPS
 
@@ -630,6 +664,20 @@ def test_ttest_does_not_mutate_input() -> None:
     ttest(df, group_col="grp", value_col="score")
 
     assert list(df.columns) == original_cols
+
+
+def test_ttest_all_nan_group_raises() -> None:
+    df = pd.DataFrame({"grp": ["a", "a", "b", "b"], "score": [None, None, 5.0, 7.0]})
+
+    with pytest.raises(ValueError, match="at least one non-null"):
+        ttest(df, group_col="grp", value_col="score")
+
+
+def test_ttest_single_observation_per_group_raises() -> None:
+    df = pd.DataFrame({"grp": ["a", "b"], "score": [1.0, 2.0]})
+
+    with pytest.raises(ValueError, match="more than one total observation"):
+        ttest(df, group_col="grp", value_col="score")
 
 
 def test_ttest_deterministic() -> None:
@@ -841,6 +889,13 @@ def test_test_proportions_single_group_raises() -> None:
 def test_test_proportions_three_groups_raises() -> None:
     df = pd.DataFrame({"grp": ["a", "b", "c"], "ok": [1, 0, 1]})
     with pytest.raises(ValueError, match="exactly 2 distinct groups"):
+        test_proportions(df, group_col="grp", success_col="ok")
+
+
+def test_test_proportions_all_nan_success_group_raises() -> None:
+    df = pd.DataFrame({"grp": ["a", "a", "a", "b", "b", "b"], "ok": [0, 1, 1, None, None, None]})
+
+    with pytest.raises(ValueError, match="at least one non-null"):
         test_proportions(df, group_col="grp", success_col="ok")
 
 

@@ -122,6 +122,18 @@
       "default": null,
       "title": "Review Id"
     },
+    "run_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Run Id"
+    },
     "session_id": {
       "title": "Session Id",
       "type": "string"
@@ -158,7 +170,8 @@
         "chat_turn_failed",
         "chat_turn_interrupted",
         "chat_ended",
-        "persona_changed"
+        "persona_changed",
+        "run_completed"
       ],
       "title": "Type",
       "type": "string"

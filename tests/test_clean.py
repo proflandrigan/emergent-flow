@@ -337,6 +337,12 @@ class TestEncodeLists:
         assert result.loc[0, "g_rock"] == 1
         assert result.loc[1, "g_rock"] == 0
 
+    def test_pd_na_cell_yields_all_zeros_row(self) -> None:
+        df = pd.DataFrame({"u": [1, 2], "g": pd.Series([["rock"], pd.NA], dtype="object")})
+        result = encode_lists(df, column="g")
+        assert result.loc[0, "g_rock"] == 1
+        assert result.loc[1, "g_rock"] == 0
+
     def test_sep_splitting(self) -> None:
         df = pd.DataFrame({"u": [1], "g": ["rock|jazz"]})
         result = encode_lists(df, column="g", sep="|")

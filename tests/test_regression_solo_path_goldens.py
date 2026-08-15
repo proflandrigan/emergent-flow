@@ -111,7 +111,13 @@ def test_validate_response_golden(client: TestClient, snapshot) -> None:
 def test_execute_response_golden(client: TestClient, snapshot) -> None:
     resp = client.post("/execute", json=_load_csv_graph())
     assert resp.status_code == 200
-    assert resp.json() == snapshot
+    body = resp.json()
+    # ``/execute`` now returns a timestamp+random ``run_id`` (issue #8 persists runs), which
+    # is inherently non-deterministic, so exclude it from the byte-identical golden
+    # comparison -- the rest of the response must stay byte-identical to the snapshot.
+    assert isinstance(body, dict) and "run_id" in body and isinstance(body["run_id"], str)
+    body.pop("run_id")
+    assert body == snapshot
 
 
 # ---------------------------------------------------------------------------

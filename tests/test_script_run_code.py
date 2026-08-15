@@ -26,6 +26,10 @@ class TestRunCode:
         with pytest.raises(CustomCodeError):
             run_code(code, None)
 
+    def test_run_code_non_str_raises_custom_code_error(self) -> None:
+        with pytest.raises(CustomCodeError, match="failed to compile"):
+            run_code(None, 1)
+
     def test_run_code_propagates_runtime_errors(self) -> None:
         code = "def transform(value):\n    return value['missing']"
         with pytest.raises(KeyError):

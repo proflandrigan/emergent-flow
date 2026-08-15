@@ -474,6 +474,29 @@ def test_system_single_user_degenerate():
     assert "novelty" in result.aggregate
 
 
+def test_system_diversity_bounded_at_scale():
+    """diversity on many users completes quickly (does not iterate U^2) and is in [0, 1]."""
+    import random as _random
+
+    n_users = 3000
+    rng = _random.Random(7)
+    frame = pd.DataFrame(
+        {
+            "user_id": [f"u{i}" for i in range(n_users) for _ in range(3)],
+            "item_id": [rng.choice(["A", "B", "C", "D", "E"]) for _ in range(n_users * 3)],
+            "value": [1] * (n_users * 3),
+        }
+    )
+    im = InteractionMatrix.from_dataframe(
+        frame, user_col="user_id", item_col="item_id", value_col="value"
+    )
+    spec = get_recommender_spec("popularity")
+    recommender = spec.fitter(im, None, {"score_type": "count"})
+    result = evaluate(recommender, im, k=3, metrics=["diversity"])
+    val = result.aggregate["diversity"]
+    assert 0.0 <= val <= 1.0
+
+
 def test_evaluate_all_ten_metrics_accepted():
     """All 10 metric names accepted; metrics=None returns all 10 aggregate keys."""
     recommender, _ = _make_fitted_popularity()
@@ -579,7 +602,16 @@ ALL_TEN_METRIC_COLS = {
     "mean_mrr_at_k",
     "mean_auc_at_k",
 }
-EXPECTED_COMPARE_COLS = {"algorithm", "is_baseline"} | ALL_TEN_METRIC_COLS
+DEFAULT_COMPARE_METRIC_COLS = {
+    "mean_precision_at_k",
+    "mean_recall_at_k",
+    "mean_ndcg_at_k",
+    "map_at_k",
+    "hit_rate",
+    "coverage",
+    "novelty",
+}
+EXPECTED_COMPARE_COLS = {"algorithm", "is_baseline"} | DEFAULT_COMPARE_METRIC_COLS
 
 
 def test_compare_with_popularity_in_list_no_auto_baseline():
@@ -626,6 +658,30 @@ def test_compare_empty_recommenders_raises():
     test = _make_test_interactions()
     with pytest.raises(InvalidRecommenderParamsError):
         compare(test, recommenders=[], k=2)
+
+
+def test_compare_default_drops_diversity_keeps_linear():
+    pop_rec, _ = _make_fitted_popularity()
+    rand_rec, _ = _make_fitted_random()
+    test = _make_test_interactions()
+    result = compare(test, recommenders=[pop_rec, rand_rec], k=2)
+    assert set(result.columns) == EXPECTED_COMPARE_COLS
+    assert "diversity" not in result.columns
+    assert "coverage" in result.columns
+    assert "novelty" in result.columns
+
+
+def test_compare_metrics_subset_honored():
+    pop_rec, _ = _make_fitted_popularity()
+    rand_rec, _ = _make_fitted_random()
+    test = _make_test_interactions()
+    result = compare(
+        test,
+        recommenders=[pop_rec, rand_rec],
+        k=2,
+        metrics=["precision_at_k", "hit_rate"],
+    )
+    assert set(result.columns) == {"algorithm", "is_baseline", "mean_precision_at_k", "hit_rate"}
 
 
 # ===================================================================

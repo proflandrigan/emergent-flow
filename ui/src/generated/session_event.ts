@@ -10,6 +10,7 @@ export type Persona = string | null;
 export type ProposalId = string | null;
 export type RevertedCheckpointId = string | null;
 export type ReviewId = string | null;
+export type RunId = string | null;
 export type SessionId = string;
 export type TurnId = string | null;
 export type Type =
@@ -31,7 +32,8 @@ export type Type =
   | "chat_turn_failed"
   | "chat_turn_interrupted"
   | "chat_ended"
-  | "persona_changed";
+  | "persona_changed"
+  | "run_completed";
 export type Version = number | null;
 
 /**
@@ -48,6 +50,7 @@ export interface SessionEvent {
   proposal_id?: ProposalId;
   reverted_checkpoint_id?: RevertedCheckpointId;
   review_id?: ReviewId;
+  run_id?: RunId;
   session_id: SessionId;
   turn_id?: TurnId;
   type: Type;

@@ -37,9 +37,9 @@ def test_compile_spec_missing_dialect_is_422() -> None:
     assert "error" in resp.json()
 
 
-def test_test_connection_unknown_profile_is_422(tmp_path, monkeypatch) -> None:
+def test_test_connection_unknown_profile_is_404(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("EMERGENTFLOW_CONNECTIONS", str(tmp_path / "connections.toml"))
     with TestClient(app) as test_client:
         resp = test_client.post("/connections/does_not_exist/test")
-    assert resp.status_code == 422
+    assert resp.status_code == 404
     assert "error" in resp.json()

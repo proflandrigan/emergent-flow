@@ -12944,6 +12944,15 @@
           "name": "columns",
           "required": false,
           "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Refuse a dense D x D correlation above this cap (bytes); unset uses a 2 GiB default.",
+          "hints": null,
+          "label": "Max footprint (bytes)",
+          "name": "max_footprint_bytes",
+          "required": false,
+          "type_token": "int"
         }
       ],
       "ports": [
@@ -12967,7 +12976,7 @@
         }
       ],
       "type": "stats.correlation",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -17346,6 +17355,14 @@
           "name": "min_common_users",
           "required": false,
           "type": "int"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Pre-flight cap (bytes) on the estimated dense n x n KNN footprint; fits above it raise RecommendationScaleError. Set very large to disable.",
+          "name": "max_footprint_bytes",
+          "required": false,
+          "type": "int"
         }
       ],
       "requires_extra": null
@@ -17846,6 +17863,14 @@
           "default": 1,
           "help": "Minimum shared interacted items required for a neighbor to count.",
           "name": "min_common_items",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "choices": null,
+          "default": null,
+          "help": "Pre-flight cap (bytes) on the estimated dense n x n KNN footprint; fits above it raise RecommendationScaleError. Set very large to disable.",
+          "name": "max_footprint_bytes",
           "required": false,
           "type": "int"
         }

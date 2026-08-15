@@ -607,3 +607,41 @@ def test_train_serve_skew_reports_count_mismatch_not_order() -> None:
     skew = [f for f in run_validity_checks(graph) if f.rule_id == "train_serve_skew"]
     assert skew, "skew must still be detected"
     assert all("different order" not in f.message for f in skew)
+
+
+def test_train_serve_skew_emits_one_finding_per_count_delta() -> None:
+    """A transform applied twice on train but once on serve is a single extra
+    application (delta = 1), so the rule must report exactly one finding — not
+    one per train node of that type (which would double-count the discrepancy)."""
+    src = _node("src", "test.source", [("src-out", "out", OUT, DF)])
+    sa = _node("sa", "transform.scale_features", _io("sa", "a"))
+    sb = _node("sb", "transform.scale_features", _io("sb", "b"))
+    sc = _node("sc", "transform.scale_features", _io("sc", "c"))
+    fit = _node(
+        "fit",
+        "ml.fit_estimator",
+        [("f-in", "frame", IN, DF), ("f-out", "model", OUT, "Model")],
+    )
+    lm = _node("lm", "ml.load_model", [("lm-out", "model", OUT, "Model")], [("path", "m.joblib")])
+    pred = _node(
+        "pred",
+        "ml.predict",
+        [
+            ("p-model", "model", IN, "Model"),
+            ("p-frame", "frame", IN, DF),
+            ("p-out", "predictions", OUT, "Predictions"),
+        ],
+    )
+    graph = _graph(
+        [src, sa, sb, sc, fit, lm, pred],
+        [
+            _edge("e1", "src", "src-out", "sa", "a-in"),
+            _edge("e2", "sa", "a-out", "sb", "b-in"),
+            _edge("e3", "sb", "b-out", "fit", "f-in"),
+            _edge("e4", "src", "src-out", "sc", "c-in"),
+            _edge("e5", "sc", "c-out", "pred", "p-frame"),
+            _edge("e6", "lm", "lm-out", "pred", "p-model"),
+        ],
+    )
+    skew = [f for f in run_validity_checks(graph) if f.rule_id == "train_serve_skew"]
+    assert len(skew) == 1, f"expected one finding for a single count delta, got {len(skew)}"

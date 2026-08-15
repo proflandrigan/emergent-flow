@@ -13,7 +13,7 @@ different order). Pure, static, and deterministic over the graph IR.
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 
 from emergentflow.ir import Graph, Node
 
@@ -225,43 +225,55 @@ class TrainServeSkew(ValidityRule):
 
                 # A transform type applied MORE times on one path than the other is a
                 # count difference, not an order difference -- report it as a missing/
-                # extra transform so the message is accurate.
-                missing = [
-                    t for t in train_transforms if train_counts[t.type] > predict_counts[t.type]
-                ]
-                extra = [
-                    t for t in predict_transforms if predict_counts[t.type] > train_counts[t.type]
-                ]
+                # extra transform so the message is accurate. Emit exactly ``abs(delta)``
+                # findings per over-represented type (the count difference), not one per
+                # node of that type: with scan applied twice on train and once on serve
+                # the *delta* is a single extra application, so tagging both train nodes
+                # as "missing" would double-count the discrepancy.
+                train_by_type: dict[str, list[Node]] = defaultdict(list)
+                predict_by_type: dict[str, list[Node]] = defaultdict(list)
+                for t in train_transforms:
+                    train_by_type[t.type].append(t)
+                for t in predict_transforms:
+                    predict_by_type[t.type].append(t)
 
-                for transform in missing:
-                    findings.append(
-                        ValidityFinding(
-                            rule_id=self.id,
-                            severity=self.severity,
-                            message=(
-                                f"node {transform.id!r} ({transform.type}) is applied "
-                                f"on the training path into node {train.id!r} but "
-                                f"NOT on the scoring path into node {predict.id!r} "
-                                "(ml.predict); served data is missing this transform "
-                                "the model was trained on."
-                            ),
-                            node_id=transform.id,
-                            related_node_ids=[train.id, predict.id],
+                for train_type, t_count in train_counts.items():
+                    delta = t_count - predict_counts.get(train_type, 0)
+                    if delta <= 0:
+                        continue
+                    for transform in train_by_type[train_type][:delta]:
+                        findings.append(
+                            ValidityFinding(
+                                rule_id=self.id,
+                                severity=self.severity,
+                                message=(
+                                    f"node {transform.id!r} ({transform.type}) is applied "
+                                    f"on the training path into node {train.id!r} but "
+                                    f"NOT on the scoring path into node {predict.id!r} "
+                                    "(ml.predict); served data is missing this transform "
+                                    "the model was trained on."
+                                ),
+                                node_id=transform.id,
+                                related_node_ids=[train.id, predict.id],
+                            )
                         )
-                    )
-                for transform in extra:
-                    findings.append(
-                        ValidityFinding(
-                            rule_id=self.id,
-                            severity=self.severity,
-                            message=(
-                                f"node {transform.id!r} ({transform.type}) is applied "
-                                f"on the scoring path into node {predict.id!r} "
-                                "(ml.predict) but NOT on the training path into node "
-                                f"{train.id!r}; the model never saw this transform."
-                            ),
-                            node_id=transform.id,
-                            related_node_ids=[train.id, predict.id],
+                for predict_type, p_count in predict_counts.items():
+                    delta = p_count - train_counts.get(predict_type, 0)
+                    if delta <= 0:
+                        continue
+                    for transform in predict_by_type[predict_type][:delta]:
+                        findings.append(
+                            ValidityFinding(
+                                rule_id=self.id,
+                                severity=self.severity,
+                                message=(
+                                    f"node {transform.id!r} ({transform.type}) is applied "
+                                    f"on the scoring path into node {predict.id!r} "
+                                    "(ml.predict) but NOT on the training path into node "
+                                    f"{train.id!r}; the model never saw this transform."
+                                ),
+                                node_id=transform.id,
+                                related_node_ids=[train.id, predict.id],
+                            )
                         )
-                    )
         return findings

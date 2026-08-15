@@ -237,8 +237,9 @@ def evaluate(model: FittedModel, df: pd.DataFrame) -> EvaluationResult:
             metrics["f1"] = float(f1_score(y_true, y_pred, zero_division=0, pos_label=pos_label))
             if hasattr(model.estimator, "predict_proba"):
                 proba = model.estimator.predict_proba(df[model.feature_names])
-                with contextlib.suppress(ValueError):
-                    metrics["roc_auc"] = float(roc_auc_score(y_true, proba[:, 1]))
+                if y_true.nunique() >= 2:
+                    with contextlib.suppress(ValueError):
+                        metrics["roc_auc"] = float(roc_auc_score(y_true, proba[:, 1]))
         # else: fewer than 2 classes in `classes_` (a degenerate single-class fit) --
         # precision/recall/f1/roc_auc are undefined, so only `accuracy` is reported.
     return EvaluationResult(task=model.task, n=int(df.shape[0]), metrics=metrics)
@@ -537,27 +538,33 @@ def optimize_threshold(
     pos_index = next(i for i, c in enumerate(classes) if str(c) == pos)
 
     prob_pos = model.estimator.predict_proba(X)[:, pos_index]
-    # ``precision_recall_curve`` returns precision/recall arrays that are one element longer than
-    # ``thresholds``. That trailing entry is the synthetic "predict nothing positive" operating
-    # point (precision=1, recall=0), which corresponds to an infinite threshold and carries no
-    # useful F1; it is NOT the "predict everything positive" point at decision threshold 0.
-    # Zipping against ``thresh`` alone would drop it, so replace that final operating point with
-    # the genuinely well-defined threshold-0 point (predict everything positive), whose precision
-    # is the positive-class prevalence and whose recall is 1.0.
+    # ``precision_recall_curve`` returns one precision/recall entry per threshold PLUS a
+    # trailing synthetic "predict nothing positive" point (precision=1, recall=0) that
+    # corresponds to an infinite threshold and carries no useful F1. Its FIRST entry
+    # (minimum threshold) is the "predict everything positive" operating point. The loop
+    # below emits one row per real threshold (labeling that first point explicitly as the
+    # threshold-0 baseline) and drops the synthetic trailing point.
     prec, rec, thresh = precision_recall_curve(y, prob_pos, pos_label=classes[pos_index])
 
     n_thresh = len(thresh)
-    positive_fraction = float((y == classes[pos_index]).sum()) / len(y)
     rows = []
     best_t = 0.0
     best_f1 = 0.0
     for i, (p, r) in enumerate(zip(prec, rec, strict=True)):
         if i < n_thresh:
-            t = float(thresh[i])
+            # Each real operating point carries a decision threshold. ``precision_recall_curve``
+            # already yields the "predict everything positive" operating point as its FIRST entry
+            # (all scores >= the minimum threshold, so precision = prevalence and recall = 1.0);
+            # label that point with the canonical threshold 0.0 rather than the minimum score so
+            # the returned curve reads as the baseline operating point, not as if it only applied
+            # at that specific positive score.
+            t = 0.0 if i == 0 else float(thresh[i])
         else:
-            t = 0.0
-            p = positive_fraction
-            r = 1.0
+            # The single trailing entry precision_recall_curve appends is the synthetic
+            # "predict nothing positive" operating point (precision=1, recall=0); it has no
+            # decision threshold and carries no useful F1, so it is dropped -- appending a
+            # threshold-0 point here would only duplicate the predict-all row above.
+            continue
         f1 = 2 * p * r / (p + r) if (p + r) > 0 else 0.0
         rows.append((t, float(p), float(r), f1))
         if f1 > best_f1:

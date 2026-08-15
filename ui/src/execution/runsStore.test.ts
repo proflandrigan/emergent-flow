@@ -45,6 +45,27 @@ describe("selectRun", () => {
     useRunsStore.getState().selectRun(null);
     expect(useRunsStore.getState().selectedRunId).toBeNull();
   });
+
+  it("ignores a stale out-of-order response from an earlier selection", async () => {
+    const detailA = { run_id: "runA", statuses: {}, reproducibility: { seeds: {}, content_hashes: {}, dependency_versions: {} }, sdk_version: "0.3.3" };
+    const detailB = { run_id: "runB", statuses: {}, reproducibility: { seeds: {}, content_hashes: {}, dependency_versions: {} }, sdk_version: "0.3.3" };
+    let resolveA!: (v: unknown) => void;
+    let resolveB!: (v: unknown) => void;
+    (getRun as ReturnType<typeof vi.fn>)
+      .mockImplementationOnce(() => new Promise((res) => { resolveA = res; }))
+      .mockImplementationOnce(() => new Promise((res) => { resolveB = res; }));
+
+    const pA = useRunsStore.getState().selectRun("runA");
+    const pB = useRunsStore.getState().selectRun("runB");
+    // B resolves first, then the stale A resolves after the user already chose B.
+    resolveB(detailB);
+    await pB;
+    expect(useRunsStore.getState().selectedRunId).toBe("runB");
+    resolveA(detailA);
+    await pA;
+    // The stale A response must NOT overwrite the user's latest selection.
+    expect(useRunsStore.getState().selectedRunId).toBe("runB");
+  });
 });
 
 describe("deleteRun", () => {

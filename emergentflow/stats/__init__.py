@@ -16,6 +16,7 @@ See ``docs/public-api-conventions.md`` and ``docs/sdk-design-philosophy.md``.
 from __future__ import annotations
 
 import importlib.util
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -58,11 +59,13 @@ from emergentflow.stats.errors import (
     InvalidModelSpecError,
     MissingOptionalDependencyError,
     StatsError,
+    StatsScaleError,
     UnknownDiagnosticError,
     UnknownModelError,
 )
 from emergentflow.stats.models import FittedStatsModel
 from emergentflow.stats.registry import ModelSpec, keys_for_archetype, known_model_keys
+from emergentflow.stats.scale import enforce_dense_square_guard
 from emergentflow.stats.spec import _prepare_diagnostic_spec, _prepare_model_spec
 
 __all__ = [
@@ -103,6 +106,7 @@ __all__ = [
     "UnknownModelError",
     "InvalidModelSpecError",
     "MissingOptionalDependencyError",
+    "StatsScaleError",
     "known_diagnostic_keys",
     "known_model_keys",
     "keys_for_archetype",
@@ -193,9 +197,19 @@ def ttest(
     # the reported sample sizes and the pooled-variance weight).
     a = df.loc[df[group_col].astype(str) == a_label, value_col].dropna()
     b = df.loc[df[group_col].astype(str) == b_label, value_col].dropna()
-    res = ttest_ind(a, b, equal_var=equal_var)
     n_a_count = int(a.shape[0])
     n_b_count = int(b.shape[0])
+    if n_a_count == 0 or n_b_count == 0:
+        raise ValueError(
+            f"two-sample t-test needs at least one non-null {value_col!r} value in each of "
+            f"groups {a_label!r} and {b_label!r}; found {n_a_count} and {n_b_count}."
+        )
+    if n_a_count + n_b_count <= 2:
+        raise ValueError(
+            f"two-sample t-test needs more than one total observation to compute a pooled "
+            f"variance; groups {a_label!r}/{b_label!r} had {n_a_count} and {n_b_count}."
+        )
+    res = ttest_ind(a, b, equal_var=equal_var)
     var_a = float(a.var(ddof=1))
     var_b = float(b.var(ddof=1))
     pooled_sd = (
@@ -432,6 +446,14 @@ def kruskal(
             f"Kruskal-Wallis needs at least 2 distinct groups in {group_col!r}; found {n_groups}."
         )
     samples = [g[value_col].dropna().to_numpy() for _, g in df.groupby(group_col, sort=True)]
+    empty_groups = [
+        str(k) for k, g in df.groupby(group_col, sort=True) if g[value_col].dropna().empty
+    ]
+    if empty_groups:
+        raise ValueError(
+            f"Kruskal-Wallis found group(s) with no non-null values in {value_col!r}: "
+            f"{empty_groups}. Drop or impute those groups before testing."
+        )
     n_total = int(sum(len(s) for s in samples))
     res = scipy_kruskal(*samples)
     h_stat = float(res.statistic)
@@ -580,9 +602,14 @@ def test_proportions(
     if not df[success_col].dropna().isin([0, 1, True, False]).all():
         raise ValueError(f"success_col {success_col!r} must contain only 0/1/True/False values.")
     a_label, b_label = groups[0], groups[1]
-    a = df.loc[df[group_col].astype(str) == a_label, success_col]
-    b = df.loc[df[group_col].astype(str) == b_label, success_col]
+    a = df.loc[df[group_col].astype(str) == a_label, success_col].dropna()
+    b = df.loc[df[group_col].astype(str) == b_label, success_col].dropna()
     n_a, n_b = int(a.shape[0]), int(b.shape[0])
+    if n_a == 0 or n_b == 0:
+        raise ValueError(
+            f"two-proportion z-test needs at least one non-null {success_col!r} value in each of "
+            f"groups {a_label!r} and {b_label!r}; found {n_a} and {n_b}."
+        )
     count_a, count_b = int(a.sum()), int(b.sum())
     p_a = count_a / n_a if n_a > 0 else float("nan")
     p_b = count_b / n_b if n_b > 0 else float("nan")
@@ -591,7 +618,7 @@ def test_proportions(
         count_b, n_b, count_a, n_a, compare="diff", alpha=alpha
     )
     diff = p_b - p_a
-    relative_uplift = diff / p_a if p_a not in (0, float("nan")) and p_a != 0 else float("nan")
+    relative_uplift = diff / p_a if not (p_a == 0 or math.isnan(p_a)) else float("nan")
     return pd.DataFrame(
         [
             {
@@ -927,12 +954,16 @@ def correlation(
     *,
     method: str = "pearson",
     columns: list[str] | None = None,
+    max_footprint_bytes: int | None = None,
 ) -> pd.DataFrame:
     """Compute a pairwise correlation matrix, returned as a tidy DataFrame.
 
     Thin wrapper over ``pandas.DataFrame.corr``. ``method`` is one of pearson/spearman/kendall.
     With ``columns`` given, only those columns are correlated (each must exist). The row labels
     are moved into a leading ``column`` field so the matrix is tidy/serializable.
+    ``max_footprint_bytes`` caps the estimated dense D x D footprint (default 2 GiB, see
+    ``emergentflow.stats.scale``); ``correlation`` refuses to run above the cap to protect the
+    shared in-process server from OOM. Pass a very large value to effectively disable the guard.
     """
     if method not in CORR_METHODS:
         raise ValueError(f"unknown method {method!r}; expected one of {list(CORR_METHODS)!r}.")
@@ -940,9 +971,16 @@ def correlation(
         unknown = [c for c in columns if c not in df.columns]
         if unknown:
             raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
-        target = df[columns]
+        target = df[columns].select_dtypes(include="number")
+        dropped = [c for c in columns if c not in target.columns]
+        if dropped:
+            raise ValueError(
+                f"columns {dropped!r} are not numeric and cannot be correlated; "
+                f"pass only numeric columns."
+            )
     else:
         target = df.select_dtypes(include="number")
+    enforce_dense_square_guard(target.shape[1], max_footprint_bytes, "correlation")
     result = target.corr(method=method).reset_index(names="column")
     return result
 

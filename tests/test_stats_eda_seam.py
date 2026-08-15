@@ -20,6 +20,7 @@ from emergentflow.stats import (
     missingness,
     profile,
 )
+from emergentflow.stats.errors import StatsScaleError
 
 
 def _make_df() -> pd.DataFrame:
@@ -141,6 +142,31 @@ def test_co_missingness_unknown_column_raises():
         co_missingness(df, columns=["nope"])
 
 
+def test_co_missingness_duplicate_columns_dedupe():
+    df = _make_df()
+    result = co_missingness(df, columns=["a", "a"])
+    assert result.columns.tolist() == ["column", "a"]
+    assert result.equals(co_missingness(df, columns=["a"]))
+
+
+def test_co_missingness_scale_guard_raises():
+    df = _make_df()
+    with pytest.raises(StatsScaleError):
+        co_missingness(df, max_footprint_bytes=1)
+
+
+def test_co_missingness_scale_guard_pass_large_cap():
+    df = _make_df()
+    result = co_missingness(df, max_footprint_bytes=1 << 60)
+    assert result.equals(co_missingness(df))
+
+
+def test_co_missingness_default_guard_does_not_trigger():
+    df = _make_df()
+    result = co_missingness(df)
+    assert result.equals(co_missingness(df, max_footprint_bytes=1 << 60))
+
+
 def test_distribution_summary_unknown_column_raises():
     df = _make_df()
     with pytest.raises(ValueError):
@@ -157,6 +183,14 @@ def test_group_by_aggregate_unknown_value_column_raises():
     df = _make_df()
     with pytest.raises(ValueError):
         group_by_aggregate(df, by="b", agg="mean", columns=["nope"])
+
+
+def test_group_by_aggregate_unknown_dict_agg_key_raises():
+    df = _make_df()
+    with pytest.raises(ValueError, match="unknown aggregation column"):
+        group_by_aggregate(df, by="b", agg={"nope": "mean"})
+    with pytest.raises(ValueError, match="unknown aggregation column"):
+        group_by_aggregate(df, by="b", agg={"a": "mean", "nope": "sum"})
 
 
 def test_missingness_pct_value():

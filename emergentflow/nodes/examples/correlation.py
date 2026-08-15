@@ -30,7 +30,7 @@ class Correlation(NodeDefinition):
     """Compute a pairwise correlation matrix."""
 
     type = "stats.correlation"
-    version = 1
+    version = 2
     family = "stats"
     label = "Correlation"
     category = "Statistics"
@@ -68,24 +68,45 @@ class Correlation(NodeDefinition):
             help="Columns to correlate; empty/unset correlates all numeric columns.",
             hints=ValidationHints(widget="column"),
         ),
+        ParamSpec(
+            name="max_footprint_bytes",
+            type_token="int",
+            default=None,
+            label="Max footprint (bytes)",
+            help="Refuse a dense D x D correlation above this cap (bytes); unset uses "
+            "a 2 GiB default.",
+        ),
     ]
 
-    def _args(self, node: Node) -> tuple[str, list[str] | None]:
+    def _args(self, node: Node) -> tuple[str, list[str] | None, int | None]:
         values = {p.name: p.value for p in node.params}
         method = values.get("method", "pearson") or "pearson"
         columns = values.get("columns")
-        return cast(str, method), cast("list[str] | None", columns)
+        max_footprint_bytes = values.get("max_footprint_bytes")
+        return (
+            cast(str, method),
+            cast("list[str] | None", columns),
+            cast("int | None", max_footprint_bytes),
+        )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        method, columns = self._args(node)
+        method, columns, max_footprint_bytes = self._args(node)
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('matrix')} = ef.stats.correlation("
-                f"{ctx.in_var('frame')}, method={method!r}, columns={columns!r})"
+                f"{ctx.in_var('frame')}, method={method!r}, columns={columns!r}, "
+                f"max_footprint_bytes={max_footprint_bytes!r})"
             ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        method, columns = self._args(node)
-        return {"matrix": correlation(inputs["frame"], method=method, columns=columns)}
+        method, columns, max_footprint_bytes = self._args(node)
+        return {
+            "matrix": correlation(
+                inputs["frame"],
+                method=method,
+                columns=columns,
+                max_footprint_bytes=max_footprint_bytes,
+            )
+        }

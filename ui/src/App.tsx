@@ -26,6 +26,7 @@ import {
 } from "./io/sessionRecovery";
 import { Palette } from "./palette/Palette";
 import { useGraphStore } from "./store/graphStore";
+import { ProposalPanel } from "./session/ProposalPanel";
 import { useSessionStore } from "./session/sessionStore";
 import { useTheme } from "./theme/useTheme";
 import { IconButton } from "./ui/IconButton";
@@ -92,6 +93,7 @@ export function App(): JSX.Element {
   const [schemaBrowserOpen, setSchemaBrowserOpen] = useState(false);
   const [runsOpen, setRunsOpen] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [proposalsOpen, setProposalsOpen] = useState(false);
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [recoveryToast, setRecoveryToast] = useState<string | null>(null);
   const past = useGraphStore((s) => s.past);
@@ -329,6 +331,13 @@ export function App(): JSX.Element {
       label: "Run history",
       onSelect: () => {
         setRunsOpen(true);
+        setMenuOpen(false);
+      },
+    },
+    {
+      label: "Review proposals",
+      onSelect: () => {
+        setProposalsOpen(true);
         setMenuOpen(false);
       },
     },
@@ -590,6 +599,11 @@ export function App(): JSX.Element {
       {runsOpen && (
         <OverlayModal width={600} onClose={() => setRunsOpen(false)}>
           <RunsPanel onClose={() => setRunsOpen(false)} />
+        </OverlayModal>
+      )}
+      {proposalsOpen && (
+        <OverlayModal width={600} onClose={() => setProposalsOpen(false)}>
+          <ProposalPanel />
         </OverlayModal>
       )}
       {chatModalOpen && (

@@ -101,8 +101,19 @@ class InteractionMatrix:
         ``None``, every present interaction gets an implicit value of ``1.0``. Does not mutate
         *df*. User and item ids are sorted for deterministic row/column ordering.
         """
-        user_ids: list[Any] = sorted(df[user_col].unique().tolist())
-        item_ids: list[Any] = sorted(df[item_col].unique().tolist())
+
+        def _sorted_ids(series: pd.Series) -> list[Any]:
+            unique = series.unique().tolist()
+            types = {type(v) for v in unique}
+            if len(types) > 1:
+                raise InvalidRecommenderParamsError(
+                    f"{series.name} ids have mixed types ({sorted(t.__name__ for t in types)!r}); "
+                    "all user/item ids must share a single comparable type."
+                )
+            return sorted(unique)
+
+        user_ids = _sorted_ids(df[user_col])
+        item_ids = _sorted_ids(df[item_col])
         user_index = {uid: i for i, uid in enumerate(user_ids)}
         item_index = {iid: i for i, iid in enumerate(item_ids)}
 

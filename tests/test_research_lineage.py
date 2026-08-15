@@ -239,3 +239,21 @@ def test_trace_lineage_edge_order_is_insertion_order_independent() -> None:
         ("b", "d"),
         ("c", "d"),
     ]
+
+
+def test_trace_lineage_tolerates_cycle() -> None:
+    """A degenerate cyclic graph (which the structural validator permits) must not
+    crash trace_lineage -- it falls back to insertion order, like trace_column_lineage."""
+    a = _node("a", type_="clean.impute_missing", in_ports=["in"], out_ports=["out"])
+    b = _node("b", type_="clean.impute_missing", in_ports=["in"], out_ports=["out"])
+    graph = Graph(
+        paradigm=Paradigm.FUNCTIONAL,
+        name="cyclic",
+        nodes={n.id: n for n in (a, b)},
+        edges={
+            "e-ab": _edge("e-ab", "a", "out", "b", "in"),
+            "e-ba": _edge("e-ba", "b", "out", "a", "in"),
+        },
+    )
+    result = trace_lineage(graph, a.id)
+    assert {n.node_id for n in result.nodes} == {a.id, b.id}

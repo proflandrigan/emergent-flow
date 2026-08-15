@@ -43,6 +43,7 @@ const darkHighlight = HighlightStyle.define([
   { tag: t.operator, color: "#89ddff" },
   { tag: t.variableName, color: "var(--text-primary)" },
   { tag: t.propertyName, color: "#82aaff" },
+  { tag: t.name, color: "var(--text-primary)" },
 ]);
 
 const lightHighlight = HighlightStyle.define([
@@ -54,6 +55,7 @@ const lightHighlight = HighlightStyle.define([
   { tag: t.operator, color: "#00838f" },
   { tag: t.variableName, color: "var(--text-primary)" },
   { tag: t.propertyName, color: "#1565c0" },
+  { tag: t.name, color: "var(--text-primary)" },
 ]);
 
 export function codeEditorExtensions(theme: Theme): Extension[] {

@@ -583,6 +583,22 @@ class SessionStore:
             )
             return attempt
 
+    def record_run(self, session_id: str, run_id: str) -> None:
+        """Publish a ``run_completed`` event for a run that already finished.
+
+        The run itself was persisted to the run store by the caller; this only
+        notifies subscribed canvases of an agent-initiated session run so they
+        can refresh. Raises ``UnknownSessionError`` if the session does not exist.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            self._publish(
+                session_id,
+                {"type": "run_completed", "session_id": session_id, "run_id": run_id},
+            )
+
     def add_review_comment(
         self, session_id: str, review_id: str, comment: ReviewComment
     ) -> ReviewThread:
