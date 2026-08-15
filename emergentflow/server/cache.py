@@ -143,6 +143,17 @@ class ExecutionCache:
             oldest.unlink(missing_ok=True)
             self._meta_path(cache_hash).unlink(missing_ok=True)
 
+        # Garbage-collect orphaned sidecars. A `.meta.json` is only meaningful
+        # beside its `.pkl` (nothing reads a meta without its artifact), so an
+        # orphaned meta -- left behind when its `.pkl` was lost or removed out
+        # of band -- can inflate `total_bytes` forever: the eviction loop above
+        # only shrinks by `.pkl` count, so once only one (or zero) artifact
+        # remains the cap would never be restored. Remove such sidecars so the
+        # size cap self-heals regardless of how the orphan arose.
+        for meta in self._root.glob("*.meta.json"):
+            if not self._pkl_path(meta.name[: -len(".meta.json")]).is_file():
+                meta.unlink(missing_ok=True)
+
 
 # A process-wide default cache so service.py's execute path and the
 # POST /cache/clear route (app.py) share one cache without an import cycle.
