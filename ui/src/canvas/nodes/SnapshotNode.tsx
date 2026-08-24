@@ -1,4 +1,4 @@
-import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
+import { type Node, type NodeProps } from "@xyflow/react";
 import { Pin } from "lucide-react";
 
 import "./SnapshotNode.css";

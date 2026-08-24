@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 
 import type { Payload } from "../store/execution";
 import { useExecutionStore } from "../store/executionStore";
-import { useGraphStore } from "../store/graphStore";
 import { selectedNodeId, useSelectionStore } from "../store/selectionStore";
 
 type SortDir = "asc" | "desc" | null;
@@ -177,7 +176,6 @@ function TableExplorer({ portName, payload }: TableExplorerProps): JSX.Element {
 
 export function DataPanel(): JSX.Element {
   const selNodes = useSelectionStore((s) => s.nodes);
-  const nodes = useGraphStore((s) => s.nodes);
   const nodeId = selectedNodeId({ nodes: selNodes });
   const results = useExecutionStore((s) => s.results);
 
