@@ -62,6 +62,33 @@ def test_dataframe_truncates_to_head() -> None:
     assert payload["shape"][0] == 60
 
 
+def test_dataframe_datetime_timedelta_describe_is_json_safe() -> None:
+    df = pd.DataFrame(
+        {
+            "ts": pd.date_range("2020-01-01", periods=3),
+            "td": pd.to_timedelta(["1 days", "2 days", "3 days"]),
+            "val": [1.0, 2.0, 3.0],
+        }
+    )
+    payload = to_payload(df)
+    json.dumps(payload)
+    desc = payload["describe"]
+    assert "ts" in desc
+    assert "td" in desc
+    assert "val" in desc
+    # Timestamp values must be ISO strings, not pd.Timestamp objects
+    assert isinstance(desc["ts"]["mean"], str)
+    assert desc["ts"]["mean"] == "2020-01-02T00:00:00"
+    # Timedelta values must be ISO strings, not pd.Timedelta objects
+    assert isinstance(desc["td"]["mean"], str)
+    assert desc["td"]["mean"] == "P2DT0H0M0S"
+    # Numeric column stats remain numbers
+    assert isinstance(desc["val"]["mean"], float)
+    assert desc["val"]["mean"] == 2.0
+    # std for a single-valued timedelta is NaN -> None
+    assert desc["ts"]["std"] is None
+
+
 def test_dataframe_nan_is_json_safe() -> None:
     df = pd.DataFrame({"x": [1.0, float("nan"), 3.0]})
     payload = to_payload(df)
@@ -70,6 +97,27 @@ def test_dataframe_nan_is_json_safe() -> None:
     assert len(nan_cells) == 1
     remaining = [row["x"] for row in payload["head"] if row["x"] is not None]
     assert all(not math.isnan(x) for x in remaining)
+
+
+def test_empty_dataframe_does_not_crash() -> None:
+    df = pd.DataFrame()
+    payload = to_payload(df)
+    assert payload["kind"] == "table"
+    assert payload["columns"] == []
+    assert payload["shape"] == [0, 0]
+    assert payload["head"] == []
+    assert payload["describe"] == {}
+    json.dumps(payload)
+
+
+def test_zero_row_dataframe_describe() -> None:
+    df = pd.DataFrame({"x": pd.Series([], dtype=float), "y": pd.Series([], dtype=object)})
+    payload = to_payload(df)
+    assert payload["kind"] == "table"
+    assert payload["shape"] == [0, 2]
+    assert "x" in payload["describe"]
+    assert "y" in payload["describe"]
+    json.dumps(payload)
 
 
 def test_dataclass_record_with_nested_dataframe() -> None:

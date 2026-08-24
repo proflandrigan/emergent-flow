@@ -3,7 +3,7 @@
 // Code tab's live-compiled output, and the Results tab's last execution output for the selected
 // node; selection is read from `selectionStore`, never the IR.
 
-import { Maximize2 } from "lucide-react";
+import { Maximize2, Pin } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { useCatalog } from "../catalog/useCatalog";
@@ -24,8 +24,11 @@ import { LineagePanel } from "./LineagePanel";
 import { PayloadView } from "./PayloadView";
 import { isRecommendationPayload, RecommendationsPanel } from "./RecommendationsPanel";
 import { StepsPanel } from "./StepsPanel";
+import { DataPanel } from "./DataPanel";
+import type { Payload } from "../store/execution";
+import type { NodeModel } from "../store/model";
 
-type InspectorTab = "config" | "code" | "results" | "steps" | "lineage";
+type InspectorTab = "config" | "code" | "results" | "steps" | "lineage" | "data";
 
 export interface InspectorProps {
   // Panel-level chrome (App's collapse toggle) rendered alongside the expand button, so the
@@ -119,6 +122,7 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
             label: "Results",
             testId: "inspector-tab-results",
           },
+          { value: "data", label: "Data", testId: "inspector-tab-data" },
           {
             value: "lineage",
             label: "Lineage",
@@ -149,6 +153,7 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
     }
     // Lineage is traced from the graph shape alone, so unlike Results it needs no prior run --
     // the panel POSTs to /lineage for whichever node is selected (Epic 16, Story 23).
+    if (tab === "data") return <DataPanel />;
     if (tab === "lineage") return <LineagePanel nodeId={nodeId} />;
     return renderResults();
   }
@@ -176,6 +181,34 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
       );
     }
     const nodeResults = results[nodeId];
+
+    function handlePinToCanvas(portName: string, payload: Payload): void {
+      const sourceNode = node;
+      if (!sourceNode) return;
+      const snapshotPayload: Payload = structuredClone(payload);
+      const offsetX = sourceNode.position.x + 200;
+      const offsetY = sourceNode.position.y + Object.keys(useGraphStore.getState().nodes).length * 30;
+      const snapshotNode: NodeModel = {
+        id: crypto.randomUUID(),
+        type: "layout.snapshot",
+        label: `Snapshot: ${sourceNode.label ?? sourceNode.type}.${portName}`,
+        paradigm: "functional",
+        params: [
+          { name: "payload_json", typeToken: "str", value: JSON.stringify(snapshotPayload), default: "" },
+          { name: "port_name", typeToken: "str", value: portName, default: "" },
+          { name: "source_node_label", typeToken: "str", value: (sourceNode.label ?? sourceNode.type) + "." + portName, default: "" },
+          { name: "caption", typeToken: "str", value: "", default: "" },
+        ],
+        ports: [],
+        position: { x: offsetX, y: offsetY },
+        groupId: null,
+      };
+      useGraphStore.getState().pushHistory("pinToCanvas");
+      useGraphStore.setState((state) => ({
+        nodes: { ...state.nodes, [snapshotNode.id]: snapshotNode },
+      }));
+    }
+
     if (!nodeResults || Object.keys(nodeResults).length === 0) {
       return (
         <p
@@ -209,7 +242,26 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
             isRecommendationPayload(payload);
           return (
             <div key={portName} style={{ marginBottom: "0.5rem" }}>
-              <span style={{ fontWeight: 600 }}>{portName}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", marginBottom: "0.25rem" }}>
+                <span style={{ fontWeight: 600 }}>{portName}</span>
+                <button
+                  type="button"
+                  data-testid="pin-to-canvas"
+                  onClick={() => handlePinToCanvas(portName, payload)}
+                  title="Pin to canvas"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: "0",
+                    cursor: "pointer",
+                    color: "var(--text-secondary)",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  <Pin size={12} />
+                </button>
+              </div>
               {isRecommendation ? (
                 <RecommendationsPanel payload={payload} />
               ) : (

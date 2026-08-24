@@ -11,10 +11,12 @@ import type { EfEdgeData } from "./edges/EfEdge";
 import type { EfNodeData } from "./nodes/EfNode";
 import type { GroupNodeData } from "./nodes/GroupNode";
 import type { NoteNodeData } from "./nodes/NoteNode";
+import type { SnapshotNodeData } from "./nodes/SnapshotNode";
 
 const NOTE_NODE_TYPE = "notes.markdown";
 const GROUP_NODE_TYPE = "layout.group";
 const COMPOSITE_NODE_TYPE = "layout.composite";
+const SNAPSHOT_NODE_TYPE = "layout.snapshot";
 
 // A group container auto-sizes to fit its members plus this padding on every side. The
 // footprint constants are a rough per-node bounding box (matches EfNode's typical rendered
@@ -171,7 +173,7 @@ export function toRFNode(
   results: Record<string, Payload> | null | undefined,
   family: string | null | undefined,
   description: string | null | undefined,
-): RFNode<EfNodeData> | RFNode<NoteNodeData> | RFNode<GroupNodeData> | RFNode<CompositeNodeData> {
+): RFNode<EfNodeData> | RFNode<NoteNodeData> | RFNode<GroupNodeData> | RFNode<CompositeNodeData> | RFNode<SnapshotNodeData> {
   if (node.type === COMPOSITE_NODE_TYPE) {
     const paramValue = (name: string): unknown =>
       node.params.find((p) => p.name === name)?.value;
@@ -225,6 +227,37 @@ export function toRFNode(
         content: typeof content === "string" ? content : "",
         color: typeof color === "string" ? color : "yellow",
         anchorId: typeof anchorId === "string" ? anchorId : null,
+      },
+    };
+  }
+  if (node.type === SNAPSHOT_NODE_TYPE) {
+    const paramValue = (name: string): unknown =>
+      node.params.find((p) => p.name === name)?.value;
+    const payloadJson = paramValue("payload_json");
+    let payload: Payload | null = null;
+    if (typeof payloadJson === "string") {
+      try {
+        payload = JSON.parse(payloadJson) as Payload;
+      } catch {
+        payload = null;
+      }
+    }
+    return {
+      id: node.id,
+      type: "snapshotNode",
+      position: node.position,
+      selected,
+      data: {
+        payload,
+        portName: typeof paramValue("port_name") === "string"
+          ? (paramValue("port_name") as string)
+          : "",
+        sourceLabel: typeof paramValue("source_node_label") === "string"
+          ? (paramValue("source_node_label") as string)
+          : "",
+        caption: typeof paramValue("caption") === "string"
+          ? (paramValue("caption") as string)
+          : "",
       },
     };
   }

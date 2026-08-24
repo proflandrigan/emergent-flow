@@ -36,6 +36,7 @@ import { EfNode } from "./nodes/EfNode";
 import { GroupNode } from "./nodes/GroupNode";
 import { CompositeNode } from "./nodes/CompositeNode";
 import { NoteNode } from "./nodes/NoteNode";
+import { SnapshotNode } from "./nodes/SnapshotNode";
 import { FindNodeModal } from "./FindNodeModal";
 import { ProblemsPanel } from "./ProblemsPanel";
 import { NodeContextMenu } from "./NodeContextMenu";
@@ -56,7 +57,7 @@ import {
 import { fromIR } from "../store/ir";
 import { useSubgraphStore, currentSubgraph } from "../store/subgraphStore";
 
-const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode, compositeNode: CompositeNode };
+const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode, compositeNode: CompositeNode, snapshotNode: SnapshotNode };
 const edgeTypes: EdgeTypes = { efEdge: EfEdge };
 
 export function Canvas(): JSX.Element {
