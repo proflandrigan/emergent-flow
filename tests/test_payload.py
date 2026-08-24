@@ -99,6 +99,27 @@ def test_dataframe_nan_is_json_safe() -> None:
     assert all(not math.isnan(x) for x in remaining)
 
 
+def test_empty_dataframe_does_not_crash() -> None:
+    df = pd.DataFrame()
+    payload = to_payload(df)
+    assert payload["kind"] == "table"
+    assert payload["columns"] == []
+    assert payload["shape"] == [0, 0]
+    assert payload["head"] == []
+    assert payload["describe"] == {}
+    json.dumps(payload)
+
+
+def test_zero_row_dataframe_describe() -> None:
+    df = pd.DataFrame({"x": pd.Series([], dtype=float), "y": pd.Series([], dtype=object)})
+    payload = to_payload(df)
+    assert payload["kind"] == "table"
+    assert payload["shape"] == [0, 2]
+    assert "x" in payload["describe"]
+    assert "y" in payload["describe"]
+    json.dumps(payload)
+
+
 def test_dataclass_record_with_nested_dataframe() -> None:
     @dataclasses.dataclass
     class FakeAnovaResult:

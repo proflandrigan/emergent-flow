@@ -76,7 +76,7 @@ function TableExplorer({ portName, payload }: TableExplorerProps): JSX.Element {
       });
     }
     return rows;
-  }, [head, filter, sortCol, sortDir]);
+  }, [head, filter, sortCol, sortDir, columns]);
 
   return (
     <div style={{ marginBottom: "1rem" }}>

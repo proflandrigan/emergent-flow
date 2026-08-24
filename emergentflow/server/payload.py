@@ -128,35 +128,40 @@ def to_payload(value: Any) -> dict[str, Any]:
     import pandas as pd
 
     if isinstance(value, pd.DataFrame):
-        # Compute describe stats on full DataFrame before head truncation
-        desc = value.describe(include="all")
-        # describe() returns rows indexed by stat names (count, mean, std, ...)
-        # and columns named after the data columns.
-        # Convert to a list of stat dicts keyed by column name.
-        describe_stats: dict[str, dict[str, Any]] = {}
-        for col_idx, col in enumerate(desc.columns):
-            col_stats = {}
-            for row_idx, idx in enumerate(desc.index):
-                val = desc.iloc[row_idx, col_idx]
-                if isinstance(val, float) and not math.isfinite(val):
-                    val = None
-                elif isinstance(val, (np.integer, np.floating)):
-                    val = val.item() if hasattr(val, "item") else float(val)
-                elif isinstance(val, np.generic):
-                    val = val.item()
-                elif isinstance(val, (pd.Timestamp, pd.Timedelta)):
-                    val = val.isoformat()
-                elif pd.isna(val):
-                    val = None
-                col_stats[str(idx)] = val
-            col_name = str(col)
-            if col_name in describe_stats:
-                n = 2
-                while f"{col_name}_{n}" in describe_stats:
-                    n += 1
-                col_name = f"{col_name}_{n}"
-            describe_stats[col_name] = col_stats
-        describe_stats = _sanitize_nonfinite(describe_stats)
+        # Compute describe stats on full DataFrame before head truncation.
+        # An empty DataFrame (no columns) has nothing to describe -- skip.
+        describe_stats: dict[str, dict[Any, Any]]
+        if value.columns.empty:
+            describe_stats = {}
+        else:
+            desc = value.describe(include="all")
+            # describe() returns rows indexed by stat names (count, mean, std, ...)
+            # and columns named after the data columns.
+            # Convert to a list of stat dicts keyed by column name.
+            describe_stats = {}
+            for col_idx, col in enumerate(desc.columns):
+                col_stats: dict[str, Any] = {}
+                for row_idx, idx in enumerate(desc.index):
+                    val = desc.iloc[row_idx, col_idx]
+                    if isinstance(val, float) and not math.isfinite(val):
+                        val = None
+                    elif isinstance(val, (np.integer, np.floating)):
+                        val = val.item() if hasattr(val, "item") else float(val)
+                    elif isinstance(val, np.generic):
+                        val = val.item()
+                    elif isinstance(val, (pd.Timestamp, pd.Timedelta)):
+                        val = val.isoformat()
+                    elif pd.isna(val):
+                        val = None
+                    col_stats[str(idx)] = val
+                col_name = str(col)
+                if col_name in describe_stats:
+                    n = 2
+                    while f"{col_name}_{n}" in describe_stats:
+                        n += 1
+                    col_name = f"{col_name}_{n}"
+                describe_stats[col_name] = col_stats
+            describe_stats = _sanitize_nonfinite(describe_stats)
 
         sample = value.head(MAX_HEAD_ROWS)
         try:
