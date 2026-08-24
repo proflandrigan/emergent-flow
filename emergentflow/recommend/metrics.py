@@ -34,13 +34,17 @@ def _ndcg_at_k(recommended: list[Any], relevant: set[Any], k: int) -> float:
     """Normalized discounted cumulative gain at k, binary relevance.
     DCG = sum over i in [0, k) of (1 if recommended[i] in relevant else 0) / log2(i + 2).
     IDCG = DCG of the ideal ordering (all relevant items first, up to k).
+    Duplicate recommended items are counted once (only the first occurrence of each
+    relevant item contributes), so repeated relevant items do not inflate the score.
     Returns DCG / IDCG, or 0.0 if IDCG is 0 (no relevant items)."""
     if k <= 0 or not recommended:
         return 0.0
     n_positions = min(k, len(recommended))
     dcg = 0.0
+    seen = set()
     for i in range(n_positions):
-        if recommended[i] in relevant:
+        if recommended[i] in relevant and recommended[i] not in seen:
+            seen.add(recommended[i])
             dcg += 1.0 / math.log2(i + 2)
     # The ideal DCG is bounded by the number of positions actually scored
     # (``n_positions``): a short recommended list cannot place more than that many
@@ -64,14 +68,18 @@ def _hit(recommended: list[Any], relevant: set[Any], k: int) -> float:
 def _average_precision_at_k(recommended: list[Any], relevant: set[Any], k: int) -> float:
     """Average precision at k: mean of precision@i for each i (1-indexed) where
     recommended[i-1] is relevant, i in [1, k]. Denominator is min(k, len(relevant)) if
-    relevant is non-empty, else return 0.0 (no relevant items -> undefined AP, define as 0.0)."""
+    relevant is non-empty, else return 0.0 (no relevant items -> undefined AP, define as 0.0).
+    Duplicate recommended items are counted once: only the first occurrence of each relevant
+    item contributes a hit, so repeated relevant items do not inflate the precision sum."""
     if k <= 0 or not recommended or not relevant:
         return 0.0
     n_relevant_total = min(k, len(relevant))
     score = 0.0
     n_hits = 0
+    seen = set()
     for i in range(min(k, len(recommended))):
-        if recommended[i] in relevant:
+        if recommended[i] in relevant and recommended[i] not in seen:
+            seen.add(recommended[i])
             n_hits += 1
             score += n_hits / (i + 1)
     return score / n_relevant_total

@@ -169,6 +169,29 @@ def test_trace_column_lineage_unknown_boundary_for_undeclared_node() -> None:
     )
 
 
+def test_trace_column_lineage_custom_code_observed_is_unknown() -> None:
+    """Even when a last-run `observed` schema refines a custom_code node's output
+    column, custom_code must still break the chain as UNKNOWN -- never be asserted as
+    a data SOURCE (the docstring/comment contract)."""
+    load = get("data.load_csv")().instantiate(label="load")
+    custom = get("script.custom_code")().instantiate(label="custom")
+    acc: dict = {"_edges": []}
+    e = _link_out_to_in(acc, load, custom, in_name="value")
+    graph = Graph(
+        paradigm=Paradigm.FUNCTIONAL,
+        name="custom-observed-flow",
+        nodes={n.id: n for n in (load, custom)},
+        edges={e.id: e},
+    )
+    observed = {custom.id: ["anything"], load.id: ["anything", "col_a"]}
+    lineage = trace_column_lineage(graph, custom.id, "anything", observed=observed)
+    # custom_code breaks the chain: UNKNOWN boundary, never a SOURCE claim.
+    assert any(n.role == ColumnRole.UNKNOWN for n in lineage.nodes)
+    assert not any(
+        n.role == ColumnRole.SOURCE and n.node_type == "script.custom_code" for n in lineage.nodes
+    )
+
+
 def test_trace_column_lineage_result_is_inspectable_and_jsonable() -> None:
     graph, _load, _derive, select = _load_derive_select_flow()
     lineage = trace_column_lineage(graph, select.id, "revenue_log")
@@ -199,6 +222,25 @@ def test_trace_column_lineage_cycle_safe() -> None:
     )
     lineage = trace_column_lineage(graph, n.id, "x")
     assert len(lineage.nodes) >= 1
+
+
+def test_trace_column_impact_tolerates_cycle() -> None:
+    """A cyclic graph must not crash trace_column_impact (it falls back to insertion
+    order, mirroring trace_column_lineage), rather than raising a bare CycleError."""
+    n = get("clean.impute_missing")().instantiate(label="n")
+    e = Edge(
+        id="self",
+        source=PortRef(node_id=n.id, port_id=_port(n, "frame", "out").id),
+        target=PortRef(node_id=n.id, port_id=_port(n, "frame", "in").id),
+    )
+    graph = Graph(
+        paradigm=Paradigm.FUNCTIONAL,
+        name="loop",
+        nodes={n.id: n},
+        edges={e.id: e},
+    )
+    impact = trace_column_impact(graph, n.id, "x")
+    assert len(impact.nodes) >= 1
 
 
 # ---------------------------------------------------------------------------

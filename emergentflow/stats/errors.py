@@ -15,6 +15,7 @@ __all__ = [
     "UnknownDiagnosticError",
     "UnknownModelError",
     "InvalidModelSpecError",
+    "StatsScaleError",
     "MissingOptionalDependencyError",
 ]
 
@@ -34,6 +35,12 @@ class UnknownDiagnosticError(StatsError):
 class InvalidModelSpecError(StatsError):
     """Raised when a structured model spec is invalid (missing/unknown columns, missing
     required fields for the family, incompatible family/link, etc.)."""
+
+
+class StatsScaleError(StatsError):
+    """Raised when an operation's estimated dense D x D footprint would be too large to run
+    safely in-process — a pre-flight guard against OOM/SIGKILL of the shared server, mirroring
+    ``emergentflow.recommend.errors.RecommendationScaleError`` for the recommend family."""
 
 
 class MissingOptionalDependencyError(StatsError):

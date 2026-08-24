@@ -234,6 +234,36 @@ def runs_client(tmp_path, monkeypatch) -> TestClient:
     return TestClient(app)
 
 
+def test_graph_hash_includes_param_overrides(tmp_path) -> None:
+    """Two runs that share a graph but override different graph-level params must
+    be recorded with distinct graph_hashes (the canvas diffs graph_hash to decide
+    whether two runs are the same graph); identical overrides stay identical."""
+    import emergentflow.server.runs as runs_mod
+    from emergentflow.ir.graph import Graph
+    from emergentflow.ir.params import Param
+    from emergentflow.server.service import _save_run_record
+
+    store = RunStore(tmp_path / "runs", keep=50)
+    runs_mod._default_runs = store
+
+    graph = Graph(
+        nodes={},
+        edges={},
+        params={"epochs": Param(name="epochs", type_token="int", value=10)},
+    )
+    payload = {"name": "g", "params": {"epochs": {"value": 10}}}
+
+    def saved_hash(overrides: dict | None) -> str:
+        run_id = _save_run_record(graph, payload, {}, {}, params=overrides)
+        return runs_mod.get_default_runs().get(run_id)["graph_hash"]
+
+    h_default = saved_hash({"epochs": 10})
+    h_diff = saved_hash({"epochs": 20})
+    h_same = saved_hash({"epochs": 10})
+    assert h_default == h_same, "identical param overrides must not change the hash"
+    assert h_default != h_diff, "different param overrides must change the hash"
+
+
 def test_routes_list_empty(runs_client: TestClient) -> None:
     resp = runs_client.get("/runs")
     assert resp.status_code == 200

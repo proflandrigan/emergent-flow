@@ -18,6 +18,8 @@ export interface RunsStore {
   clearError: () => void;
 }
 
+let requestSeq = 0;
+
 export const useRunsStore = create<RunsStore>((set, get) => ({
   runs: [],
   selectedRunId: null,
@@ -37,30 +39,41 @@ export const useRunsStore = create<RunsStore>((set, get) => ({
     }
   },
 
-  async selectRun(runId) {
+  selectRun: async (runId) => {
     if (runId === null) {
-      set({ selectedRunId: null, selectedRunDetail: null });
+      set({ selectedRunId: null, selectedRunDetail: null, loading: false });
       return;
     }
+    const requestId = ++requestSeq;
     set({ loading: true, error: null });
     try {
       const detail = await getRun(runId);
-      set({ selectedRunId: runId, selectedRunDetail: detail, loading: false });
+      if (requestId === requestSeq) {
+        set({ selectedRunId: runId, selectedRunDetail: detail, loading: false });
+      }
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err), loading: false });
+      if (requestId === requestSeq) {
+        set({ error: err instanceof Error ? err.message : String(err), loading: false });
+      }
     }
   },
 
-  async selectCompareRun(runId) {
+  selectCompareRun: async (runId) => {
     if (runId === null) {
       set({ compareRunId: null, compareRunDetail: null });
       return;
     }
+    const requestId = ++requestSeq;
+    set({ loading: true, error: null });
     try {
       const detail = await getRun(runId);
-      set({ compareRunId: runId, compareRunDetail: detail });
+      if (requestId === requestSeq) {
+        set({ compareRunId: runId, compareRunDetail: detail, loading: false });
+      }
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : String(err) });
+      if (requestId === requestSeq) {
+        set({ error: err instanceof Error ? err.message : String(err), loading: false });
+      }
     }
   },
 

@@ -8,6 +8,7 @@
 import { create } from "zustand";
 
 import { useGraphStore } from "../store/graphStore";
+import { useRunsStore } from "../execution/runsStore";
 import type { Graph } from "../generated/ir";
 import type { GraphMutation } from "../generated/mutation";
 import type { SessionEvent } from "../generated/session_event";
@@ -190,6 +191,14 @@ let queuedEvent: SessionEvent | null = null;
 async function handleSessionEvent(event: SessionEvent): Promise<void> {
   const state = useSessionStore.getState();
   if (state.sessionId === null || event.session_id !== state.sessionId) {
+    return;
+  }
+  // A completed agent-initiated run does not change the session's graph, proposals, or chat --
+  // it only adds a row to the runs list (the server persists the run and emits run_completed
+  // with the real run_id). Refresh the runs store so an already-open Runs panel surfaces the
+  // new run live, without paying for a full-session GET.
+  if (event.type === "run_completed") {
+    void useRunsStore.getState().fetchRuns();
     return;
   }
   if (inFlightRefresh) {

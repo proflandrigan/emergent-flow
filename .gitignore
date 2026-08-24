@@ -172,3 +172,5 @@ temp/
 /.ef-cache/
 # On-disk node artifact store (partial runs, issue #105)
 /.ef-artifacts/
+# On-disk run store (issue #8 run persistence)
+/.ef-runs/

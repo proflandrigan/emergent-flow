@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import { CodingAgentsSection } from "./CodingAgentsSection";
+import { useSessionStore } from "../session/sessionStore";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -137,5 +138,32 @@ test("clicking End session issues DELETE request", async () => {
 
   await waitFor(() => {
     expect(screen.getByTestId("coding-agents-empty")).toBeInTheDocument();
+  });
+});
+
+test("clicking Join calls sessionStore.join", async () => {
+  const joinSpy = vi
+    .spyOn(useSessionStore.getState(), "join")
+    .mockResolvedValue(undefined);
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response(
+      JSON.stringify({
+        sessions: [
+          { id: "sess-1", version: 1, graph: { nodes: { a: {} } }, proposals: {} },
+        ],
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    ),
+  );
+
+  render(<CodingAgentsSection />);
+
+  await waitFor(() => {
+    expect(screen.getByTestId("session-row-sess-1")).toBeInTheDocument();
+  });
+  fireEvent.click(screen.getByTestId("session-join-sess-1"));
+
+  await waitFor(() => {
+    expect(joinSpy).toHaveBeenCalledWith("sess-1");
   });
 });

@@ -182,6 +182,31 @@ def test_score_json_schema_valid():
     assert list(result["score_has_x"]) == [1.0, 0.0, 0.0]
 
 
+def test_score_json_schema_accepts_integral_float_and_numpy_scalar():
+    # JSON `"3.0"` parses to the float 3.0; JSON Schema's `integer` type is a number
+    # with a zero fractional part, so it must score as a match rather than a type
+    # violation. Numpy ints/real floats (common from pandas rows) are not
+    # isinstance-subclasses of python int/float and must also pass.
+    import numpy as np
+
+    from emergentflow.eval.score import _score_json_schema
+
+    df = pd.DataFrame({"output": ['{"x": 3.0}', '{"x": 3.5}', np.nan, '{"x": 3}']})
+    schema = {"type": "object", "required": ["x"], "properties": {"x": {"type": "integer"}}}
+    result = score(df, [{"name": "int_ok", "kind": "json_schema", "schema": schema}])
+    assert list(result["score_int_ok"]) == [1.0, 0.0, 0.0, 1.0]
+
+    for value, expect in [(np.int64(3), 1.0), (np.float64(3.5), 0.0), (np.float64(3.0), 1.0)]:
+        assert _score_json_schema(value, {"schema": {"type": "integer"}}, None) == expect
+
+    for value, expect in [
+        (np.int64(3), 1.0),
+        (np.float64(3.5), 1.0),
+        (True, 0.0),
+    ]:
+        assert _score_json_schema(value, {"schema": {"type": "number"}}, None) == expect
+
+
 def test_score_json_schema_on_native_dict():
     df = pd.DataFrame(
         {

@@ -189,6 +189,30 @@ test("Manage connections overflow item opens the connections panel", async () =>
   });
 });
 
+test("Review proposals overflow item opens the proposals panel", async () => {
+  mockHealth("ok");
+  useSessionStore.setState({
+    sessionId: "app-test-session",
+    version: 0,
+    proposals: {
+      p1: {
+        id: "p1",
+        mutation: { base_version: 0, author: "ml_engineer", description: "add a describe node" },
+        diagnostics: { diagnostics: [], edge_compatibility: {} },
+        status: "pending",
+      },
+    },
+  });
+  render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  fireEvent.click(screen.getByText("Review proposals"));
+
+  await waitFor(() => {
+    expect(screen.getByTestId("proposal-panel")).toBeInTheDocument();
+  });
+});
+
 test("Start chat overflow item opens the chat modal", async () => {
   mockHealth("ok");
   render(<App />);

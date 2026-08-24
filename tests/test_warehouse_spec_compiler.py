@@ -302,3 +302,43 @@ def test_other_join_types_keep_on() -> None:
         )
         assert " ON sales.region_id = regions.id" in result, result
         assert "CROSS" not in result.upper(), result
+
+
+def test_outer_suffixed_join_types_preserve_outerness() -> None:
+    """`LEFT/RIGHT/FULL OUTER` must compile to the OUTER join, not silently an INNER."""
+    for join_type in ("LEFT OUTER", "RIGHT OUTER", "FULL OUTER"):
+        result = compile_spec(
+            {
+                "source": "sales",
+                "select": ["revenue"],
+                "join": [
+                    {
+                        "relation": "regions",
+                        "on": [{"left": "sales.region_id", "right": "regions.id"}],
+                        "type": join_type,
+                    },
+                ],
+            },
+            "duckdb",
+        )
+        expected = join_type.split()[0].upper()
+        assert f"{expected} JOIN" in result, (join_type, result)
+
+
+def test_unsupported_join_type_raises() -> None:
+    """An unrecognized join type raises instead of silently falling back to INNER."""
+    with pytest.raises(SpecValidationError):
+        compile_spec(
+            {
+                "source": "sales",
+                "select": ["revenue"],
+                "join": [
+                    {
+                        "relation": "regions",
+                        "on": [{"left": "sales.region_id", "right": "regions.id"}],
+                        "type": "HASH",
+                    },
+                ],
+            },
+            "duckdb",
+        )

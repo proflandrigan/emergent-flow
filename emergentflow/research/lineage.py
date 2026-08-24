@@ -201,7 +201,16 @@ def trace_lineage(graph: Graph, node_id: IRId) -> Lineage:
                 visited.add(pred)
                 frontier.append(pred)
 
-    order = [nid for nid in topological_sort(graph) if nid in visited]
+    # A degenerate cycle is tolerated, mirroring `trace_column_lineage`: the
+    # visited-set walk above already terminated (so every node in `visited`
+    # genuinely feeds `node_id`); we only need a stable ordering, which falls
+    # back to insertion order when no topological order exists.
+    try:
+        order = [nid for nid in topological_sort(graph) if nid in visited]
+    except Exception:
+        order = [nid for nid in graph.nodes if nid in visited]
+        if node_id not in order:
+            order.append(node_id)
 
     nodes = [
         LineageNode(node_id=nid, node_type=graph.nodes[nid].type, label=graph.nodes[nid].label)
@@ -523,10 +532,18 @@ def trace_column_lineage(
         resolved = _resolve_column(graph, node, col)
         if resolved is not None:
             role, source_cols = resolved
-        elif observed is not None and col in observed.get(nid, ()):
+        elif (
+            node.type != "script.custom_code"
+            and observed is not None
+            and col in observed.get(nid, ())
+        ):
             # Last-run observed schema refines a statically-undecidable node:
             # its output column is known, but provenance stops here (Epic 18,
-            # Story 4). custom_code still terminates the chain (no upstream).
+            # Story 4). custom_code still terminates the chain (no upstream) --
+            # it must NOT be asserted as a genetic SOURCE just because a prior
+            # run observed an output column, since that would falsely claim an
+            # arbitrary computed column is a data origin. It falls through to
+            # the UNKNOWN boundary below instead.
             role, source_cols = ColumnRole.SOURCE, ()
             nodes.append(
                 ColumnLineageNode(
@@ -673,7 +690,13 @@ def trace_column_impact(
                 visited_nodes.add(child)
                 frontier.append(child)
 
-    order = [nid for nid in topological_sort(graph) if nid in visited_nodes or nid == node_id]
+    try:
+        order = [nid for nid in topological_sort(graph) if nid in visited_nodes or nid == node_id]
+    except Exception:
+        # A degenerate cycle is tolerated (same policy as `trace_column_lineage`):
+        # the reachability walk above already bounded `visited_nodes`, so fall back
+        # to insertion order for a stable presentation rather than crashing.
+        order = [nid for nid in graph.nodes if nid in visited_nodes or nid == node_id]
     downstream_order = [nid for nid in order]
     position = {nid: i for i, nid in enumerate(downstream_order)}
 

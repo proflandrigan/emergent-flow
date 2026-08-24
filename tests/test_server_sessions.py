@@ -17,6 +17,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
+from emergentflow.collab import mcp as mcp_mod
 from emergentflow.collab import session as session_mod
 from emergentflow.collab.agents.base import AdapterEvent, AgentAdapter, register_adapter
 from emergentflow.server.app import configure_session_auth, create_app
@@ -70,6 +71,20 @@ class TestSessionLifecycle:
         assert body["version"] == 0
         assert body["graph"]["nodes"] == {}
         assert body["proposals"] == {}
+        assert body["open_in_ui"] == f"http://127.0.0.1:8765/?session={body['id']}"
+
+    def test_create_session_open_in_ui_uses_configured_base(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """POST /sessions builds open_in_ui from the shared base, so a server bound
+        to a non-default port produces a correct link (bug fix: it used to be
+        hardcoded to 127.0.0.1:8765)."""
+        monkeypatch.setattr(mcp_mod, "OPEN_IN_UI_BASE", "http://127.0.0.1:9000")
+
+        r = client.post("/sessions", json={})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["open_in_ui"] == f"http://127.0.0.1:9000/?session={body['id']}"
 
     def test_create_session_with_seed_graph(self, client: TestClient) -> None:
         r = client.post("/sessions", json={"graph": _seed_graph()})

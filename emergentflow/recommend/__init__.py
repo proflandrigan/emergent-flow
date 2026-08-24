@@ -20,6 +20,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import math
+import random
 import time
 from pathlib import Path
 from typing import Any
@@ -365,6 +366,54 @@ _VALID_EVAL_METRICS = frozenset(
 )
 
 
+_DIVERSITY_SAMPLE_SIZE = 200
+"""When computing :func:`evaluate`'s ``diversity``, compare this many users' top-k sets at
+most. Diversity is a system-level metric estimated over all pairs; with more than this many
+users a deterministic (seeded) sample is used so the work cannot grow O(U^2) and OOM the
+in-process server."""
+
+
+def _bounded_diversity(user_sets: list[set]) -> float:
+    """Return ``1 - mean pairwise cosine similarity`` of the users' top-k sets.
+
+    Exact for ``len(user_sets) <= _DIVERSITY_SAMPLE_SIZE`` (identical to the historical
+    all-pairs result); for larger inputs, compares a deterministic (``Random(0)``) sample so
+    peak work is bounded by O(_DIVERSITY_SAMPLE_SIZE**2) regardless of U. Returns ``0.0``
+    for fewer than 2 users.
+    """
+    n = len(user_sets)
+    if n < 2:
+        return 0.0
+    if n > _DIVERSITY_SAMPLE_SIZE:
+        rng = random.Random(0)
+        picked = rng.sample(range(n), _DIVERSITY_SAMPLE_SIZE)
+        sets = [user_sets[i] for i in picked]
+    else:
+        sets = user_sets
+    similarities: list[float] = []
+    for i in range(len(sets)):
+        for j in range(i + 1, len(sets)):
+            a, b = sets[i], sets[j]
+            denom = math.sqrt(len(a)) * math.sqrt(len(b))
+            similarities.append(len(a & b) / denom if denom > 0 else 0.0)
+    return 1.0 - (sum(similarities) / len(similarities))
+
+
+_DEFAULT_COMPARE_METRICS = [
+    "precision_at_k",
+    "recall_at_k",
+    "ndcg_at_k",
+    "map_at_k",
+    "hit_rate",
+    "coverage",
+    "novelty",
+]
+"""Default ``metrics`` for :func:`compare`: the cheap per-user ranking + linear system
+metrics. Excludes ``diversity`` (O(U^2)) unless a caller opts in explicitly."""
+
+_DEFAULT_COMPARE_METRICS_SET = frozenset(_DEFAULT_COMPARE_METRICS)
+
+
 @public_op(name="ef.recommend.evaluate")
 def evaluate(
     recommender: FittedRecommender,
@@ -392,9 +441,10 @@ def evaluate(
 
     Three of the ten metrics are system-level (computed once across all users, never per-user):
     coverage = fraction of catalog items appearing in any user's top-k; diversity = 1 -- mean
-    pairwise cosine similarity of users' top-k item sets; novelty = mean ``-log2(popularity)`` of
-    recommended items, popularity measured within ``test_interactions``. These appear only in
-    ``aggregate``, not in ``per_user``.
+    pairwise cosine similarity of users' top-k item sets (estimated over a deterministic sample
+    of users when there are more than ``_DIVERSITY_SAMPLE_SIZE``, so it cannot grow O(U^2));
+    novelty = mean ``-log2(popularity)`` of recommended items, popularity measured within
+    ``test_interactions``. These appear only in ``aggregate``, not in ``per_user``.
 
     Returns an :class:`EvalResult` with a tidy per-user metrics frame and an aggregate dict
     (``mean_<metric>`` for the four per-user metrics, plus ``hit_rate`` -- the mean of the
@@ -496,16 +546,7 @@ def evaluate(
         user_sets = (
             [set(items[:k]) for items in recs_by_user.values() if items] if test_users else []
         )
-        if len(user_sets) >= 2:
-            similarities: list[float] = []
-            for i in range(len(user_sets)):
-                for j in range(i + 1, len(user_sets)):
-                    a, b = user_sets[i], user_sets[j]
-                    denom = math.sqrt(len(a)) * math.sqrt(len(b))
-                    similarities.append(len(a & b) / denom if denom > 0 else 0.0)
-            aggregate["diversity"] = 1.0 - (sum(similarities) / len(similarities))
-        else:
-            aggregate["diversity"] = 0.0
+        aggregate["diversity"] = _bounded_diversity(user_sets)
 
     if "novelty" in requested:
         n_users_total = test_interactions.n_users
@@ -531,18 +572,21 @@ def compare(
     *,
     recommenders: list[FittedRecommender],
     k: int = 10,
+    metrics: list[str] | None = None,
 ) -> pd.DataFrame:
     """Evaluate multiple fitted recommenders on the same held-out test set and rank them.
 
     The recommend-family analog to ``ef.ml.compare_models`` (Epic 15, Story 12). Unlike
     ``compare_models``, every candidate here arrives already fitted -- ``compare`` does not fit
     anything except the automatic popularity baseline described below. Calls the existing
-    :func:`evaluate` wrapper once per recommender (all 10 metrics -- see ``evaluate``'s
-    ``_VALID_EVAL_METRICS``), and returns a tidy comparison DataFrame: one row per recommender,
-    with an ``algorithm`` column, an ``is_baseline`` bool column, and one column per evaluation
-    metric (``mean_precision_at_k``, ``mean_recall_at_k``, ``mean_ndcg_at_k``, ``hit_rate``,
-    ``map_at_k``, ``coverage``, ``diversity``, ``novelty``, ``mean_mrr_at_k``, ``mean_auc_at_k``).
-    Sorted by ``mean_ndcg_at_k``
+    :func:`evaluate` wrapper once per recommender with ``metrics`` (defaulting to the seven cheap
+    metrics of ``_DEFAULT_COMPARE_METRICS`` -- ``mean_precision_at_k``, ``mean_recall_at_k``,
+    ``mean_ndcg_at_k``, ``map_at_k``, ``hit_rate``, ``coverage``, ``novelty`` -- excluding the
+    quadratic-cost ``diversity``, which callers may opt into by passing a ``metrics`` list
+    including ``"diversity"``), and returns a tidy comparison DataFrame: one row per recommender,
+    with an ``algorithm`` column, an ``is_baseline`` bool column, and one column per requested
+    metric (for the default set: ``mean_precision_at_k``, ``mean_recall_at_k``, ``mean_ndcg_at_k``,
+    ``map_at_k``, ``hit_rate``, ``coverage``, ``novelty``). Sorted by ``mean_ndcg_at_k``
     descending -- the "baseline-to-beat" framing: the strongest recommender by ranking quality is
     always first.
 
@@ -570,9 +614,11 @@ def compare(
         auto_baseline_index = len(to_compare)
         to_compare = [*to_compare, baseline]
 
+    resolved_metrics = metrics if metrics is not None else _DEFAULT_COMPARE_METRICS
+
     rows: list[dict[str, Any]] = []
     for i, rec in enumerate(to_compare):
-        result = evaluate(rec, test_interactions, k=k)
+        result = evaluate(rec, test_interactions, k=k, metrics=resolved_metrics)
         row: dict[str, Any] = {
             "algorithm": rec.algorithm,
             "is_baseline": i == auto_baseline_index,
@@ -852,9 +898,13 @@ def temporal_split(
         # non-empty for any user with >= 2 interactions, per the documented "recent goes to
         # test" contract. A single-interaction user (no half to split) keeps their row in train.
         n = len(ordered)
-        n_test = max(1, min(n - 1, round(n * test_ratio))) if n >= 2 else 0
-        test_parts.append(ordered.iloc[-n_test:])
-        train_parts.append(ordered.iloc[:-n_test])
+        if n >= 2:
+            n_test = max(1, min(n - 1, round(n * test_ratio)))
+            test_parts.append(ordered.iloc[-n_test:])
+            train_parts.append(ordered.iloc[:-n_test])
+        else:
+            # A single-interaction user (no half to split) keeps their row in train.
+            train_parts.append(ordered)
 
     train_df = pd.concat(train_parts, ignore_index=True) if train_parts else df.iloc[0:0]
     test_df = pd.concat(test_parts, ignore_index=True) if test_parts else df.iloc[0:0]

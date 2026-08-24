@@ -305,6 +305,35 @@ def test_eviction_leaves_a_single_oversized_entry_in_place(tmp_path) -> None:
     assert cache.get("h1") == {"x": "y" * 1000}
 
 
+def test_eviction_cleans_orphaned_meta_sidecars(tmp_path) -> None:
+    # An orphaned .meta.json (sidecar whose .pkl no longer exists) inflates the
+    # cache's total on-disk size forever: the eviction loop only shrinks by .pkl
+    # count, so once only one artifact remains the size cap would never be
+    # restored. Eviction must garbage-collect such sidecars.
+    probe = ExecutionCache(root=tmp_path / "probe")
+    probe.put("p", {"x": "v"}, node_id="n", label="A")
+    entry_bytes = sum(f.stat().st_size for f in (tmp_path / "probe").iterdir())
+    cap_bytes = int(entry_bytes * 1.5)  # holds roughly one entry
+    cache = ExecutionCache(root=tmp_path / "cache", max_mb=cap_bytes / (1024 * 1024))
+
+    cache.put("h1", {"x": "v"}, node_id="n1", label="A")
+
+    # Simulate orphaned sidecars left behind (no matching .pkl).
+    cache_dir = tmp_path / "cache"
+    for i in range(4):
+        (cache_dir / f"orphan{i}.meta.json").write_text('{"pad":"' + "a" * 500 + '"}')
+
+    # Trigger an eviction pass with a second put.
+    cache.put("h2", {"x": "w"}, node_id="n2", label="B")
+
+    total = sum(p.stat().st_size for p in cache_dir.iterdir() if p.is_file())
+    assert total <= cap_bytes
+    # Orphans are gone: every remaining sidecar has a live artifact beside it.
+    for p in cache_dir.iterdir():
+        if p.name.endswith(".meta.json"):
+            assert (cache_dir / (p.name[: -len(".meta.json")] + ".pkl")).is_file()
+
+
 def test_configure_cache_then_get_default_cache_uses_configured_root(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(cache_mod, "_default_cache", None)
     monkeypatch.setattr(cache_mod, "_configured_root", None)

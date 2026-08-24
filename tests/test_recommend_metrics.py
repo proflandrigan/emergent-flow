@@ -1,7 +1,12 @@
 """Unit tests for the MRR@K, ranking AUC and NDCG@K metric helpers in
 ``emergentflow.recommend.metrics``."""
 
-from emergentflow.recommend.metrics import _auc_at_k, _mrr_at_k, _ndcg_at_k
+from emergentflow.recommend.metrics import (
+    _auc_at_k,
+    _average_precision_at_k,
+    _mrr_at_k,
+    _ndcg_at_k,
+)
 
 
 def test_mrr_empty_and_zero_k_return_zero():
@@ -72,3 +77,20 @@ def test_ndcg_empty_and_zero_k_return_zero():
     assert _ndcg_at_k([1, 2, 3], set(), 5) == 0.0
     assert _ndcg_at_k([1, 2, 3], {1, 2}, 0) == 0.0
     assert _ndcg_at_k([1, 2, 3], {1, 2}, -1) == 0.0
+
+
+def test_ndcg_duplicate_relevant_items_counted_once():
+    # A repeated relevant item must not inflate DCG: [1, 1, ...] scores identically
+    # to a list with a single occurrence of the relevant item.
+    assert _ndcg_at_k([1, 1], {1}, 10) <= 1.0
+    single = _ndcg_at_k([1, 2, 3], {1}, 10)
+    duplicate = _ndcg_at_k([1, 1, 2, 3], {1}, 10)
+    assert duplicate == single
+
+
+def test_average_precision_duplicate_relevant_items_counted_once():
+    # A repeated relevant item only contributes one hit, so AP stays <= 1.0.
+    assert _average_precision_at_k([1, 1], {1}, 10) <= 1.0
+    single = _average_precision_at_k([1, 2, 3], {1}, 10)
+    duplicate = _average_precision_at_k([1, 1, 2, 3], {1}, 10)
+    assert duplicate == single

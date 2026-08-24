@@ -267,6 +267,15 @@ def seasonal_decompose(
     if period < 1:
         raise TimeseriesError(f"period must be >= 1; got {period}.")
     series = _prepare_series(df, target=target, date_col=date_col)
+    if len(series) < 2 * period:
+        # statsmodels.seasonal_decompose requires at least two full cycles and
+        # raises a bare ValueError ("x must have 2 complete cycles requires N
+        # observations") otherwise; surface it as the family's typed error
+        # instead of letting a library error escape the boundary.
+        raise TimeseriesError(
+            f"period must allow at least 2 complete cycles (<= half the series "
+            f"length); got period={period} with {len(series)} observations."
+        )
 
     result = _sm_seasonal_decompose(series, model=model, period=period)
     components = pd.DataFrame(

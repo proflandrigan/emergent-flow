@@ -124,9 +124,11 @@ def test_optimize_threshold_backend():
 def test_optimize_threshold_metrics_cover_full_precision_recall_curve():
     # precision_recall_curve returns precision/recall arrays one element longer than its
     # thresholds. The synthetic trailing entry is the "predict nothing positive" point
-    # (precision=1, recall=0) with no real threshold; the function replaces it with the
-    # genuinely well-defined decision-threshold-0 "predict everything positive" operating
-    # point (precision = positive-class prevalence, recall = 1.0).
+    # (precision=1, recall=0) with no real threshold and no useful F1, so it is dropped.
+    # The first entry (minimum threshold) is already the "predict everything positive"
+    # operating point; it is labelled explicitly as the decision-threshold-0 baseline
+    # (precision = positive-class prevalence, recall = 1.0) -- so the returned metrics curve
+    # has exactly one row per real threshold, and no operating point is duplicated.
     from sklearn.metrics import precision_recall_curve
 
     df = _binary_df()
@@ -137,14 +139,18 @@ def test_optimize_threshold_metrics_cover_full_precision_recall_curve():
         base.estimator.predict_proba(df[["x1", "x2"]])[:, 1],
         pos_label=base.estimator.classes_[1],
     )
-    assert len(r.metrics) == len(prec) == len(rec)
-    assert len(r.metrics) == len(thresh) + 1
-    assert r.metrics["threshold"].iloc[-1] == 0.0
+    # One row per real decision threshold; the synthetic trailing point is dropped.
+    assert len(r.metrics) == len(thresh)
+    # The first row is the predict-everything-positive baseline at threshold 0.0.
     pos = base.estimator.classes_[1]
-    assert r.metrics["precision"].iloc[-1] == pytest.approx(
+    assert r.metrics["threshold"].iloc[0] == 0.0
+    assert r.metrics["precision"].iloc[0] == pytest.approx(
         (df["label"] == pos).sum() / len(df),
     )
-    assert r.metrics["recall"].iloc[-1] == 1.0
+    assert r.metrics["recall"].iloc[0] == 1.0
+    # No operating point is duplicated across the returned curve.
+    pairs = list(zip(r.metrics["precision"], r.metrics["recall"], strict=True))
+    assert len(set((round(p, 9), round(rr, 9)) for p, rr in pairs)) == len(pairs)
 
 
 def test_optimize_threshold_respects_positive_class():

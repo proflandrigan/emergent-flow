@@ -104,9 +104,11 @@ def _read_protocol_doc() -> str:
 # matching emergentflow.collab.persona_defs -- _FILENAME_TO_SLUG/_SLUG_TO_FILENAME below bridge
 # the two.
 _PERSONA_SLASH_COMMANDS: dict[str, str] = {
+    "/data-modeller": "data-modeller.md",
     "/data-scientist": "data-scientist.md",
     "/researcher": "researcher.md",
     "/ml-engineer": "ml-engineer.md",
+    "/experimenter": "emergent-flow-experimenter.md",
 }
 _FILENAME_TO_SLUG: dict[str, str] = {
     filename: command.lstrip("/").replace("-", "_")

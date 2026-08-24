@@ -6,6 +6,14 @@ import type { SessionEvent } from "../generated/session_event";
 import * as sessionClient from "./sessionClient";
 import { useSessionStore } from "./sessionStore";
 
+const { fetchRunsMock } = vi.hoisted(() => ({ fetchRunsMock: vi.fn() }));
+
+vi.mock("../execution/runsStore", () => ({
+  useRunsStore: {
+    getState: vi.fn(() => ({ fetchRuns: fetchRunsMock })),
+  },
+}));
+
 vi.mock("./sessionClient", () => ({
   createSession: vi.fn(),
   getSession: vi.fn(),
@@ -485,6 +493,24 @@ describe("SSE event handling", () => {
 
     expect(sessionClient.getSession).not.toHaveBeenCalled();
     expect(useSessionStore.getState().version).toBe(0);
+  });
+
+  test("run_completed refreshes the runs store so an open Runs panel surfaces the new run", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+
+    await capturedOnEvent?.({
+      type: "run_completed",
+      session_id: "abc",
+      run_id: "run-1",
+    });
+
+    expect(fetchRunsMock).toHaveBeenCalledTimes(1);
+    // A run_completed event only affects the runs list, not the session's graph/proposals/chat,
+    // so it must not trigger a full-session GET.
+    expect(sessionClient.getSession).not.toHaveBeenCalled();
   });
 
   test("a burst of events while a refresh is in flight coalesces into one trailing refresh", async () => {

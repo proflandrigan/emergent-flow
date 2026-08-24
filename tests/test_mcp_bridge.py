@@ -154,3 +154,97 @@ def test_bridge_drops_none_optional_param() -> None:
 
     asyncio.run(_scenario())
     assert received["arguments"] == {"session_id": "s1", "content": "hello"}
+
+
+def test_bridge_reparses_stringified_dict_arg() -> None:
+    """Stringified dict/array args for complex-typed params are parsed back."""
+    from emergentflow.collab.mcp_bridge import _make_wrapper
+
+    received: dict[str, object] = {}
+
+    async def invoke(tool_name: str, arguments: dict[str, object]) -> object:
+        received["arguments"] = arguments
+        return {}
+
+    wrapper = _make_wrapper(
+        "add_node",
+        ["session_id", "node_type", "params", "position"],
+        {"session_id", "node_type"},
+        invoke,
+        complex_names={"params", "position"},
+    )
+
+    async def _scenario() -> None:
+        await wrapper(
+            "s1",
+            "data.sql_query",
+            '{"sql":"select 1","connection":"BigQuery","dialect":"bigquery"}',
+            '{"x":80,"y":200}',
+        )
+
+    asyncio.run(_scenario())
+    args = received["arguments"]
+    assert args["params"] == {
+        "sql": "select 1",
+        "connection": "BigQuery",
+        "dialect": "bigquery",
+    }
+    assert args["position"] == {"x": 80, "y": 200}
+    assert args["session_id"] == "s1"
+
+
+def test_bridge_add_node_forwards_stringified_params() -> None:
+    """A stringified ``params`` arg reaches the server and mutates its store."""
+    from emergentflow.collab.mcp_bridge import create_bridge_mcp_server
+
+    async def _scenario() -> tuple[dict, str]:
+        session = session_mod.get_default_store().create()
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=create_app()),
+            base_url="http://testserver",
+        ) as client:
+            mcp = await create_bridge_mcp_server("http://testserver", _http_client=client)
+            result = await mcp.call_tool(
+                "add_node",
+                {
+                    "session_id": session.id,
+                    "node_type": "data.load_csv",
+                    "params": '{"path":"a.csv"}',
+                },
+            )
+            return result.structured_content, session.id
+
+    content, session_id = asyncio.run(_scenario())
+    assert "checkpoint_id" in content
+    # The node now exists in the server's session store.
+    stored = session_mod.get_default_store().get(session_id)
+    assert content["node_id"] in stored.graph.nodes
+
+
+def test_default_client_has_raised_read_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The bridge's default httpx.AsyncClient uses a 600s read timeout, not the 5s httpx default.
+
+    The default client is only constructed when ``_http_client`` is omitted, and the
+    catalog fetch to an unreachable URL raises ``RuntimeError`` before the client is
+    returned -- so capture the constructed client's ``timeout`` by hooking the
+    ``httpx.AsyncClient`` constructor, then assert the read timeout that was created.
+    """
+    from emergentflow.collab.mcp_bridge import create_bridge_mcp_server
+
+    captured: dict[str, object] = {}
+    real_init = httpx.AsyncClient.__init__
+
+    def _recording_init(self: httpx.AsyncClient, *args: object, **kwargs: object) -> None:
+        captured["timeout"] = kwargs.get("timeout")
+        real_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.AsyncClient, "__init__", _recording_init)
+
+    async def _scenario() -> None:
+        with pytest.raises(RuntimeError):
+            await create_bridge_mcp_server("http://127.0.0.1:1")
+
+    asyncio.run(_scenario())
+    timeout = captured["timeout"]
+    assert isinstance(timeout, httpx.Timeout)
+    assert timeout.read == 600.0

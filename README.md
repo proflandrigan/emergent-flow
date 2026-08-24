@@ -33,16 +33,22 @@ Python — eliminating vendor lock-in and preserving true developer freedom.
 > sentence-transformers model; a recommender-systems family (`ef.recommend`, Epic 15,
 > ADR 0021) spanning baselines, content-based and collaborative filtering, and deep
 > recommenders (NCF, two-tower) over sparse interaction matrices, with ranking-aware
-> evaluation metrics (precision/recall/NDCG/MAP@k, coverage, diversity); the `ui/`
+> evaluation metrics (precision/recall/NDCG/MAP@k, coverage, diversity) and
+> scale/OOM remediation for multi-model canvases (block-wise sparse top-k KNN fits, a
+> `RecommendationScaleError` pre-flight memory guard, bounded/efficient system metrics);
+> the `ui/`
 > canvas (React Flow + Zustand) with CodeMirror 6 code editing, column-aware and
 > curated per-algorithm parameter widgets, expandable inspector panels, and markdown notes
 > for graph annotation; a bundled local FastAPI server (`emergentflow serve`) with streaming
 > execution, DAG-aware incremental caching, and visual results (Epics 5–7); a collaboration
 > layer (`emergentflow/collab/`) with an in-app agent chat panel, slash-command-activated
 > review personas (data modeller, data scientist, researcher, ML engineer), a one-shot
-> persona consult mode, and multi-backend agent adapters (Claude, Gemini, Codex,
+> persona consult mode, persisted session runs with real `run_id`s surfaced in the canvas,
+> and multi-backend agent adapters (Claude, Gemini, Codex,
 > OpenCode) letting an AI agent propose graph edits as reviewable `GraphMutation`s alongside a
-> human on the same canvas (Epic 14); and a unified connection manager for warehouse, LLM,
+> human on the same canvas (Epic 14) — including an MCP tool surface with `create_session`
+> (returning an `open_in_ui` URL), direction-aware `connect_ports`, and a stdio JSON bridge,
+> plus a quickstart guide; and a unified connection manager for warehouse, LLM,
 > and agent profiles. Still stubs: full multi-step agentic orchestration / LangGraph codegen
 > (Epic 10), RAG (Epic 11), and real-time multiplayer. See
 > [`epics/README.md`](./epics/README.md) for the epic-by-epic delivery status, the
@@ -234,7 +240,7 @@ See the [Declarative Codegen Seam](./docs/codegen-declarative.md) for the worked
 | :--- | :--- |
 | **Canvas (`ui/` tree, bundled)** | React + `@xyflow/react` (React Flow), Zustand, CodeMirror 6, Vite, TypeScript |
 | **Local server (`emergentflow/server/`)** | FastAPI + Uvicorn (optional `[server]` extra) — REST, SSE streaming execution, session/collab routes, connection management, in-process `ef.*` |
-| **Collaboration (`emergentflow/collab/`)** | `GraphMutation` proposals, sessions, review threads, gates, slash-command-activated review personas (data modeller, data scientist, researcher, ML engineer) plus a one-shot persona consult mode, in-app agent chat, multi-backend agent adapters (Claude, Gemini, Codex, OpenCode); optional MCP tool wrapper (`[mcp]` extra, FastMCP) — ADR 0019 |
+| **Collaboration (`emergentflow/collab/`)** | `GraphMutation` proposals, sessions, review threads, gates, slash-command-activated review personas (data modeller, data scientist, researcher, ML engineer) plus a one-shot persona consult mode, in-app agent chat, multi-backend agent adapters (Claude, Gemini, Codex, OpenCode); persisted session runs with real `run_id`s; MCP tool surface (`create_session` with `open_in_ui` URL, direction-aware `connect_ports`, stdio JSON bridge); optional MCP tool wrapper (`[mcp]` extra, FastMCP) — ADR 0019 |
 | **Backend engine (hosted tier)** | Celery, Redis — *deferred to the hosted product (ADR 0013 / §A6)* |
 | **Data wrangling** | Pandas, PyArrow (Parquet) |
 | **Feature transforms (`emergentflow/nodes/examples/`)** | Scaling, categorical encoding, discretization, polynomial/interaction feature generation — all via scikit-learn |
@@ -243,7 +249,7 @@ See the [Declarative Codegen Seam](./docs/codegen-declarative.md) for the worked
 | **Time series (`emergentflow/timeseries/`)** | Statsmodels-backed forecasting (ARIMA/SARIMAX, Holt-Winters ETS, seasonal decomposition) and pandas-backed feature transforms (EWMA, lag features, rolling/time-weighted aggregates) |
 | **Machine learning** | Scikit-Learn |
 | **Model explainability (`emergentflow/explain/`)** | SHAP-based feature attribution, error tables, diagnostic plots (residuals, calibration, ROC/PR, predicted-vs-actual) — optional `[explain]` extra for SHAP; diagnostic plots need no extra deps (ADR 0020) |
-| **Recommender systems (`emergentflow/recommend/`)** | Baselines, content-based (TF-IDF, feature/embedding KNN), and sklearn-backed collaborative filtering (SVD/NMF) on hard deps; `implicit` (`[recommend]` extra) for ALS/BPR; PyTorch for deep recommenders (NCF, two-tower). Sparse `InteractionMatrix` representation; ranking metrics (precision/recall/NDCG/MAP@k, coverage, diversity) — ADR 0021 |
+| **Recommender systems (`emergentflow/recommend/`)** | Baselines, content-based (TF-IDF, feature/embedding KNN), and sklearn-backed collaborative filtering (SVD/NMF) on hard deps; `implicit` (`[recommend]` extra) for ALS/BPR; PyTorch for deep recommenders (NCF, two-tower). Sparse `InteractionMatrix` representation; ranking metrics (precision/recall/NDCG/MAP@k, coverage, diversity); scale/OOM remediation: block-wise sparse top-k KNN fits, `RecommendationScaleError` pre-flight memory guard (`max_footprint_bytes`), bounded/efficient `diversity` + `compare(metrics=...)` — ADR 0021 |
 | **Text embeddings (`emergentflow/embed/`)** | `ef.embed.text` dispatches to an API provider via the injected LLM client seam, or a local `sentence-transformers` model (`[embed]` extra) |
 | **Deep learning** | PyTorch (declarative `nn.Module` codegen seam; also backs deep recommenders — not a runtime dependency) |
 | **Visualization** | Plotly |
@@ -280,14 +286,21 @@ seam (Epic 13); agent collaboration with an in-app chat panel, slash-command-act
 personas (data modeller, data scientist, researcher, ML engineer) plus a one-shot persona
 consult mode, and multi-backend agent adapters (Claude, Gemini, Codex, OpenCode) — an AI
 agent proposes `GraphMutation`s that a human reviews on the same canvas via ghost-diffs,
-gates, and review threads (Epic 14, ADR 0019); dedicated per-family statistical modeling
+gates, and review threads (Epic 14, ADR 0019) — with persisted session runs and real
+`run_id`s (readable via `get_results`/`get_metric`) surfaced on the canvas, an MCP tool
+surface (`create_session` returning an `open_in_ui` URL, direction-aware `connect_ports`, a
+stdio JSON bridge), and an [`agent-quickstart.md`](./docs/agent-quickstart.md);
+dedicated per-family statistical modeling
 nodes (linear regression, GLM, GAM, mixed models, Bayesian); feature transformation nodes
 (scaling, encoding, discretization, feature generation); a time-series family with
 forecasting (ARIMA, exponential smoothing, seasonal decomposition) and feature transforms
 (EWMA, lag features, rolling/time-weighted aggregates); SHAP-based model explainability with
 diagnostic plots (ADR 0020); a recommender-systems family (`ef.recommend`, Epic 15,
 ADR 0021) spanning baselines, content-based and collaborative filtering, and deep
-recommenders over sparse interaction matrices, with ranking-aware evaluation metrics;
+recommenders over sparse interaction matrices, with ranking-aware evaluation metrics and
+scale/OOM remediation (block-wise sparse top-k KNN fits with a `RecommendationScaleError`
+pre-flight memory guard, bounded/efficient system metrics) — see
+[`memory-and-scale-remediation.md`](./docs/memory-and-scale-remediation.md);
 custom-code nodes for user-defined Python transforms; markdown notes for graph annotation;
 a unified connection manager for warehouse, LLM, and agent profiles; and canvas UX
 improvements including CodeMirror 6 code editing, column-aware and curated per-algorithm
@@ -311,13 +324,13 @@ emergent-flow/
 │   ├── clean, stats, ml, viz, reports/   # Reference node-family SDK wrappers
 │   ├── timeseries/            # ef.timeseries: forecasting (ARIMA/ETS/decomposition) + feature transforms
 │   ├── explain/              # SHAP-based model explainability and diagnostic plots (ADR 0020, [explain] extra)
-│   ├── recommend/             # ef.recommend: baselines, content-based/collaborative/deep recommenders, InteractionMatrix, metrics (Epic 15, ADR 0021, [recommend] extra)
+│   ├── recommend/             # ef.recommend: baselines, content-based/collaborative/deep recommenders, InteractionMatrix, metrics, scale/OOM remediation + pre-flight memory guard (Epic 15, ADR 0021, [recommend] extra)
 │   ├── embed/                  # ef.embed.text: API or local sentence-transformers text embeddings ([embed] extra)
 │   ├── script/               # Custom-code node: user-defined Python transform functions
 │   ├── connections/          # Unified connection-profile store (warehouse + LLM + agent, TOML-backed)
 │   ├── llm/                   # Injected LLM client seam (Gateway/Replay), prompt templating, budget/pricing
 │   ├── eval/                  # Prompt Lab eval run / label / export
-│   ├── collab/                # Agent collaboration: sessions, chat, personas/consult, agent adapters, GraphMutation, gates, review, MCP (Epic 14)
+│   ├── collab/                # Agent collaboration: sessions, chat, personas/consult, agent adapters, GraphMutation, gates, review, MCP + stdio bridge + persisted runs (Epic 14)
 │   ├── server/                # Local FastAPI/Uvicorn server (ef.* in-process) — `emergentflow serve`
 │   ├── clients.py             # Injected-client bundle threaded through execute()/compiled main()
 │   ├── cli.py                 # `emergentflow` console entry point (serve / lab)
@@ -331,7 +344,8 @@ emergent-flow/
 │   ├── adr/                  # Architecture Decision Records (foundational decisions)
 │   ├── runbook.md            # How to install, launch, and use the app (UI, API, CLI)
 │   ├── acceptance-demo.md    # End-to-end worked pipeline
-│   ├── agent-integration.md, bring-your-own-key.md  # Agent collaboration protocol + LLM credentials
+│   ├── agent-integration.md, agent-quickstart.md, bring-your-own-key.md  # Agent collaboration protocol + quickstart + LLM credentials
+│   ├── memory-and-scale-remediation.md  # OOM hotspots + remediation for the in-process executor
 │   ├── node-contract-spec.md, node-registry.md, node-catalog-artifact.md, authoring-a-node.md
 │   ├── codegen-compiler.md, codegen-executor.md, codegen-traversal.md, codegen-declarative.md, how-codegen-works.md
 │   ├── ir-spec.md, ir-serialization-format.md, ir-migrations.md, result-payload-contract.md
@@ -364,6 +378,12 @@ emergent-flow/
   [`agents/emergent-flow-collaborator.md`](./agents/emergent-flow-collaborator.md) persona —
   how an AI agent (Claude Code, Shards, or any HTTP client) joins a session and proposes
   `GraphMutation`s alongside a human, per [ADR 0019](./docs/adr/0019-graph-sessions-and-agent-collaboration.md).
+- [Agent Quickstart](./docs/agent-quickstart.md) — the hands-on, from-empty-server walkthrough
+  (register the MCP bridge, `create_session`, build + preflight, execute to a persisted
+  `run_id`, read results/metrics) for onboarding a new agent quickly.
+- [Memory & Scale Remediation](./docs/memory-and-scale-remediation.md) — known OOM hotspots,
+  the adopted remediation (block-wise sparse KNN, pre-flight memory guards, bounded system
+  metrics) and planned hardening for the in-process synchronous executor.
 - [Bring Your Own Key](./docs/bring-your-own-key.md) — how LLM/warehouse credentials are
   supplied (env-var names only; never embedded in the IR — ADR 0017/0018).
 - [Package Layout & Namespace Conventions](./docs/package-layout.md) — the `emergentflow` / `ef`

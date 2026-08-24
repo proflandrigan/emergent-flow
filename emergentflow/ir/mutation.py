@@ -210,6 +210,7 @@ def apply_mutation(graph: Graph, m: GraphMutation) -> Graph:
             name=graph.name,
             nodes=new_nodes,
             edges=new_edges,
+            params=graph.params,
         )
     except ValidationError as exc:
         raise MutationError(str(exc)) from exc

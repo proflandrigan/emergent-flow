@@ -118,6 +118,33 @@ class TestEmbedTextSdk:
         assert "vec" in result.columns
         assert "embedding" not in result.columns
 
+    def test_overwriting_existing_output_column_raises(self, tmp_path):
+        df = _make_df()
+        df["dt"] = ["2020-01-01", "2020-01-02"]
+        client = _seed_fixture(tmp_path, df["text"].tolist())
+        with pytest.raises(EmbedError, match="never overwrites"):
+            embed_text(
+                df,
+                "text",
+                provider="openai",
+                model="text-embedding-3-small",
+                client=client,
+                output_column="dt",
+            )
+
+    def test_in_place_output_column_is_allowed(self, tmp_path):
+        df = _make_df()
+        client = _seed_fixture(tmp_path, df["text"].tolist())
+        result = embed_text(
+            df,
+            "text",
+            provider="openai",
+            model="text-embedding-3-small",
+            client=client,
+            output_column="text",
+        )
+        assert list(result["text"]) == SAMPLE_EMBEDDINGS
+
     def test_api_path_missing_client_raises(self):
         df = _make_df()
         with pytest.raises(MissingClientError):

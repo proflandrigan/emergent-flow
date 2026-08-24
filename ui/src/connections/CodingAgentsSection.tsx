@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { useSessionStore } from "../session/sessionStore";
 import { Button } from "../ui/Button";
 
 interface SessionSummary {
@@ -62,6 +63,10 @@ export function CodingAgentsSection(): JSX.Element {
   async function handleEndSession(id: string) {
     await fetch(`/sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
     setReloadToken((t) => t + 1);
+  }
+
+  function handleJoin(id: string) {
+    void useSessionStore.getState().join(id);
   }
 
   return (
@@ -158,6 +163,13 @@ export function CodingAgentsSection(): JSX.Element {
                     : ""}
                 </span>
               </div>
+              <Button
+                variant="ghost"
+                data-testid={`session-join-${s.id}`}
+                onClick={() => handleJoin(s.id)}
+              >
+                Join
+              </Button>
               <Button
                 variant="ghost"
                 data-testid={`session-end-${s.id}`}

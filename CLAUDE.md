@@ -5,9 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 The project uses [`uv`](https://docs.astral.sh/uv/) for the Python SDK/server and `npm` for the
-`ui/` canvas. CI (`.github/workflows/ci.yml`) has three jobs — a Python matrix (3.11/3.12), a UI
-job, and a live-Postgres driver-integration job — run the Python gates and the UI gates locally
-before pushing:
+`ui/` canvas. CI (`.github/workflows/ci.yml`) has five jobs — a Python lint/type/test matrix
+(3.11/3.12), a UI job, a live-Postgres driver-integration job, a `[recommend]`-extra equivalence
+job (implicit-backed ALS/BPR), and a torch-backed equivalence job (NCF, two-tower) — run the
+Python gates and the UI gates locally before pushing:
 
 ```bash
 uv sync --locked            # install pinned deps (regenerate lock with `uv lock` after editing pyproject)
@@ -247,6 +248,16 @@ opaque `ImportError`. Reference nodes live alongside the other families in
 `recommend_hybrid_weighted`, `recommend_hybrid_switching`, `recommend_fit_two_tower`,
 `recommend_compare`, `recommend_evaluate`, `recommend_temporal_split`).
 
+Because the in-process synchronous executor means a single fit's allocation spike can OOM-kill
+the whole server, the recommender family carries scale/OOM remediation: user/item-KNN fitters
+build top-k similarity **block-wise** over sparse CSR (no dense n×n), a typed
+`RecommendationScaleError` pre-flight guard (params: `max_footprint_bytes`, default ~2 GiB)
+refuses fits whose n² footprint would blow memory, `evaluate`'s `diversity` is bounded by
+deterministic sampling, and `compare` gained a `metrics` param defaulting to seven cheap
+metrics. See [`docs/memory-and-scale-remediation.md`](./docs/memory-and-scale-remediation.md)
+for the hotspot audits and the guard design, and
+[`docs/agent-quickstart.md`](./docs/agent-quickstart.md) for the agent-onboarding path.
+
 ### Text embeddings (`emergentflow/embed/`)
 
 `ef.embed.text()` embeds a text column of a DataFrame, dispatching to one of two backends:
@@ -283,7 +294,14 @@ agents invariant** is a regression-tested requirement: the base install gains ze
 dependencies, `emergentflow/collab/` is never eagerly imported, CI never calls a live LLM, and
 existing route contracts stay byte-identical whether or not any session is ever opened. An
 optional MCP tool wrapper over the same routes lives in `emergentflow/collab/mcp.py` (`[mcp]`
-extra, FastMCP).
+extra, FastMCP), exposing `create_session` (returns an `open_in_ui` URL),
+direction-aware `connect_ports`, and a stdio JSON bridge (`mcp_bridge.py`). Session
+`execute` calls persist runs with a real `run_id` (readable via `get_results`/`get_metric`)
+and emit a `run_completed` SSE event that the canvas consumes to surface agent-initiated
+runs; `POST /sessions` returns `open_in_ui`. The served URL base is configurable via a shared
+`OPEN_IN_UI_BASE` (overwritten with the real bind host/port on non-loopback binds), and
+`serve()` prints the session bearer-token hint. Hands-on onboarding is in
+[`docs/agent-quickstart.md`](./docs/agent-quickstart.md).
 
 A registry of built-in **personas** (`emergentflow/collab/personas.py`, definitions in
 `persona_defs.py`: `data_modeller`, `data_scientist`, `researcher`, `ml_engineer`) scopes an

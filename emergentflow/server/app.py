@@ -58,6 +58,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 
+import emergentflow.collab.mcp as _mcp
 from emergentflow.collab.agents import list_available_adapter_names
 from emergentflow.collab.chat import (
     ChatAlreadyActiveError,
@@ -257,8 +258,12 @@ async def _run_sync(fn: Callable[[], Any]) -> Any:
 
 async def _safe_json(fn: Callable[[], dict[str, Any]]) -> Response:
     """Run *fn* off the event loop; map any exception to the project's 422 contract."""
+    from emergentflow.connections.profiles import UnknownConnectionError as _conn_unknown
+
     try:
         result = await _run_sync(fn)
+    except _conn_unknown as exc:
+        return _error_json(404, str(exc))
     except Exception as exc:  # noqa: BLE001 - any ef.* failure -> 422, never crash the server
         return _error_json(422, f"{type(exc).__name__}: {exc}")
     return JSONResponse(content=result)
@@ -649,7 +654,9 @@ def create_app() -> FastAPI:
                 _graph_from_session_payload(graph_payload) if graph_payload is not None else None
             )
             session = get_default_session_store().create(graph)
-            return session.model_dump(mode="json")
+            doc = session.model_dump(mode="json")
+            doc["open_in_ui"] = f"{_mcp.OPEN_IN_UI_BASE}/?session={session.id}"
+            return doc
 
         return await _session_json(_create)
 
@@ -1372,6 +1379,7 @@ def serve(
     resolved_runs_keep = runs_keep if runs_keep is not None else DEFAULT_RUNS_KEEP
     configure_runs(runs_root, keep=resolved_runs_keep)
 
+    token_hint = ""
     if host == "127.0.0.1":
         configure_session_auth(required=False)
     else:
@@ -1383,6 +1391,10 @@ def serve(
                 "EMERGENTFLOW_SESSION_TOKEN environment variable."
             )
         configure_session_auth(required=True, token=resolved_token)
+        token_hint = (
+            f"\nSession bearer token: {resolved_token}"
+            "  (pass it to the agent as its Authorization: Bearer <token> header)"
+        )
 
     from emergentflow.collab.persona_defs import register_builtin_personas
 
@@ -1390,7 +1402,11 @@ def serve(
 
     browse_host = "127.0.0.1" if host == "0.0.0.0" else host  # noqa: S104
     url = f"http://{browse_host}:{port}"
-    print(f"Emergent Flow - serving the local canvas at {url}  (Ctrl-C to stop)")
+    # Point the shared open_in_ui base at the real bind so agent-created sessions get
+    # a working browser link even on a non-default host/port. Runs before any session
+    # is created (the first tool call / request happens only after uvicorn binds).
+    _mcp.OPEN_IN_UI_BASE = url
+    print(f"Emergent Flow - serving the local canvas at {url}  (Ctrl-C to stop){token_hint}")
     if open_browser:
         threading.Thread(
             target=_open_browser_when_ready, args=(browse_host, port, url), daemon=True
