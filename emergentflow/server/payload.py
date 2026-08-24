@@ -144,8 +144,11 @@ def to_payload(value: Any) -> dict[str, Any]:
                     val = val.item() if hasattr(val, "item") else float(val)
                 elif isinstance(val, np.generic):
                     val = val.item()
+                elif isinstance(val, (pd.Timestamp, pd.Timedelta)):
+                    val = val.isoformat()
                 col_stats[str(idx)] = val
             describe_stats[str(col)] = col_stats
+        describe_stats = _sanitize_nonfinite(describe_stats)
 
         sample = value.head(MAX_HEAD_ROWS)
         try:
