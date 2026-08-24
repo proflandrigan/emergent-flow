@@ -95,7 +95,7 @@ function TableExplorer({ portName, payload }: TableExplorerProps): JSX.Element {
       {/* Type row */}
       <div style={{ fontSize: 10, color: "var(--text-secondary)", padding: "0.15rem 0.4rem", fontFamily: "var(--font-mono)" }}>
         {columns.map((col, i) => (
-          <span key={col} style={{ marginRight: "0.75rem" }} data-testid={`data-type-${col}`}>
+          <span key={`${i}-${col}`} style={{ marginRight: "0.75rem" }} data-testid={`data-type-${col}`}>
             {col}: {dtypes[i] ?? "unknown"}
           </span>
         ))}
@@ -109,9 +109,9 @@ function TableExplorer({ portName, payload }: TableExplorerProps): JSX.Element {
         >
           <thead>
             <tr>
-              {columns.map((col) => (
+              {columns.map((col, i) => (
                 <th
-                  key={col}
+                  key={`${i}-${col}`}
                   style={headerCellStyle}
                   onClick={() => handleSort(col)}
                   data-testid={`data-col-header-${col}`}
@@ -125,8 +125,8 @@ function TableExplorer({ portName, payload }: TableExplorerProps): JSX.Element {
           <tbody>
             {filtered.map((row, i) => (
               <tr key={i} data-testid="data-row">
-                {columns.map((col) => (
-                  <td key={col} style={cellStyle}>
+                {columns.map((col, i) => (
+                  <td key={`${i}-${col}`} style={cellStyle}>
                     {String(row[col] ?? "")}
                   </td>
                 ))}

@@ -146,8 +146,16 @@ def to_payload(value: Any) -> dict[str, Any]:
                     val = val.item()
                 elif isinstance(val, (pd.Timestamp, pd.Timedelta)):
                     val = val.isoformat()
+                elif pd.isna(val):
+                    val = None
                 col_stats[str(idx)] = val
-            describe_stats[str(col)] = col_stats
+            col_name = str(col)
+            if col_name in describe_stats:
+                n = 2
+                while f"{col_name}_{n}" in describe_stats:
+                    n += 1
+                col_name = f"{col_name}_{n}"
+            describe_stats[col_name] = col_stats
         describe_stats = _sanitize_nonfinite(describe_stats)
 
         sample = value.head(MAX_HEAD_ROWS)
