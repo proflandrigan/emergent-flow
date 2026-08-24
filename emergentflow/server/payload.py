@@ -128,6 +128,25 @@ def to_payload(value: Any) -> dict[str, Any]:
     import pandas as pd
 
     if isinstance(value, pd.DataFrame):
+        # Compute describe stats on full DataFrame before head truncation
+        desc = value.describe(include="all")
+        # describe() returns rows indexed by stat names (count, mean, std, ...)
+        # and columns named after the data columns.
+        # Convert to a list of stat dicts keyed by column name.
+        describe_stats: dict[str, dict[str, Any]] = {}
+        for col_idx, col in enumerate(desc.columns):
+            col_stats = {}
+            for row_idx, idx in enumerate(desc.index):
+                val = desc.iloc[row_idx, col_idx]
+                if isinstance(val, float) and not math.isfinite(val):
+                    val = None
+                elif isinstance(val, (np.integer, np.floating)):
+                    val = val.item() if hasattr(val, "item") else float(val)
+                elif isinstance(val, np.generic):
+                    val = val.item()
+                col_stats[str(idx)] = val
+            describe_stats[str(col)] = col_stats
+
         sample = value.head(MAX_HEAD_ROWS)
         try:
             # to_json(orient="records") requires unique column labels; most
@@ -148,6 +167,7 @@ def to_payload(value: Any) -> dict[str, Any]:
             "shape": [int(value.shape[0]), int(value.shape[1])],
             "head": head,
             "truncated": bool(value.shape[0] > MAX_HEAD_ROWS),
+            "describe": describe_stats,
         }
 
     if isinstance(value, pd.Series):

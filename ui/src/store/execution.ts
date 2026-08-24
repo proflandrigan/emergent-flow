@@ -10,6 +10,7 @@ export type Payload =
       shape: [number, number];
       head: Record<string, unknown>[];
       truncated: boolean;
+      describe?: Record<string, Record<string, number | null>>;
     }
   | { kind: "record"; type: string; fields: Record<string, Payload> }
   | { kind: "json"; value: unknown }
