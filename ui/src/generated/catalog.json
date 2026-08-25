@@ -14257,8 +14257,57 @@
           "type_token": "list[str]"
         },
         {
+          "default": null,
+          "help": "One or more aggregation functions applied to every value column.",
+          "hints": {
+            "choices": [
+              "mean",
+              "sum",
+              "min",
+              "max",
+              "median",
+              "count",
+              "std",
+              "var"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "multiselect"
+          },
+          "label": "Aggregations",
+          "name": "aggs",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Names of callables registered via ef.stats.register_aggregation, applied alongside the builtin aggregations.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Custom aggregations",
+          "name": "custom_aggs",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
           "default": "mean",
-          "help": "Aggregation function.",
+          "help": "Single aggregation function. Ignored when `aggs`/`custom_aggs` are set.",
           "hints": {
             "choices": [
               "mean",
@@ -14279,7 +14328,7 @@
             "step": null,
             "widget": "select"
           },
-          "label": "Aggregation",
+          "label": "Aggregation (single, legacy)",
           "name": "agg",
           "required": false,
           "type_token": "str"
@@ -14326,7 +14375,7 @@
         }
       ],
       "type": "stats.group_by_aggregate",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,

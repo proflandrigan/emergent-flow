@@ -30,7 +30,7 @@ class GroupByAggregate(NodeDefinition):
     """Split-apply-combine: group by column(s) and aggregate."""
 
     type = "stats.group_by_aggregate"
-    version = 1
+    version = 2
     family = "stats"
     label = "Group By Aggregate"
     category = "Statistics"
@@ -63,11 +63,33 @@ class GroupByAggregate(NodeDefinition):
             hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
+            name="aggs",
+            type_token="list[str]",
+            default=None,
+            label="Aggregations",
+            help="One or more aggregation functions applied to every value column.",
+            hints=ValidationHints(
+                choices=["mean", "sum", "min", "max", "median", "count", "std", "var"],
+                widget="multiselect",
+            ),
+        ),
+        ParamSpec(
+            name="custom_aggs",
+            type_token="list[str]",
+            default=None,
+            label="Custom aggregations",
+            help=(
+                "Names of callables registered via ef.stats.register_aggregation, "
+                "applied alongside the builtin aggregations."
+            ),
+            hints=ValidationHints(widget="text"),
+        ),
+        ParamSpec(
             name="agg",
             type_token="str",
             default="mean",
-            label="Aggregation",
-            help="Aggregation function.",
+            label="Aggregation (single, legacy)",
+            help="Single aggregation function. Ignored when `aggs`/`custom_aggs` are set.",
             hints=ValidationHints(
                 choices=["mean", "sum", "min", "max", "median", "count", "std"],
                 widget="select",
@@ -83,16 +105,21 @@ class GroupByAggregate(NodeDefinition):
         ),
     ]
 
-    def _args(self, node: Node) -> tuple[list[str], str, list[str] | None]:
+    def _args(self, node: Node) -> tuple[list[str], str | list[str], list[str] | None]:
         values = {p.name: p.value for p in node.params}
         by = values.get("by")
-        agg = values.get("agg", "mean")
-        if agg is None:
-            agg = "mean"
         columns = values.get("columns")
+        raw_aggs = values.get("aggs")
+        raw_custom = values.get("custom_aggs")
+        multi: list[str] = []
+        if isinstance(raw_aggs, list):
+            multi.extend(cast("list[str]", raw_aggs))
+        if isinstance(raw_custom, list):
+            multi.extend(cast("list[str]", raw_custom))
+        agg: str | list[str] = multi if multi else (cast("str", values.get("agg") or "mean"))
         return (
             cast("list[str]", by),
-            cast(str, agg),
+            agg,
             cast("list[str] | None", columns),
         )
 

@@ -68,6 +68,7 @@ _GOLDEN_GRAPHS = {
     "missingness": (Missingness, {}),
     "distribution_summary": (DistributionSummary, {}),
     "group_by_aggregate": (GroupByAggregate, {"by": ["target"], "agg": "mean"}),
+    "group_by_aggregate_multi": (GroupByAggregate, {"by": ["target"], "aggs": ["mean", "std"]}),
     "auto_eda": (AutoEda, {}),
 }
 
@@ -146,6 +147,16 @@ def test_group_by_aggregate_equivalence() -> None:
     df = _fixed_eda_frame()
     defn = GroupByAggregate()
     node = defn.instantiate(by=["grp"], agg="mean", label="Group By Aggregate")
+    executed = defn.execute(node, inputs={"frame": df.copy()})
+    scope = _run_codegen(defn, node, {"frame": df.copy()})
+    pd.testing.assert_frame_equal(executed["summary"], scope["summary"])
+
+
+@pytest.mark.equivalence
+def test_group_by_aggregate_multi_stat_equivalence() -> None:
+    df = _fixed_eda_frame()
+    defn = GroupByAggregate()
+    node = defn.instantiate(by=["grp"], aggs=["mean", "std"], label="Group By Aggregate Multi")
     executed = defn.execute(node, inputs={"frame": df.copy()})
     scope = _run_codegen(defn, node, {"frame": df.copy()})
     pd.testing.assert_frame_equal(executed["summary"], scope["summary"])

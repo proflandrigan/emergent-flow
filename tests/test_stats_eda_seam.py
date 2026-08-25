@@ -271,3 +271,81 @@ def test_auto_eda_missingness_plot_is_the_co_missingness_heatmap():
 
     assert result.frames["co_missingness"].equals(co_missingness(df))
     assert result.plots["missingness"].spec == plot_missingness_heatmap(co_missingness(df)).spec
+
+
+def test_group_by_aggregate_list_agg_flattens_multiindex():
+    df = pd.DataFrame({"g": ["a", "a", "b"], "x": [1.0, 2.0, 3.0]})
+    result = group_by_aggregate(df, by="g", agg=["mean", "sum"])
+    assert not isinstance(result.columns, pd.MultiIndex)
+    assert set(result.columns) == {"g", "x_mean", "x_sum"}
+    assert len(result) == 2
+    assert is_inspectable(result)
+    payload = to_payload(result)
+    assert payload["kind"] == "table"
+
+
+def test_group_by_aggregate_list_agg_does_not_mutate():
+    df = pd.DataFrame({"g": ["a", "a", "b"], "x": [1.0, 2.0, 3.0]})
+    before = df.copy(deep=True)
+    group_by_aggregate(df, by="g", agg=["mean", "sum"])
+    assert df.equals(before)
+
+
+def test_register_aggregation_direct_call():
+    from emergentflow.stats.eda import _AGG_REGISTRY, register_aggregation
+
+    _AGG_REGISTRY.clear()
+
+    def iqr(s):
+        return float(s.quantile(0.75) - s.quantile(0.25))
+
+    register_aggregation("iqr", iqr)
+    assert "iqr" in _AGG_REGISTRY
+    assert _AGG_REGISTRY["iqr"] is iqr
+
+
+def test_register_aggregation_decorator():
+    from emergentflow.stats.eda import _AGG_REGISTRY, register_aggregation
+
+    _AGG_REGISTRY.clear()
+
+    @register_aggregation("range")
+    def _range(s):
+        return float(s.max() - s.min())
+
+    assert "range" in _AGG_REGISTRY
+    assert _AGG_REGISTRY["range"] is _range
+
+
+def test_group_by_aggregate_custom_agg_resolves_registered_name():
+    from emergentflow.stats.eda import _AGG_REGISTRY, register_aggregation
+
+    _AGG_REGISTRY.clear()
+
+    def iqr(s):
+        return float(s.quantile(0.75) - s.quantile(0.25))
+
+    register_aggregation("iqr", iqr)
+
+    df = pd.DataFrame({"g": ["a", "a", "b"], "x": [1.0, 5.0, 3.0]})
+    result = group_by_aggregate(df, by="g", agg=["iqr"])
+    assert result.loc[result["g"] == "a", "x_iqr"].iloc[0] == pytest.approx(2.0)
+    assert is_inspectable(result)
+
+
+def test_group_by_aggregate_custom_agg_in_dict():
+    from emergentflow.stats.eda import _AGG_REGISTRY, register_aggregation
+
+    _AGG_REGISTRY.clear()
+
+    def iqr(s):
+        return float(s.quantile(0.75) - s.quantile(0.25))
+
+    register_aggregation("iqr", iqr)
+
+    df = pd.DataFrame({"g": ["a", "a", "b"], "x": [1.0, 5.0, 3.0], "y": [10.0, 20.0, 30.0]})
+    result = group_by_aggregate(df, by="g", agg={"x": ["mean", "iqr"], "y": "sum"})
+    assert not isinstance(result.columns, pd.MultiIndex)
+    assert "x_mean" in result.columns
+    assert "x_iqr" in result.columns
+    assert "y_sum" in result.columns

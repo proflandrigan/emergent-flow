@@ -13,6 +13,7 @@ based report node, which is explicitly kept separate).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -27,6 +28,31 @@ from emergentflow.stats.scale import enforce_dense_square_guard
 # ``emergentflow.stats``, so importing it here is cycle-free -- unlike ``emergentflow.viz`` itself
 # (whose ``__init__`` imports ``emergentflow.stats.models``), which ``auto_eda`` imports lazily.
 from emergentflow.viz.models import PlotSpec
+
+_AGG_REGISTRY: dict[str, Callable[[pd.Series], Any]] = {}
+
+
+def register_aggregation(name, fn=None):
+    if fn is None:
+
+        def _deco(f):
+            _AGG_REGISTRY[name] = f
+            return f
+
+        return _deco
+    _AGG_REGISTRY[name] = fn
+    return fn
+
+
+def _resolve_agg(agg):
+    def _sub(a):
+        return _AGG_REGISTRY.get(a, a) if isinstance(a, str) else a
+
+    if isinstance(agg, str):
+        return _sub(agg)
+    if isinstance(agg, list):
+        return [_sub(a) for a in agg]
+    return {k: ([_sub(x) for x in v] if isinstance(v, list) else _sub(v)) for k, v in agg.items()}
 
 
 @public_op(name="ef.stats.profile")
@@ -273,7 +299,7 @@ def group_by_aggregate(
     df: pd.DataFrame,
     *,
     by: str | list[str],
-    agg: str | dict[str, str | list[str]],
+    agg: str | list[str] | dict[str, str | list[str]],
     columns: list[str] | None = None,
 ) -> pd.DataFrame:
     """Split/agg/pivot returning a tidy DataFrame, one row per group.
@@ -298,7 +324,7 @@ def group_by_aggregate(
         if unknown:
             raise ValueError(f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}.")
 
-    if isinstance(agg, str):
+    if isinstance(agg, (str, list)):
         if columns is not None:
             value_cols = [c for c in columns if c not in by_cols]
         else:
@@ -314,7 +340,7 @@ def group_by_aggregate(
                 f"expected one of {list(df.columns)!r}."
             )
         target = df[by_cols + list(agg.keys())]
-    grouped = target.groupby(by_cols).agg(agg)
+    grouped = target.groupby(by_cols).agg(_resolve_agg(agg))
     if isinstance(grouped.columns, pd.MultiIndex):
         grouped.columns = [
             "_".join(str(level) for level in col if level) for col in grouped.columns
