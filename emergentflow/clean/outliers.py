@@ -186,6 +186,7 @@ def detect_outliers(
     flag_column: str = "is_outlier",
     score_column: str = "outlier_score",
     drop: bool = False,
+    by: str | list[str] | None = None,
 ) -> pd.DataFrame:
     """Flag outlying rows, returning a NEW DataFrame.
 
@@ -210,6 +211,11 @@ def detect_outliers(
     column is enough to leave the row unflagged. ``drop=True`` returns only the non-outlier
     rows and omits both added columns.
 
+    ``by`` groups the data before flagging, so fences are computed within each
+    group rather than over the whole column. Group columns are never treated as
+    measurement columns. Pass a single column name (``str``) or a list.
+    ``by=None`` (default) uses the whole frame.
+
     Deterministic (pure pandas aggregation, no sampling). Raises ``CleanError`` for an
     unknown ``method``/``combine`` or a ``threshold`` outside the method's domain, and
     ``ColumnCollisionError`` rather than overwriting an existing ``flag_column``/
@@ -222,21 +228,34 @@ def detect_outliers(
     if combine not in OUTLIER_COMBINE:
         raise CleanError(f"unknown combine {combine!r}; expected one of {OUTLIER_COMBINE!r}.")
 
+    by_cols = [by] if isinstance(by, str) else (list(by) if by else [])
+    unknown_by = [c for c in by_cols if c not in df.columns]
+    if unknown_by:
+        raise UnknownColumnError(
+            f"unknown group columns {unknown_by!r}; expected one of {list(df.columns)!r}."
+        )
+
     if columns is not None:
         unknown = [c for c in columns if c not in df.columns]
         if unknown:
             raise UnknownColumnError(
                 f"unknown columns {unknown!r}; expected one of {list(df.columns)!r}."
             )
-        ineligible = [c for c in columns if not is_outlier_eligible(df[c])]
+        # Exclude group columns before checking eligibility — group keys are never
+        # measurement columns, even when the user includes them in ``columns``.
+        measurement_columns = [c for c in columns if c not in by_cols]
+        ineligible = [c for c in measurement_columns if not is_outlier_eligible(df[c])]
         if ineligible:
             raise CleanError(
                 f"columns {ineligible!r} are not numeric; every outlier rule is "
                 "undefined on non-numeric (and boolean) data."
             )
-        target = list(columns)
+        target = list(measurement_columns)
     else:
         target = [c for c in df.columns if is_outlier_eligible(df[c])]
+
+    # Never treat a grouping key as a measurement column.
+    target = [c for c in target if c not in by_cols]
 
     # Only the non-drop path writes these columns, so only it can collide. Guarding
     # unconditionally would reject the natural two-node flow (flag with one
@@ -252,6 +271,24 @@ def detect_outliers(
 
     if drop and not target:
         return df.copy()
+
+    # Grouped path: compute fences within each subset, preserving original row order.
+    if by_cols:
+        parts = [
+            detect_outliers(
+                sub,
+                columns=target,
+                method=method,
+                threshold=threshold,
+                combine=combine,
+                flag_column=flag_column,
+                score_column=score_column,
+                drop=drop,
+            )
+            for _, sub in df.groupby(by_cols, sort=False, dropna=False)
+        ]
+        out = pd.concat(parts) if parts else df.copy()
+        return out.reindex([i for i in df.index if i in out.index])
 
     result = df.copy()
     if not target:

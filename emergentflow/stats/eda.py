@@ -242,6 +242,7 @@ def outlier_summary(
     columns: list[str] | None = None,
     method: str = "zscore",
     threshold: float = 3.0,
+    by: str | list[str] | None = None,
 ) -> pd.DataFrame:
     """Report the outlier bounds a rule would apply, one row per numeric column.
 
@@ -261,10 +262,21 @@ def outlier_summary(
     is silently omitted here, mirroring ``distribution_summary``, where ``detect_outliers``
     raises. Raises ``ValueError`` for an unknown ``method`` or a ``threshold`` outside the
     method's domain. Never mutates ``df``.
+
+    ``by`` groups the data before computing bounds, so fences are per-group.
+    Returns one row per (group × column) with group keys as leading columns.
+    ``by=None`` (default) uses the whole frame.
     """
     problem = check_outlier_rule(method, threshold)
     if problem is not None:
         raise ValueError(problem)
+
+    by_cols = [by] if isinstance(by, str) else (list(by) if by else [])
+    unknown_by = [c for c in by_cols if c not in df.columns]
+    if unknown_by:
+        raise ValueError(
+            f"unknown group columns {unknown_by!r}; expected one of {list(df.columns)!r}."
+        )
 
     if columns is not None:
         unknown = [c for c in columns if c not in df.columns]
@@ -273,6 +285,26 @@ def outlier_summary(
         target = df[columns]
     else:
         target = df
+
+    if by_cols:
+        # Exclude group columns from the measurement set.
+        if columns is not None:
+            effective_columns = [c for c in columns if c not in by_cols]
+        else:
+            effective_columns = [
+                c for c in df.columns if is_outlier_eligible(df[c]) and c not in by_cols
+            ]
+        result_rows: list[pd.DataFrame] = []
+        for keys, sub in df.groupby(by_cols, sort=False, dropna=False):
+            key_tuple = keys if isinstance(keys, tuple) else (keys,)
+            part = outlier_summary(
+                sub, columns=effective_columns, method=method, threshold=threshold
+            )
+            # Insert group keys in reverse so final column order matches by_cols order.
+            for col, val in zip(reversed(by_cols), reversed(key_tuple), strict=True):
+                part.insert(0, col, val)
+            result_rows.append(part)
+        return pd.concat(result_rows, ignore_index=True) if result_rows else pd.DataFrame()
 
     rows: list[dict[str, Any]] = []
     for col in target.columns:

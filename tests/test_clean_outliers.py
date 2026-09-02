@@ -316,6 +316,96 @@ def test_boolean_columns_are_not_outlier_targets() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Group-aware (by=) parameter
+# ---------------------------------------------------------------------------
+
+
+def test_detect_outliers_by_string_group_column() -> None:
+    """``by`` as a single string groups data and applies per-group fence."""
+    df = pd.DataFrame(
+        {
+            "group": ["a", "a", "a", "b", "b", "b"],
+            "x": [0.0, 0.0, 10.0, 5.0, 5.0, 5.0],
+        }
+    )
+    result = detect_outliers(df, columns=["x"], method="zscore", threshold=1.0, by="group")
+    # Group "a": mean≈3.33, std≈4.71 → fence ≈ [-1.38, 8.05]; 10.0 flagged
+    # Group "b": mean≈5.0, std≈0.0 → fence collapses to [5.0, 5.0]; nothing flagged
+    assert result["is_outlier"].tolist() == [False, False, True, False, False, False]
+
+
+def test_detect_outliers_by_list_group_columns() -> None:
+    """``by`` as a list of column names groups by multiple columns."""
+    df = pd.DataFrame(
+        {
+            "g1": ["a", "a", "a", "a", "a", "b", "b", "b"],
+            "g2": ["x", "x", "x", "y", "y", "z", "z", "z"],
+            "x": [0.0, 0.0, 100.0, 10.0, 10.0, 5.0, 5.0, 5.0],
+        }
+    )
+    result = detect_outliers(df, columns=["x"], method="zscore", threshold=1.0, by=["g1", "g2"])
+    assert "is_outlier" in result.columns
+    # Group ("a","x"): [0,0,100] → mean≈33.3, std≈57.7 → 100 flagged at zscore≈1.15
+    # Group ("a","y"): [10,10] → constant, nothing flagged
+    # Group ("b","z"): [5,5,5] → constant, nothing flagged
+    assert result["is_outlier"].tolist() == [False, False, True, False, False, False, False, False]
+
+
+def test_detect_outliers_by_excludes_group_keys_from_target() -> None:
+    """Grouping columns are never treated as measurement columns."""
+    df = pd.DataFrame(
+        {
+            "group": ["a", "a", "a", "b", "b", "b"],
+            "x": [0.0, 0.0, 100.0, 5.0, 5.0, 5.0],
+        }
+    )
+    result = detect_outliers(df, method="zscore", threshold=1.0, by="group")
+    assert result["is_outlier"].tolist() == [False, False, True, False, False, False]
+
+
+def test_detect_outliers_by_preserves_row_order() -> None:
+    """Original row order is preserved in the grouped output."""
+    df = pd.DataFrame(
+        {
+            "group": ["b", "b", "a", "a", "a"],
+            "x": [0.0, 0.0, 10.0, 0.0, 0.0],
+        }
+    )
+    result = detect_outliers(df, columns=["x"], method="zscore", threshold=1.0, by="group")
+    assert list(result.index) == [0, 1, 2, 3, 4]
+
+
+def test_detect_outliers_by_unknown_column_raises() -> None:
+    """Unknown group column raises UnknownColumnError."""
+    df = pd.DataFrame({"x": [1.0, 2.0]})
+    with pytest.raises(UnknownColumnError):
+        detect_outliers(df, columns=["x"], by="nonexistent")
+
+
+def test_detect_outliers_by_drop_works_with_groups() -> None:
+    """``drop=True`` with ``by`` returns only inlier rows."""
+    df = pd.DataFrame(
+        {
+            "group": ["a", "a", "a", "b", "b"],
+            "x": [0.0, 0.0, 10.0, 5.0, 5.0],
+        }
+    )
+    result = detect_outliers(
+        df, columns=["x"], method="zscore", threshold=1.0, by="group", drop=True
+    )
+    assert len(result) == 4
+    assert 2 not in result.index
+
+
+def test_detect_outliers_by_none_is_backward_compatible() -> None:
+    """``by=None`` (default) produces exactly the same result as calling without `by`."""
+    df = pd.DataFrame({"x": [0.0, 0.0, 0.0, 10.0]})
+    with_by = detect_outliers(df, columns=["x"], method="zscore", threshold=1.0, by=None)
+    without_by = detect_outliers(df, columns=["x"], method="zscore", threshold=1.0)
+    pd.testing.assert_frame_equal(with_by, without_by)
+
+
+# ---------------------------------------------------------------------------
 # ADR-0002 equivalence: execute() == running codegen()'s emitted code.
 # ---------------------------------------------------------------------------
 
@@ -331,6 +421,34 @@ def test_detect_outliers_node_equivalence() -> None:
     df = _make_df()
     defn = DetectOutliers()
     node = defn.instantiate(columns=["x"], method="zscore", threshold=1.0)
+
+    executed = defn.execute(node, inputs={"frame": df.copy()})
+    executed_result = executed["frame"]
+
+    scope = _run_codegen(defn, node, {"frame": df.copy()})
+    codegen_result = scope["frame"]
+
+    assert executed_result["is_outlier"].tolist() == codegen_result["is_outlier"].tolist()
+    assert executed_result["outlier_score"].tolist() == pytest.approx(
+        codegen_result["outlier_score"].tolist(), nan_ok=True
+    )
+    pd.testing.assert_frame_equal(
+        executed_result.drop(columns=["is_outlier", "outlier_score"]),
+        codegen_result.drop(columns=["is_outlier", "outlier_score"]),
+    )
+
+
+@pytest.mark.equivalence
+def test_detect_outliers_node_equivalence_with_by() -> None:
+    """ADR-0002: execute() == codegen() output when `by` is set."""
+    df = pd.DataFrame(
+        {
+            "group": ["a", "a", "a", "b", "b", "b"],
+            "x": [0.0, 0.0, 10.0, 5.0, 5.0, 5.0],
+        }
+    )
+    defn = DetectOutliers()
+    node = defn.instantiate(columns=["x"], method="zscore", threshold=1.0, by=["group"])
 
     executed = defn.execute(node, inputs={"frame": df.copy()})
     executed_result = executed["frame"]

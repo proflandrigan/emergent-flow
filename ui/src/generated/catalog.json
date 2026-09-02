@@ -2705,6 +2705,26 @@
           "name": "drop",
           "required": false,
           "type_token": "bool"
+        },
+        {
+          "default": null,
+          "help": "Detect outliers within each group of these columns; unset uses the whole frame.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group by",
+          "name": "by",
+          "required": false,
+          "type_token": "list[str]"
         }
       ],
       "ports": [
@@ -2728,7 +2748,7 @@
         }
       ],
       "type": "clean.detect_outliers",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -14678,6 +14698,26 @@
           "name": "threshold",
           "required": false,
           "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Report outlier bounds within each group of these columns; unset uses the whole frame.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group by",
+          "name": "by",
+          "required": false,
+          "type_token": "list[str]"
         }
       ],
       "ports": [
@@ -14701,7 +14741,7 @@
         }
       ],
       "type": "stats.outlier_summary",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
