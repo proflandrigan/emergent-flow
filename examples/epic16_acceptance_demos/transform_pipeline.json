@@ -268,6 +268,22 @@
           "description": null
         },
         {
+          "name": "aggs",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null,
+          "ref": null,
+          "description": null
+        },
+        {
+          "name": "custom_aggs",
+          "type_token": "list[str]",
+          "value": null,
+          "default": null,
+          "ref": null,
+          "description": null
+        },
+        {
           "name": "agg",
           "type_token": "str",
           "value": "mean",

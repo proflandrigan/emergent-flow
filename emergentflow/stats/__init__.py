@@ -54,6 +54,7 @@ from emergentflow.stats.eda import (
     missingness,
     outlier_summary,
     profile,
+    register_aggregation,
 )
 from emergentflow.stats.errors import (
     InvalidModelSpecError,
@@ -95,6 +96,7 @@ __all__ = [
     "outlier_summary",
     "power_analysis",
     "profile",
+    "register_aggregation",
     "test_proportions",
     "ttest",
     "TTestResult",
