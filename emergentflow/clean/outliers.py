@@ -287,7 +287,14 @@ def detect_outliers(
             )
             for _, sub in df.groupby(by_cols, sort=False, dropna=False)
         ]
-        out = pd.concat(parts) if parts else df.copy()
+        if not parts:
+            if drop:
+                return df.copy()
+            result = df.copy()
+            result[flag_column] = False
+            result[score_column] = float("nan")
+            return result
+        out = pd.concat(parts)
         return out.reindex([i for i in df.index if i in out.index])
 
     result = df.copy()

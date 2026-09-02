@@ -405,6 +405,22 @@ def test_detect_outliers_by_none_is_backward_compatible() -> None:
     pd.testing.assert_frame_equal(with_by, without_by)
 
 
+def test_detect_outliers_by_empty_dataframe_has_flag_columns() -> None:
+    """Empty DataFrame with ``by`` must still produce ``flag_column``/``score_column``."""
+    df = pd.DataFrame({"group": pd.Series(dtype="object"), "x": pd.Series(dtype="float64")})
+    result = detect_outliers(df, columns=["x"], method="zscore", threshold=1.0, by="group")
+    assert "is_outlier" in result.columns
+    assert "outlier_score" in result.columns
+    assert len(result) == 0
+
+
+def test_detect_outliers_by_empty_dataframe_drop_is_unchanged() -> None:
+    """Empty DataFrame with ``by`` and ``drop=True`` returns an empty copy."""
+    df = pd.DataFrame({"group": pd.Series(dtype="object")})
+    result = detect_outliers(df, by="group", drop=True)
+    pd.testing.assert_frame_equal(result, df)
+
+
 # ---------------------------------------------------------------------------
 # ADR-0002 equivalence: execute() == running codegen()'s emitted code.
 # ---------------------------------------------------------------------------
