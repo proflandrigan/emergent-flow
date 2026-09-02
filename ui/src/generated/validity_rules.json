@@ -32,7 +32,7 @@
     {
       "confidence": "medium",
       "id": "random_split_on_temporal_graph",
-      "rationale": "ml.train_test_split shuffles its rows before splitting (it has no shuffle param; sklearn's default is shuffle=True). When the graph's rows are time-ordered -- signalled by the presence of timeseries.* nodes or recommend.temporal_split -- a random split assigns future rows to train and past rows to test, so the model is trained on tomorrow to predict yesterday. Use a temporal split instead. False-positive shape: timeseries nodes present for EDA while the model branch splits an unrelated static frame. Warning: the intended holdout depends on the experiment.",
+      "rationale": "ml.train_test_split shuffles its rows before splitting (it has no shuffle param; sklearn's default is shuffle=True). When the graph's rows are time-ordered -- signalled by the presence of timeseries.* nodes or recommend.temporal_split -- a random split assigns future rows to train and past rows to test, so the model is trained on tomorrow to predict yesterday. Set strategy=\"temporal\" on ml.train_test_split (or use recommend.temporal_split) for temporal holdout. False-positive shape: timeseries nodes present for EDA while the model branch splits an unrelated static frame. Warning: the intended holdout depends on the experiment.",
       "severity": "warning",
       "title": "Random train/test split on a temporal graph"
     },

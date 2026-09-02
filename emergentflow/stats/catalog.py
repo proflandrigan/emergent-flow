@@ -73,6 +73,36 @@ _GLM_LINKS: dict[str, dict[str, Any]] = {
     },
 }
 
+_COV_TYPES = ("nonrobust", "HC0", "HC1", "HC2", "HC3", "cluster")
+
+
+def _cov_kwargs(df: pd.DataFrame, spec: dict[str, Any]) -> dict[str, Any]:
+    """Translate validated cov_type/cov_group spec fields into statsmodels fit kwargs.
+
+    ``cov_type="nonrobust"`` or omitting the field entirely reproduces today's bare
+    ``.fit()`` (statsmodels' default). ``cov_type="cluster"`` requires ``cov_group``
+    and passes ``cov_kwds={"groups": df[cov_group]}``.
+    """
+    cov_type = spec.get("cov_type", "nonrobust")
+    if cov_type == "nonrobust":
+        return {}
+    if cov_type not in _COV_TYPES:
+        raise InvalidModelSpecError(
+            f"unknown cov_type {cov_type!r}; expected one of {_COV_TYPES!r}."
+        )
+    cov_kwargs: dict[str, Any] = {"cov_type": cov_type}
+    if cov_type == "cluster":
+        cov_group = spec.get("cov_group")
+        if not cov_group:
+            raise InvalidModelSpecError("cov_type='cluster' requires cov_group (a column name).")
+        if cov_group not in df.columns:
+            raise InvalidModelSpecError(
+                f"cov_group {cov_group!r} is not a column of the input frame; "
+                f"available columns: {sorted(df.columns)!r}."
+            )
+        cov_kwargs["cov_kwds"] = {"groups": df[cov_group]}
+    return cov_kwargs
+
 
 def _patsy_term(column: str) -> str:
     """Render *column* as a Patsy formula term, quoting via ``Q()`` only when required.
@@ -102,7 +132,7 @@ def _ols_formula(spec: dict[str, Any]) -> str:
 def _fit_ols(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
     """Fit an OLS model from a validated structured spec and wrap it in a FittedStatsModel."""
     formula = _ols_formula(spec)
-    results = smf.ols(formula, data=df).fit()
+    results = smf.ols(formula, data=df).fit(**_cov_kwargs(df, spec))
     fixed = spec.get("fixed_effects") or []
     # Undo Q()-quoting in the fitted term names so the tidy coefficient frame reports the raw
     # column name a caller passed in, not the internal Patsy formula artifact.
@@ -125,7 +155,7 @@ register_model(
         archetype="fit_model",
         fitter=_fit_ols,
         required_spec_fields=("target",),
-        optional_spec_fields=("fixed_effects",),
+        optional_spec_fields=("fixed_effects", "cov_type", "cov_group"),
         description="Ordinary least squares linear regression (statsmodels).",
     )
 )
@@ -135,7 +165,7 @@ def _fit_wls(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
     """Fit a WLS model from a validated structured spec."""
     formula = _ols_formula(spec)
     weights = df[spec["weights"]]
-    results = smf.wls(formula, data=df, weights=weights).fit()
+    results = smf.wls(formula, data=df, weights=weights).fit(**_cov_kwargs(df, spec))
     fixed = spec.get("fixed_effects") or []
     term_map = {_patsy_term(col): col for col in fixed}
     coefficients = ols_coefficient_frame(results)
@@ -156,7 +186,7 @@ register_model(
         archetype="fit_model",
         fitter=_fit_wls,
         required_spec_fields=("target", "weights"),
-        optional_spec_fields=("fixed_effects",),
+        optional_spec_fields=("fixed_effects", "cov_type", "cov_group"),
         description="Weighted least squares linear regression (statsmodels).",
     )
 )
@@ -169,7 +199,7 @@ def _fit_gls(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
     exists so GLS is a selectable, distinct model key using statsmodels' own GLS estimator.
     """
     formula = _ols_formula(spec)
-    results = smf.gls(formula, data=df).fit()
+    results = smf.gls(formula, data=df).fit(**_cov_kwargs(df, spec))
     fixed = spec.get("fixed_effects") or []
     term_map = {_patsy_term(col): col for col in fixed}
     coefficients = ols_coefficient_frame(results)
@@ -190,7 +220,7 @@ register_model(
         archetype="fit_model",
         fitter=_fit_gls,
         required_spec_fields=("target",),
-        optional_spec_fields=("fixed_effects",),
+        optional_spec_fields=("fixed_effects", "cov_type", "cov_group"),
         description="Generalized least squares, default covariance (statsmodels).",
     )
 )
@@ -206,7 +236,7 @@ def _fit_glm(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
     glm_kwargs: dict[str, Any] = {"family": family_cls(link=link_cls())}
     if "weights" in spec and spec["weights"] is not None:
         glm_kwargs["var_weights"] = df[spec["weights"]]
-    results = smf.glm(formula, data=df, **glm_kwargs).fit()
+    results = smf.glm(formula, data=df, **glm_kwargs).fit(**_cov_kwargs(df, spec))
     fixed = spec.get("fixed_effects") or []
     term_map = {_patsy_term(col): col for col in fixed}
     coefficients = ols_coefficient_frame(results)
@@ -227,7 +257,7 @@ register_model(
         archetype="fit_model",
         fitter=_fit_glm,
         required_spec_fields=("target", "family"),
-        optional_spec_fields=("fixed_effects", "link", "weights"),
+        optional_spec_fields=("fixed_effects", "link", "weights", "cov_type", "cov_group"),
         description="Generalized linear model (Gaussian/Binomial/Poisson/NegativeBinomial/Gamma "
         "families, statsmodels).",
     )
@@ -255,7 +285,7 @@ def _fit_mixedlm(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
     re_formula = _mixedlm_re_formula(random_effects)
     groups = df[spec["groups"]]
     model = smf.mixedlm(formula, data=df, groups=groups, re_formula=re_formula)
-    results = model.fit()
+    results = model.fit(**_cov_kwargs(df, spec))
 
     fixed = spec.get("fixed_effects") or []
     term_map = {_patsy_term(col): col for col in fixed}
@@ -277,7 +307,7 @@ register_model(
         archetype="fit_model",
         fitter=_fit_mixedlm,
         required_spec_fields=("target", "groups"),
-        optional_spec_fields=("fixed_effects", "random_effects"),
+        optional_spec_fields=("fixed_effects", "random_effects", "cov_type", "cov_group"),
         description="Linear mixed-effects / hierarchical model with random intercepts and "
         "slopes, grouped (statsmodels MixedLM).",
     )
@@ -337,7 +367,7 @@ def _fit_gam(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
         exog_linear = pd.DataFrame({"const": np.ones(len(df))}, index=df.index)
 
     model = GLMGam(df[target], exog=exog_linear, smoother=bs, family=family_cls(link=link_cls()))
-    results = model.fit()
+    results = model.fit(**_cov_kwargs(df, spec))
 
     coefficients = gam_coefficient_frame(results, linear_terms, smooth_columns)
     return FittedStatsModel(
@@ -356,7 +386,7 @@ register_model(
         archetype="fit_model",
         fitter=_fit_gam,
         required_spec_fields=("target", "smooth_terms"),
-        optional_spec_fields=("linear_terms", "family", "link"),
+        optional_spec_fields=("linear_terms", "family", "link", "cov_type", "cov_group"),
         description="Generalized additive model: linear terms + B-spline smooth terms "
         "(statsmodels GLMGam, unpenalized).",
     )

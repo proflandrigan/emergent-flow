@@ -19,12 +19,15 @@ from .apply_estimator import ApplyEstimator
 from .assert_data import AssertData
 from .auto_eda import AutoEda
 from .blend_models import BlendModels
+from .bootstrap_ci import BootstrapCi
 from .build_report import BuildReport
 from .calibrate_model import CalibrateModel
 from .cast_types import CastTypes
 from .chi_square import ChiSquare
 from .clean_text import CleanText
 from .cluster_detect import ClusterDetect
+from .cluster_metrics import ClusterMetrics
+from .cluster_stability import ClusterStability
 from .cohort_retention import CohortRetention
 from .compare_models import CompareModels
 from .composite import Composite
@@ -73,6 +76,7 @@ from .fit_gam import FitGAM
 from .fit_glm import FitGLM
 from .fit_linear_regression import FitLinearRegression
 from .fit_mixed_model import FitMixedModel
+from .fit_survival import FitSurvival
 from .fit_transform import FitTransform
 from .forecast_arima import ForecastArima
 from .forecast_ets import ForecastEts
@@ -111,6 +115,7 @@ from .pipeline import Pipeline
 from .power_analysis import PowerAnalysis
 from .predict import Predict
 from .prepare_interactions import PrepareInteractions
+from .proportion_confint import ProportionConfint
 from .proportions import TestProportions
 from .query_builder import QueryBuilder
 from .recommend_build_sequences import RecommendBuildSequences
@@ -144,6 +149,7 @@ from .sort import Sort
 from .sql_query import SqlQuery
 from .stack_models import StackModels
 from .summarize import Summarize
+from .survival_curve import SurvivalCurve
 from .train import TrainClassifier
 from .train_random_forest import TrainRandomForest
 from .train_regressor import TrainRegressor
@@ -176,12 +182,15 @@ __all__ = [
     "AssertData",
     "AutoEda",
     "BlendModels",
+    "BootstrapCi",
     "BuildReport",
     "CalibrateModel",
     "CastTypes",
     "ChiSquare",
     "CleanText",
     "ClusterDetect",
+    "ClusterMetrics",
+    "ClusterStability",
     "CohortRetention",
     "CompareModels",
     "Composite",
@@ -226,6 +235,7 @@ __all__ = [
     "FinalizeModel",
     "FitBayesianModel",
     "FitEstimator",
+    "FitSurvival",
     "FitGAM",
     "FitGLM",
     "FitLinearRegression",
@@ -269,6 +279,7 @@ __all__ = [
     "ParseDates",
     "Pipeline",
     "PowerAnalysis",
+    "ProportionConfint",
     "Predict",
     "PrepareInteractions",
     "QueryBuilder",
@@ -297,6 +308,7 @@ __all__ = [
     "SemiJoin",
     "SimilarItems",
     "Sort",
+    "SurvivalCurve",
     "SqlQuery",
     "StackModels",
     "Summarize",

@@ -36,7 +36,7 @@ class CrossValidate(NodeDefinition):
     """Cross-validate a curated, fit-archetype sklearn estimator."""
 
     type = "ml.cross_validate"
-    version = 1
+    version = 2
     family = "ml"
     label = "Cross Validate"
     category = "Machine Learning"
@@ -106,11 +106,30 @@ class CrossValidate(NodeDefinition):
             help="sklearn scoring string (e.g. 'accuracy', 'r2'); unset uses the estimator's "
             "default scorer.",
         ),
+        ParamSpec(
+            name="cv_strategy",
+            type_token="str",
+            default="kfold",
+            label="CV Strategy",
+            help="Cross-validation strategy: kfold, grouped, or temporal.",
+            hints=ValidationHints(
+                choices=cast("list[ParamValue]", ["kfold", "grouped", "temporal"]),
+                widget="select",
+            ),
+        ),
+        ParamSpec(
+            name="group_col",
+            type_token="str",
+            default=None,
+            label="Group column",
+            help="Column to group by (for cv_strategy='grouped').",
+            hints=ValidationHints(widget="column"),
+        ),
     ]
 
     def _args(
         self, node: Node
-    ) -> tuple[str, str, list[str] | None, dict[str, Any], int, str | None]:
+    ) -> tuple[str, str, list[str] | None, dict[str, Any], int, str | None, str, str | None]:
         values = {p.name: p.value for p in node.params}
         estimator = values.get("estimator")
         target = values.get("target")
@@ -118,6 +137,8 @@ class CrossValidate(NodeDefinition):
         params = values.get("params") or {}
         cv = values.get("cv", 5)
         scoring = values.get("scoring")
+        cv_strategy = values.get("cv_strategy") or "kfold"
+        group_col = values.get("group_col")
         return (
             cast(str, estimator),
             cast(str, target),
@@ -125,21 +146,26 @@ class CrossValidate(NodeDefinition):
             cast("dict[str, Any]", params),
             cast(int, cv),
             cast("str | None", scoring),
+            cast(str, cv_strategy),
+            cast("str | None", group_col),
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        estimator, target, features, params, cv, scoring = self._args(node)
+        estimator, target, features, params, cv, scoring, cv_strategy, group_col = self._args(node)
+        codegen_cv_strategy = f", cv_strategy={cv_strategy!r}" if cv_strategy != "kfold" else ""
+        codegen_group = f", group_col={group_col!r}" if group_col else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('result')} = ef.ml.cross_validate("
                 f"{ctx.in_var('frame')}, estimator={estimator!r}, target={target!r}, "
-                f"features={features!r}, params={params!r}, cv={cv!r}, scoring={scoring!r})"
+                f"features={features!r}, params={params!r}, cv={cv!r}, scoring={scoring!r}"
+                f"{codegen_cv_strategy}{codegen_group})"
             ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        estimator, target, features, params, cv, scoring = self._args(node)
+        estimator, target, features, params, cv, scoring, cv_strategy, group_col = self._args(node)
         return {
             "result": cross_validate(
                 inputs["frame"],
@@ -149,5 +175,7 @@ class CrossValidate(NodeDefinition):
                 params=params,
                 cv=cv,
                 scoring=scoring,
+                cv_strategy=cv_strategy,
+                group_col=group_col,
             )
         }

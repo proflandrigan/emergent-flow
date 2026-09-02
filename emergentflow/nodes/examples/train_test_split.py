@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from emergentflow.ir.common import Direction
 from emergentflow.ir.node import Node
+from emergentflow.ir.params import ParamValue
 from emergentflow.ml import train_test_split
 
 from ..contract import CodeFragment, NodeDefinition
@@ -33,7 +34,7 @@ class TrainTestSplit(NodeDefinition):
     """Split a DataFrame into train and test sets."""
 
     type = "ml.train_test_split"
-    version = 1
+    version = 2
     family = "ml"
     label = "Train/Test Split"
     category = "Machine Learning"
@@ -77,9 +78,44 @@ class TrainTestSplit(NodeDefinition):
             help="Seed controlling the train/test split.",
             hints=ValidationHints(widget="number"),
         ),
+        ParamSpec(
+            name="strategy",
+            type_token="str",
+            default="random",
+            label="Strategy",
+            help="Split strategy: random, stratified, grouped, or temporal.",
+            hints=ValidationHints(
+                choices=cast("list[ParamValue]", ["random", "stratified", "grouped", "temporal"]),
+                widget="select",
+            ),
+        ),
+        ParamSpec(
+            name="stratify_col",
+            type_token="str",
+            default=None,
+            label="Stratify column",
+            help="Column to stratify on (for strategy='stratified').",
+            hints=ValidationHints(widget="column"),
+        ),
+        ParamSpec(
+            name="group_col",
+            type_token="str",
+            default=None,
+            label="Group column",
+            help="Column to group by (for strategy='grouped').",
+            hints=ValidationHints(widget="column"),
+        ),
+        ParamSpec(
+            name="time_col",
+            type_token="str",
+            default=None,
+            label="Time column",
+            help="Column to sort by (for strategy='temporal').",
+            hints=ValidationHints(widget="column"),
+        ),
     ]
 
-    def _args(self, node: Node) -> tuple[float, int]:
+    def _args(self, node: Node) -> dict[str, Any]:
         values = {p.name: p.value for p in node.params}
         test_size = values.get("test_size", 0.25)
         if test_size is None:
@@ -87,19 +123,46 @@ class TrainTestSplit(NodeDefinition):
         random_state = values.get("random_state", 0)
         if random_state is None:
             random_state = 0
-        return cast(float, test_size), cast(int, random_state)
+        strategy = values.get("strategy") or "random"
+        stratify_col = values.get("stratify_col")
+        group_col = values.get("group_col")
+        time_col = values.get("time_col")
+        return {
+            "test_size": cast(float, test_size),
+            "random_state": cast(int, random_state),
+            "strategy": cast(str, strategy),
+            "stratify_col": cast("str | None", stratify_col),
+            "group_col": cast("str | None", group_col),
+            "time_col": cast("str | None", time_col),
+        }
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        test_size, random_state = self._args(node)
+        args = self._args(node)
+        codegen_strategy = f", strategy={args['strategy']!r}"
+        codegen_stratify = (
+            f", stratify_col={args['stratify_col']!r}" if args["stratify_col"] else ""
+        )
+        codegen_group = f", group_col={args['group_col']!r}" if args["group_col"] else ""
+        codegen_time = f", time_col={args['time_col']!r}" if args["time_col"] else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('train')}, {ctx.out_var('test')} = ef.ml.train_test_split("
-                f"{ctx.in_var('frame')}, test_size={test_size!r}, random_state={random_state!r})"
+                f"{ctx.in_var('frame')}, test_size={args['test_size']!r}, "
+                f"random_state={args['random_state']!r}"
+                f"{codegen_strategy}{codegen_stratify}{codegen_group}{codegen_time})"
             ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        test_size, random_state = self._args(node)
-        result = train_test_split(inputs["frame"], test_size=test_size, random_state=random_state)
+        args = self._args(node)
+        result = train_test_split(
+            inputs["frame"],
+            test_size=args["test_size"],
+            random_state=args["random_state"],
+            strategy=args["strategy"],
+            stratify_col=args["stratify_col"],
+            group_col=args["group_col"],
+            time_col=args["time_col"],
+        )
         return {"train": result[0], "test": result[1]}

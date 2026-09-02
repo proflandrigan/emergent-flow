@@ -114,10 +114,11 @@ class RandomSplitOnTemporalGraph(ValidityRule):
         "rows are time-ordered -- signalled by the presence of timeseries.* "
         "nodes or recommend.temporal_split -- a random split assigns future "
         "rows to train and past rows to test, so the model is trained on "
-        "tomorrow to predict yesterday. Use a temporal split instead. "
-        "False-positive shape: timeseries nodes present for EDA while the "
-        "model branch splits an unrelated static frame. Warning: the intended "
-        "holdout depends on the experiment."
+        'tomorrow to predict yesterday. Set strategy="temporal" on '
+        "ml.train_test_split (or use recommend.temporal_split) for temporal "
+        "holdout. False-positive shape: timeseries nodes present for EDA while "
+        "the model branch splits an unrelated static frame. Warning: the "
+        "intended holdout depends on the experiment."
     )
 
     @classmethod
@@ -140,8 +141,8 @@ class RandomSplitOnTemporalGraph(ValidityRule):
                     message=(
                         f"node {split.id!r} (ml.train_test_split) shuffles rows in "
                         "a graph that contains temporally ordered data; future rows "
-                        "can land in train. Use recommend.temporal_split (or a "
-                        "time-aware split) for temporal holdout."
+                        'can land in train. Set strategy="temporal" on the split '
+                        "node (or use recommend.temporal_split) for temporal holdout."
                     ),
                     node_id=split.id,
                     related_node_ids=[],
