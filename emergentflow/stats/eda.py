@@ -304,7 +304,19 @@ def outlier_summary(
             for col, val in zip(reversed(by_cols), reversed(key_tuple), strict=True):
                 part.insert(0, col, val)
             result_rows.append(part)
-        return pd.concat(result_rows, ignore_index=True) if result_rows else pd.DataFrame()
+        if not result_rows:
+            expected_cols = by_cols + [
+                "column",
+                "method",
+                "threshold",
+                "lower",
+                "upper",
+                "n",
+                "n_outliers",
+                "pct_outliers",
+            ]
+            return pd.DataFrame({c: pd.Series(dtype="object") for c in expected_cols})
+        return pd.concat(result_rows, ignore_index=True)
 
     rows: list[dict[str, Any]] = []
     for col in target.columns:

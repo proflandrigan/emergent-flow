@@ -274,6 +274,12 @@ def detect_outliers(
 
     # Grouped path: compute fences within each subset, preserving original row order.
     if by_cols:
+        original_index = df.index
+        # Use a unique RangeIndex during the group/recursion so that the final
+        # reindex step (which is label-based) never has to navigate duplicate
+        # labels.  The original index is restored at the end.
+        df_temp = df.copy()
+        df_temp.index = pd.RangeIndex(len(df))
         parts = [
             detect_outliers(
                 sub,
@@ -285,7 +291,7 @@ def detect_outliers(
                 score_column=score_column,
                 drop=drop,
             )
-            for _, sub in df.groupby(by_cols, sort=False, dropna=False)
+            for _, sub in df_temp.groupby(by_cols, sort=False, dropna=False)
         ]
         if not parts:
             if drop:
@@ -295,7 +301,13 @@ def detect_outliers(
             result[score_column] = float("nan")
             return result
         out = pd.concat(parts)
-        return out.reindex([i for i in df.index if i in out.index])
+        # Reindex by the unambiguous RangeIndex (positional order) rather
+        # than by the original (potentially duplicate) labels.
+        pos_order = [i for i in range(len(df)) if i in out.index]
+        out = out.reindex(pos_order)
+        if pos_order:
+            out.index = original_index[pos_order]
+        return out
 
     result = df.copy()
     if not target:
