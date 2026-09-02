@@ -32,7 +32,7 @@ class DetectOutliers(NodeDefinition):
     """Flag outlying rows with z-score, modified z-score, IQR, quantile, or percent rules."""
 
     type = "clean.detect_outliers"
-    version = 1
+    version = 2
     family = "clean"
     label = "Detect Outliers"
     category = "Transform"
@@ -109,9 +109,17 @@ class DetectOutliers(NodeDefinition):
             help="If true, return only inlier rows and omit the added columns.",
             hints=ValidationHints(widget="checkbox"),
         ),
+        ParamSpec(
+            name="by",
+            type_token="list[str]",
+            default=None,
+            label="Group by",
+            help="Detect outliers within each group of these columns; unset uses the whole frame.",
+            hints=ValidationHints(widget="column"),
+        ),
     ]
 
-    def _args(self, node: Node) -> tuple[list[str] | None, str, float, str, bool]:
+    def _args(self, node: Node) -> tuple[list[str] | None, str, float, str, bool, list[str] | None]:
         values = {p.name: p.value for p in node.params}
         columns = values.get("columns")
         method = values.get("method") or "zscore"
@@ -120,27 +128,30 @@ class DetectOutliers(NodeDefinition):
             threshold = 3.0
         combine = values.get("combine") or "any"
         drop = values.get("drop") or False
+        by = values.get("by")
         return (
             cast("list[str] | None", columns),
             cast(str, method),
             cast(float, threshold),
             cast(str, combine),
             cast(bool, drop),
+            cast("list[str] | None", by),
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        columns, method, threshold, combine, drop = self._args(node)
+        columns, method, threshold, combine, drop, by = self._args(node)
+        codegen_by = f", by={by!r}" if by else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('frame')} = ef.clean.detect_outliers("
                 f"{ctx.in_var('frame')}, columns={columns!r}, method={method!r}, "
-                f"threshold={threshold!r}, combine={combine!r}, drop={drop!r})"
+                f"threshold={threshold!r}, combine={combine!r}, drop={drop!r}{codegen_by})"
             ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        columns, method, threshold, combine, drop = self._args(node)
+        columns, method, threshold, combine, drop, by = self._args(node)
         return {
             "frame": detect_outliers(
                 inputs["frame"],
@@ -149,5 +160,6 @@ class DetectOutliers(NodeDefinition):
                 threshold=threshold,
                 combine=combine,
                 drop=drop,
+                by=by,
             )
         }

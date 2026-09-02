@@ -32,7 +32,7 @@ class OutlierSummary(NodeDefinition):
     """Report per-column outlier bounds and hit counts (companion to Detect Outliers)."""
 
     type = "stats.outlier_summary"
-    version = 1
+    version = 2
     family = "stats"
     label = "Outlier Summary"
     category = "Statistics"
@@ -86,36 +86,48 @@ class OutlierSummary(NodeDefinition):
             "to quantile or percent.",
             hints=ValidationHints(widget="number", min=0),
         ),
+        ParamSpec(
+            name="by",
+            type_token="list[str]",
+            default=None,
+            label="Group by",
+            help="Report outlier bounds within each group of these columns; "
+            "unset uses the whole frame.",
+            hints=ValidationHints(widget="column"),
+        ),
     ]
 
-    def _args(self, node: Node) -> tuple[list[str] | None, str, float]:
+    def _args(self, node: Node) -> tuple[list[str] | None, str, float, list[str] | None]:
         values = {p.name: p.value for p in node.params}
         columns = values.get("columns")
         method = values.get("method") or "zscore"
         threshold = values.get("threshold")
         if threshold is None:
             threshold = 3.0
+        by = values.get("by")
         return (
             cast("list[str] | None", columns),
             cast(str, method),
             cast(float, threshold),
+            cast("list[str] | None", by),
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        columns, method, threshold = self._args(node)
+        columns, method, threshold, by = self._args(node)
+        codegen_by = f", by={by!r}" if by else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('summary')} = ef.stats.outlier_summary("
                 f"{ctx.in_var('frame')}, columns={columns!r}, method={method!r}, "
-                f"threshold={threshold!r})"
+                f"threshold={threshold!r}{codegen_by})"
             ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        columns, method, threshold = self._args(node)
+        columns, method, threshold, by = self._args(node)
         return {
             "summary": outlier_summary(
-                inputs["frame"], columns=columns, method=method, threshold=threshold
+                inputs["frame"], columns=columns, method=method, threshold=threshold, by=by
             )
         }

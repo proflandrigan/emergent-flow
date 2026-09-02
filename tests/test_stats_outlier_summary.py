@@ -159,6 +159,73 @@ def test_outlier_summary_ignores_missing_values_in_counts() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Group-aware (by=) parameter
+# ---------------------------------------------------------------------------
+
+
+def test_outlier_summary_by_string_one_row_per_group_x_column() -> None:
+    """``by`` produces one row per (group × column)."""
+
+    df = pd.DataFrame(
+        {
+            "group": ["a", "a", "b", "b"],
+            "x": [0.0, 10.0, 5.0, 5.0],
+        }
+    )
+    result = outlier_summary(df, columns=["x"], method="zscore", threshold=1.0, by="group")
+    assert list(result.columns[:2]) == ["group", "column"]
+    assert list(result["group"]) == ["a", "b"]
+    assert list(result["column"]) == ["x", "x"]
+    assert len(result) == 2
+
+
+def test_outlier_summary_by_group_keys_are_leading_columns() -> None:
+    """Group key columns are inserted as leading columns (leftmost)."""
+    df = pd.DataFrame(
+        {
+            "g1": ["a", "a", "b", "b"],
+            "g2": ["x", "x", "y", "y"],
+            "val": [0.0, 10.0, 5.0, 5.0],
+        }
+    )
+    result = outlier_summary(df, columns=["val"], method="zscore", threshold=1.0, by=["g1", "g2"])
+    assert list(result.columns[:2]) == ["g1", "g2"]
+    assert list(result["g1"]) == ["a", "b"]
+    assert list(result["g2"]) == ["x", "y"]
+
+
+def test_outlier_summary_by_unknown_column_raises() -> None:
+    """Unknown group column raises ValueError."""
+    df = pd.DataFrame({"x": [1.0, 2.0]})
+    with pytest.raises(ValueError):
+        outlier_summary(df, columns=["x"], by="nonexistent")
+
+
+def test_outlier_summary_by_bounds_match_detect_outliers_per_group() -> None:
+    """The shared-seam invariant holds per group: n_outliers matches detector."""
+    from emergentflow.clean import detect_outliers
+
+    df = pd.DataFrame(
+        {
+            "group": ["a", "a", "a", "b", "b"],
+            "x": [0.0, 0.0, 10.0, 5.0, 5.0],
+        }
+    )
+    summary = outlier_summary(df, columns=["x"], method="zscore", threshold=1.0, by="group")
+    flagged = detect_outliers(df, columns=["x"], method="zscore", threshold=1.0, by="group")
+    assert int(summary["n_outliers"].sum()) == int(flagged["is_outlier"].sum())
+    assert list(summary["n_outliers"]) == [1, 0]
+
+
+def test_outlier_summary_by_none_is_backward_compatible() -> None:
+    """``by=None`` produces exactly the same result as calling without `by`."""
+    df = _make_df()
+    with_by = outlier_summary(df, columns=["x"], method="zscore", threshold=1.0, by=None)
+    without_by = outlier_summary(df, columns=["x"], method="zscore", threshold=1.0)
+    pd.testing.assert_frame_equal(with_by, without_by)
+
+
+# ---------------------------------------------------------------------------
 # ADR-0002 equivalence: execute() == running codegen()'s emitted code.
 # ---------------------------------------------------------------------------
 
@@ -174,6 +241,27 @@ def test_outlier_summary_node_equivalence() -> None:
     df = _make_df()
     defn = OutlierSummary()
     node = defn.instantiate(columns=["x"], method="zscore", threshold=1.0)
+
+    executed = defn.execute(node, inputs={"frame": df.copy()})
+    executed_result = executed["summary"]
+
+    scope = _run_codegen(defn, node, {"frame": df.copy()})
+    codegen_result = scope["summary"]
+
+    pd.testing.assert_frame_equal(executed_result, codegen_result)
+
+
+@pytest.mark.equivalence
+def test_outlier_summary_node_equivalence_with_by() -> None:
+    """ADR-0002: execute() == codegen() output when `by` is set."""
+    df = pd.DataFrame(
+        {
+            "group": ["a", "a", "a", "b", "b", "b"],
+            "x": [0.0, 0.0, 10.0, 5.0, 5.0, 5.0],
+        }
+    )
+    defn = OutlierSummary()
+    node = defn.instantiate(columns=["x"], method="zscore", threshold=1.0, by=["group"])
 
     executed = defn.execute(node, inputs={"frame": df.copy()})
     executed_result = executed["summary"]
