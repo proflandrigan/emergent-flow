@@ -32,10 +32,13 @@ from emergentflow.viz.models import PlotSpec
 _AGG_REGISTRY: dict[str, Callable[[pd.Series], Any]] = {}
 
 
-def register_aggregation(name, fn=None):
+def register_aggregation(
+    name: str,
+    fn: Callable[[pd.Series], Any] | None = None,
+) -> Callable[[pd.Series], Any]:
     if fn is None:
 
-        def _deco(f):
+        def _deco(f: Callable[[pd.Series], Any]) -> Callable[[pd.Series], Any]:
             _AGG_REGISTRY[name] = f
             return f
 
@@ -44,8 +47,10 @@ def register_aggregation(name, fn=None):
     return fn
 
 
-def _resolve_agg(agg):
-    def _sub(a):
+def _resolve_agg(
+    agg: str | list[str] | dict[str, str | list[str]],
+) -> Any:
+    def _sub(a: str | Any) -> Any:
         return _AGG_REGISTRY.get(a, a) if isinstance(a, str) else a
 
     if isinstance(agg, str):

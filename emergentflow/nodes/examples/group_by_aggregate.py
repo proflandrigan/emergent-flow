@@ -121,7 +121,7 @@ class GroupByAggregate(NodeDefinition):
             multi.extend(cast("list[str]", raw_aggs))
         if isinstance(raw_custom, list):
             multi.extend(cast("list[str]", raw_custom))
-        agg: str | list[str] = multi if multi else (cast("str", values.get("agg") or "mean"))
+        agg: str | list[str] = multi or cast("str", values.get("agg") or "mean")
         return (
             cast("list[str]", by),
             agg,
@@ -143,14 +143,14 @@ class GroupByAggregate(NodeDefinition):
             if fn is None:
                 raise CodegenError(
                     f"custom_agg {name!r} is not registered. "
-                    "Register it with ef.stats.register_aggregation() first."
+                    "Register it with ef.stats.register_aggregation() first.",
                 )
             try:
                 source = inspect.getsource(fn)
             except (OSError, TypeError) as exc:
                 raise CodegenError(
                     f"custom_agg {name!r} source cannot be retrieved ({exc}). "
-                    "The function must be defined in a module with accessible source code."
+                    "The function must be defined in a module with accessible source code.",
                 ) from exc
             tree = ast.parse(textwrap.dedent(source))
             for stmt in tree.body:
@@ -171,7 +171,7 @@ class GroupByAggregate(NodeDefinition):
             body_lines.append(self._codegen_custom_agg_preamble(raw_custom))
         body_lines.append(
             f"{ctx.out_var('summary')} = ef.stats.group_by_aggregate("
-            f"{ctx.in_var('frame')}, by={by!r}, agg={agg!r}, columns={columns!r})"
+            f"{ctx.in_var('frame')}, by={by!r}, agg={agg!r}, columns={columns!r})",
         )
         return CodeFragment(
             imports=["import emergentflow as ef"],
