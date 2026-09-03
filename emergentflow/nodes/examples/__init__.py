@@ -22,6 +22,7 @@ from .blend_models import BlendModels
 from .bootstrap_ci import BootstrapCi
 from .build_report import BuildReport
 from .calibrate_model import CalibrateModel
+from .callout import CalloutNode
 from .cast_types import CastTypes
 from .chi_square import ChiSquare
 from .clean_text import CleanText
@@ -101,7 +102,6 @@ from .load_model import LoadModel
 from .load_parquet import LoadParquet
 from .load_sample import LoadSample
 from .mann_whitney import MannWhitney
-from .callout import CalloutNode
 from .markdown_note import MarkdownNote
 from .merge import Merge
 from .missingness import Missingness
