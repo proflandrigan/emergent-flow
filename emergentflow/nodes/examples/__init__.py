@@ -101,6 +101,7 @@ from .load_model import LoadModel
 from .load_parquet import LoadParquet
 from .load_sample import LoadSample
 from .mann_whitney import MannWhitney
+from .callout import CalloutNode
 from .markdown_note import MarkdownNote
 from .merge import Merge
 from .missingness import Missingness
@@ -185,6 +186,7 @@ __all__ = [
     "BootstrapCi",
     "BuildReport",
     "CalibrateModel",
+    "CalloutNode",
     "CastTypes",
     "ChiSquare",
     "CleanText",

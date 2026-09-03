@@ -11,12 +11,14 @@ import type { EfEdgeData } from "./edges/EfEdge";
 import type { EfNodeData } from "./nodes/EfNode";
 import type { GroupNodeData } from "./nodes/GroupNode";
 import type { NoteNodeData } from "./nodes/NoteNode";
+import type { CalloutNodeData } from "./nodes/CalloutNode";
 import type { SnapshotNodeData } from "./nodes/SnapshotNode";
 
 const NOTE_NODE_TYPE = "notes.markdown";
 const GROUP_NODE_TYPE = "layout.group";
 const COMPOSITE_NODE_TYPE = "layout.composite";
 const SNAPSHOT_NODE_TYPE = "layout.snapshot";
+const CALLOUT_NODE_TYPE = "layout.callout";
 
 // A group container auto-sizes to fit its members plus this padding on every side. The
 // footprint constants are a rough per-node bounding box (matches EfNode's typical rendered
@@ -173,7 +175,7 @@ export function toRFNode(
   results: Record<string, Payload> | null | undefined,
   family: string | null | undefined,
   description: string | null | undefined,
-): RFNode<EfNodeData> | RFNode<NoteNodeData> | RFNode<GroupNodeData> | RFNode<CompositeNodeData> | RFNode<SnapshotNodeData> {
+): RFNode<EfNodeData> | RFNode<NoteNodeData> | RFNode<GroupNodeData> | RFNode<CompositeNodeData> | RFNode<SnapshotNodeData> | RFNode<CalloutNodeData> {
   if (node.type === COMPOSITE_NODE_TYPE) {
     const paramValue = (name: string): unknown =>
       node.params.find((p) => p.name === name)?.value;
@@ -209,6 +211,27 @@ export function toRFNode(
       data: {
         label: typeof label === "string" ? label : "Group",
         color: typeof color === "string" ? color : "slate",
+      },
+    };
+  }
+  if (node.type === CALLOUT_NODE_TYPE) {
+    const paramValue = (name: string): unknown =>
+      node.params.find((p) => p.name === name)?.value;
+    const label = paramValue("label");
+    const color = paramValue("color");
+    const width = paramValue("width");
+    const height = paramValue("height");
+    return {
+      id: node.id,
+      type: "calloutNode",
+      position: node.position,
+      selected,
+      style: { zIndex: -2 },
+      data: {
+        label: typeof label === "string" ? label : "Callout",
+        color: typeof color === "string" ? color : "blue",
+        width: typeof width === "number" ? width : 400,
+        height: typeof height === "number" ? height : 300,
       },
     };
   }

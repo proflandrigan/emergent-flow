@@ -84,6 +84,7 @@ export interface GraphStore extends CanvasModel {
   ) => string | null;
   pasteNodes: (models: NodeModel[]) => string[];
   groupSelection: (nodeIds: string[]) => string | null;
+  addCalloutAroundSelection: (nodeIds: string[]) => string | null;
   ungroupSelection: (nodeIds: string[]) => void;
   moveGroup: (groupId: string, position: { x: number; y: number }) => void;
   extractToComposite: (nodeIds: string[]) => string | null;
@@ -339,6 +340,40 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       return { nodes };
     });
     return groupId;
+  },
+
+  addCalloutAroundSelection(nodeIds) {
+    const ids = nodeIds.filter((id) => get().nodes[id]);
+    if (ids.length < 2) {
+      return null;
+    }
+    get().pushHistory("addCallout");
+    const members = ids.map((id) => get().nodes[id]);
+    const minX = Math.min(...members.map((n) => n.position.x));
+    const minY = Math.min(...members.map((n) => n.position.y));
+    const maxX = Math.max(...members.map((n) => n.position.x + 200));
+    const maxY = Math.max(...members.map((n) => n.position.y + 100));
+    const PADDING = 30;
+    const calloutId = newId("node");
+    const calloutNode: NodeModel = {
+      id: calloutId,
+      type: "layout.callout",
+      label: "Callout",
+      paradigm: "functional",
+      params: [
+        { name: "label", typeToken: "str", value: "Callout", default: "Callout" },
+        { name: "color", typeToken: "str", value: "blue", default: "blue" },
+        { name: "width", typeToken: "int", value: Math.max(400, maxX - minX + PADDING * 2), default: 400 },
+        { name: "height", typeToken: "int", value: Math.max(300, maxY - minY + PADDING * 2), default: 300 },
+      ],
+      ports: [],
+      position: { x: minX - PADDING, y: minY - PADDING },
+      groupId: null,
+    };
+    set((state) => ({
+      nodes: { ...state.nodes, [calloutId]: calloutNode },
+    }));
+    return calloutId;
   },
 
   ungroupSelection(nodeIds) {

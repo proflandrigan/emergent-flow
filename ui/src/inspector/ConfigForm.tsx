@@ -77,6 +77,9 @@ const JOIN_KEY_NODES: Record<string, { leftPort: string; rightPort: string }> = 
 };
 const JOIN_KEY_PARAMS = new Set(["on", "left_on", "right_on"]);
 
+const ANCHORABLE_NODES = new Set(["notes.markdown"]);
+const ANCHOR_PARAM_NAME = "anchor_id";
+
 function resolveCatalogParam(
   meta: CatalogParam | undefined,
   param: ParamModel,
@@ -146,6 +149,33 @@ function ConnectionSelect({
   );
 }
 
+function NodeAnchorSelect({
+  nodeId,
+  value,
+  onChange,
+}: {
+  nodeId: string;
+  value: string;
+  onChange: (value: string | null) => void;
+}): JSX.Element {
+  const nodes = useGraphStore((s) => s.nodes);
+  const options = Object.values(nodes).filter((n) => n.id !== nodeId);
+  return (
+    <Select
+      data-testid="param-anchor-id"
+      value={value || ""}
+      onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
+    >
+      <option value="">(floating note — no anchor)</option>
+      {options.map((n) => (
+        <option key={n.id} value={n.id}>
+          {n.label ?? n.type} ({n.type})
+        </option>
+      ))}
+    </Select>
+  );
+}
+
 function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
   const setParam = useGraphStore((s) => s.setParam);
   const graphParams = useGraphStore((s) => s.params);
@@ -158,7 +188,15 @@ function ParamRow({ node, param, meta }: ParamRowProps): JSX.Element {
   const testId = `param-${param.name}`;
 
   let widget: JSX.Element;
-  if (kind === "select") {
+  if (ANCHORABLE_NODES.has(node.type) && param.name === ANCHOR_PARAM_NAME) {
+    widget = (
+      <NodeAnchorSelect
+        nodeId={node.id}
+        value={formatValue(catalogParam, param.value)}
+        onChange={(value) => setParam(node.id, param.name, value)}
+      />
+    );
+  } else if (kind === "select") {
     const choices = catalogParam.hints?.choices ?? [];
     widget = (
       <Select

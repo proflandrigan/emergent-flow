@@ -1,4 +1,5 @@
 import { useState, type CSSProperties, type KeyboardEvent } from "react";
+import { Link } from "lucide-react";
 import type { Node, NodeProps } from "@xyflow/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -41,12 +42,15 @@ export function NoteNode({ id, data }: NodeProps<NoteNodeType>): JSX.Element {
   const setParam = useGraphStore((s) => s.setParam);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(data.content);
+  const nodes = useGraphStore((s) => s.nodes);
+  const [showAnchorPicker, setShowAnchorPicker] = useState(false);
 
   const swatch = NOTE_COLORS[data.color] ?? NOTE_COLORS[DEFAULT_COLOR];
   const boxStyle: CSSProperties = {
     ...boxStyleBase,
     background: swatch.background,
     border: `1px solid ${swatch.border}`,
+    position: "relative",
   };
 
   function startEditing() {
@@ -70,6 +74,38 @@ export function NoteNode({ id, data }: NodeProps<NoteNodeType>): JSX.Element {
 
   return (
     <div style={boxStyle} data-testid="note-node">
+      {showAnchorPicker && (
+        <div className="nodrag" style={{ marginBottom: 4 }}>
+          <select
+            data-testid="note-anchor-picker"
+            className="nodrag"
+            value={data.anchorId || ""}
+            onChange={(e) => {
+              const val = e.target.value;
+              setParam(id, "anchor_id", val || null);
+              setShowAnchorPicker(false);
+            }}
+            autoFocus
+            style={{
+              width: "100%",
+              fontSize: "var(--text-xs)",
+              padding: 2,
+              background: "transparent",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: "var(--radius-sm)",
+            }}
+          >
+            <option value="">(floating note)</option>
+            {Object.values(nodes)
+              .filter((n) => n.id !== id)
+              .map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.label ?? n.type}
+                </option>
+              ))}
+          </select>
+        </div>
+      )}
       {editing ? (
         <textarea
           data-testid="note-node-editor"
@@ -104,6 +140,45 @@ export function NoteNode({ id, data }: NodeProps<NoteNodeType>): JSX.Element {
               Double-click to add a note…
             </span>
           )}
+        </div>
+      )}
+      {data.anchorId ? (
+        <div
+          className="nodrag"
+          style={{
+            position: "absolute",
+            top: 2,
+            right: 2,
+            cursor: "pointer",
+            color: "var(--fam-notes)",
+            opacity: 0.6,
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowAnchorPicker((v) => !v);
+          }}
+          title="Anchored to a node. Click to change."
+        >
+          <Link size={12} />
+        </div>
+      ) : (
+        <div
+          className="nodrag"
+          style={{
+            position: "absolute",
+            top: 2,
+            right: 2,
+            cursor: "pointer",
+            color: "var(--text-tertiary)",
+            opacity: 0.4,
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowAnchorPicker((v) => !v);
+          }}
+          title="Link this note to a node"
+        >
+          <Link size={12} />
         </div>
       )}
     </div>

@@ -36,6 +36,7 @@ import { EfNode } from "./nodes/EfNode";
 import { GroupNode } from "./nodes/GroupNode";
 import { CompositeNode } from "./nodes/CompositeNode";
 import { NoteNode } from "./nodes/NoteNode";
+import { CalloutNode } from "./nodes/CalloutNode";
 import { SnapshotNode } from "./nodes/SnapshotNode";
 import { FindNodeModal } from "./FindNodeModal";
 import { ProblemsPanel } from "./ProblemsPanel";
@@ -57,7 +58,7 @@ import {
 import { fromIR } from "../store/ir";
 import { useSubgraphStore, currentSubgraph } from "../store/subgraphStore";
 
-const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode, compositeNode: CompositeNode, snapshotNode: SnapshotNode };
+const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode, compositeNode: CompositeNode, snapshotNode: SnapshotNode, calloutNode: CalloutNode };
 const edgeTypes: EdgeTypes = { efEdge: EfEdge };
 
 export function Canvas(): JSX.Element {
@@ -76,12 +77,14 @@ export function Canvas(): JSX.Element {
   const groupSelection = useGraphStore((s) => s.groupSelection);
   const ungroupSelection = useGraphStore((s) => s.ungroupSelection);
   const extractToComposite = useGraphStore((s) => s.extractToComposite);
+  const addCalloutAroundSelection = useGraphStore((s) => s.addCalloutAroundSelection);
 
   const selNodes = useSelectionStore((s) => s.nodes);
   const selEdges = useSelectionStore((s) => s.edges);
   const setNodeSelected = useSelectionStore((s) => s.setNodeSelected);
   const setEdgeSelected = useSelectionStore((s) => s.setEdgeSelected);
   const clearSelection = useSelectionStore((s) => s.clear);
+  const replaceSelection = useSelectionStore((s) => s.replaceSelection);
 
   const edgeCompatibility = useValidationStore((s) => s.edgeCompatibility);
   const diagnostics = useValidationStore((s) => s.diagnostics);
@@ -185,8 +188,6 @@ export function Canvas(): JSX.Element {
         } else if (change.type === "remove") {
           setNodeSelected(change.id, false);
           removeNode(change.id);
-        } else if (change.type === "select") {
-          setNodeSelected(change.id, change.selected);
         }
       }
     },
@@ -208,6 +209,16 @@ export function Canvas(): JSX.Element {
       }
     },
     [isInSubgraph, removeEdge, setEdgeSelected],
+  );
+
+  const onSelectionChange = useCallback(
+    (params: { nodes: Array<{ id: string }> }) => {
+      if (isInSubgraph) {
+        return;
+      }
+      replaceSelection(params.nodes.map((n) => n.id));
+    },
+    [isInSubgraph, replaceSelection],
   );
 
   const onConnect = useCallback(
@@ -232,6 +243,11 @@ export function Canvas(): JSX.Element {
   const handleMoveEnd = useCallback(() => {
     document.body.classList.remove("ef-panning");
   }, []);
+
+  const handleCallout = useCallback(() => {
+    if (selectedNodeIds.length < 2) return;
+    addCalloutAroundSelection(selectedNodeIds);
+  }, [selectedNodeIds, addCalloutAroundSelection]);
 
   const onNodeDragStop = useCallback(() => {
     if (isInSubgraph) {
@@ -403,6 +419,7 @@ export function Canvas(): JSX.Element {
         onMoveEnd={handleMoveEnd}
         onNodeDragStop={onNodeDragStop}
         onEdgesChange={onEdgesChange}
+        onSelectionChange={onSelectionChange}
         onConnect={onConnect}
         onNodeDoubleClick={handleNodeDoubleClick}
         onNodeContextMenu={onNodeContextMenu}
@@ -449,6 +466,7 @@ export function Canvas(): JSX.Element {
           onGroup={canGroup ? () => groupSelection(selectedNodeIds) : undefined}
           onUngroup={canUngroup ? () => ungroupSelection(selectedNodeIds) : undefined}
           onExtractToComposite={canGroup ? () => extractToComposite(selectedNodeIds) : undefined}
+          onCallout={canGroup ? handleCallout : undefined}
         />
       )}
       {contextMenu && (
