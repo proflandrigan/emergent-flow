@@ -20,6 +20,7 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from scipy import optimize
@@ -36,6 +37,12 @@ from scipy.stats import (
 )
 from scipy.stats import (
     wilcoxon as scipy_wilcoxon,
+)
+from sklearn.metrics import (
+    adjusted_rand_score,
+    calinski_harabasz_score,
+    davies_bouldin_score,
+    silhouette_score,
 )
 from statsmodels.formula.api import ols
 from statsmodels.stats.multitest import multipletests
@@ -80,6 +87,13 @@ __all__ = [
     "CohortRetentionResult",
     "correct_pvalues",
     "correlation",
+    "ClusterMetrics",
+    "cluster_metrics",
+    "cluster_stability",
+    "proportion_confint",
+    "bootstrap_ci",
+    "fit_survival",
+    "survival_curve",
     "CORR_METHODS",
     "crosstab",
     "CrosstabResult",
@@ -138,6 +152,19 @@ class AnovaResult:
     summary: pd.DataFrame
     ci_low: float
     ci_high: float
+
+
+@dataclass
+class ClusterMetrics:
+    """Internal-validation metrics for a clustering, with the n each was computed on."""
+
+    n_clusters: int
+    n_samples: int
+    n_noise: int
+    silhouette: float
+    calinski_harabasz: float
+    davies_bouldin: float
+    sample_size: int | None = None
 
 
 @dataclass
@@ -987,6 +1014,332 @@ def correlation(
     return result
 
 
+@public_op(name="ef.stats.cluster_metrics")
+def cluster_metrics(
+    df: pd.DataFrame,
+    *,
+    label_col: str,
+    features: list[str] | None = None,
+    sample_size: int | None = None,
+    random_state: int = 0,
+) -> ClusterMetrics:
+    """Internal cluster-validation metrics for an already-labelled frame.
+
+    Thin wrapper over ``sklearn.metrics.silhouette_score``,
+    ``calinski_harabasz_score`` and ``davies_bouldin_score``. Noise rows
+    (``label == -1``) are excluded from every metric and reported separately
+    as ``n_noise``. ``sample_size`` subsamples deterministically for
+    silhouette, which is O(n^2); the value used is echoed back so a reported
+    number is never ambiguous about what it was computed on.
+    Deterministic given ``random_state``.
+    """
+    if label_col not in df.columns:
+        raise ValueError(f"unknown label_col {label_col!r}; expected one of {list(df.columns)!r}.")
+    labels = df[label_col]
+    if features is not None:
+        unknown = [c for c in features if c not in df.columns]
+        if unknown:
+            raise ValueError(f"unknown features {unknown!r}; expected one of {list(df.columns)!r}.")
+        data = df[[c for c in features if c != label_col]]
+    else:
+        data = df.select_dtypes(include="number").drop(columns=[label_col], errors="ignore")
+
+    noise_mask = labels == -1
+    n_noise = int(noise_mask.sum())
+    clean_mask = ~noise_mask
+    n_samples_total = int(clean_mask.sum())
+
+    if n_samples_total == 0:
+        return ClusterMetrics(
+            n_clusters=0,
+            n_samples=0,
+            n_noise=n_noise,
+            silhouette=float("nan"),
+            calinski_harabasz=float("nan"),
+            davies_bouldin=float("nan"),
+            sample_size=0,
+        )
+
+    clean_labels = labels[clean_mask]
+    clean_data = data.loc[clean_mask].to_numpy()
+    unique_labels = sorted(set(clean_labels) - {-1})
+    n_clusters = len(unique_labels)
+
+    if n_clusters < 2 or clean_data.shape[1] < 1:
+        return ClusterMetrics(
+            n_clusters=n_clusters,
+            n_samples=n_samples_total,
+            n_noise=n_noise,
+            silhouette=float("nan"),
+            calinski_harabasz=float("nan"),
+            davies_bouldin=float("nan"),
+            sample_size=0,
+        )
+
+    ch = float(calinski_harabasz_score(clean_data, clean_labels))
+    db = float(davies_bouldin_score(clean_data, clean_labels))
+
+    if sample_size is not None and sample_size < len(clean_labels):
+        rng = np.random.default_rng(random_state)
+        idx = rng.choice(len(clean_labels), size=int(sample_size), replace=False)
+        sil = float(
+            silhouette_score(clean_data[idx], clean_labels.iloc[idx], random_state=random_state)
+        )
+        actual_sample = int(sample_size)
+    else:
+        sil = float(silhouette_score(clean_data, clean_labels, random_state=random_state))
+        actual_sample = n_samples_total
+
+    return ClusterMetrics(
+        n_clusters=n_clusters,
+        n_samples=n_samples_total,
+        n_noise=n_noise,
+        silhouette=sil,
+        calinski_harabasz=ch,
+        davies_bouldin=db,
+        sample_size=actual_sample,
+    )
+
+
+@public_op(name="ef.stats.cluster_stability")
+def cluster_stability(
+    df: pd.DataFrame,
+    *,
+    estimator: str,
+    features: list[str] | None = None,
+    params: dict[str, Any] | None = None,
+    n_resamples: int = 50,
+    group_col: str | None = None,
+    random_state: int = 0,
+) -> pd.DataFrame:
+    """Bootstrap-resample, refit, and score partition agreement against the full-data fit.
+
+    Thin wrapper over ``sklearn.metrics.adjusted_rand_score`` plus a resample
+    loop over the curated ``estimator``. ``group_col`` resamples whole groups
+    rather than rows. Returns one row per resample (``resample``, ``ari``,
+    ``n_clusters``, ``ok``) so the caller sees the distribution.
+    Deterministic given ``random_state``.
+    """
+    from emergentflow.ml import fit_estimator
+
+    if features is not None:
+        unknown = [c for c in features if c not in df.columns]
+        if unknown:
+            raise ValueError(f"unknown features {unknown!r}; expected one of {list(df.columns)!r}.")
+    if group_col is not None and group_col not in df.columns:
+        raise ValueError(f"unknown group_col {group_col!r}; expected one of {list(df.columns)!r}.")
+
+    full_fit = fit_estimator(df, estimator=estimator, features=features, params=params)
+    if hasattr(full_fit.estimator, "labels_"):  # type: ignore[union-attr]
+        full_labels = full_fit.estimator.labels_  # type: ignore[union-attr]
+    else:
+        full_labels = full_fit.estimator.predict(  # type: ignore[union-attr]
+            df[features or [c for c in df.select_dtypes(include="number").columns]]
+        )
+    full_labels_series = pd.Series(full_labels, index=df.index, name="label")
+
+    rng = np.random.default_rng(random_state)
+    rows: list[dict[str, Any]] = []
+
+    for i in range(n_resamples):
+        try:
+            if group_col is not None and group_col in df.columns:
+                groups = df[group_col].unique()
+                sampled_groups = rng.choice(groups, size=len(groups), replace=True)
+                boot_dfs = [df[df[group_col] == g] for g in sampled_groups]
+                boot_df = pd.concat(boot_dfs, ignore_index=False)
+            else:
+                boot_df = df.sample(frac=1.0, replace=True, random_state=rng.integers(0, 2**31))
+
+            boot_fit = fit_estimator(boot_df, estimator=estimator, features=features, params=params)
+            if hasattr(boot_fit.estimator, "labels_"):  # type: ignore[union-attr]
+                boot_labels = boot_fit.estimator.labels_  # type: ignore[union-attr]
+            else:
+                boot_labels = boot_fit.estimator.predict(  # type: ignore[union-attr]
+                    boot_df[features or [c for c in df.select_dtypes(include="number").columns]]
+                )
+
+            full_uniq = full_labels_series[~full_labels_series.index.duplicated(keep="first")]
+            boot_labels_series = pd.Series(boot_labels, index=boot_df.index)
+            boot_uniq = boot_labels_series[~boot_labels_series.index.duplicated(keep="first")]
+            common_idx = full_uniq.index.intersection(boot_uniq.index)
+            ari = float(
+                adjusted_rand_score(
+                    full_uniq.loc[common_idx],
+                    boot_uniq.loc[common_idx],
+                )
+            )
+            n_clusters = len(set(boot_labels) - {-1})
+            rows.append({"resample": i, "ari": ari, "n_clusters": n_clusters, "ok": True})
+        except Exception:
+            rows.append({"resample": i, "ari": float("nan"), "n_clusters": 0, "ok": False})
+
+    return pd.DataFrame(rows)
+
+
+@public_op(name="ef.stats.proportion_confint")
+def proportion_confint(
+    df: pd.DataFrame,
+    *,
+    success_col: str,
+    by: list[str] | None = None,
+    method: str = "wilson",
+    alpha: float = 0.05,
+    min_n: int | None = None,
+) -> pd.DataFrame:
+    """Per-group point estimate and confidence interval for a single proportion.
+
+    Thin wrapper over ``statsmodels.stats.proportion.proportion_confint``.
+    ``method`` defaults to **"wilson"**, not "normal": at the small proportions
+    typical of funnel and conversion metrics the normal approximation's
+    coverage collapses near 0 and can produce a negative lower bound.
+    Returns one row per group with ``n``, ``successes``, ``proportion`` (the raw
+    ``k/n``, never an adjusted centre), ``ci_low``, ``ci_high``, ``method``,
+    ``alpha``. When ``min_n`` is given, groups below it get null bounds and
+    ``below_min_n=True`` rather than a published interval. Deterministic.
+    """
+    if success_col not in df.columns:
+        raise ValueError(
+            f"unknown success_col {success_col!r}; expected one of {list(df.columns)!r}."
+        )
+    if not df[success_col].dropna().isin([0, 1, True, False]).all():
+        raise ValueError(f"success_col {success_col!r} must contain only 0/1/True/False values.")
+    if method not in ("normal", "wilson", "jeffreys", "beta", "agresti_coull"):
+        raise ValueError(
+            f"unknown method {method!r}; expected one of "
+            "'normal', 'wilson', 'jeffreys', 'beta', 'agresti_coull'."
+        )
+
+    by_cols = [by] if isinstance(by, str) else (list(by) if by else [])
+    unknown_by = [c for c in by_cols if c not in df.columns]
+    if unknown_by:
+        raise ValueError(
+            f"unknown group columns {unknown_by!r}; expected one of {list(df.columns)!r}."
+        )
+
+    from statsmodels.stats.proportion import proportion_confint as _prop_ci
+
+    def _ci_for_group(sub: pd.DataFrame) -> dict[str, Any]:
+        successes = int(sub[success_col].sum())
+        n = int(sub[success_col].count())
+        proportion = successes / n if n > 0 else float("nan")
+        if min_n is not None and n < min_n:
+            return {
+                "n": n,
+                "successes": successes,
+                "proportion": proportion,
+                "ci_low": None,
+                "ci_high": None,
+                "method": method,
+                "alpha": float(alpha),
+                "below_min_n": True,
+            }
+        if n == 0 or (method == "normal" and (successes == 0 or successes == n)):
+            ci_low, ci_high = float("nan"), float("nan")
+        else:
+            ci_low, ci_high = _prop_ci(successes, n, alpha=alpha, method=method)
+        return {
+            "n": n,
+            "successes": successes,
+            "proportion": proportion,
+            "ci_low": float(ci_low),
+            "ci_high": float(ci_high),
+            "method": method,
+            "alpha": float(alpha),
+            "below_min_n": False,
+        }
+
+    if by_cols:
+        grouped = list(df.groupby(by_cols, sort=True, dropna=False))
+        rows = [_ci_for_group(sub) for _, sub in grouped]
+        result = pd.DataFrame(rows)
+        if len(by_cols) == 1:
+            result.insert(
+                0,
+                "group",
+                [str(g) if not isinstance(g, tuple) else str(g[0]) for g, _ in grouped],
+            )
+        else:
+            for i, col in enumerate(by_cols):
+                result.insert(i, col, [g[i] if isinstance(g, tuple) else g for g, _ in grouped])
+        return result
+    else:
+        row = _ci_for_group(df)
+        return pd.DataFrame([row])
+
+
+@public_op(name="ef.stats.bootstrap_ci")
+def bootstrap_ci(
+    df: pd.DataFrame,
+    *,
+    statistic: str,
+    value_col: str,
+    group_col: str | None = None,
+    n_resamples: int = 1000,
+    ci: float = 0.95,
+    random_state: int = 0,
+) -> pd.DataFrame:
+    """Bootstrap confidence interval for a statistic of one column.
+
+    ``statistic`` is one of ``"mean"``, ``"median"``, ``"std"``, ``"sum"``.
+    ``group_col`` resamples whole groups rather than rows (cluster bootstrap).
+    Returns a one-row DataFrame with ``statistic``, ``point_estimate``,
+    ``ci_low``, ``ci_high``, ``ci``, ``n_resamples``, ``method``.
+    Deterministic given ``random_state``.
+    """
+    if value_col not in df.columns:
+        raise ValueError(f"unknown value_col {value_col!r}; expected one of {list(df.columns)!r}.")
+    if statistic not in ("mean", "median", "std", "sum"):
+        raise ValueError(
+            f"unknown statistic {statistic!r}; expected 'mean', 'median', 'std', or 'sum'."
+        )
+    if group_col is not None and group_col not in df.columns:
+        raise ValueError(f"unknown group_col {group_col!r}; expected one of {list(df.columns)!r}.")
+    if n_resamples < 1:
+        raise ValueError(f"n_resamples must be >= 1; got {n_resamples}.")
+
+    _STAT_FN = {
+        "mean": lambda s: float(s.mean()),
+        "median": lambda s: float(s.median()),
+        "std": lambda s: float(s.std(ddof=1)),
+        "sum": lambda s: float(s.sum()),
+    }
+    stat_fn = _STAT_FN[statistic]
+    point = stat_fn(df[value_col])
+
+    rng = np.random.default_rng(random_state)
+    boot_stats: list[float] = []
+
+    for _ in range(n_resamples):
+        if group_col is not None and group_col in df.columns:
+            groups = df[group_col].unique()
+            sampled_groups = rng.choice(groups, size=len(groups), replace=True)
+            boot_df = pd.concat([df[df[group_col] == g] for g in sampled_groups], ignore_index=True)
+        else:
+            boot_df = df.sample(frac=1.0, replace=True, random_state=rng.integers(0, 2**31))
+        boot_stats.append(stat_fn(boot_df[value_col]))
+
+    boot_stats.sort()
+    lower_idx = int(n_resamples * (1 - ci) / 2)
+    upper_idx = min(int(n_resamples * (1 + ci) / 2), n_resamples - 1)
+    ci_low = boot_stats[lower_idx]
+    ci_high = boot_stats[upper_idx]
+
+    return pd.DataFrame(
+        [
+            {
+                "statistic": statistic,
+                "point_estimate": point,
+                "ci_low": ci_low,
+                "ci_high": ci_high,
+                "ci": float(ci),
+                "n_resamples": n_resamples,
+                "method": f"percentile_{group_col + '_cluster' if group_col else 'basic'}",
+            }
+        ]
+    )
+
+
 #: Maps an optional pip-extra target to every module whose presence proves the extra is fully
 #: installed, so fit_model can raise a typed MissingOptionalDependencyError (never an opaque
 #: ImportError) before attempting to fit an optional-dependency model (Epic 12 Story 1's hard
@@ -1043,4 +1396,10 @@ def diagnostic(
     return diag_spec.fn(df, model, resolved_spec)
 
 
-from emergentflow.stats import catalog, diagnostics_catalog  # noqa: E402, F401
+# Survival functions (optional ``emergentflow[survival]`` extra, Epic 19 Story 8).
+# Imported lazily so a bare install stays light and never pulls lifelines.
+from emergentflow.stats import (  # noqa: E402, F401
+    catalog,
+    diagnostics_catalog,
+    survival,  # noqa: E402, F401
+)

@@ -192,6 +192,13 @@ pii = [
     "presidio-analyzer>=2,<3",
     "presidio-anonymizer>=2,<3",
 ]
+# `pip install emergentflow[survival]` enables survival analysis (Cox PH, Kaplan-Meier)
+# via lifelines (MIT license). Kept optional so a bare SDK install stays light (ADR 0007);
+# a survival node in a base install raises a typed MissingOptionalDependencyError, never
+# an opaque ImportError.
+survival = [
+    "lifelines>=0.28,<1",
+]
 # `pip install emergentflow[excel]` enables `ef.data.load_excel`. openpyxl is MIT
 # (compatible with this SDK's Apache-2.0 license; not GPL). Kept optional so a bare
 # SDK install stays light (ADR 0007); a `load_excel` call in a base install raises a
@@ -231,7 +238,7 @@ mcp = [
 # modeling, and the MCP tool wrapper. Convenient for local development or
 # exploration; production installs should cherry-pick only the extras they need.
 all = [
-    "emergentflow[server,llm,bayes,embed,explain,cloud,excel,bigquery,redshift,postgres,mcp,recommend,fuzzy,umap,report-pdf,docs,pii]",
+    "emergentflow[server,llm,bayes,embed,explain,cloud,excel,bigquery,redshift,postgres,mcp,recommend,fuzzy,umap,report-pdf,docs,pii,survival]",
 ]
 
 [project.urls]
@@ -379,5 +386,9 @@ module = [
     # `ef.clean.fuzzy_join`, absent from the bare `uv sync --locked` CI env (like
     # torch/litellm/pymc).
     "rapidfuzz.*",
+    # The optional `emergentflow[survival]` extra: lifelines ships no type stubs and is
+    # imported lazily inside `emergentflow/stats/survival.py`, absent from the bare
+    # `uv sync --locked` CI env (like torch/litellm/pymc).
+    "lifelines.*",
 ]
 ignore_missing_imports = true

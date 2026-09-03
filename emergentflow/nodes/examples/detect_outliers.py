@@ -32,7 +32,7 @@ class DetectOutliers(NodeDefinition):
     """Flag outlying rows with z-score, modified z-score, IQR, quantile, or percent rules."""
 
     type = "clean.detect_outliers"
-    version = 2
+    version = 3
     family = "clean"
     label = "Detect Outliers"
     category = "Transform"
@@ -110,6 +110,17 @@ class DetectOutliers(NodeDefinition):
             hints=ValidationHints(widget="checkbox"),
         ),
         ParamSpec(
+            name="action",
+            type_token="str",
+            default="flag",
+            label="Action",
+            help="What to do: flag (add columns), drop (remove rows), or clip (winsorize values).",
+            hints=ValidationHints(
+                choices=cast("list[ParamValue]", ["flag", "drop", "clip"]),
+                widget="select",
+            ),
+        ),
+        ParamSpec(
             name="by",
             type_token="list[str]",
             default=None,
@@ -119,7 +130,9 @@ class DetectOutliers(NodeDefinition):
         ),
     ]
 
-    def _args(self, node: Node) -> tuple[list[str] | None, str, float, str, bool, list[str] | None]:
+    def _args(
+        self, node: Node
+    ) -> tuple[list[str] | None, str, float, str, bool, str, list[str] | None]:
         values = {p.name: p.value for p in node.params}
         columns = values.get("columns")
         method = values.get("method") or "zscore"
@@ -128,6 +141,7 @@ class DetectOutliers(NodeDefinition):
             threshold = 3.0
         combine = values.get("combine") or "any"
         drop = values.get("drop") or False
+        action = values.get("action") or "flag"
         by = values.get("by")
         return (
             cast("list[str] | None", columns),
@@ -135,23 +149,26 @@ class DetectOutliers(NodeDefinition):
             cast(float, threshold),
             cast(str, combine),
             cast(bool, drop),
+            cast(str, action),
             cast("list[str] | None", by),
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        columns, method, threshold, combine, drop, by = self._args(node)
+        columns, method, threshold, combine, drop, action, by = self._args(node)
         codegen_by = f", by={by!r}" if by else ""
+        codegen_action = f", action={action!r}" if action != "flag" else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('frame')} = ef.clean.detect_outliers("
                 f"{ctx.in_var('frame')}, columns={columns!r}, method={method!r}, "
-                f"threshold={threshold!r}, combine={combine!r}, drop={drop!r}{codegen_by})"
+                f"threshold={threshold!r}, combine={combine!r}, drop={drop!r}"
+                f"{codegen_action}{codegen_by})"
             ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        columns, method, threshold, combine, drop, by = self._args(node)
+        columns, method, threshold, combine, drop, action, by = self._args(node)
         return {
             "frame": detect_outliers(
                 inputs["frame"],
@@ -160,6 +177,7 @@ class DetectOutliers(NodeDefinition):
                 threshold=threshold,
                 combine=combine,
                 drop=drop,
+                action=action,
                 by=by,
             )
         }

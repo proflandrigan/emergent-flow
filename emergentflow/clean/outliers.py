@@ -186,6 +186,7 @@ def detect_outliers(
     flag_column: str = "is_outlier",
     score_column: str = "outlier_score",
     drop: bool = False,
+    action: str = "flag",
     by: str | list[str] | None = None,
 ) -> pd.DataFrame:
     """Flag outlying rows, returning a NEW DataFrame.
@@ -227,6 +228,20 @@ def detect_outliers(
         raise CleanError(problem)
     if combine not in OUTLIER_COMBINE:
         raise CleanError(f"unknown combine {combine!r}; expected one of {OUTLIER_COMBINE!r}.")
+    if action not in ("flag", "drop", "clip"):
+        raise CleanError(f"unknown action {action!r}; expected 'flag', 'drop', or 'clip'.")
+    if drop and action == "flag":
+        drop = True
+        action = "drop"
+    if drop and action not in ("drop",):
+        raise CleanError(
+            f"drop=True is incompatible with action={action!r}; use "
+            f"action='drop' or set drop=False."
+        )
+    if not drop and action == "drop":
+        action = "drop"
+    effective_drop = drop or action == "drop"
+    effective_clip = action == "clip"
 
     by_cols = [by] if isinstance(by, str) else (list(by) if by else [])
     unknown_by = [c for c in by_cols if c not in df.columns]
@@ -260,8 +275,8 @@ def detect_outliers(
     # Only the non-drop path writes these columns, so only it can collide. Guarding
     # unconditionally would reject the natural two-node flow (flag with one
     # detect_outliers, then cut the rows with a second one set to drop=True) over
-    # columns the second call never adds.
-    if not drop:
+    # columns the second call never adds. Clip also never adds these columns.
+    if not effective_drop and not effective_clip:
         collisions = [c for c in (flag_column, score_column) if c in df.columns]
         if collisions:
             raise ColumnCollisionError(
@@ -269,7 +284,9 @@ def detect_outliers(
                 "choose different flag_column/score_column names."
             )
 
-    if drop and not target:
+    if effective_drop and not target:
+        return df.copy()
+    if effective_clip and not target:
         return df.copy()
 
     # Grouped path: compute fences within each subset, preserving original row order.
@@ -284,11 +301,12 @@ def detect_outliers(
                 flag_column=flag_column,
                 score_column=score_column,
                 drop=drop,
+                action=action,
             )
             for _, sub in df.groupby(by_cols, sort=False, dropna=False)
         ]
         if not parts:
-            if drop:
+            if effective_drop or effective_clip:
                 return df.copy()
             result = df.copy()
             result[flag_column] = False
@@ -313,8 +331,14 @@ def detect_outliers(
 
     is_outlier = flags.any(axis=1) if combine == "any" else flags.all(axis=1)
 
-    if drop:
+    if effective_drop:
         return df.loc[~is_outlier].copy()
+
+    if effective_clip:
+        for col in target:
+            bounds = outlier_bounds(df[col].astype("float64"), method=method, threshold=threshold)
+            result[col] = result[col].clip(lower=bounds[0], upper=bounds[1])
+        return result
 
     result[flag_column] = is_outlier
     result[score_column] = scores.max(axis=1)

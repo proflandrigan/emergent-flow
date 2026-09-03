@@ -777,9 +777,9 @@ class TestTrainTestSplit:
         node = defn.instantiate(test_size=0.25, random_state=0)
         frag = defn.preview(node)
         assert frag.imports == ["import emergentflow as ef"]
-        assert (
-            frag.body
-            == "train, test = ef.ml.train_test_split(frame, test_size=0.25, random_state=0)"
+        assert frag.body == (
+            "train, test = ef.ml.train_test_split("
+            "frame, test_size=0.25, random_state=0, strategy='random')"
         )
 
     def test_codegen_matches_execute(self):

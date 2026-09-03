@@ -2707,6 +2707,30 @@
           "type_token": "bool"
         },
         {
+          "default": "flag",
+          "help": "What to do: flag (add columns), drop (remove rows), or clip (winsorize values).",
+          "hints": {
+            "choices": [
+              "flag",
+              "drop",
+              "clip"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Action",
+          "name": "action",
+          "required": false,
+          "type_token": "str"
+        },
+        {
           "default": null,
           "help": "Detect outliers within each group of these columns; unset uses the whole frame.",
           "hints": {
@@ -2748,7 +2772,7 @@
         }
       ],
       "type": "clean.detect_outliers",
-      "version": 2
+      "version": 3
     },
     {
       "advisor_persona": null,
@@ -8421,6 +8445,50 @@
           "name": "scoring",
           "required": false,
           "type_token": "str"
+        },
+        {
+          "default": "kfold",
+          "help": "Cross-validation strategy: kfold, grouped, or temporal.",
+          "hints": {
+            "choices": [
+              "kfold",
+              "grouped",
+              "temporal"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "CV Strategy",
+          "name": "cv_strategy",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column to group by (for cv_strategy='grouped').",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group column",
+          "name": "group_col",
+          "required": false,
+          "type_token": "str"
         }
       ],
       "ports": [
@@ -8444,7 +8512,7 @@
         }
       ],
       "type": "ml.cross_validate",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -10297,6 +10365,91 @@
           "name": "random_state",
           "required": false,
           "type_token": "int"
+        },
+        {
+          "default": "random",
+          "help": "Split strategy: random, stratified, grouped, or temporal.",
+          "hints": {
+            "choices": [
+              "random",
+              "stratified",
+              "grouped",
+              "temporal"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Strategy",
+          "name": "strategy",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column to stratify on (for strategy='stratified').",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Stratify column",
+          "name": "stratify_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column to group by (for strategy='grouped').",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group column",
+          "name": "group_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column to sort by (for strategy='temporal').",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Time column",
+          "name": "time_col",
+          "required": false,
+          "type_token": "str"
         }
       ],
       "ports": [
@@ -10329,7 +10482,7 @@
         }
       ],
       "type": "ml.train_test_split",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -12623,6 +12776,165 @@
       "advisor_persona": null,
       "category": "Statistics",
       "column_effect": null,
+      "description": "Bootstrap confidence interval for a statistic (mean, median, std, sum).",
+      "family": "stats",
+      "keywords": [],
+      "label": "Bootstrap CI",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "mean",
+          "help": "Statistic to compute: mean, median, std, sum.",
+          "hints": {
+            "choices": [
+              "mean",
+              "median",
+              "std",
+              "sum"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Statistic",
+          "name": "statistic",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column to bootstrap.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Value column",
+          "name": "value_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column for cluster bootstrap (resample whole groups); None resamples rows.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group column",
+          "name": "group_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 1000,
+          "help": "Number of bootstrap resamples.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 100.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Resamples",
+          "name": "n_resamples",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": 0.95,
+          "help": "Confidence level (e.g. 0.95 for 95% CI).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Confidence level",
+          "name": "ci",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": 0,
+          "help": "Seed for deterministic resampling.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Random state",
+          "name": "random_state",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "DataFrame with the value column to bootstrap.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "One-row DataFrame with point_estimate, ci_low, ci_high.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.bootstrap_ci",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "column_effect": null,
       "description": "Chi-square test of independence on a contingency table.",
       "family": "stats",
       "keywords": [],
@@ -12711,6 +13023,274 @@
         }
       ],
       "type": "stats.chi_square",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "column_effect": null,
+      "description": "Silhouette, Calinski-Harabasz, and Davies-Bouldin scores for a clustering.",
+      "family": "stats",
+      "keywords": [],
+      "label": "Cluster Metrics",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "label",
+          "help": "Name of the column containing cluster labels. Noise rows (label==-1) are excluded.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Label column",
+          "name": "label_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to score on; empty uses all numeric columns except label_col.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Features",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Subsample for silhouette (O(n^2)); None scores all.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Sample size",
+          "name": "sample_size",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for deterministic subsampling.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Random state",
+          "name": "random_state",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "A DataFrame with a label column (from a clustering node) and numeric feature columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "ClusterMetrics",
+          "direction": "out",
+          "help": "Inspectable cluster-validation metrics.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.cluster_metrics",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "column_effect": null,
+      "description": "Bootstrap-resample, refit, and score partition agreement via adjusted Rand index.",
+      "family": "stats",
+      "keywords": [],
+      "label": "Cluster Stability",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "KMeans",
+          "help": "Clustering estimator key from the ml catalog.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Estimator",
+          "name": "estimator",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to cluster on; None uses all numeric columns.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Features",
+          "name": "features",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": 50,
+          "help": "Number of bootstrap resamples.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 2.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Resamples",
+          "name": "n_resamples",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Column to group-resample (cluster bootstrap); None resamples rows.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group column",
+          "name": "group_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 0,
+          "help": "Seed for deterministic resampling.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Random state",
+          "name": "random_state",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Optional hyperparameters for the clustering estimator.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, Any] | None"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "DataFrame with features and optional group column.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "One row per resample (resample, ari, n_clusters, ok).",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.cluster_stability",
       "version": 1
     },
     {
@@ -14164,6 +14744,120 @@
       "advisor_persona": null,
       "category": "Statistics",
       "column_effect": null,
+      "description": "Cox proportional-hazards model with PH assumption test.",
+      "family": "stats",
+      "keywords": [],
+      "label": "Fit Survival",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column with time-to-event (or time-to-censor).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Duration column",
+          "name": "duration_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column indicating whether the event occurred (1) or censored (0).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Event column",
+          "name": "event_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Patsy formula; None uses all other columns as predictors.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Formula",
+          "name": "formula",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 0.05,
+          "help": "Significance level.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Alpha",
+          "name": "alpha",
+          "required": false,
+          "type_token": "float"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "DataFrame with duration and event columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Coefficient frame with hazard ratios, CIs, and PH test.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.fit_survival",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "column_effect": null,
       "description": "Per-step conversion and drop-off funnel over an event log.",
       "family": "stats",
       "keywords": [],
@@ -14846,6 +15540,260 @@
         }
       ],
       "type": "stats.power_analysis",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "column_effect": null,
+      "description": "Per-group point estimate and confidence interval for a single proportion.",
+      "family": "stats",
+      "keywords": [],
+      "label": "Proportion CI",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Binary 0/1/True/False column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Success column",
+          "name": "success_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Columns to group by for per-group intervals.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group by",
+          "name": "by",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "wilson",
+          "help": "CI method: normal, wilson, jeffreys, beta, agresti_coull.",
+          "hints": {
+            "choices": [
+              "normal",
+              "wilson",
+              "jeffreys",
+              "beta",
+              "agresti_coull"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Method",
+          "name": "method",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 0.05,
+          "help": "Significance level (1 - confidence).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Alpha",
+          "name": "alpha",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Minimum sample size for reporting; groups below this get null bounds.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Min N",
+          "name": "min_n",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "DataFrame with a binary success column.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "One row per group with n, successes, proportion, ci_low, ci_high.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.proportion_confint",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Statistics",
+      "column_effect": null,
+      "description": "Kaplan-Meier survival curve with confidence bounds.",
+      "family": "stats",
+      "keywords": [],
+      "label": "Survival Curve",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column with time-to-event (or time-to-censor).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Duration column",
+          "name": "duration_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column indicating event (1) or censored (0).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Event column",
+          "name": "event_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column to stratify curves by; None returns a single curve.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group column",
+          "name": "group_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 0.05,
+          "help": "Significance level.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Alpha",
+          "name": "alpha",
+          "required": false,
+          "type_token": "float"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "DataFrame with duration and event columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Survival curve: timeline, survival_probability, ci_low, ci_high.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "stats.survival_curve",
       "version": 1
     },
     {

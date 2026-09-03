@@ -50,6 +50,8 @@ from sklearn.ensemble import (
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
+    average_precision_score,
+    brier_score_loss,
     classification_report,
     f1_score,
     mean_absolute_error,
@@ -60,7 +62,13 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+from sklearn.model_selection import (
+    GridSearchCV,
+    GroupShuffleSplit,
+    RandomizedSearchCV,
+    StratifiedGroupKFold,
+    TimeSeriesSplit,
+)
 from sklearn.model_selection import cross_validate as _sk_cross_validate
 from sklearn.model_selection import train_test_split as _sk_split
 from sklearn.pipeline import Pipeline as _SkPipeline
@@ -240,6 +248,11 @@ def evaluate(model: FittedModel, df: pd.DataFrame) -> EvaluationResult:
                 if y_true.nunique() >= 2:
                     with contextlib.suppress(ValueError):
                         metrics["roc_auc"] = float(roc_auc_score(y_true, proba[:, 1]))
+                        metrics["average_precision"] = float(
+                            average_precision_score(y_true, proba[:, 1])
+                        )
+                        metrics["brier"] = float(brier_score_loss(y_true, proba[:, 1]))
+                        metrics["positive_rate"] = float(pd.Series(y_true).eq(pos_label).mean())
         # else: fewer than 2 classes in `classes_` (a degenerate single-class fit) --
         # precision/recall/f1/roc_auc are undefined, so only `accuracy` is reported.
     return EvaluationResult(task=model.task, n=int(df.shape[0]), metrics=metrics)
@@ -716,15 +729,54 @@ def train_test_split(
     *,
     test_size: float = 0.25,
     random_state: int = 0,
+    strategy: str = "random",
+    stratify_col: str | None = None,
+    group_col: str | None = None,
+    time_col: str | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Split a DataFrame into (train, test) frames. Deterministic given ``random_state``.
 
-    Thin wrapper over ``sklearn.model_selection.train_test_split``. Returns two NEW frames with
-    reset indices. A tuple of tidy DataFrames is inspectable under the ``@public_op`` contract.
+    Thin wrapper over ``sklearn.model_selection.train_test_split`` (random/stratified),
+    ``GroupShuffleSplit`` (grouped), and a deterministic ``time_col`` quantile cut
+    (temporal, no shuffle). ``strategy="random"`` reproduces today's behaviour exactly.
+    Returns two NEW frames with reset indices.
     """
     if not 0.0 < test_size < 1.0:
         raise ValueError(f"test_size must be in (0, 1); got {test_size!r}.")
-    train_df, test_df = _sk_split(df, test_size=test_size, random_state=random_state)
+    if strategy not in ("random", "stratified", "grouped", "temporal"):
+        raise ValueError(
+            f"unknown strategy {strategy!r}; expected 'random', 'stratified', "
+            f"'grouped', or 'temporal'."
+        )
+
+    if strategy == "random":
+        train_df, test_df = _sk_split(df, test_size=test_size, random_state=random_state)
+    elif strategy == "stratified":
+        if not stratify_col or stratify_col not in df.columns:
+            raise ValueError(
+                f"stratify_col {stratify_col!r} must be a valid column for stratified split."
+            )
+        train_df, test_df = _sk_split(
+            df,
+            test_size=test_size,
+            random_state=random_state,
+            stratify=df[stratify_col],
+        )
+    elif strategy == "grouped":
+        if not group_col or group_col not in df.columns:
+            raise ValueError(f"group_col {group_col!r} must be a valid column for grouped split.")
+        gss = GroupShuffleSplit(n_splits=1, test_size=test_size, random_state=random_state)
+        train_idx, test_idx = next(gss.split(df, groups=df[group_col]))
+        train_df = df.iloc[train_idx]
+        test_df = df.iloc[test_idx]
+    elif strategy == "temporal":
+        if not time_col or time_col not in df.columns:
+            raise ValueError(f"time_col {time_col!r} must be a valid column for temporal split.")
+        sorted_df = df.sort_values(time_col)
+        cutoff = int(len(sorted_df) * (1 - test_size))
+        train_df = sorted_df.iloc[:cutoff]
+        test_df = sorted_df.iloc[cutoff:]
+
     return train_df.reset_index(drop=True), test_df.reset_index(drop=True)
 
 
@@ -1279,6 +1331,8 @@ def cross_validate(
     params: dict[str, Any] | None = None,
     cv: int = 5,
     scoring: str | None = None,
+    cv_strategy: str = "kfold",
+    group_col: str | None = None,
 ) -> pd.DataFrame:
     """Cross-validate a curated, ``fit``-archetype (supervised) estimator on ``df``.
 
@@ -1308,7 +1362,34 @@ def cross_validate(
 
     feature_names = _resolve_features_for_fit(df, features, target=target)
     est = spec.sklearn_class(**kwargs)
-    cv_result = _sk_cross_validate(est, df[feature_names], df[target], cv=cv, scoring=scoring)
+    if cv_strategy not in ("kfold", "grouped", "temporal"):
+        raise ValueError(
+            f"unknown cv_strategy {cv_strategy!r}; expected 'kfold', 'grouped', or 'temporal'."
+        )
+
+    if cv_strategy == "grouped":
+        if not group_col or group_col not in df.columns:
+            raise ValueError(f"group_col {group_col!r} must be a valid column for grouped CV.")
+        cv_obj = StratifiedGroupKFold(n_splits=cv, shuffle=True, random_state=0)
+        cv_result = _sk_cross_validate(
+            est,
+            df[feature_names],
+            df[target],
+            cv=cv_obj,
+            scoring=scoring,
+            groups=df[group_col],
+        )
+    elif cv_strategy == "temporal":
+        cv_obj = TimeSeriesSplit(n_splits=cv)
+        cv_result = _sk_cross_validate(
+            est,
+            df[feature_names],
+            df[target],
+            cv=cv_obj,
+            scoring=scoring,
+        )
+    else:
+        cv_result = _sk_cross_validate(est, df[feature_names], df[target], cv=cv, scoring=scoring)
 
     return pd.DataFrame(
         {
