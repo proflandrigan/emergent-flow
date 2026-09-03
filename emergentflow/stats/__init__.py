@@ -1065,7 +1065,7 @@ def cluster_metrics(
     unique_labels = sorted(set(clean_labels) - {-1})
     n_clusters = len(unique_labels)
 
-    if n_clusters < 2:
+    if n_clusters < 2 or clean_data.shape[1] < 1:
         return ClusterMetrics(
             n_clusters=n_clusters,
             n_samples=n_samples_total,

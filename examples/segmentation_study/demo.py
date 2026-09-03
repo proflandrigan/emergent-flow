@@ -55,25 +55,24 @@ def run(
             "proanthocyanins",
             "color_intensity",
             "hue",
-            "od280_od315",
+            "od280/od315_of_diluted_wines",
             "proline",
         ],
         drop=False,
     )
-    scaled = ef.ml.fit_transform(numeric, estimator="StandardScaler")
+    _, scaled = ef.ml.fit_transform(numeric, estimator="StandardScaler")
 
     # Cluster
-    clustered = ef.ml.fit_and_label(
+    _, clustered = ef.ml.fit_and_label(
         scaled,
         estimator="KMeans",
         params={"n_clusters": n_clusters, "random_state": random_state},
-        label_col="segment",
     )
 
     # Validate the clustering
     metrics = ef.stats.cluster_metrics(
         clustered,
-        label_col="segment",
+        label_col="cluster",
         random_state=random_state,
     )
     stability = ef.stats.cluster_stability(
