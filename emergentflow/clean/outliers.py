@@ -275,8 +275,8 @@ def detect_outliers(
     # Only the non-drop path writes these columns, so only it can collide. Guarding
     # unconditionally would reject the natural two-node flow (flag with one
     # detect_outliers, then cut the rows with a second one set to drop=True) over
-    # columns the second call never adds.
-    if not effective_drop:
+    # columns the second call never adds. Clip also never adds these columns.
+    if not effective_drop and not effective_clip:
         collisions = [c for c in (flag_column, score_column) if c in df.columns]
         if collisions:
             raise ColumnCollisionError(

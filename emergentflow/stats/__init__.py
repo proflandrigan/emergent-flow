@@ -1040,7 +1040,7 @@ def cluster_metrics(
         unknown = [c for c in features if c not in df.columns]
         if unknown:
             raise ValueError(f"unknown features {unknown!r}; expected one of {list(df.columns)!r}.")
-        data = df[features]
+        data = df[[c for c in features if c != label_col]]
     else:
         data = df.select_dtypes(include="number").drop(columns=[label_col], errors="ignore")
 
@@ -1232,7 +1232,7 @@ def proportion_confint(
                 "alpha": float(alpha),
                 "below_min_n": True,
             }
-        if n == 0 or successes == 0 or successes == n:
+        if n == 0 or (method == "normal" and (successes == 0 or successes == n)):
             ci_low, ci_high = float("nan"), float("nan")
         else:
             ci_low, ci_high = _prop_ci(successes, n, alpha=alpha, method=method)
