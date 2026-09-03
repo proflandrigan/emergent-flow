@@ -11,8 +11,10 @@ import {
   Controls,
   ReactFlow,
   type Connection,
+  type Edge,
   type EdgeChange,
   type EdgeTypes,
+  type Node,
   type NodeChange,
   type NodeMouseHandler,
   type NodeTypes,
@@ -212,7 +214,7 @@ export function Canvas(): JSX.Element {
   );
 
   const onSelectionChange = useCallback(
-    (params: { nodes: Array<{ id: string }> }) => {
+    (params: { nodes: Node[]; edges: Edge[] }) => {
       if (isInSubgraph) {
         return;
       }
