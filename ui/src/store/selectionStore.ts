@@ -35,7 +35,7 @@ export const useSelectionStore = create<SelectionStore>((set) => ({
       for (const id of nodeIds) {
         nodes[id] = true;
       }
-      return { nodes };
+      return { nodes, edges: {} };
     });
   },
 }));

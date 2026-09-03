@@ -9,7 +9,7 @@ import type { CatalogNode } from "../catalog/types";
 import type { Graph } from "../generated/ir";
 import { useExecutionStore } from "./executionStore";
 import { layeredLayout, separateOverlappingNodes } from "../canvas/layout";
-import { computeGroupBounds } from "../canvas/toReactFlow";
+import { computeGroupBounds, NODE_FOOTPRINT_WIDTH, NODE_FOOTPRINT_HEIGHT, GROUP_PADDING } from "../canvas/toReactFlow";
 import { newId } from "./ids";
 import { edgeToIR, fromIR, nodeToIR, toIR } from "./ir";
 import { useValidationStore } from "./validationStore";
@@ -349,11 +349,29 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     }
     get().pushHistory("addCallout");
     const members = ids.map((id) => get().nodes[id]);
-    const minX = Math.min(...members.map((n) => n.position.x));
-    const minY = Math.min(...members.map((n) => n.position.y));
-    const maxX = Math.max(...members.map((n) => n.position.x + 200));
-    const maxY = Math.max(...members.map((n) => n.position.y + 100));
-    const PADDING = 30;
+    const state = get();
+    // For group nodes, use the computed bounding box from their members
+    // rather than the stale store position + hardcoded footprint.
+    function effectiveBounds(n: NodeModel): { x: number; y: number; width: number; height: number } {
+      if (n.type === "layout.group") {
+        const groupMembers = Object.values(state.nodes).filter((m) => m.groupId === n.id);
+        if (groupMembers.length > 0) {
+          return computeGroupBounds(groupMembers);
+        }
+      }
+      return {
+        x: n.position.x,
+        y: n.position.y,
+        width: NODE_FOOTPRINT_WIDTH,
+        height: NODE_FOOTPRINT_HEIGHT,
+      };
+    }
+    const bounds = ids.map((id) => effectiveBounds(state.nodes[id]));
+    const minX = Math.min(...bounds.map((b) => b.x));
+    const minY = Math.min(...bounds.map((b) => b.y));
+    const maxX = Math.max(...bounds.map((b) => b.x + b.width));
+    const maxY = Math.max(...bounds.map((b) => b.y + b.height));
+    const PADDING = GROUP_PADDING;
     const calloutId = newId("node");
     const calloutNode: NodeModel = {
       id: calloutId,

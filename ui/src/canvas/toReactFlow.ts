@@ -27,8 +27,8 @@ const CALLOUT_NODE_TYPE = "layout.callout";
 export const GROUP_PADDING = 40;
 const MIN_GROUP_WIDTH = 240;
 const MIN_GROUP_HEIGHT = 160;
-const NODE_FOOTPRINT_WIDTH = 200;
-const NODE_FOOTPRINT_HEIGHT = 100;
+export const NODE_FOOTPRINT_WIDTH = 200;
+export const NODE_FOOTPRINT_HEIGHT = 100;
 
 export interface GroupBounds {
   x: number;
