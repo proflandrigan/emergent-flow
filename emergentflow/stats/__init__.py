@@ -1126,6 +1126,8 @@ def cluster_stability(
         unknown = [c for c in features if c not in df.columns]
         if unknown:
             raise ValueError(f"unknown features {unknown!r}; expected one of {list(df.columns)!r}.")
+    if group_col is not None and group_col not in df.columns:
+        raise ValueError(f"unknown group_col {group_col!r}; expected one of {list(df.columns)!r}.")
 
     full_fit = fit_estimator(df, estimator=estimator, features=features, params=params)
     if hasattr(full_fit.estimator, "labels_"):  # type: ignore[union-attr]
@@ -1134,7 +1136,7 @@ def cluster_stability(
         full_labels = full_fit.estimator.predict(  # type: ignore[union-attr]
             df[features or [c for c in df.select_dtypes(include="number").columns]]
         )
-    full_labels_series = pd.Series(full_labels, name="label")
+    full_labels_series = pd.Series(full_labels, index=df.index, name="label")
 
     rng = np.random.default_rng(random_state)
     rows: list[dict[str, Any]] = []
@@ -1291,6 +1293,8 @@ def bootstrap_ci(
         raise ValueError(
             f"unknown statistic {statistic!r}; expected 'mean', 'median', 'std', or 'sum'."
         )
+    if group_col is not None and group_col not in df.columns:
+        raise ValueError(f"unknown group_col {group_col!r}; expected one of {list(df.columns)!r}.")
 
     _STAT_FN = {
         "mean": lambda s: float(s.mean()),
