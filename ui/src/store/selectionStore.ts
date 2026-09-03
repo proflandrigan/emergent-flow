@@ -10,7 +10,7 @@ export interface SelectionStore {
   setNodeSelected: (id: string, selected: boolean) => void;
   setEdgeSelected: (id: string, selected: boolean) => void;
   clear: () => void;
-  replaceSelection: (nodeIds: string[]) => void;
+  replaceSelection: (nodeIds: string[], edgeIds?: string[]) => void;
 }
 
 export const useSelectionStore = create<SelectionStore>((set) => ({
@@ -29,13 +29,19 @@ export const useSelectionStore = create<SelectionStore>((set) => ({
     set({ nodes: {}, edges: {} });
   },
 
-  replaceSelection(nodeIds) {
+  replaceSelection(nodeIds: string[], edgeIds?: string[]) {
     set(() => {
       const nodes: Record<string, boolean> = {};
       for (const id of nodeIds) {
         nodes[id] = true;
       }
-      return { nodes, edges: {} };
+      const edges: Record<string, boolean> = {};
+      if (edgeIds) {
+        for (const id of edgeIds) {
+          edges[id] = true;
+        }
+      }
+      return { nodes, edges };
     });
   },
 }));

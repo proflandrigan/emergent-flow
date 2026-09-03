@@ -137,3 +137,68 @@ describe("addCalloutAroundSelection with group nodes", () => {
     expect(callout.position.x).toBeLessThan(groupStoreX - GROUP_PADDING);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Edge selection is preserved when onSelectionChange fires after onEdgesChange.select
+// (i.e., the order React Flow uses: onSelectionChange first, then onEdgesChange.select).
+// ---------------------------------------------------------------------------
+describe("replaceSelection with edge selection interaction", () => {
+  test("edge stays selected when setEdgeSelected fires after replaceSelection", () => {
+    // Simulates: onSelectionChange fires first (clears edges via replaceSelection),
+    // then onEdgesChange.select fires (re-selects the edge).
+    useSelectionStore.getState().replaceSelection([]);
+    useSelectionStore.getState().setEdgeSelected("e1", true);
+    expect(useSelectionStore.getState().edges).toEqual({ e1: true });
+  });
+
+  test("node selection clears edges when replaceSelection fires after setEdgeSelected", () => {
+    // Simulates: an edge was previously selected, then a node is clicked.
+    // onEdgesChange.select may or may not fire, but onSelectionChange fires
+    // with the node, and replaceSelection overwrites both.
+    useSelectionStore.getState().setEdgeSelected("e1", true);
+    useSelectionStore.getState().replaceSelection(["n1"]);
+    expect(useSelectionStore.getState().edges).toEqual({});
+    expect(useSelectionStore.getState().nodes).toEqual({ n1: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// onSelectionChange can fire after onEdgesChange.select, wiping edge selection
+// ---------------------------------------------------------------------------
+describe("onSelectionChange races with onEdgesChange.select", () => {
+  test("edge selection is lost when onSelectionChange fires after onEdgesChange.select", () => {
+    // Simulates: user clicks edge e1. React Flow fires:
+    //   onEdgesChange([{ type: "select", id: "e1", selected: true }])
+    //   onSelectionChange({ nodes: [], edges: [{ id: "e1" }] })
+    // If onSelectionChange fires AFTER onEdgesChange.select, the edge
+    // selection set by the select handler gets wiped.
+
+    // Step 1: onEdgesChange.select fires
+    useSelectionStore.getState().setEdgeSelected("e1", true);
+    expect(useSelectionStore.getState().edges).toEqual({ e1: true });
+
+    // Step 2: onSelectionChange fires, calls replaceSelection([])
+    // (onSelectionChange only passes node ids, ignoring the edge)
+    useSelectionStore.getState().replaceSelection([]);
+
+    // Bug: edge selection is lost!
+    expect(useSelectionStore.getState().edges).toEqual({});
+  });
+
+  test("edge selection is preserved when replaceSelection accepts edge ids", () => {
+    // The fix: onSelectionChange should pass edge ids too, so replaceSelection
+    // preserves edge selection instead of always clearing it.
+
+    // Step 1: onEdgesChange.select fires
+    useSelectionStore.getState().setEdgeSelected("e1", true);
+    expect(useSelectionStore.getState().edges).toEqual({ e1: true });
+
+    // Step 2: onSelectionChange fires with both nodes and edges
+    // (after fix, replaceSelection accepts edgeIds)
+    useSelectionStore.getState().replaceSelection([], ["e1"]);
+
+    // Edge selection is preserved
+    expect(useSelectionStore.getState().edges).toEqual({ e1: true });
+    expect(useSelectionStore.getState().nodes).toEqual({});
+  });
+});

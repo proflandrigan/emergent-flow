@@ -205,8 +205,6 @@ export function Canvas(): JSX.Element {
         if (change.type === "remove") {
           setEdgeSelected(change.id, false);
           removeEdge(change.id);
-        } else if (change.type === "select") {
-          setEdgeSelected(change.id, change.selected);
         }
       }
     },
@@ -218,7 +216,10 @@ export function Canvas(): JSX.Element {
       if (isInSubgraph) {
         return;
       }
-      replaceSelection(params.nodes.map((n) => n.id));
+      replaceSelection(
+        params.nodes.map((n) => n.id),
+        params.edges.length > 0 ? params.edges.map((e) => e.id) : undefined,
+      );
     },
     [isInSubgraph, replaceSelection],
   );
