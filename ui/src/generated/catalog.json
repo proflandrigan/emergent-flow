@@ -13248,6 +13248,26 @@
           "name": "random_state",
           "required": false,
           "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Optional hyperparameters for the clustering estimator.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "json"
+          },
+          "label": "Params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, Any] | None"
         }
       ],
       "ports": [

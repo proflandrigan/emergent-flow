@@ -286,6 +286,8 @@ def detect_outliers(
 
     if effective_drop and not target:
         return df.copy()
+    if effective_clip and not target:
+        return df.copy()
 
     # Grouped path: compute fences within each subset, preserving original row order.
     if by_cols:
@@ -304,7 +306,7 @@ def detect_outliers(
             for _, sub in df.groupby(by_cols, sort=False, dropna=False)
         ]
         if not parts:
-            if effective_drop:
+            if effective_drop or effective_clip:
                 return df.copy()
             result = df.copy()
             result[flag_column] = False

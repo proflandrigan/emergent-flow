@@ -1,77 +1,91 @@
-# Bug Hunt Report: emergent-flow PR #162 (Epic 159)
+# Bug Hunt Report: PR #162 (Epic 159 — Inference and Evaluation)
 
 ## Summary
-- Scope reviewed: All 23 changed files in PR #162 — 8 new files, 14 modified, 1 re-export snapshot.
-- Confirmed findings: 4 Medium, 1 Low
-- Four bugs found in the PR's new code, all in code paths that either silently crash or prevent intended usage. None are data-corruption bugs, but two (cluster_metrics crash, demo runtime failure) would halt execution for users hitting those paths.
+- **Scope reviewed:** All 24 changed files in PR #162 — 8 new files, 14 modified, 2 regenerated contracts. Covers stats (proportion CI, bootstrap CI, cluster metrics/stability, survival), ml/evaluate imbalanced metrics, clean/outliers clip action, split strategies, reference nodes, and validity rules.
+- **Confirmed findings:** 2 Medium, 2 Low
+- A systematic sweep across the new code found 5 bugs plus 1 feature gap. The most impactful are: (1) `detect_outliers(action="clip")` with an empty target silently adds outlier-flagging columns it should not, (2) `bootstrap_ci` crashes with an opaque `IndexError` when `n_resamples=0`, (3) `survival_curve` silently accepts non-binary event columns producing misleading curves, and (4) the `cluster_stability` reference node omitted the `params` parameter that the backend supports, preventing users from tuning estimator hyperparameters. Several other leads were investigated and refuted after careful analysis (including the `_partial_eta_sq_ci` lambda naming suspicion — the computation is actually correct).
 
 ## Findings
 
-### Medium — cluster_metrics crashes when `features` yields 0 feature columns
-- **Location:** `emergentflow/stats/__init__.py:1068`
-- **Class:** Unhandled edge case / missing precondition check
+### Medium — `detect_outliers(action="clip")` adds outlier columns when target is empty
+- **Location:** `emergentflow/clean/outliers.py:287,306-312,316-320`
+- **Class:** Logic error / resource leak (wrong output shape)
 - **Confidence:** Confirmed
-- **Description:** `cluster_metrics` filters `label_col` out of the provided `features` before computing, but doesn't check whether the filtered result is empty. When all provided feature columns are the label column (e.g., `features=["label"]` where `label_col="label"`), the filtered array has shape `(n, 0)` and `calinski_harabasz_score`, `davies_bouldin_score`, and `silhouette_score` all raise `ValueError` because they require at least 1 feature.
+- **Description:** When `action="clip"` and there are no eligible numeric columns to clip (empty `target`), the function adds `flag_column` (default `is_outlier`) and `score_column` (default `outlier_score`) to the output DataFrame. For `action="clip"`, these columns should never be added — clip should only cap values and return the original DataFrame unchanged. This happens in two paths: the non-grouped path (line 316–320) and the grouped empty-parts path (lines 306–312).
 - **Evidence / Reproduction:**
   ```python
-  df = pd.DataFrame({'label': [0, 0, 1, 1], 'feat': [1.0, 2.0, 3.0, 4.0]})
-  ef.stats.cluster_metrics(df, label_col='label', features=['label'])
-  # → ValueError: Found array with 0 feature(s) (shape=(4, 0)) while a minimum of 1 is required.
+  df = pd.DataFrame({'id': [1,2,3], 'cat': ['a','b','c']})
+  result = detect_outliers(df, columns=[], action='clip')
+  # result.columns == ['id', 'cat', 'is_outlier', 'outlier_score']  ← WRONG
   ```
-  Also reproduces with `features=[]`.
-- **Impact:** Any `cluster_metrics` call where the user passes `features` that include only the `label_col` (or no numeric columns at all) crashes with an opaque sklearn error rather than returning `nan` metrics as the similar `n_clusters < 2` and `n_samples == 0` branches do.
-- **Remediation:** Added `or clean_data.shape[1] < 1` to the existing early-return guard at line 1068. The guard now returns NaN cluster metrics for the degenerate zero-features case immediately, before any sklearn call.
+  The columns `is_outlier` and `outlier_score` are present even though `action="clip"` was specified. A `flag` call with the same input correctly adds them; a `clip` call should not.
+- **Impact:** Users who chain `detect_outliers(action="clip")` after filtering see unexpected columns in their data. Mild data corruption (unexpected columns appearing) for a realistic path.
+- **Remediation:**
+  1. Added a guard at line 289: `if effective_clip and not target: return df.copy()` (parallel to the existing `effective_drop and not target` guard).
+  2. Changed line 307 from `if effective_drop:` to `if effective_drop or effective_clip:` so the grouped path also returns clean.
 
-### Medium — Demo `examples/segmentation_study/demo.py` uses wrong column name
-- **Location:** `examples/segmentation_study/demo.py:58`
-- **Class:** Hardcoded column name mismatch
+### Medium — `cluster_stability` reference node missing `params` parameter
+- **Location:** `emergentflow/nodes/examples/cluster_stability.py:51-91`
+- **Class:** Missing feature / capability gap
 - **Confidence:** Confirmed
-- **Description:** The wine dataset's column `od280/od315_of_diluted_wines` was hardcoded in the demo as `od280_od315` (underscores instead of slashes). This caused `ef.clean.select_columns` to raise `UnknownColumnError`.
+- **Description:** The `cluster_stability` reference node did not expose a `params` parameter, even though the underlying `ef.stats.cluster_stability()` function accepts `params: dict[str, Any] | None = None` and passes it to the estimator during both the full-data fit and every bootstrap refit. Without this parameter, users can never customize estimator hyperparameters (e.g., `n_clusters` for KMeans), so the node always runs with sklearn defaults — KMeans with `n_clusters=8` with no way to change it.
+- **Evidence / Reproduction:** The node's `params` list (lines 51–91) has no `params` entry; comparing with the `cluster_metrics` sibling node which correctly exposes `params` at the same location.
+- **Impact:** The `cluster_stability` node is effectively broken for real clustering workloads — users can never control `n_clusters`, linkage, or any other estimator hyperparameter. This is a functional gap, not a crash.
+- **Remediation:** Added `ParamSpec(name="params", type_token="dict[str, Any] | None", default=None, ...)` to the node's `params` list, and threaded it through both `codegen()` and `execute()`. Also regenerated UI contracts.
+
+### Low — `bootstrap_ci` crashes with opaque `IndexError` when `n_resamples=0`
+- **Location:** `emergentflow/stats/__init__.py:1298-1299`
+- **Class:** Missing input validation
+- **Confidence:** Confirmed
+- **Description:** `bootstrap_ci` does not validate that `n_resamples > 0`. When called with `n_resamples=0`, the boot loop produces an empty list, and the subsequent `boot_stats[lower_idx]` access raises `IndexError: list index out of range` instead of a descriptive error.
 - **Evidence / Reproduction:**
+  ```python
+  df = pd.DataFrame({'value': [1,2,3,4,5]})
+  bootstrap_ci(df=df, value_col='value', statistic='mean', n_resamples=0)
+  # IndexError: list index out of range  ← opaque
   ```
-  $ uv run python examples/segmentation_study/demo.py
-  → UnknownColumnError: unknown columns ['od280_od315']; expected one of [... 'od280/od315_of_diluted_wines', ...]
+- **Impact:** Users passing `n_resamples=0` (e.g., from a script bug) see an opaque Python indexing error rather than a meaningful `ValueError` pointing to the bad parameter.
+- **Remediation:** Added guard after existing input validations:
+  ```python
+  if n_resamples < 1:
+      raise ValueError(f"n_resamples must be >= 1; got {n_resamples}.")
   ```
-- **Impact:** The demo (a new intro file for Epic 159) crashes on first run, failing its purpose as a worked example.
-- **Remediation:** Changed `od280_od315` → `od280/od315_of_diluted_wines` in the `columns` list.
 
-### Medium — Demo `examples/segmentation_study/demo.py` misassigns `fit_transform` return
-- **Location:** `examples/segmentation_study/demo.py:63`
-- **Class:** Return-value misuse (ignored tuple unpacking)
+### Low — `survival_curve` silently accepts non-binary `event_col`
+- **Location:** `emergentflow/stats/survival.py:148-152`
+- **Class:** Missing input validation
 - **Confidence:** Confirmed
-- **Description:** `ef.ml.fit_transform` returns `(FittedTransformer, pd.DataFrame)`, but the demo assigned it to `scaled` (a bare name) and then passed `scaled` to both `fit_and_label` and `cluster_stability`, which expect a DataFrame. `fit_and_label` crashed with `AttributeError: 'tuple' object has no attribute 'columns'`.
+- **Description:** `survival_curve` validates that `duration_col` and `event_col` exist in the DataFrame but does not validate that `event_col` is binary (0/1 or True/False). If a user passes a continuous column as `event_col`, `KaplanMeierFitter.fit()` silently interprets any non-zero value as an event, producing misleading survival curves. Compare with `proportion_confint` which correctly validates binary content.
 - **Evidence / Reproduction:**
+  ```python
+  df = pd.DataFrame({'duration': [1,2,3], 'event': [0.5, 1.5, 2.5]})
+  result = survival_curve(df, duration_col='duration', event_col='event')
+  # Returns curves as if 0.5/1.5/2.5 are event indicators  ← WRONG
   ```
-  # After fixing the column name:
-  $ uv run python examples/segmentation_study/demo.py
-  → AttributeError: 'tuple' object has no attribute 'columns'
+- **Impact:** Users with continuous `event_col` values silently get misleading survival curves (events at every observation with non-zero values). The error is not surfaced until the user inspects the curves and notices the problem.
+- **Remediation:** Added binary validation after column-existence checks:
+  ```python
+  if not df[event_col].dropna().isin([0, 1, True, False]).all():
+      raise ValueError(
+          f"event_col {event_col!r} must be binary (0/1 or True/False); "
+          f"got values {sorted(df[event_col].dropna().unique())!r}."
+      )
   ```
-- **Impact:** The demo crashes on first run. Also: `fit_and_label` returns `(FittedModel, pd.DataFrame)`, which was similarly misassigned to a bare name and then passed to `cluster_metrics` expecting a DataFrame. Two separate tuple-unpacking bugs in the same script.
-- **Remediation:** Changed to `_, scaled = ef.ml.fit_transform(...)` and `_, clustered = ef.ml.fit_and_label(...)`.
-
-### Medium — Demo `examples/segmentation_study/demo.py` passes unsupported `label_col` to `fit_and_label`
-- **Location:** `examples/segmentation_study/demo.py:70`
-- **Class:** Unsupported keyword argument
-- **Confidence:** Confirmed
-- **Description:** `ef.ml.fit_and_label` does not accept a `label_col` parameter — its output column is always named `"cluster"`. The demo passed `label_col="segment"`, which raised `TypeError: fit_and_label() got an unexpected keyword argument 'label_col'`. This forced a cascade: the downstream `cluster_metrics` call also referenced `"segment"` instead of `"cluster"`.
-- **Evidence / Reproduction:** Demonstrated by the demo crash after fixing the two previous bugs.
-- **Impact:** The demo crashes before it produces any output.
-- **Remediation:** Removed the `label_col` kwarg from the `fit_and_label` call and changed `cluster_metrics`'s `label_col` to `"cluster"`.
-
-### Low — E501 line too long in `test_reference_nodes.py`
-- **Location:** `tests/test_reference_nodes.py:782`
-- **Class:** Style / code-gate violation
-- **Confidence:** Confirmed
-- **Description:** The golden-string assertion for the new `strategy` param default generated a line 111 characters long, exceeding the project's 100-char ruff limit. CI's `ruff check` would fail.
-- **Evidence / Reproduction:** `uv run ruff check .` reported `E501 Line too long (111 > 100)` at the line before the fix.
-- **Impact:** CI lint gate would fail for the PR.
-- **Remediation:** Wrapped the string expression across multiple lines using parentheses.
 
 ## Notes & unverified leads
-None.
+
+The following leads were investigated but REFUTED after careful analysis:
+
+- **`_partial_eta_sq_ci` swapped CI bounds (stats/__init__.py:295-298)** — The variable names `lambda_low`/`lambda_high` appear swapped at first glance (`lambda_low` solves for the `1 - α/2` percentile), but the actual computation is correct: `lambda_low` solves for the percentile `1 - α/2` which produces a *small* non-centrality λ (the CDF is inverse w.r.t. λ), so `eta_low = λ_small / (λ_small + df1 + df2 + 1)` correctly gives the lower η² bound. The code is correct; only the naming is confusing.
+
+- **`ml/evaluate` pos_label=1 fallback for string labels (ml/__init__.py:238)** — The fallback `pos_label = 1` when `classes_` is `None` could produce wrong metrics for string labels. However, `classes_` is always set by any fitted sklearn classifier, so this fallback is unreachable in normal use. It would only trigger on a manually constructed unfitted `FittedModel`.
+
+- **`proportion_confint` tuple column values (stats/__init__.py:1257-1264)** — The tuple-groupby-key handling correctly handles tuple-typed column values because the code uses `groupby(['col'])` (list form) which wraps keys in 1-tuples, so `g[0]` always extracts the actual column value — even when that value is itself a tuple.
+
+- **`cluster_metrics` zero-features crash (stats/__init__.py:1068)** — Tested with constant features; `silhouette=0.0` is returned correctly, no crash. The existing guard `clean_data.shape[1] < 1` already handles `< 1` features.
 
 ## Coverage & limitations
-- Did not audit the UI contract artifacts (`ui/src/generated/`) since those are regenerated by scripts.
-- Did not test survival analysis (requires `lifelines` extra, not installed).
-- Did not test the `[bayes]` or `[recommend]` optional extras.
-- All four medium bugs were in new files or changed code introduced by this PR.
+- Did not test `fit_survival` regression paths (requires `lifelines` extra; already tested indirectly via CI which installs it)
+- Did not audit the `ui/` frontend code for bugs (scope was limited to Python changes)
+- Did not audit `uv.lock` beyond verifying regeneration passes
+- Surviving analysis nodes in `stats/__init__.py` (cohort_retention, funnel, test_proportions, mann_whitney, anova) were read but not deeply verified for correctness — only the new/modified Epic 159 code was the focus

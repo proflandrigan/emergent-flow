@@ -89,6 +89,14 @@ class ClusterStability(NodeDefinition):
             help="Seed for deterministic resampling.",
             hints=ValidationHints(widget="number"),
         ),
+        ParamSpec(
+            name="params",
+            type_token="dict[str, Any] | None",
+            default=None,
+            label="Params",
+            help="Optional hyperparameters for the clustering estimator.",
+            hints=ValidationHints(widget="json"),
+        ),
     ]
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
@@ -98,13 +106,15 @@ class ClusterStability(NodeDefinition):
         n_resamples = values.get("n_resamples") or 50
         group_col = values.get("group_col")
         random_state = values.get("random_state") or 0
+        params = cast("dict[str, Any] | None", values.get("params") or None)
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('result')} = ef.stats.cluster_stability("
                 f"{ctx.in_var('frame')}, estimator={estimator!r}, "
                 f"features={features!r}, n_resamples={n_resamples!r}, "
-                f"group_col={group_col!r}, random_state={random_state!r})"
+                f"group_col={group_col!r}, random_state={random_state!r}, "
+                f"params={params!r})"
             ),
         )
 
@@ -115,6 +125,7 @@ class ClusterStability(NodeDefinition):
         n_resamples = cast(int, values.get("n_resamples") or 50)
         group_col = cast("str | None", values.get("group_col"))
         random_state = cast(int, values.get("random_state") or 0)
+        params = cast("dict[str, Any] | None", values.get("params") or None)
         return {
             "result": cluster_stability(
                 inputs["frame"],
@@ -123,5 +134,6 @@ class ClusterStability(NodeDefinition):
                 n_resamples=n_resamples,
                 group_col=group_col,
                 random_state=random_state,
+                params=params,
             )
         }

@@ -1295,6 +1295,8 @@ def bootstrap_ci(
         )
     if group_col is not None and group_col not in df.columns:
         raise ValueError(f"unknown group_col {group_col!r}; expected one of {list(df.columns)!r}.")
+    if n_resamples < 1:
+        raise ValueError(f"n_resamples must be >= 1; got {n_resamples}.")
 
     _STAT_FN = {
         "mean": lambda s: float(s.mean()),

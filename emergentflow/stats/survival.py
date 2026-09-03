@@ -145,6 +145,11 @@ def survival_curve(
         )
     if event_col not in df.columns:
         raise ValueError(f"unknown event_col {event_col!r}; expected one of {list(df.columns)!r}.")
+    if not df[event_col].dropna().isin([0, 1, True, False]).all():
+        raise ValueError(
+            f"event_col {event_col!r} must be binary (0/1 or True/False); "
+            f"got values {sorted(df[event_col].dropna().unique())!r}."
+        )
 
     rows: list[dict[str, Any]] = []
 
