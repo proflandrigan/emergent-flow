@@ -1304,7 +1304,7 @@ def bootstrap_ci(
 
     boot_stats.sort()
     lower_idx = int(n_resamples * (1 - ci) / 2)
-    upper_idx = int(n_resamples * (1 + ci) / 2)
+    upper_idx = min(int(n_resamples * (1 + ci) / 2), n_resamples - 1)
     ci_low = boot_stats[lower_idx]
     ci_high = boot_stats[upper_idx]
 

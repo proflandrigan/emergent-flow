@@ -11,7 +11,9 @@ from __future__ import annotations
 import importlib.util
 from typing import Any
 
+import numpy as np
 import pandas as pd
+from scipy import stats
 
 from emergentflow.api import public_op
 from emergentflow.stats.errors import MissingOptionalDependencyError
@@ -61,7 +63,13 @@ def fit_survival(
     else:
         cph.fit(df, duration_col=duration_col, event_col=event_col)
 
+    n_events = int(df[event_col].sum())
+    n_observations = int(cph._n_examples)
+
     summary = cph.summary.reset_index()
+    ci_level = 100 * (1 - alpha)
+    ci_low_col = f"coef lower {ci_level:.0f}%"
+    ci_high_col = f"coef upper {ci_level:.0f}%"
     summary = summary.rename(
         columns={
             "coef": "coef",
@@ -69,39 +77,45 @@ def fit_survival(
             "se(coef)": "se",
             "z": "z",
             "p": "p_value",
-            "coef lower 95%": "ci_low",
-            "coef upper 95%": "ci_high",
+            ci_low_col: "ci_low",
+            ci_high_col: "ci_high",
         }
     )
-    summary["n_observations"] = cph._n_examples
-    summary["n_events"] = cph._n_events
+    summary["n_observations"] = n_observations
+    summary["n_events"] = n_events
 
-    try:
-        ph_test = cph.check_assumptions(
-            df, p_value_threshold=alpha, show_plots=False, print_warning=False
+    ph_rows: list[dict[str, Any]] = []
+    residuals = cph.compute_residuals(df, "scaled_schoenfeld")
+    for covariate in residuals.columns:
+        valid = residuals[covariate].notna()
+        if valid.sum() < 3:
+            continue
+        rho, p_value = stats.spearmanr(
+            residuals.loc[valid, covariate],
+            np.log(residuals.index[valid]),
         )
-        ph_rows = []
-        for col, row in ph_test.summary.iterrows():
-            ph_rows.append(
-                {
-                    "covariate": col,
-                    "ph_test_p": float(row["p"]),
-                    "ph_test_stat": float(row["test_statistic"]),
-                    "ph_violation": bool(row["p"] < alpha),
-                }
-            )
-        ph_df = pd.DataFrame(ph_rows) if ph_rows else pd.DataFrame()
-    except Exception:
-        ph_df = pd.DataFrame()
+        ph_rows.append(
+            {
+                "covariate": covariate,
+                "ph_test_p": float(p_value),
+                "ph_test_stat": float(rho**2 * (valid.sum() - 2) / (1 - rho**2))
+                if abs(rho) < 1 and valid.sum() > 2
+                else float("nan"),
+                "ph_violation": bool(p_value < alpha),
+            }
+        )
+    ph_df = pd.DataFrame(ph_rows) if ph_rows else pd.DataFrame()
 
     if not ph_df.empty:
-        for col in ["ph_test_p", "ph_test_stat", "ph_violation"]:
-            summary[col] = float("nan")
+        summary["ph_test_p"] = float("nan")
+        summary["ph_test_stat"] = float("nan")
+        summary["ph_violation"] = False
         for _, ph_row in ph_df.iterrows():
             mask = summary["covariate"] == ph_row["covariate"]
             if mask.any():
-                for col in ["ph_test_p", "ph_test_stat", "ph_violation"]:
-                    summary.loc[mask, col] = ph_row[col]
+                summary.loc[mask, "ph_test_p"] = float(ph_row["ph_test_p"])
+                summary.loc[mask, "ph_test_stat"] = float(ph_row["ph_test_stat"])
+                summary.loc[mask, "ph_violation"] = bool(ph_row["ph_violation"])
 
     return summary
 
