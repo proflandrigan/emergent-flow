@@ -348,7 +348,6 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       return null;
     }
     get().pushHistory("addCallout");
-    const members = ids.map((id) => get().nodes[id]);
     const state = get();
     // For group nodes, use the computed bounding box from their members
     // rather than the stale store position + hardcoded footprint.
