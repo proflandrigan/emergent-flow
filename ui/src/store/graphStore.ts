@@ -9,7 +9,7 @@ import type { CatalogNode } from "../catalog/types";
 import type { Graph } from "../generated/ir";
 import { useExecutionStore } from "./executionStore";
 import { layeredLayout, separateOverlappingNodes } from "../canvas/layout";
-import { computeGroupBounds } from "../canvas/toReactFlow";
+import { computeGroupBounds, NODE_FOOTPRINT_WIDTH, NODE_FOOTPRINT_HEIGHT, GROUP_PADDING } from "../canvas/toReactFlow";
 import { newId } from "./ids";
 import { edgeToIR, fromIR, nodeToIR, toIR } from "./ir";
 import { useValidationStore } from "./validationStore";
@@ -84,6 +84,7 @@ export interface GraphStore extends CanvasModel {
   ) => string | null;
   pasteNodes: (models: NodeModel[]) => string[];
   groupSelection: (nodeIds: string[]) => string | null;
+  addCalloutAroundSelection: (nodeIds: string[]) => string | null;
   ungroupSelection: (nodeIds: string[]) => void;
   moveGroup: (groupId: string, position: { x: number; y: number }) => void;
   extractToComposite: (nodeIds: string[]) => string | null;
@@ -339,6 +340,57 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       return { nodes };
     });
     return groupId;
+  },
+
+  addCalloutAroundSelection(nodeIds) {
+    const ids = nodeIds.filter((id) => get().nodes[id]);
+    if (ids.length < 2) {
+      return null;
+    }
+    get().pushHistory("addCallout");
+    const state = get();
+    // For group nodes, use the computed bounding box from their members
+    // rather than the stale store position + hardcoded footprint.
+    function effectiveBounds(n: NodeModel): { x: number; y: number; width: number; height: number } {
+      if (n.type === "layout.group") {
+        const groupMembers = Object.values(state.nodes).filter((m) => m.groupId === n.id);
+        if (groupMembers.length > 0) {
+          return computeGroupBounds(groupMembers);
+        }
+      }
+      return {
+        x: n.position.x,
+        y: n.position.y,
+        width: NODE_FOOTPRINT_WIDTH,
+        height: NODE_FOOTPRINT_HEIGHT,
+      };
+    }
+    const bounds = ids.map((id) => effectiveBounds(state.nodes[id]));
+    const minX = Math.min(...bounds.map((b) => b.x));
+    const minY = Math.min(...bounds.map((b) => b.y));
+    const maxX = Math.max(...bounds.map((b) => b.x + b.width));
+    const maxY = Math.max(...bounds.map((b) => b.y + b.height));
+    const PADDING = GROUP_PADDING;
+    const calloutId = newId("node");
+    const calloutNode: NodeModel = {
+      id: calloutId,
+      type: "layout.callout",
+      label: "Callout",
+      paradigm: "functional",
+      params: [
+        { name: "label", typeToken: "str", value: "Callout", default: "Callout" },
+        { name: "color", typeToken: "str", value: "blue", default: "blue" },
+        { name: "width", typeToken: "int", value: Math.max(400, maxX - minX + PADDING * 2), default: 400 },
+        { name: "height", typeToken: "int", value: Math.max(300, maxY - minY + PADDING * 2), default: 300 },
+      ],
+      ports: [],
+      position: { x: minX - PADDING, y: minY - PADDING },
+      groupId: null,
+    };
+    set((state) => ({
+      nodes: { ...state.nodes, [calloutId]: calloutNode },
+    }));
+    return calloutId;
   },
 
   ungroupSelection(nodeIds) {

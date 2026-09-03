@@ -7,6 +7,7 @@ export interface SelectionToolbarProps {
   onGroup?: () => void;
   onUngroup?: () => void;
   onExtractToComposite?: () => void;
+  onCallout?: () => void;
 }
 
 export function SelectionToolbar({
@@ -16,6 +17,7 @@ export function SelectionToolbar({
   onGroup,
   onUngroup,
   onExtractToComposite,
+  onCallout,
 }: SelectionToolbarProps): JSX.Element {
   return (
     <div
@@ -55,6 +57,11 @@ export function SelectionToolbar({
       {onGroup && (
         <Button variant="secondary" data-testid="group-selection" onClick={onGroup}>
           Group
+        </Button>
+      )}
+      {onCallout && (
+        <Button variant="secondary" data-testid="callout-selection" onClick={onCallout}>
+          Callout
         </Button>
       )}
       {onUngroup && (

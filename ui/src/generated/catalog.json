@@ -7315,6 +7315,97 @@
     },
     {
       "advisor_persona": null,
+      "category": "Annotation",
+      "column_effect": null,
+      "description": "A decorative border box that visually groups a region of the canvas.",
+      "family": "layout",
+      "keywords": [],
+      "label": "Callout",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "Callout",
+          "help": "Title text shown in the callout header bar.",
+          "hints": null,
+          "label": "Label",
+          "name": "label",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "blue",
+          "help": "Border/header color theme.",
+          "hints": {
+            "choices": [
+              "slate",
+              "blue",
+              "green",
+              "purple",
+              "amber",
+              "rose"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Color",
+          "name": "color",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 400,
+          "help": "Width of the callout box in canvas pixels.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 100.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": 10.0,
+            "widget": "number"
+          },
+          "label": "Width",
+          "name": "width",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": 300,
+          "help": "Height of the callout box in canvas pixels.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 80.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": 10.0,
+            "widget": "number"
+          },
+          "label": "Height",
+          "name": "height",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [],
+      "type": "layout.callout",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "Organization",
       "column_effect": null,
       "description": "A reusable container owning an extracted subgraph.",
