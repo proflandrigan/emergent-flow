@@ -1065,12 +1065,21 @@ def cluster_metrics(
     unique_labels = sorted(set(clean_labels) - {-1})
     n_clusters = len(unique_labels)
 
+    if n_clusters < 2:
+        return ClusterMetrics(
+            n_clusters=n_clusters,
+            n_samples=n_samples_total,
+            n_noise=n_noise,
+            silhouette=float("nan"),
+            calinski_harabasz=float("nan"),
+            davies_bouldin=float("nan"),
+            sample_size=0,
+        )
+
     ch = float(calinski_harabasz_score(clean_data, clean_labels))
     db = float(davies_bouldin_score(clean_data, clean_labels))
 
-    if n_clusters < 2:
-        sil = float("nan")
-    elif sample_size is not None and sample_size < len(clean_labels):
+    if sample_size is not None and sample_size < len(clean_labels):
         rng = np.random.default_rng(random_state)
         idx = rng.choice(len(clean_labels), size=int(sample_size), replace=False)
         sil = float(
@@ -1136,7 +1145,7 @@ def cluster_stability(
                 groups = df[group_col].unique()
                 sampled_groups = rng.choice(groups, size=len(groups), replace=True)
                 boot_dfs = [df[df[group_col] == g] for g in sampled_groups]
-                boot_df = pd.concat(boot_dfs, ignore_index=True)
+                boot_df = pd.concat(boot_dfs, ignore_index=False)
             else:
                 boot_df = df.sample(frac=1.0, replace=True, random_state=rng.integers(0, 2**31))
 
@@ -1148,12 +1157,14 @@ def cluster_stability(
                     boot_df[features or [c for c in df.select_dtypes(include="number").columns]]
                 )
 
-            common_idx = full_labels_series.index.intersection(boot_df.index)
+            full_uniq = full_labels_series[~full_labels_series.index.duplicated(keep="first")]
             boot_labels_series = pd.Series(boot_labels, index=boot_df.index)
+            boot_uniq = boot_labels_series[~boot_labels_series.index.duplicated(keep="first")]
+            common_idx = full_uniq.index.intersection(boot_uniq.index)
             ari = float(
                 adjusted_rand_score(
-                    full_labels_series.loc[common_idx],
-                    boot_labels_series.loc[common_idx],
+                    full_uniq.loc[common_idx],
+                    boot_uniq.loc[common_idx],
                 )
             )
             n_clusters = len(set(boot_labels) - {-1})
