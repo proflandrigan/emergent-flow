@@ -129,6 +129,9 @@ def test_warehouse_client_protocol_runtime_checkable() -> None:
         def describe_relation(self, connection: object, relation: object) -> object:
             raise NotImplementedError
 
+        def write(self, request: object, df: object) -> object:
+            raise NotImplementedError
+
     assert isinstance(StubWarehouseClient(), WarehouseClient)
     assert not isinstance(object(), WarehouseClient)
 

@@ -34,7 +34,7 @@ class CompareModels(NodeDefinition):
     """Cross-validate every curated fit-archetype estimator matching a task and rank them."""
 
     type = "ml.compare_models"
-    version = 1
+    version = 2
     family = "ml"
     label = "Compare Models"
     category = "Machine Learning"
@@ -110,11 +110,19 @@ class CompareModels(NodeDefinition):
             label="Sort by",
             help="Metric to rank by; unset uses accuracy (classification) or r2 (regression).",
         ),
+        ParamSpec(
+            name="weight_col",
+            type_token="str",
+            default=None,
+            label="Weights column",
+            help="Optional column of per-row sample weights forwarded to every candidate's fit.",
+            hints=ValidationHints(widget="column"),
+        ),
     ]
 
     def _args(
         self, node: Node
-    ) -> tuple[str, str, list[str] | None, list[str] | None, int, str | None]:
+    ) -> tuple[str, str, list[str] | None, list[str] | None, int, str | None, str | None]:
         values = {p.name: p.value for p in node.params}
         task = values.get("task")
         target = values.get("target")
@@ -122,6 +130,7 @@ class CompareModels(NodeDefinition):
         estimators = values.get("estimators")
         cv = values.get("cv", 5)
         sort_by = values.get("sort_by")
+        weight_col = values.get("weight_col") or None
         return (
             cast(str, task),
             cast(str, target),
@@ -129,22 +138,24 @@ class CompareModels(NodeDefinition):
             cast("list[str] | None", estimators),
             cast(int, cv),
             cast("str | None", sort_by),
+            cast("str | None", weight_col),
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        task, target, features, estimators, cv, sort_by = self._args(node)
+        task, target, features, estimators, cv, sort_by, weight_col = self._args(node)
+        codegen_weight = f", weight_col={weight_col!r}" if weight_col is not None else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('comparison')}, {ctx.out_var('model')} = "
                 f"ef.ml.compare_models({ctx.in_var('frame')}, task={task!r}, "
                 f"target={target!r}, features={features!r}, estimators={estimators!r}, "
-                f"cv={cv!r}, sort_by={sort_by!r})"
+                f"cv={cv!r}, sort_by={sort_by!r}{codegen_weight})"
             ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        task, target, features, estimators, cv, sort_by = self._args(node)
+        task, target, features, estimators, cv, sort_by, weight_col = self._args(node)
         comparison, model = compare_models(
             inputs["frame"],
             task=task,
@@ -153,5 +164,6 @@ class CompareModels(NodeDefinition):
             estimators=estimators,
             cv=cv,
             sort_by=sort_by,
+            weight_col=weight_col,
         )
         return {"comparison": comparison, "model": model}

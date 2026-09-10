@@ -75,6 +75,7 @@ from emergentflow.stats.models import FittedStatsModel
 from emergentflow.stats.registry import ModelSpec, keys_for_archetype, known_model_keys
 from emergentflow.stats.scale import enforce_dense_square_guard
 from emergentflow.stats.spec import _prepare_diagnostic_spec, _prepare_model_spec
+from emergentflow.stats.survival import fit_survival, survival_curve  # noqa: F401
 
 __all__ = [
     "anova",

@@ -15,7 +15,10 @@ from __future__ import annotations
 
 import glob
 import importlib.util
+import math
 import os
+import shutil
+import urllib.parse
 from collections.abc import Callable
 from pathlib import Path
 
@@ -35,6 +38,7 @@ from emergentflow.data.http.fetch import http_fetch
 from emergentflow.data.http.sheets import load_google_sheet
 from emergentflow.data.warehouse.introspect import describe_relation
 from emergentflow.data.warehouse.query import query
+from emergentflow.data.warehouse.write import write_table
 
 __all__ = [
     "DataError",
@@ -50,7 +54,9 @@ __all__ = [
     "load_sample",
     "MissingOptionalDependencyError",
     "query",
+    "save_frame",
     "SchemaContractError",
+    "write_table",
 ]
 
 
@@ -737,3 +743,152 @@ def load_sample(name: str = "iris") -> pd.DataFrame:
 
     loader = {"iris": _sk.load_iris, "wine": _sk.load_wine, "diabetes": _sk.load_diabetes}[name]
     return loader(as_frame=True).frame
+
+
+_HIVE_NULL = "__HIVE_DEFAULT_PARTITION__"
+_SAVE_FORMATS = ("parquet", "csv", "json")
+_SAVE_EXTENSIONS = {"parquet": "parquet", "csv": "csv", "json": "json"}
+
+
+def _hive_partition_value(value: object) -> str:
+    """Encode one partition value as a Hive directory component.
+
+    Nulls become the Hive sentinel ``__HIVE_DEFAULT_PARTITION__`` (distinct from the string
+    ``"nan"``); everything else is percent-encoded with no safe characters, so a value such as
+    ``"sub/dir"`` or ``"../x"`` can never escape the target directory or nest an extra level.
+    pyarrow/pandas decode both conventions when reading the dataset back.
+    """
+    if value is None or (isinstance(value, float) and math.isnan(value)) or value is pd.NaT:
+        return _HIVE_NULL
+    try:
+        if pd.isna(value):
+            return _HIVE_NULL
+    except (TypeError, ValueError):
+        pass
+    return urllib.parse.quote(str(value), safe="")
+
+
+def _write_frame_file(frame: pd.DataFrame, path: str, *, format: str, keep_index: bool) -> None:
+    """Write one frame to *path* in *format*; ``keep_index`` keeps a meaningful index."""
+    try:
+        if format == "parquet":
+            frame.to_parquet(path, index=keep_index)
+        elif format == "csv":
+            frame.to_csv(path, index=keep_index)
+        else:
+            out = frame.reset_index() if keep_index else frame
+            out.to_json(path, orient="records", lines=True)
+    except OSError as exc:
+        raise DataError(f"could not write {path!r}: {exc}") from exc
+
+
+@public_op(name="ef.data.save_frame")
+def save_frame(
+    df: pd.DataFrame,
+    *,
+    path: str,
+    format: str = "parquet",
+    mode: str = "overwrite",
+    partition_by: list[str] | None = None,
+    index: bool | None = None,
+) -> pd.DataFrame:
+    """Write *df* to *path* and return it unchanged, so the node stays chainable.
+
+    The dataset writer that makes a canvas able to produce a *dataset* as an artifact
+    (issue #164 Gap 6): phase N's cleaned output becomes phase N+1's input without
+    leaving the graph. ``format`` is ``"parquet"`` (default), ``"csv"``, or ``"json"``
+    (newline-delimited JSON, one object per line -- read it back with
+    ``ef.data.load_json(path, lines=True)``). ``mode`` is ``"overwrite"`` (default; replaces
+    an existing file, or an existing partitioned directory *including its stale
+    partitions*) or ``"error"`` (refuses to clobber). ``partition_by``, when given, writes a
+    Hive-partitioned directory layout ``path/<col>=<value>/part-<n>.<ext>`` instead of a
+    single file; partition values are percent-encoded (so a value containing ``/`` can never
+    escape the target) and nulls land in ``<col>=__HIVE_DEFAULT_PARTITION__`` -- pyarrow
+    decodes both on read. ``index`` controls the frame's index: ``None`` (default) keeps a
+    non-``RangeIndex`` index (e.g. a ``DatetimeIndex``; written natively for parquet, as a
+    leading column for csv/json) and drops a default ``RangeIndex``; ``True``/``False`` force it.
+
+    Local paths are ``~``-expanded. A remote URI (``s3://``, ``gs://``, ...) requires the
+    optional ``[cloud]`` extra (typed ``MissingOptionalDependencyError`` otherwise) and does
+    not support ``partition_by``.
+
+    Returning the frame (rather than nothing) keeps it a pass-through in the DAG -- the
+    same pattern as ``research.assert_data`` -- so a save can be inserted mid-graph without
+    restructuring downstream edges. Raises ``DataError`` on an unsupported format, a
+    ``mode="error"`` collision, a file/directory mismatch, or a bad ``partition_by``. Never
+    mutates ``df``.
+    """
+    if not path or not isinstance(path, str):
+        raise ValueError(f"path must be a non-empty string, got {path!r}")
+    if format not in _SAVE_FORMATS:
+        raise DataError(f"unknown format {format!r}; expected 'parquet', 'csv', or 'json'.")
+    if mode not in ("overwrite", "error"):
+        raise DataError(f"unknown mode {mode!r}; expected 'overwrite' or 'error'.")
+    if partition_by is not None and not isinstance(partition_by, (list, tuple)):
+        raise DataError(
+            f"partition_by must be a list of column names, got {type(partition_by).__name__} "
+            f"{partition_by!r} (a bare string would be read as one column per character)."
+        )
+    keep_index = (not isinstance(df.index, pd.RangeIndex)) if index is None else bool(index)
+    ext = _SAVE_EXTENSIONS[format]
+
+    if _is_remote_uri(path):
+        _require_extra("emergentflow[cloud]")
+        if partition_by:
+            raise DataError("partition_by is not supported for remote URIs; write a single file.")
+        if mode == "error":
+            import fsspec
+
+            fs, _, paths = fsspec.get_fs_token_paths(path)
+            if fs.exists(paths[0]):
+                raise DataError(
+                    f"refusing to overwrite existing object at {path!r} (mode='error')."
+                )
+        _write_frame_file(df, path, format=format, keep_index=keep_index)
+        return df
+
+    target = Path(path).expanduser()
+    if partition_by:
+        unknown = [c for c in partition_by if c not in df.columns]
+        if unknown:
+            raise DataError(
+                f"unknown partition_by columns {unknown!r}; expected one of {list(df.columns)!r}."
+            )
+        if set(partition_by) >= set(df.columns):
+            raise DataError(
+                "partition_by covers every column, so nothing would be left to write inside the "
+                "partitions; leave at least one non-partition column."
+            )
+        if target.exists() and not target.is_dir():
+            raise DataError(
+                f"{path!r} exists and is a file; partition_by needs a directory target."
+            )
+        if mode == "error" and target.exists() and any(target.iterdir()):
+            raise DataError(f"refusing to overwrite existing partitioned output at {path!r}.")
+        if mode == "overwrite" and target.exists():
+            shutil.rmtree(target)  # drop stale partitions from an earlier write
+        target.mkdir(parents=True, exist_ok=True)
+        for i, (key, group) in enumerate(df.groupby(list(partition_by), sort=True, dropna=False)):
+            key_tuple = key if isinstance(key, tuple) else (key,)
+            parts = [
+                f"{col}={_hive_partition_value(val)}"
+                for col, val in zip(partition_by, key_tuple, strict=True)
+            ]
+            sub_path = target.joinpath(*parts)
+            sub_path.mkdir(parents=True, exist_ok=True)
+            sub = group.drop(columns=list(partition_by))
+            _write_frame_file(
+                sub, str(sub_path / f"part-{i}.{ext}"), format=format, keep_index=keep_index
+            )
+        return df
+
+    if target.exists() and target.is_dir():
+        raise DataError(
+            f"{path!r} is a directory; pass partition_by to write a partitioned dataset or "
+            "point at a file path."
+        )
+    if mode == "error" and target.exists():
+        raise DataError(f"refusing to overwrite existing file at {path!r} (mode='error').")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    _write_frame_file(df, str(target), format=format, keep_index=keep_index)
+    return df

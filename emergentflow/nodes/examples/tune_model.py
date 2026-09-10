@@ -34,7 +34,7 @@ class TuneModel(NodeDefinition):
     """Randomized-search a hyperparameter space for a curated, fit-archetype sklearn estimator."""
 
     type = "ml.tune_model"
-    version = 1
+    version = 2
     family = "ml"
     label = "Tune Model"
     category = "Machine Learning"
@@ -96,6 +96,14 @@ class TuneModel(NodeDefinition):
             hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
+            name="weight_col",
+            type_token="str",
+            default=None,
+            label="Weights column",
+            help="Optional column of per-row sample weights forwarded to the fit.",
+            hints=ValidationHints(widget="column"),
+        ),
+        ParamSpec(
             name="n_iter",
             type_token="int",
             default=10,
@@ -121,7 +129,7 @@ class TuneModel(NodeDefinition):
 
     def _args(
         self, node: Node
-    ) -> tuple[str, dict[str, list[Any]], str, list[str] | None, int, int, str | None]:
+    ) -> tuple[str, dict[str, list[Any]], str, list[str] | None, int, int, str | None, str | None]:
         values = {p.name: p.value for p in node.params}
         estimator = values.get("estimator")
         param_dists = values.get("param_distributions") or {}
@@ -130,6 +138,8 @@ class TuneModel(NodeDefinition):
         n_iter = values.get("n_iter", 10)
         cv = values.get("cv", 5)
         scoring = values.get("scoring")
+        # "" from the UI must mean "unset" on both paths
+        weight_col = values.get("weight_col") or None
         return (
             cast(str, estimator),
             cast("dict[str, list[Any]]", param_dists),
@@ -138,10 +148,12 @@ class TuneModel(NodeDefinition):
             cast(int, n_iter),
             cast(int, cv),
             cast("str | None", scoring),
+            cast("str | None", weight_col),
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        estimator, param_dists, target, features, n_iter, cv, scoring = self._args(node)
+        estimator, param_dists, target, features, n_iter, cv, scoring, weight_col = self._args(node)
+        codegen_weight = f", weight_col={weight_col!r}" if weight_col else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
@@ -149,12 +161,12 @@ class TuneModel(NodeDefinition):
                 f"{ctx.in_var('frame')}, estimator={estimator!r}, "
                 f"param_distributions={param_dists!r}, "
                 f"target={target!r}, features={features!r}, n_iter={n_iter!r}, cv={cv!r}, "
-                f"scoring={scoring!r}, random_state=0)"
+                f"scoring={scoring!r}, random_state=0{codegen_weight})"
             ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        estimator, param_dists, target, features, n_iter, cv, scoring = self._args(node)
+        estimator, param_dists, target, features, n_iter, cv, scoring, weight_col = self._args(node)
         model, cv_results = tune_model(
             inputs["frame"],
             estimator=estimator,
@@ -164,5 +176,6 @@ class TuneModel(NodeDefinition):
             n_iter=n_iter,
             cv=cv,
             scoring=scoring,
+            weight_col=weight_col,
         )
         return {"model": model, "cv_results": cv_results}

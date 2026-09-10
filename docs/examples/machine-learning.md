@@ -239,6 +239,16 @@ print(cv_df)
 Unlike `grid_search`, `cross_validate` produces no reusable `FittedModel` — it's a pure
 evaluation step over a single, fixed-hyperparameter estimator, one row per fold.
 
+For repeated-measures data pass `cv_strategy="grouped"` with `group_col`: every row of a subject
+lands in the same fold, and the returned frame gains a `splitter` column naming the splitter
+actually used (`StratifiedGroupKFold` for classification targets, `GroupKFold` for regression,
+including integer-valued regression targets).
+
+Every fit op (`fit_estimator`, `train_*`, `cross_validate`, `grid_search`, `tune_model`) accepts
+`weight_col`, a numeric column of per-row sample weights forwarded to the estimator's `fit`. The
+weight column is never used as a feature. Note the scoring asymmetry inherited from scikit-learn:
+`grid_search`/`tune_model` score folds *weighted*, `cross_validate` scores them *unweighted*.
+
 ## 8. Pipelines
 
 ```python

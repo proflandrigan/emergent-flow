@@ -264,12 +264,31 @@ register_model(
 )
 
 
+#: ``level_icc`` keys reserved for the top-level group and the residual share; a
+#: ``nested_groups`` column with one of these names would silently overwrite them.
+_MIXEDLM_RESERVED_LEVELS = frozenset({"group", "residual"})
+
+
 def _mixedlm_re_formula(random_effects: list[str] | None) -> str | None:
     """Build the ``re_formula`` for random slopes; ``None`` means random-intercept-only
     (statsmodels' default when ``re_formula`` is omitted)."""
     if not random_effects:
         return None
     return "~ " + " + ".join(_patsy_term(col) for col in random_effects)
+
+
+def _mixedlm_vc_formula(nested_groups: list[str] | None) -> dict[str, str] | None:
+    """Build statsmodels' ``vc_formula`` for nesting levels below ``groups``.
+
+    ``["classroom", "teacher"]`` -> ``{"classroom": "0 + C(classroom)",
+    "teacher": "0 + C(teacher)"}``. Each becomes an independent variance component
+    *nested within* the top-level ``groups`` factor (issue #164 Gap 2). This expresses
+    nesting only -- a truly crossed random effect (e.g. teachers shared across schools)
+    is not expressible as a within-group variance component.
+    """
+    if not nested_groups:
+        return None
+    return {col: f"0 + C({_patsy_term(col)})" for col in nested_groups}
 
 
 def _fit_mixedlm(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
@@ -279,13 +298,71 @@ def _fit_mixedlm(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
     module's docstring / docs/stats-viz-design.md for why AIC/BIC may be NaN under REML, and
     why the generic ``ols_coefficient_frame`` helper is NOT reused here (MixedLM's ``.params``
     mixes in variance components at the wrong scale; see ``mixedlm_coefficient_frame``).
+
+    ``groups`` names the outermost grouping level; ``nested_groups`` (optional) names
+    additional levels below it, modelled as independent variance components via
+    statsmodels' ``vc_formula``. ``random_effects`` (random slopes) and ``nested_groups``
+    combine freely. statsmodels only adds its default random intercept when *neither*
+    ``re_formula`` nor ``vc_formula`` is given, so when a ``vc_formula`` is present the
+    top-level intercept is requested explicitly via ``re_formula="1"`` -- otherwise the
+    ``groups`` variance is silently absorbed into the first nested component (issue #164
+    Gap 2).
     """
+    if spec.get("cov_type", "nonrobust") != "nonrobust":
+        raise InvalidModelSpecError(
+            "MixedLM does not support cov_type; statsmodels' MixedLM.fit() has no robust-"
+            "covariance surface. Model the clustering as a random effect via `groups` "
+            "(and `vc_formula` for additional levels), or use OLS/GLM with "
+            "cov_type='cluster' if you want cluster-robust SEs on a marginal model."
+        )
     formula = _ols_formula(spec)
     random_effects = spec.get("random_effects") or []
+    nested_groups = spec.get("nested_groups") or []
+    groups_col = spec["groups"]
+    if not df.index.is_unique:
+        raise InvalidModelSpecError(
+            "MixedLM requires a unique DataFrame index (statsmodels aligns the variance-"
+            "component design by index label); call df.reset_index(drop=True) first."
+        )
+    if df[groups_col].isna().any():
+        raise InvalidModelSpecError(
+            f"groups column {groups_col!r} contains missing values; drop or fill them before "
+            "fitting MixedLM."
+        )
+    if nested_groups:
+        if len(set(nested_groups)) != len(nested_groups):
+            raise InvalidModelSpecError(f"nested_groups contains duplicates: {nested_groups!r}.")
+        if groups_col in nested_groups:
+            raise InvalidModelSpecError(
+                f"nested_groups must not repeat the top-level groups column {groups_col!r}."
+            )
+        clash = [c for c in nested_groups if c in _MIXEDLM_RESERVED_LEVELS]
+        if clash:
+            raise InvalidModelSpecError(
+                f"nested_groups {clash!r} clash with the reserved level_icc keys "
+                f"{sorted(_MIXEDLM_RESERVED_LEVELS)!r}; rename the column."
+            )
+        na_cols = [c for c in nested_groups if df[c].isna().any()]
+        if na_cols:
+            raise InvalidModelSpecError(
+                f"nested_groups columns {na_cols!r} contain missing values; drop or fill them "
+                "before fitting MixedLM."
+            )
     re_formula = _mixedlm_re_formula(random_effects)
-    groups = df[spec["groups"]]
-    model = smf.mixedlm(formula, data=df, groups=groups, re_formula=re_formula)
-    results = model.fit(**_cov_kwargs(df, spec))
+    vc_formula = _mixedlm_vc_formula(nested_groups)
+    if vc_formula is not None and re_formula is None:
+        # statsmodels drops the default random intercept when exog_vc is present; keep the
+        # top-level `groups` intercept explicitly so the 3-level decomposition is correct.
+        re_formula = "1"
+    groups = df[groups_col]
+    model = smf.mixedlm(
+        formula,
+        data=df,
+        groups=groups,
+        re_formula=re_formula,
+        vc_formula=vc_formula,
+    )
+    results = model.fit()
 
     fixed = spec.get("fixed_effects") or []
     term_map = {_patsy_term(col): col for col in fixed}
@@ -307,9 +384,10 @@ register_model(
         archetype="fit_model",
         fitter=_fit_mixedlm,
         required_spec_fields=("target", "groups"),
-        optional_spec_fields=("fixed_effects", "random_effects", "cov_type", "cov_group"),
+        optional_spec_fields=("fixed_effects", "random_effects", "nested_groups", "cov_type"),
         description="Linear mixed-effects / hierarchical model with random intercepts and "
-        "slopes, grouped (statsmodels MixedLM).",
+        "slopes, grouped (statsmodels MixedLM). `nested_groups` adds variance-component "
+        "levels below `groups`.",
     )
 )
 
@@ -403,16 +481,23 @@ _BAMBI_FAMILIES: dict[str, str] = {
 
 
 def _bayesian_formula(spec: dict[str, Any]) -> str:
-    """Assemble a bambi formula: fixed effects + an optional ``(re_terms | groups)`` random
-    part, reusing ``_ols_formula`` for the fixed-effects RHS and the same ``groups``/
-    ``random_effects`` structured-spec fields ``MixedLM`` uses (Story 5)."""
+    """Assemble a bambi formula: fixed effects + one random term per grouping level.
+
+    Reuses ``_ols_formula`` for the fixed-effects RHS and the same ``groups``/
+    ``random_effects`` structured-spec fields ``MixedLM`` uses (Story 5). ``groups`` may be
+    a single column name (one ``(re_terms | g)`` term) or a list of column names (one term
+    per level, e.g. ``(1 | school) + (1 | room)``), which is how bambi expresses nested /
+    crossed random effects (issue #164 Gap 2).
+    """
     base = _ols_formula(spec)
     groups = spec.get("groups")
     if not groups:
         return base
+    group_list = [groups] if isinstance(groups, str) else list(groups)
     random_effects = spec.get("random_effects") or []
     re_term = " + ".join(_patsy_term(c) for c in random_effects) if random_effects else "1"
-    return f"{base} + ({re_term} | {_patsy_term(groups)})"
+    parts = [f"({re_term} | {_patsy_term(g)})" for g in group_list]
+    return f"{base} + " + " + ".join(parts)
 
 
 def _fit_bayesian_glm(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
@@ -421,8 +506,10 @@ def _fit_bayesian_glm(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsMode
     Requires ``emergentflow[bayes]`` (checked by ``fit_model`` before this fitter ever runs).
     ``seed``/``draws``/``tune``/``chains`` are all REQUIRED spec fields (not defaulted) so the
     ADR-0002 equivalence gate can pin exact MCMC reproducibility -- see
-    docs/stats-viz-design.md Decision 5. No prior-override surface, no custom link -- bambi's
-    own defaults are used (deferred enhancements, not shipped here).
+    docs/stats-viz-design.md Decision 5. ``groups`` may be a single column or a list of
+    columns (one random term per level); ``priors`` (optional) is passed through to
+    ``bmb.Model(priors=...)`` so a partially-pooled model on sparse groups can override the
+    default priors (issue #164 Gap 2).
     """
     import bambi as bmb
 
@@ -430,7 +517,11 @@ def _fit_bayesian_glm(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsMode
     family_key = spec.get("family") or "gaussian"
     bambi_family = _BAMBI_FAMILIES[family_key]
 
-    model = bmb.Model(formula, df, family=bambi_family)
+    priors = spec.get("priors")
+    model_kwargs: dict[str, Any] = {"family": bambi_family}
+    if priors:
+        model_kwargs["priors"] = priors
+    model = bmb.Model(formula, df, **model_kwargs)
     idata = model.fit(
         draws=int(spec["draws"]),
         tune=int(spec["tune"]),
@@ -455,9 +546,10 @@ register_model(
         archetype="bayesian_fit",
         fitter=_fit_bayesian_glm,
         required_spec_fields=("target", "seed", "draws", "tune", "chains"),
-        optional_spec_fields=("fixed_effects", "random_effects", "groups", "family"),
+        optional_spec_fields=("fixed_effects", "random_effects", "groups", "family", "priors"),
         requires_extra="emergentflow[bayes]",
         description="Bayesian GLM (optionally hierarchical: random intercepts/slopes via "
-        "random_effects/groups), fit via bambi/PyMC, summarized with ArviZ.",
+        "random_effects/groups, one random term per grouping level; optional priors "
+        "override), fit via bambi/PyMC, summarized with ArviZ.",
     )
 )

@@ -125,6 +125,10 @@ class NodeDefinition(ABC):
         params and inputs (e.g. non-deterministic LLM nodes, deferred to a
         later epic) — a cache hit for such a node would silently serve a
         stale/wrong result.
+    requires_extra:
+        Optional pip extra (e.g. ``"emergentflow[psychometrics]"``) whose packages this
+        node's ``execute`` imports. Informational for docs/UI; the op itself still raises a
+        typed ``MissingOptionalDependencyError`` at run time. ``None`` for base-install nodes.
     requires_client:
         Whether this node's ``execute`` needs an injected ``LLMClient``
         (ADR 0017). Default ``False`` for every ordinary, pure node. LLM-call
@@ -169,6 +173,7 @@ class NodeDefinition(ABC):
     keywords: ClassVar[list[str]] = []
     paradigm: ClassVar[Paradigm] = Paradigm.FUNCTIONAL
     cacheable: ClassVar[bool] = True
+    requires_extra: ClassVar[str | None] = None
     requires_client: ClassVar[bool] = False
     requires: ClassVar[frozenset[ClientKind]] = frozenset()
     advisor_persona: ClassVar[str | None] = None

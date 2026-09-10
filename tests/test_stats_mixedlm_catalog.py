@@ -62,6 +62,21 @@ def _grouped_df(seed: int = 0) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _nested_grouped_df(seed: int = 3) -> pd.DataFrame:
+    """A nested fixture: 8 schools x 5 rooms x 8 obs, school + room random intercepts."""
+    rng = np.random.default_rng(seed)
+    rows = []
+    for s in range(8):
+        u_school = rng.normal(scale=3.0)
+        for r in range(5):
+            u_room = rng.normal(scale=2.0)
+            for _ in range(8):
+                x = rng.normal()
+                y = 2.0 * x + u_school + u_room + rng.normal(scale=1.0)
+                rows.append({"x": x, "y": y, "school": f"s{s}", "room": f"s{s}_r{r}"})
+    return pd.DataFrame(rows)
+
+
 # ---------------------------------------------------------------------------
 # 1. Golden-code quality: one representative MixedLM graph.
 # ---------------------------------------------------------------------------
@@ -126,11 +141,20 @@ def test_mixedlm_codegen_is_ruff_clean() -> None:
             },
             id="random_intercept_and_slope",
         ),
+        pytest.param(
+            {
+                "target": "y",
+                "fixed_effects": ["x"],
+                "groups": "school",
+                "nested_groups": ["room"],
+            },
+            id="nested_groups_vc_formula",
+        ),
     ],
 )
 def test_mixedlm_equivalence_matrix(fit_kwargs: dict) -> None:
     """ADR 0002: execute == running the emitted code, for MixedLM (both RE structures)."""
-    df = _grouped_df()
+    df = _grouped_df() if "nested_groups" not in fit_kwargs else _nested_grouped_df()
 
     defn = FitMixedModel()
     node = defn.instantiate(**fit_kwargs)
@@ -139,7 +163,13 @@ def test_mixedlm_equivalence_matrix(fit_kwargs: dict) -> None:
     codegen_model = scope["model"]
 
     pd.testing.assert_frame_equal(executed_model.coefficients, codegen_model.coefficients)
-    assert executed_model.fit_stats == codegen_model.fit_stats
+    assert executed_model.fit_stats.keys() == codegen_model.fit_stats.keys()
+    for key in executed_model.fit_stats:
+        lhs, rhs = executed_model.fit_stats[key], codegen_model.fit_stats[key]
+        if isinstance(lhs, float) and np.isnan(lhs):
+            assert isinstance(rhs, float) and np.isnan(rhs)
+        else:
+            assert lhs == rhs, f"fit_stats mismatch on {key!r}"
     assert executed_model.model == codegen_model.model == "MixedLM"
     assert "Residual Var" in set(executed_model.coefficients["term"])
     assert executed_model.fit_stats["converged"] is True

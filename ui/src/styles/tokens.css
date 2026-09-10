@@ -94,6 +94,10 @@
   --fam-research-soft: rgba(100, 116, 139, 0.14);
   --fam-script: #94a3b8;
   --fam-script-soft: rgba(148, 163, 184, 0.14);
+  --fam-causal: #8b5cf6;
+  --fam-causal-soft: rgba(139, 92, 246, 0.14);
+  --fam-psychometrics: #0ea5e9;
+  --fam-psychometrics-soft: rgba(14, 165, 233, 0.14);
   --fam-layout: #64748b;
   --fam-layout-soft: rgba(100, 116, 139, 0.14);
 

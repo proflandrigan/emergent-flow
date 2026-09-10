@@ -34,7 +34,7 @@ class GridSearch(NodeDefinition):
     """Search a hyperparameter grid for a curated, fit-archetype sklearn estimator."""
 
     type = "ml.grid_search"
-    version = 1
+    version = 2
     family = "ml"
     label = "Grid Search"
     category = "Machine Learning"
@@ -96,6 +96,14 @@ class GridSearch(NodeDefinition):
             hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
+            name="weight_col",
+            type_token="str",
+            default=None,
+            label="Weights column",
+            help="Optional column of per-row sample weights forwarded to the fit.",
+            hints=ValidationHints(widget="column"),
+        ),
+        ParamSpec(
             name="cv",
             type_token="int",
             default=5,
@@ -114,7 +122,7 @@ class GridSearch(NodeDefinition):
 
     def _args(
         self, node: Node
-    ) -> tuple[str, dict[str, list[Any]], str, list[str] | None, int, str | None]:
+    ) -> tuple[str, dict[str, list[Any]], str, list[str] | None, int, str | None, str | None]:
         values = {p.name: p.value for p in node.params}
         estimator = values.get("estimator")
         param_grid = values.get("param_grid") or {}
@@ -122,6 +130,8 @@ class GridSearch(NodeDefinition):
         features = values.get("features")
         cv = values.get("cv", 5)
         scoring = values.get("scoring")
+        # "" from the UI must mean "unset" on both paths
+        weight_col = values.get("weight_col") or None
         return (
             cast(str, estimator),
             cast("dict[str, list[Any]]", param_grid),
@@ -129,21 +139,24 @@ class GridSearch(NodeDefinition):
             cast("list[str] | None", features),
             cast(int, cv),
             cast("str | None", scoring),
+            cast("str | None", weight_col),
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        estimator, param_grid, target, features, cv, scoring = self._args(node)
+        estimator, param_grid, target, features, cv, scoring, weight_col = self._args(node)
+        codegen_weight = f", weight_col={weight_col!r}" if weight_col else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('model')}, {ctx.out_var('cv_results')} = ef.ml.grid_search("
                 f"{ctx.in_var('frame')}, estimator={estimator!r}, param_grid={param_grid!r}, "
-                f"target={target!r}, features={features!r}, cv={cv!r}, scoring={scoring!r})"
+                f"target={target!r}, features={features!r}, cv={cv!r}, scoring={scoring!r}"
+                f"{codegen_weight})"
             ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        estimator, param_grid, target, features, cv, scoring = self._args(node)
+        estimator, param_grid, target, features, cv, scoring, weight_col = self._args(node)
         model, cv_results = grid_search(
             inputs["frame"],
             estimator=estimator,
@@ -152,5 +165,6 @@ class GridSearch(NodeDefinition):
             features=features,
             cv=cv,
             scoring=scoring,
+            weight_col=weight_col,
         )
         return {"model": model, "cv_results": cv_results}

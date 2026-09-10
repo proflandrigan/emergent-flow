@@ -20,6 +20,7 @@ __all__ = [
     "MissingOptionalDependencyError",
     "UnknownEstimatorError",
     "InvalidEstimatorParamsError",
+    "UnsupportedEstimatorOptionError",
     "ModelPersistenceError",
 ]
 
@@ -34,6 +35,11 @@ class UnknownEstimatorError(MLAdapterError):
 
 class InvalidEstimatorParamsError(MLAdapterError):
     """Raised when a kwarg passed to an estimator is not in its accepted-kwargs allow-list."""
+
+
+class UnsupportedEstimatorOptionError(MLAdapterError):
+    """Raised when a requested fit-time option (e.g. sample_weight) is not supported
+    by the chosen estimator."""
 
 
 class MissingOptionalDependencyError(MLAdapterError):

@@ -31,14 +31,15 @@ class FitMixedModel(NodeDefinition):
     """Fit a linear mixed-effects / hierarchical model (statsmodels MixedLM)."""
 
     type = "stats.fit_mixed_model"
-    version = 1
+    version = 2
     family = "stats"
     label = "Fit Mixed Model"
     category = "Statistics"
     advisor_persona = "researcher"
     description = (
         "Fit a linear mixed-effects / hierarchical model"
-        " with random intercepts and slopes, grouped (statsmodels MixedLM)."
+        " with random intercepts and slopes, grouped (statsmodels MixedLM); nested_groups"
+        " adds variance-component levels below groups."
     )
 
     ports = [
@@ -89,7 +90,19 @@ class FitMixedModel(NodeDefinition):
             type_token="str",
             required=True,
             label="Grouping factor",
-            help="Grouping-factor column (e.g. subject/site/region).",
+            help="Grouping-factor column (e.g. subject/site/region) -- the outermost level.",
+            hints=ValidationHints(widget="column"),
+        ),
+        ParamSpec(
+            name="nested_groups",
+            type_token="list[str]",
+            default=None,
+            label="Nested groups",
+            help=(
+                "Additional levels nested below `groups`, modelled as variance "
+                "components (e.g. classroom within school). Combines freely with "
+                "random_effects."
+            ),
             hints=ValidationHints(widget="column"),
         ),
     ]
@@ -97,7 +110,7 @@ class FitMixedModel(NodeDefinition):
     def _spec(self, node: Node) -> dict[str, Any]:
         values = {p.name: p.value for p in node.params}
         spec: dict[str, Any] = {}
-        for key in ("target", "fixed_effects", "random_effects", "groups"):
+        for key in ("target", "fixed_effects", "random_effects", "groups", "nested_groups"):
             value = values.get(key)
             if value not in (None, "", [], ()):
                 spec[key] = value

@@ -35,7 +35,7 @@ class FitEstimator(NodeDefinition):
     """Fit a curated, allow-listed sklearn classifier or regressor."""
 
     type = "ml.fit_estimator"
-    version = 1
+    version = 2
     family = "ml"
     label = "Fit Estimator"
     category = "Machine Learning"
@@ -84,6 +84,14 @@ class FitEstimator(NodeDefinition):
             hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
+            name="weight_col",
+            type_token="str",
+            default=None,
+            label="Weights column",
+            help="Optional column of per-row sample weights forwarded to the fit.",
+            hints=ValidationHints(widget="column"),
+        ),
+        ParamSpec(
             name="params",
             type_token="dict[str, any]",
             default={},
@@ -92,32 +100,36 @@ class FitEstimator(NodeDefinition):
         ),
     ]
 
-    def _args(self, node: Node) -> tuple[str, str, list[str] | None, dict[str, Any]]:
+    def _args(self, node: Node) -> tuple[str, str, list[str] | None, dict[str, Any], str | None]:
         values = {p.name: p.value for p in node.params}
         estimator = values.get("estimator")
         target = values.get("target")
         features = values.get("features")
         params = values.get("params") or {}
+        # "" from the UI must mean "unset" on both paths
+        weight_col = values.get("weight_col") or None
         return (
             cast(str, estimator),
             cast(str, target),
             cast("list[str] | None", features),
             cast("dict[str, Any]", params),
+            cast("str | None", weight_col),
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        estimator, target, features, params = self._args(node)
+        estimator, target, features, params, weight_col = self._args(node)
+        codegen_weight = f", weight_col={weight_col!r}" if weight_col else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('model')} = ef.ml.fit_estimator("
                 f"{ctx.in_var('frame')}, estimator={estimator!r}, target={target!r}, "
-                f"features={features!r}, params={params!r})"
+                f"features={features!r}, params={params!r}{codegen_weight})"
             ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        estimator, target, features, params = self._args(node)
+        estimator, target, features, params, weight_col = self._args(node)
         return {
             "model": fit_estimator(
                 inputs["frame"],
@@ -125,5 +137,6 @@ class FitEstimator(NodeDefinition):
                 target=target,
                 features=features,
                 params=params,
+                weight_col=weight_col,
             )
         }

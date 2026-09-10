@@ -8,8 +8,10 @@ lives only behind this extra, never on the hard-dep path).
 
 from __future__ import annotations
 
+import importlib
 import time
 from collections.abc import Mapping
+from typing import Any
 
 import pandas as pd
 
@@ -20,10 +22,13 @@ from emergentflow.data.warehouse.protocol import (
     MissingDriverError,
     QueryRequest,
     QueryResult,
+    WriteRequest,
+    WriteResult,
 )
 
+_sa: Any
 try:
-    import sqlalchemy as _sa
+    _sa = importlib.import_module("sqlalchemy")
 except ImportError:
     _sa = None
 
@@ -44,6 +49,12 @@ def _escape_literal(value: str) -> str:
     of the literal and injecting arbitrary SQL.
     """
     return value.replace("'", "''")
+
+
+def _split_table(table: str) -> tuple[str | None, str]:
+    """Split ``schema.table`` into ``(schema, table)``; ``(None, table)`` when unqualified."""
+    schema, _, name = table.rpartition(".")
+    return (schema or None), name
 
 
 class PostgresAdapter:
@@ -194,3 +205,43 @@ class PostgresAdapter:
         df["schema"] = schema
         df["table"] = relation
         return df[list(RELATION_SCHEMA_COLUMNS)]
+
+    def write(
+        self,
+        request: WriteRequest,
+        df: pd.DataFrame,
+        credentials: Mapping[str, str],
+    ) -> WriteResult:
+        """Write *df* to *request.table* per the request's mode (issue #164 Gap 6).
+
+        ``table`` may be ``schema.table`` (split on the last dot and passed to pandas as
+        ``schema=``). ``"append"`` -> ``to_sql(if_exists="append")``; ``"error"`` ->
+        ``if_exists="fail"``; ``"truncate"`` -> ``TRUNCATE TABLE`` (a plain ``DELETE`` on
+        non-PostgreSQL engines) followed by an append, so the table's column types,
+        constraints, indexes and grants survive. Everything runs in ONE transaction
+        (``engine.begin()``): a failed insert rolls the truncate back and the old rows remain.
+        """
+        _require_driver()
+        start = time.monotonic()
+        engine = self._engine(credentials)
+        schema, name = _split_table(request.table)
+        with engine.begin() as conn:
+            if request.mode == "truncate":
+                if _sa.inspect(conn).has_table(name, schema=schema):
+                    preparer = conn.dialect.identifier_preparer
+                    parts = ([schema] if schema else []) + [name]
+                    qualified = ".".join(preparer.quote(p) for p in parts)
+                    verb = "TRUNCATE TABLE" if conn.dialect.name == "postgresql" else "DELETE FROM"
+                    conn.execute(_sa.text(f"{verb} {qualified}"))
+                df.to_sql(name, conn, schema=schema, if_exists="append", index=False)
+            else:
+                if_exists = {"append": "append", "error": "fail"}[request.mode]
+                df.to_sql(name, conn, schema=schema, if_exists=if_exists, index=False)
+        elapsed_ms = (time.monotonic() - start) * 1000
+        return WriteResult(
+            table=request.table,
+            mode=request.mode,
+            rows_written=len(df),
+            dialect="postgres",
+            elapsed_ms=elapsed_ms,
+        )

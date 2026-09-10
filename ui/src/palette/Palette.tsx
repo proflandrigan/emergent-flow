@@ -19,7 +19,7 @@ export const SECTIONS = [
   { id: "data", label: "Data", families: ["data"] },
   { id: "prepare", label: "Prepare", families: ["clean", "transform"] },
   { id: "explore", label: "Explore", families: ["viz"] },
-  { id: "analyze", label: "Analyze", families: ["stats", "timeseries"] },
+  { id: "analyze", label: "Analyze", families: ["stats", "timeseries", "causal", "psychometrics"] },
   { id: "model", label: "Model", families: ["ml", "nn", "recommend"] },
   { id: "explain", label: "Explain", families: ["explain"] },
   // `eval` sits with `llm` rather than with `explain`: its nodes score prompt-variant
