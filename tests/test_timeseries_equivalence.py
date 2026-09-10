@@ -175,3 +175,27 @@ def test_time_weighted_aggregate_equivalence():
     codegen_result = scope["result"]
 
     pd.testing.assert_frame_equal(executed, codegen_result)
+
+
+@pytest.mark.equivalence
+def test_time_weighted_aggregate_date_aware_equivalence():
+    # Issue #164 Gap 5: execute must equal the emitted code for the date-aware
+    # (half_life/anchor/group_col) mode too, not just the positional path.
+    df = _ts_df()
+    rng = np.random.default_rng(7)
+    df["channel"] = rng.choice(["organic", "paid", "referral"], size=len(df))
+    defn = TsTimeWeightedAggregate()
+    node = defn.instantiate(
+        columns=["value"],
+        date_col="date",
+        half_life=7.0,
+        unit="D",
+        anchor="2020-03-01",
+        group_col="channel",
+    )
+
+    executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+    scope = _run_codegen(defn, node, {"frame": df.copy()})
+    codegen_result = scope["result"]
+
+    pd.testing.assert_frame_equal(executed, codegen_result)

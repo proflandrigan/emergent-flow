@@ -233,12 +233,20 @@ postgres = [
 mcp = [
     "fastmcp>=3.4.4",
 ]
+# `pip install emergentflow[psychometrics]` enables IRT ability estimation for
+# ef.psychometrics.fit_irt (issue #164 Gap 3): girth (BSD-3-Clause) provides the
+# marginal-maximum-likelihood Rasch/2PL/3PL fits. Kept optional so a bare SDK install
+# stays light (ADR 0007); reliability and disattenuate need no extra. An IRT call in a
+# base install raises a typed MissingOptionalDependencyError, never an opaque ImportError.
+psychometrics = [
+    "girth>=0.8,<1",
+]
 # `pip install emergentflow[all]` installs every optional extra in one shot —
 # the server, all warehouse adapters, LLM gateway, explainability, Bayesian
 # modeling, and the MCP tool wrapper. Convenient for local development or
 # exploration; production installs should cherry-pick only the extras they need.
 all = [
-    "emergentflow[server,llm,bayes,embed,explain,cloud,excel,bigquery,redshift,postgres,mcp,recommend,fuzzy,umap,report-pdf,docs,pii,survival]",
+    "emergentflow[server,llm,bayes,embed,explain,cloud,excel,bigquery,redshift,postgres,mcp,recommend,fuzzy,umap,report-pdf,docs,pii,survival,psychometrics]",
 ]
 
 [project.urls]

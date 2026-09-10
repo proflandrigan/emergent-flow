@@ -300,3 +300,71 @@ def test_time_weighted_aggregate_raises_on_existing_output_column(ts_df):
     ts_df["value_tw_linear"] = "should-not-be-overwritten"
     with pytest.raises(ValueError):
         time_weighted_aggregate(ts_df, columns=["value"], date_col="date", decay="linear", window=5)
+
+
+# --------------------------------------------------------------------------
+# date-aware mode (issue #164 Gap 5): half_life / unit / anchor / group_col
+# --------------------------------------------------------------------------
+
+
+def test_twa_halflife_returns_named_column_and_handchecked_values():
+    dates = pd.to_datetime(["2024-01-01", "2024-01-08", "2024-01-15", "2024-01-22"])
+    df = pd.DataFrame({"date": dates, "value": [10.0, 20.0, 30.0, 40.0]})
+    result = time_weighted_aggregate(df, columns=["value"], date_col="date", half_life=7)
+    assert "value_tw_halflife" in result.columns
+    assert "value_tw_linear" not in result.columns
+    # anchor defaults to the partition's max date (2024-01-22); weights are
+    # 0.5**(delta/7): row0 0.125, row1 0.25, row2 0.5, row3 1.0. Expanding weighted
+    # means: r0=10; r1=(10*0.125+20*0.25)/(0.375); r2=...; r3=...
+    assert result["value_tw_halflife"].iloc[0] == pytest.approx(10.0)
+    assert result["value_tw_halflife"].iloc[1] == pytest.approx(16.6666667, abs=1e-5)
+    assert result["value_tw_halflife"].iloc[2] == pytest.approx(24.2857143, abs=1e-5)
+    assert result["value_tw_halflife"].iloc[3] == pytest.approx(32.6666667, abs=1e-5)
+
+
+def test_twa_halflife_anchor_as_fixed_timestamp():
+    dates = pd.to_datetime(["2024-01-01", "2024-01-08", "2024-01-15"])
+    df = pd.DataFrame({"date": dates, "value": [10.0, 20.0, 30.0]})
+    result = time_weighted_aggregate(
+        df, columns=["value"], date_col="date", half_life=7, anchor="2024-01-15"
+    )
+    # same as default-anchor (max date = 2024-01-15)
+    assert result["value_tw_halflife"].iloc[1] == pytest.approx(16.6666667, abs=1e-5)
+
+
+def test_twa_halflife_anchor_as_column():
+    dates = pd.to_datetime(["2024-01-01", "2024-01-08", "2024-01-15"])
+    df = pd.DataFrame({"date": dates, "value": [10.0, 20.0, 30.0], "meas": ["2024-01-20"] * 3})
+    result = time_weighted_aggregate(
+        df, columns=["value"], date_col="date", half_life=7, anchor="meas"
+    )
+    assert result["value_tw_halflife"].iloc[1] == pytest.approx(16.6666667, abs=1e-5)
+
+
+def test_twa_halflife_group_col_partitions():
+    df = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2024-01-01", "2024-01-08", "2024-01-01", "2024-01-08"]),
+            "value": [10.0, 20.0, 100.0, 200.0],
+            "subj": ["a", "a", "b", "b"],
+        }
+    )
+    result = time_weighted_aggregate(
+        df, columns=["value"], date_col="date", half_life=7, group_col="subj"
+    )
+    # subject a: [10, 16.667]; subject b: [100, 166.667] -- independently weighted
+    assert result["value_tw_halflife"].tolist() == pytest.approx(
+        [10.0, 16.6666667, 100.0, 166.6666667]
+    )
+
+
+def test_twa_halflife_invalid_half_life_raises():
+    df = pd.DataFrame({"date": pd.to_datetime(["2024-01-01", "2024-01-08"]), "value": [10.0, 20.0]})
+    with pytest.raises(TimeseriesError, match="half_life"):
+        time_weighted_aggregate(df, columns=["value"], date_col="date", half_life=0)
+
+
+def test_twa_halflife_invalid_unit_raises():
+    df = pd.DataFrame({"date": pd.to_datetime(["2024-01-01", "2024-01-08"]), "value": [10.0, 20.0]})
+    with pytest.raises(TimeseriesError, match="unit"):
+        time_weighted_aggregate(df, columns=["value"], date_col="date", half_life=7, unit="bogus")

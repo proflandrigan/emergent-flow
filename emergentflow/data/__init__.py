@@ -35,6 +35,7 @@ from emergentflow.data.http.fetch import http_fetch
 from emergentflow.data.http.sheets import load_google_sheet
 from emergentflow.data.warehouse.introspect import describe_relation
 from emergentflow.data.warehouse.query import query
+from emergentflow.data.warehouse.write import write_table
 
 __all__ = [
     "DataError",
@@ -50,7 +51,9 @@ __all__ = [
     "load_sample",
     "MissingOptionalDependencyError",
     "query",
+    "save_frame",
     "SchemaContractError",
+    "write_table",
 ]
 
 
@@ -737,3 +740,74 @@ def load_sample(name: str = "iris") -> pd.DataFrame:
 
     loader = {"iris": _sk.load_iris, "wine": _sk.load_wine, "diabetes": _sk.load_diabetes}[name]
     return loader(as_frame=True).frame
+
+
+@public_op(name="ef.data.save_frame")
+def save_frame(
+    df: pd.DataFrame,
+    *,
+    path: str,
+    format: str = "parquet",
+    mode: str = "overwrite",
+    partition_by: list[str] | None = None,
+) -> pd.DataFrame:
+    """Write *df* to *path* and return it unchanged, so the node stays chainable.
+
+    The dataset writer that makes a canvas able to produce a *dataset* as an artifact
+    (issue #164 Gap 6): phase N's cleaned output becomes phase N+1's input without
+    leaving the graph. ``format`` is ``"parquet"`` (default), ``"csv"``, or ``"json"``;
+    ``mode`` is ``"overwrite"`` (default; replaces an existing file) or ``"error"``
+    (refuses to clobber). ``partition_by``, when given, writes a Hive-partitioned
+    directory layout via ``pyarrow``/``pandas`` (``path/<col>=<value>/...``) instead of a
+    single file.
+
+    Returning the frame (rather than nothing) keeps it a pass-through in the DAG -- the
+    same pattern as ``research.assert_data`` -- so a save can be inserted mid-graph without
+    restructuring downstream edges. Raises ``DataError`` on an unsupported format or a
+    ``mode="error"`` collision. Never mutates ``df``.
+    """
+    if not path or not isinstance(path, str):
+        raise ValueError(f"path must be a non-empty string, got {path!r}")
+    if format not in ("parquet", "csv", "json"):
+        raise DataError(f"unknown format {format!r}; expected 'parquet', 'csv', or 'json'.")
+    if mode not in ("overwrite", "error"):
+        raise DataError(f"unknown mode {mode!r}; expected 'overwrite' or 'error'.")
+
+    target = Path(path)
+    if partition_by:
+        if not partition_by:
+            raise DataError("partition_by must be a non-empty list of column names.")
+        unknown = [c for c in partition_by if c not in df.columns]
+        if unknown:
+            raise DataError(
+                f"unknown partition_by columns {unknown!r}; expected one of {list(df.columns)!r}."
+            )
+        if mode == "error" and target.exists() and any(target.iterdir()):
+            raise DataError(f"refusing to overwrite existing partitioned output at {path!r}.")
+        target.mkdir(parents=True, exist_ok=True)
+        for key, group in df.groupby(partition_by, sort=True, dropna=False):
+            if isinstance(key, tuple):
+                parts = [f"{col}={val}" for col, val in zip(partition_by, key, strict=True)]
+            else:
+                parts = [f"{partition_by[0]}={key}"]
+            sub = group.drop(columns=partition_by)
+            sub_path = target.joinpath(*parts)
+            sub_path.mkdir(parents=True, exist_ok=True)
+            if format == "parquet":
+                sub.to_parquet(sub_path / "data.parquet", index=False)
+            elif format == "csv":
+                sub.to_csv(sub_path / "data.csv", index=False)
+            else:
+                sub.to_json(sub_path / "data.json", orient="records", lines=True)
+        return df
+
+    if mode == "error" and target.exists():
+        raise DataError(f"refusing to overwrite existing file at {path!r} (mode='error').")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if format == "parquet":
+        df.to_parquet(path, index=False)
+    elif format == "csv":
+        df.to_csv(path, index=False)
+    else:
+        df.to_json(path, orient="records", lines=True)
+    return df

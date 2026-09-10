@@ -20,6 +20,8 @@ from emergentflow.data.warehouse.protocol import (
     CostEstimate,
     QueryRequest,
     QueryResult,
+    WriteRequest,
+    WriteResult,
 )
 
 
@@ -167,5 +169,61 @@ class DuckDBAdapter:
             df["schema"] = schema
             df["table"] = relation
             return df[list(RELATION_SCHEMA_COLUMNS)]
+        finally:
+            conn.close()
+
+    def write(
+        self,
+        request: WriteRequest,
+        df: pd.DataFrame,
+        credentials: Mapping[str, str],
+    ) -> WriteResult:
+        """Write *df* to *request.table* per the request's mode (issue #164 Gap 6).
+
+        ``"append"`` appends rows (creating/registering the table if absent);
+        ``"truncate"`` drops the table if present and recreates it from *df*;
+        ``"error"`` refuses when the table already exists. Requires a writable
+        connection (a file-backed DuckDB is opened read-write for the write).
+        """
+        import time
+
+        start = time.monotonic()
+        path = credentials.get("path")
+        if path and path != ":memory:":
+            conn = duckdb.connect(path, read_only=False)
+        else:
+            conn = duckdb.connect(":memory:", read_only=False)
+
+        table = request.table
+        try:
+            exists = (
+                len(
+                    conn.execute(
+                        "SELECT 1 FROM information_schema.tables "
+                        f"WHERE table_name = '{_escape_literal(table)}'"
+                    ).fetchall()
+                )
+                > 0
+            )
+            if request.mode == "error" and exists:
+                raise RuntimeError(
+                    f"table {table!r} already exists (mode='error'); pass mode='append' or "
+                    "'truncate' to write anyway."
+                )
+            if request.mode == "truncate" and exists:
+                conn.execute(f"DROP TABLE {table}")
+                exists = False
+            if not exists:
+                conn.execute(f"CREATE TABLE {table} AS SELECT * FROM df")
+            else:
+                conn.execute(f"INSERT INTO {table} SELECT * FROM df")
+            elapsed_ms = (time.monotonic() - start) * 1000
+            return WriteResult(
+                table=table,
+                mode=request.mode,
+                rows_written=len(df),
+                dialect="duckdb",
+                elapsed_ms=elapsed_ms,
+            )
         finally:
             conn.close()

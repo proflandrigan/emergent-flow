@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib.util
+import inspect
 import json
 import sys
 import time
@@ -64,6 +65,7 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import (
     GridSearchCV,
+    GroupKFold,
     GroupShuffleSplit,
     RandomizedSearchCV,
     StratifiedGroupKFold,
@@ -72,6 +74,7 @@ from sklearn.model_selection import (
 from sklearn.model_selection import cross_validate as _sk_cross_validate
 from sklearn.model_selection import train_test_split as _sk_split
 from sklearn.pipeline import Pipeline as _SkPipeline
+from sklearn.utils.multiclass import type_of_target
 from tqdm import tqdm
 
 from emergentflow import __version__
@@ -82,6 +85,7 @@ from emergentflow.ml.errors import (
     MissingOptionalDependencyError,
     ModelPersistenceError,
     UnknownEstimatorError,
+    UnsupportedEstimatorOptionError,
 )
 from emergentflow.ml.registry import get_estimator_spec, keys_for_archetype
 
@@ -285,6 +289,7 @@ def train_classifier(
     features: list[str] | None = None,
     test_size: float = 0.25,
     random_state: int = 0,
+    weight_col: str | None = None,
 ) -> ClassifierResult:
     """Train a logistic-regression classifier and return inspectable metrics.
 
@@ -305,12 +310,21 @@ def train_classifier(
     X = df[feature_names]
     y = df[target]
 
-    X_train, X_test, y_train, y_test = _sk_split(
-        X, y, test_size=test_size, random_state=random_state
-    )
+    logreg = LogisticRegression(max_iter=1000, random_state=random_state)
+    sample_weight = _resolve_sample_weight(df, weight_col, est=logreg)
+    if sample_weight is not None:
+        X_train, X_test, y_train, y_test, w_train, _w_test = _sk_split(
+            X, y, sample_weight, test_size=test_size, random_state=random_state
+        )
+    else:
+        X_train, X_test, y_train, y_test = _sk_split(
+            X, y, test_size=test_size, random_state=random_state
+        )
+        w_train = None
 
     model = LogisticRegression(max_iter=1000, random_state=random_state)
-    model.fit(X_train, y_train)
+    fit_kwargs = {"sample_weight": w_train} if w_train is not None else {}
+    model.fit(X_train, y_train, **fit_kwargs)
 
     acc = float(accuracy_score(y_test, model.predict(X_test)))
 
@@ -330,6 +344,7 @@ def train_regressor(
     *,
     target: str,
     features: list[str] | None = None,
+    weight_col: str | None = None,
 ) -> FittedModel:
     """Fit a linear-regression model and return a :class:`FittedModel`.
 
@@ -350,7 +365,10 @@ def train_regressor(
     X = df[feature_names]
     y = df[target]
 
-    est = LinearRegression().fit(X, y)
+    est = LinearRegression()
+    sample_weight = _resolve_sample_weight(df, weight_col, est=est)
+    fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
+    est.fit(X, y, **fit_kwargs)
     return FittedModel(
         estimator_type="LinearRegression",
         task="regression",
@@ -369,6 +387,7 @@ def train_random_forest(
     task: str = "classification",
     n_estimators: int = 100,
     random_state: int = 0,
+    weight_col: str | None = None,
 ) -> FittedModel:
     """Fit a random-forest model and return a :class:`FittedModel`.
 
@@ -392,7 +411,10 @@ def train_random_forest(
     y = df[target]
 
     cls = RandomForestClassifier if task == "classification" else RandomForestRegressor
-    est = cls(n_estimators=n_estimators, random_state=random_state).fit(X, y)
+    est = cls(n_estimators=n_estimators, random_state=random_state)
+    sample_weight = _resolve_sample_weight(df, weight_col, est=est)
+    fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
+    est.fit(X, y, **fit_kwargs)
     return FittedModel(
         estimator_type=type(est).__name__,
         task=task,
@@ -797,6 +819,39 @@ def _resolve_features_for_fit(
     return feature_names
 
 
+def _resolve_sample_weight(
+    df: pd.DataFrame, weight_col: str | None, est: Any | None = None
+) -> pd.Series | None:
+    """Validate *weight_col* and return it as a Series, or ``None`` when unset.
+
+    When *weight_col* is set, it must name an existing column whose values are
+    finite and non-negative; when *est* is given, ``est.fit`` must accept a
+    ``sample_weight`` parameter (or ``**kwargs``). Raises ``ValueError`` or
+    :class:`~emergentflow.ml.errors.UnsupportedEstimatorOptionError` otherwise.
+    """
+    if weight_col is None:
+        return None
+    if weight_col not in df.columns:
+        raise ValueError(
+            f"unknown weight_col {weight_col!r}; expected one of {list(df.columns)!r}."
+        )
+    w = df[weight_col]
+    if not np.isfinite(w.to_numpy(dtype=float)).all():
+        raise ValueError("weight_col must be finite (no NaN or infinite values).")
+    if (w < 0).any():
+        raise ValueError("weight_col must be non-negative.")
+    if est is not None:
+        params = inspect.signature(est.fit).parameters
+        if "sample_weight" not in params and not any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()
+        ):
+            raise UnsupportedEstimatorOptionError(
+                f"{getattr(est, '__class__', type(est)).__name__!r} does not accept "
+                "sample_weight; drop weight_col or choose a weight-aware estimator."
+            )
+    return w
+
+
 def _resolve_estimator_and_kwargs(
     estimator: str, params: dict[str, Any] | None
 ) -> tuple[Any, dict[str, Any]]:
@@ -850,6 +905,7 @@ def fit_estimator(
     target: str | None = None,
     features: list[str] | None = None,
     params: dict[str, Any] | None = None,
+    weight_col: str | None = None,
 ) -> FittedModel | FittedTransformer:
     """Fit a curated, allow-listed sklearn estimator and return an inspectable fitted wrapper.
 
@@ -888,13 +944,22 @@ def fit_estimator(
         if target not in df.columns:
             raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
         feature_names = _resolve_features_for_fit(df, features, target=target)
-        est = spec.sklearn_class(**kwargs).fit(df[feature_names], df[target])
+        est = spec.sklearn_class(**kwargs)
+        sample_weight = _resolve_sample_weight(df, weight_col, est=est)
+        fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
+        est.fit(df[feature_names], df[target], **fit_kwargs)
         return FittedModel(
             estimator_type=spec.key,
             task=spec.task or "classification",
             feature_names=list(feature_names),
             target=target,
             estimator=est,
+        )
+
+    if weight_col is not None and spec.archetype != "fit":
+        raise ValueError(
+            f"weight_col is only supported for fit-archetype (supervised) estimators; "
+            f"{estimator!r} is a {spec.archetype}-archetype estimator."
         )
 
     if spec.archetype == "cluster_detect":
@@ -1168,6 +1233,7 @@ def grid_search(
     features: list[str] | None = None,
     cv: int = 5,
     scoring: str | None = None,
+    weight_col: str | None = None,
 ) -> tuple[FittedModel, pd.DataFrame]:
     """Search ``param_grid`` for a curated, ``fit``-archetype (supervised) estimator.
 
@@ -1209,10 +1275,11 @@ def grid_search(
         raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
 
     feature_names = _resolve_features_for_fit(df, features, target=target)
-    grid = GridSearchCV(
-        spec.sklearn_class(**base_kwargs), param_grid=param_grid, cv=cv, scoring=scoring
-    )
-    grid.fit(df[feature_names], df[target])
+    base_est = spec.sklearn_class(**base_kwargs)
+    sample_weight = _resolve_sample_weight(df, weight_col, est=base_est)
+    grid = GridSearchCV(base_est, param_grid=param_grid, cv=cv, scoring=scoring)
+    grid_fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
+    grid.fit(df[feature_names], df[target], **grid_fit_kwargs)
 
     model = FittedModel(
         estimator_type=spec.key,
@@ -1247,6 +1314,7 @@ def tune_model(
     cv: int = 5,
     scoring: str | None = None,
     random_state: int = 0,
+    weight_col: str | None = None,
 ) -> tuple[FittedModel, pd.DataFrame]:
     """Randomized hyperparameter search over a curated, ``fit``-archetype (supervised) estimator.
 
@@ -1290,15 +1358,18 @@ def tune_model(
         raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
 
     feature_names = _resolve_features_for_fit(df, features, target=target)
+    base_est = spec.sklearn_class(**base_kwargs)
+    sample_weight = _resolve_sample_weight(df, weight_col, est=base_est)
     grid = RandomizedSearchCV(
-        spec.sklearn_class(**base_kwargs),
+        base_est,
         param_distributions=param_distributions,
         n_iter=n_iter,
         cv=cv,
         scoring=scoring,
         random_state=random_state,
     )
-    grid.fit(df[feature_names], df[target])
+    grid_fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
+    grid.fit(df[feature_names], df[target], **grid_fit_kwargs)
 
     model = FittedModel(
         estimator_type=spec.key,
@@ -1333,6 +1404,7 @@ def cross_validate(
     scoring: str | None = None,
     cv_strategy: str = "kfold",
     group_col: str | None = None,
+    weight_col: str | None = None,
 ) -> pd.DataFrame:
     """Cross-validate a curated, ``fit``-archetype (supervised) estimator on ``df``.
 
@@ -1349,7 +1421,10 @@ def cross_validate(
     missing from ``df``.
 
     Returns a NEW, tidy DataFrame, one row per fold, with columns ``fold`` (0-indexed),
-    ``test_score``, ``fit_time``, ``score_time``. ``df`` is never mutated.
+    ``test_score``, ``fit_time``, ``score_time``. When ``cv_strategy="grouped"`` the
+    chosen splitter is reported in an additional ``splitter`` column
+    (``"StratifiedGroupKFold"`` for binary/multiclass targets,
+    ``"GroupKFold"`` for continuous ones). ``df`` is never mutated.
     """
     spec, kwargs = _resolve_estimator_and_kwargs(estimator, params)
     if spec.archetype != "fit":
@@ -1362,6 +1437,8 @@ def cross_validate(
 
     feature_names = _resolve_features_for_fit(df, features, target=target)
     est = spec.sklearn_class(**kwargs)
+    sample_weight = _resolve_sample_weight(df, weight_col, est=est)
+    cv_params = {"sample_weight": sample_weight} if sample_weight is not None else {}
     if cv_strategy not in ("kfold", "grouped", "temporal"):
         raise ValueError(
             f"unknown cv_strategy {cv_strategy!r}; expected 'kfold', 'grouped', or 'temporal'."
@@ -1370,7 +1447,15 @@ def cross_validate(
     if cv_strategy == "grouped":
         if not group_col or group_col not in df.columns:
             raise ValueError(f"group_col {group_col!r} must be a valid column for grouped CV.")
-        cv_obj = StratifiedGroupKFold(n_splits=cv, shuffle=True, random_state=0)
+        # StratifiedGroupKFold requires a discrete target; fall back to GroupKFold for
+        # continuous targets so grouped CV is available to every fit-archetype estimator
+        # (issue #164 Bug 2).
+        if type_of_target(df[target]) in ("binary", "multiclass"):
+            cv_obj = StratifiedGroupKFold(n_splits=cv, shuffle=True, random_state=0)
+            splitter_name = "StratifiedGroupKFold"
+        else:
+            cv_obj = GroupKFold(n_splits=cv)
+            splitter_name = "GroupKFold"
         cv_result = _sk_cross_validate(
             est,
             df[feature_names],
@@ -1378,6 +1463,7 @@ def cross_validate(
             cv=cv_obj,
             scoring=scoring,
             groups=df[group_col],
+            params=cv_params,
         )
     elif cv_strategy == "temporal":
         cv_obj = TimeSeriesSplit(n_splits=cv)
@@ -1387,11 +1473,19 @@ def cross_validate(
             df[target],
             cv=cv_obj,
             scoring=scoring,
+            params=cv_params,
         )
     else:
-        cv_result = _sk_cross_validate(est, df[feature_names], df[target], cv=cv, scoring=scoring)
+        cv_result = _sk_cross_validate(
+            est,
+            df[feature_names],
+            df[target],
+            cv=cv,
+            scoring=scoring,
+            params=cv_params,
+        )
 
-    return pd.DataFrame(
+    result = pd.DataFrame(
         {
             "fold": list(range(len(cv_result["test_score"]))),
             "test_score": cv_result["test_score"],
@@ -1399,6 +1493,9 @@ def cross_validate(
             "score_time": cv_result["score_time"],
         }
     )
+    if cv_strategy == "grouped":
+        result["splitter"] = splitter_name
+    return result
 
 
 @public_op(name="ef.ml.compare_models")

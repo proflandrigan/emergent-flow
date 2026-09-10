@@ -24,6 +24,9 @@ from emergentflow.data.warehouse.protocol import (
     QueryResult,
     QueryTimeoutError,
     WarehouseAdapter,
+    WriteNotEnabledError,
+    WriteRequest,
+    WriteResult,
     dry_run_result,
     enforce_byte_scan_cap,
 )
@@ -114,3 +117,16 @@ class AdapterWarehouseClient:
         return self._adapter_for(profile.dialect).describe_relation(
             credentials, relation, database=database, schema=schema
         )
+
+    def write(self, request: WriteRequest, df: pd.DataFrame) -> WriteResult:
+        """Write *df* to the target table, gated on the profile's ``write_enabled``.
+
+        ADR 0018 defaults connections to read-only; this is the single gate that
+        enforces it for the write path. A profile without ``write_enabled`` raises
+        :class:`WriteNotEnabledError` naming the exact setting to change; a resolved,
+        explicitly-writable profile delegates the write to its dialect adapter.
+        """
+        profile, credentials = self._resolve(request.connection)
+        if not profile.write_enabled:
+            raise WriteNotEnabledError(request.connection)
+        return self._adapter_for(profile.dialect).write(request, df, credentials)

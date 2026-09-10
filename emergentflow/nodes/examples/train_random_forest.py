@@ -31,7 +31,7 @@ class TrainRandomForest(NodeDefinition):
     """Fit a random-forest classifier or regressor and return a FittedModel."""
 
     type = "ml.train_random_forest"
-    version = 1
+    version = 2
     family = "ml"
     label = "Train Random Forest"
     category = "Machine Learning"
@@ -70,6 +70,14 @@ class TrainRandomForest(NodeDefinition):
             hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
+            name="weight_col",
+            type_token="str",
+            default=None,
+            label="Weights column",
+            help="Optional column of per-row sample weights forwarded to the fit.",
+            hints=ValidationHints(widget="column"),
+        ),
+        ParamSpec(
             name="task",
             type_token="str",
             default="classification",
@@ -95,7 +103,7 @@ class TrainRandomForest(NodeDefinition):
         ),
     ]
 
-    def _args(self, node: Node) -> tuple[str, list[str] | None, str, int, int]:
+    def _args(self, node: Node) -> tuple[str, list[str] | None, str, int, int, str | None]:
         values = {p.name: p.value for p in node.params}
         target = values.get("target")
         features = values.get("features")
@@ -106,27 +114,31 @@ class TrainRandomForest(NodeDefinition):
         random_state = values.get("random_state", 0)
         if random_state is None:
             random_state = 0
+        weight_col = values.get("weight_col")
         return (
             cast(str, target),
             cast("list[str] | None", features),
             cast(str, task),
             cast(int, n_estimators),
             cast(int, random_state),
+            cast("str | None", weight_col),
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        target, features, task, n_estimators, random_state = self._args(node)
+        target, features, task, n_estimators, random_state, weight_col = self._args(node)
+        codegen_weight = f", weight_col={weight_col!r}" if weight_col else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('model')} = ef.ml.train_random_forest("
                 f"{ctx.in_var('frame')}, target={target!r}, features={features!r}, "
-                f"task={task!r}, n_estimators={n_estimators!r}, random_state={random_state!r})"
+                f"task={task!r}, n_estimators={n_estimators!r}, random_state={random_state!r}"
+                f"{codegen_weight})"
             ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        target, features, task, n_estimators, random_state = self._args(node)
+        target, features, task, n_estimators, random_state, weight_col = self._args(node)
         return {
             "model": train_random_forest(
                 inputs["frame"],
@@ -135,5 +147,6 @@ class TrainRandomForest(NodeDefinition):
                 task=task,
                 n_estimators=n_estimators,
                 random_state=random_state,
+                weight_col=weight_col,
             )
         }

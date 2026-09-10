@@ -19,6 +19,9 @@ from emergentflow.data.warehouse.protocol import (
     MissingDriverError,
     QueryRequest,
     QueryResult,
+    WriteNotEnabledError,
+    WriteRequest,
+    WriteResult,
 )
 
 try:
@@ -173,3 +176,11 @@ class BigQueryAdapter:
                 }
             )
         return pd.DataFrame(rows, columns=list(RELATION_SCHEMA_COLUMNS))
+
+    def write(
+        self,
+        request: WriteRequest,
+        df: pd.DataFrame,
+        credentials: Mapping[str, str],
+    ) -> WriteResult:
+        raise WriteNotEnabledError(request.connection)

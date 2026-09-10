@@ -287,3 +287,25 @@ register_type(
         supertypes=("DataFrame",),
     )
 )
+register_type(
+    TypeDef(
+        token="PropensityResult",
+        description=(
+            "The structured result of ef.causal.fit_propensity (issue #164 Gap 1): per-row "
+            "propensity scores and IPW/ATT weights, a per-covariate balance table, an "
+            "overlap/common-support summary, and Kish effective sample sizes. A record, not "
+            "a DataFrame -- the balance table is exposed separately on the node's 'balance' "
+            "OUT port."
+        ),
+    )
+)
+register_type(
+    TypeDef(
+        token="IRTResult",
+        description=(
+            "The structured result of ef.psychometrics.fit_irt (issue #164 Gap 3): per-subject "
+            "ability estimates (theta + SE), per-item difficulty/discrimination/guessing, and "
+            "per-item infit/outfit fit statistics. A record, not a DataFrame."
+        ),
+    )
+)

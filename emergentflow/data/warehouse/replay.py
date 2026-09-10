@@ -32,6 +32,8 @@ from emergentflow.data.warehouse.protocol import (
     FixtureMissError,
     QueryRequest,
     QueryResult,
+    WriteRequest,
+    WriteResult,
     dry_run_result,
     enforce_byte_scan_cap,
 )
@@ -365,3 +367,15 @@ class ReplayWarehouseClient:
             )
         payload = json.loads(path.read_text())
         return _frame_from_dict(payload)
+
+    def write(self, request: WriteRequest, df: pd.DataFrame) -> WriteResult:
+        """Refuse writes: a replay client never performs a real warehouse write.
+
+        The equivalence / test seam must not silently pretend a write happened. This
+        deliberately raises :class:`WriteNotEnabledError` (a read-only-style refusal)
+        so a graph that reaches a write against a replay client fails loudly instead of
+        producing a fake success the ADR-0002 gate would then compare, invalid.
+        """
+        from emergentflow.data.warehouse.protocol import WriteNotEnabledError
+
+        raise WriteNotEnabledError(request.connection)

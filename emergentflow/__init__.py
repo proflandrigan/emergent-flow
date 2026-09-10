@@ -35,6 +35,8 @@ _LAZY_FAMILIES = frozenset(
         "timeseries",
         "recommend",
         "research",
+        "causal",
+        "psychometrics",
     }
 )
 
@@ -69,6 +71,7 @@ _LAZY_ENTRY_POINTS = {
 
 if TYPE_CHECKING:  # let type-checkers resolve ef.data, ef.codegen, ... statically
     from emergentflow import (
+        causal,
         clean,
         codegen,
         data,
@@ -77,6 +80,7 @@ if TYPE_CHECKING:  # let type-checkers resolve ef.data, ef.codegen, ... statical
         explain,
         llm,
         ml,
+        psychometrics,
         recommend,
         reports,
         research,
@@ -114,6 +118,8 @@ __all__ = [
     "recommend",
     "reports",
     "research",
+    "causal",
+    "psychometrics",
     "script",
     "llm",
     "eval",

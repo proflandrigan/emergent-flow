@@ -170,6 +170,64 @@ def dry_run_result(estimate: CostEstimate) -> QueryResult:
     )
 
 
+@dataclasses.dataclass(frozen=True)
+class WriteRequest:
+    """A pure, JSON-native description of one warehouse table write (issue #164 Gap 6).
+
+    Mirrors ``QueryRequest``: carries a connection-profile **name** only, never a
+    credential (ADR 0018 secrets rule). The DataFrame being written is NOT part of
+    this request — it is passed separately to ``WarehouseClient.write`` so the
+    request stays JSON-native and hashable (and the write path stays a single
+    delegated effect, exactly like ``query``).
+
+    Attributes
+    ----------
+    table: the target table name (optionally ``schema.table``).
+    mode: ``"append"`` (default), ``"truncate"`` (drop + recreate), or ``"error"``
+        (refuse if the table already exists).
+    dialect: the sqlglot dialect key the target warehouse speaks.
+    connection: the connection-profile **name**.
+    """
+
+    table: str
+    dialect: str
+    connection: str
+    mode: str = "append"
+
+
+@dataclasses.dataclass(frozen=True)
+class WriteResult:
+    """The inspectable result of one warehouse table write (issue #164 Gap 6).
+
+    JSON-native and inspectable: ``table``, ``mode``, ``rows_written``, ``dialect``,
+    and ``elapsed_ms``. Never holds a live connection or cursor.
+    """
+
+    table: str
+    mode: str
+    rows_written: int
+    dialect: str
+    elapsed_ms: float | None = None
+
+
+class WriteNotEnabledError(RuntimeError):
+    """Raised when a write is attempted against a read-only connection profile.
+
+    ADR 0018 defaults every connection profile to read-only; a write requires the
+    profile's ``write_enabled`` flag to be set. The message names the profile and the
+    exact setting to change, so a user is never left guessing why the write was refused.
+    """
+
+    def __init__(self, connection: str) -> None:
+        self.connection = connection
+        super().__init__(
+            f"connection profile {connection!r} is read-only (ADR 0018); warehouse writes "
+            f"require the profile's `write_enabled = true` setting. Edit "
+            f"~/.config/emergentflow/connections.toml (or set EMERGENTFLOW_CONNECTIONS) "
+            f"to enable writes for this profile."
+        )
+
+
 #: Standard column order for the tidy schema frames returned by
 #: ``WarehouseClient.list_relations`` / ``describe_relation`` (Story 7 fills these
 #: in concretely). Kept here so the frame shape is defined in one place.
@@ -306,6 +364,15 @@ class WarehouseClient(Protocol):
         """
         ...
 
+    def write(self, request: WriteRequest, df: pd.DataFrame) -> WriteResult:
+        """Write *df* to the target table per *request* (issue #164 Gap 6).
+
+        The single delegated effect for warehouse writes, mirroring ``run``. A
+        read-only connection profile raises :class:`WriteNotEnabledError`; the
+        underlying adapter performs the write.
+        """
+        ...
+
 
 @runtime_checkable
 class WarehouseAdapter(Protocol):
@@ -348,4 +415,18 @@ class WarehouseAdapter(Protocol):
     ) -> pd.DataFrame:
         """Return a tidy column-schema frame for *relation*, optionally scoped to
         *database*/*schema* to disambiguate a same-named relation elsewhere."""
+        ...
+
+    def write(
+        self,
+        request: WriteRequest,
+        df: pd.DataFrame,
+        credentials: Mapping[str, str],
+    ) -> WriteResult:
+        """Write *df* to the target table per *request* (issue #164 Gap 6).
+
+        ``mode`` is ``"append"`` (default), ``"truncate"`` (drop + recreate), or
+        ``"error"`` (refuse if the table exists). Adapters that do not support
+        writes raise :class:`WriteNotEnabledError`.
+        """
         ...

@@ -2199,6 +2199,555 @@
   "nodes": [
     {
       "advisor_persona": null,
+      "category": "Causal Inference",
+      "column_effect": null,
+      "description": "TWFE difference-in-differences with cluster-robust SEs and pre-trend test.",
+      "family": "causal",
+      "keywords": [],
+      "label": "Diff-in-Diff",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Continuous outcome column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Outcome column",
+          "name": "outcome",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column naming the panel's units (subject, school, ...).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Unit column",
+          "name": "unit_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column naming the time periods.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Time column",
+          "name": "time_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Binary column: units ever treated.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Treated column",
+          "name": "treated_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Binary column: post-treatment periods.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Post column",
+          "name": "post_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional additional adjustment regressors.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Covariates",
+          "name": "covariates",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Columns to cluster SEs over; defaults to unit_col.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Cluster column",
+          "name": "cluster_col",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Panel DataFrame: one row per unit per period.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "One-row frame: estimate, CIs, p-value, counts, and the pre-trend test.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "causal.did",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Causal Inference",
+      "column_effect": null,
+      "description": "ATE estimation via IPW/AIPW/matching/regression adjustment.",
+      "family": "causal",
+      "keywords": [],
+      "label": "Estimate Effect",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Continuous outcome column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Outcome column",
+          "name": "outcome",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Binary (0/1 or True/False) column naming treated units.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Treatment column",
+          "name": "treatment",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Adjustment-set columns; non-numeric are one-hot encoded.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Covariates",
+          "name": "covariates",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "aipw",
+          "help": "Effect estimator: ipw, aipw, matching, or regression_adjust.",
+          "hints": {
+            "choices": [
+              "aipw",
+              "ipw",
+              "matching",
+              "regression_adjust"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Method",
+          "name": "method",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional column to cluster-robust inference over (e.g. subject id).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Cluster column",
+          "name": "cluster_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 0,
+          "help": ">0 runs a bootstrap (cluster bootstrap when cluster_col is set).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Bootstrap resamples",
+          "name": "n_boot",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame with outcome, binary treatment, and covariates.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "One-row frame: estimate, std_err, ci_low, ci_high, p_value, method.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "causal.estimate_effect",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Causal Inference",
+      "column_effect": null,
+      "description": "Fit a propensity model; report IPW weights and balance diagnostics.",
+      "family": "causal",
+      "keywords": [],
+      "label": "Fit Propensity",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Binary (0/1 or True/False) column naming treated units.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Treatment column",
+          "name": "treatment",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Adjustment-set columns; non-numeric are one-hot encoded.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Covariates",
+          "name": "covariates",
+          "required": true,
+          "type_token": "list[str]"
+        },
+        {
+          "default": "LogisticRegression",
+          "help": "Propensity model estimator.",
+          "hints": {
+            "choices": [
+              "LogisticRegression"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Estimator",
+          "name": "estimator",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": [
+            0.01,
+            0.99
+          ],
+          "help": "Propensity-score support to winsorize weights to, or [] for none.",
+          "hints": null,
+          "label": "Trim",
+          "name": "trim",
+          "required": false,
+          "type_token": "list[float]"
+        },
+        {
+          "default": "ATE",
+          "help": "Weight scheme: 'ATE' (IPW) or 'ATT'.",
+          "hints": {
+            "choices": [
+              "ATE",
+              "ATT"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Effect",
+          "name": "effect",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame with the binary treatment and covariates.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "PropensityResult",
+          "direction": "out",
+          "help": "Fitted scores, IPW/ATT weights, and summary diagnostics.",
+          "label": null,
+          "name": "result",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "Per-covariate standardized mean difference + variance ratio before/after weighting.",
+          "label": null,
+          "name": "balance",
+          "required": true
+        }
+      ],
+      "type": "causal.fit_propensity",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Causal Inference",
+      "column_effect": null,
+      "description": "E-value: how strong must unmeasured confounding be to explain the estimate?",
+      "family": "causal",
+      "keywords": [],
+      "label": "Sensitivity",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "e_value",
+          "help": "Sensitivity method; the MVP implements 'e_value'.",
+          "hints": {
+            "choices": [
+              "e_value"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Method",
+          "name": "method",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional direct risk ratio; overrides the effect frame's estimate.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Risk ratio",
+          "name": "risk_ratio",
+          "required": false,
+          "type_token": "float"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The one-row effect frame from causal.estimate_effect (with 'estimate').",
+          "label": "Effect",
+          "name": "effect",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "One-row frame with point_evalue and bound_evalue.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "causal.sensitivity",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "Transform",
       "column_effect": {
         "detail": null,
@@ -6282,6 +6831,130 @@
     },
     {
       "advisor_persona": null,
+      "category": "Export",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
+      "description": "Write the input DataFrame to parquet/csv/json and pass it through.",
+      "family": "data",
+      "keywords": [],
+      "label": "Save Frame",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "File or (with partition_by) directory path to write to.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Output path",
+          "name": "path",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "parquet",
+          "help": "parquet (default), csv, or json.",
+          "hints": {
+            "choices": [
+              "parquet",
+              "csv",
+              "json"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Format",
+          "name": "format",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "overwrite",
+          "help": "overwrite (default) or error (refuse to clobber an existing file).",
+          "hints": {
+            "choices": [
+              "overwrite",
+              "error"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Mode",
+          "name": "mode",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional columns to write a Hive-partitioned directory by.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Partition by",
+          "name": "partition_by",
+          "required": false,
+          "type_token": "list[str]"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame to persist.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The same DataFrame, unchanged (chainable pass-through).",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "data.save_frame",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
       "category": "Ingest",
       "column_effect": null,
       "description": "Run a raw SQL query against a warehouse connection and return a DataFrame.",
@@ -6418,6 +7091,127 @@
       ],
       "type": "data.sql_query",
       "version": 3
+    },
+    {
+      "advisor_persona": null,
+      "category": "Export",
+      "column_effect": {
+        "detail": null,
+        "kind": "passthrough"
+      },
+      "description": "Materialize the input DataFrame as a warehouse table (write-enabled profile).",
+      "family": "data",
+      "keywords": [],
+      "label": "Write Table",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Target table (optionally schema.table).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Table",
+          "name": "table",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Connection profile name (must have write_enabled=true).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Connection",
+          "name": "connection",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "sqlglot dialect key (duckdb, postgres, ...).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Dialect",
+          "name": "dialect",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "append",
+          "help": "append (default), truncate (drop+recreate), or error (refuse if exists).",
+          "hints": {
+            "choices": [
+              "append",
+              "truncate",
+              "error"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Mode",
+          "name": "mode",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "The input DataFrame to materialize.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "The same DataFrame, unchanged (chainable pass-through).",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "data.write_table",
+      "version": 1
     },
     {
       "advisor_persona": null,
@@ -8580,6 +9374,26 @@
           "name": "group_col",
           "required": false,
           "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional column of per-row sample weights forwarded to the fit.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Weights column",
+          "name": "weight_col",
+          "required": false,
+          "type_token": "str"
         }
       ],
       "ports": [
@@ -8603,7 +9417,7 @@
         }
       ],
       "type": "ml.cross_validate",
-      "version": 2
+      "version": 3
     },
     {
       "advisor_persona": null,
@@ -8949,6 +9763,26 @@
           "type_token": "list[str]"
         },
         {
+          "default": null,
+          "help": "Optional column of per-row sample weights forwarded to the fit.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Weights column",
+          "name": "weight_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
           "default": {},
           "help": "Constructor kwargs for the chosen estimator (allow-listed per estimator).",
           "hints": null,
@@ -8979,7 +9813,7 @@
         }
       ],
       "type": "ml.fit_estimator",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -9227,6 +10061,26 @@
           "type_token": "list[str]"
         },
         {
+          "default": null,
+          "help": "Optional column of per-row sample weights forwarded to the fit.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Weights column",
+          "name": "weight_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
           "default": 5,
           "help": "Number of cross-validation folds.",
           "hints": null,
@@ -9275,7 +10129,7 @@
         }
       ],
       "type": "ml.grid_search",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -10133,6 +10987,26 @@
           "type_token": "list[str]"
         },
         {
+          "default": null,
+          "help": "Optional column of per-row sample weights forwarded to the fit.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Weights column",
+          "name": "weight_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
           "default": 0.25,
           "help": "Fraction of rows held out for evaluation.",
           "hints": {
@@ -10194,7 +11068,7 @@
         }
       ],
       "type": "ml.train_classifier",
-      "version": 2
+      "version": 3
     },
     {
       "advisor_persona": null,
@@ -10245,6 +11119,26 @@
           "name": "features",
           "required": false,
           "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional column of per-row sample weights forwarded to the fit.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Weights column",
+          "name": "weight_col",
+          "required": false,
+          "type_token": "str"
         },
         {
           "default": "classification",
@@ -10331,7 +11225,7 @@
         }
       ],
       "type": "ml.train_random_forest",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -10382,6 +11276,26 @@
           "name": "features",
           "required": false,
           "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional column of per-row sample weights forwarded to the fit.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Weights column",
+          "name": "weight_col",
+          "required": false,
+          "type_token": "str"
         }
       ],
       "ports": [
@@ -10405,7 +11319,7 @@
         }
       ],
       "type": "ml.train_regressor",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -10751,6 +11665,26 @@
           "type_token": "list[str]"
         },
         {
+          "default": null,
+          "help": "Optional column of per-row sample weights forwarded to the fit.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Weights column",
+          "name": "weight_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
           "default": 10,
           "help": "Number of parameter-distribution samples to evaluate.",
           "hints": null,
@@ -10808,7 +11742,7 @@
         }
       ],
       "type": "ml.tune_model",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -10977,6 +11911,390 @@
       ],
       "ports": [],
       "type": "notes.markdown",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Psychometrics",
+      "column_effect": null,
+      "description": "Correct an observed correlation for measurement error (attenuation).",
+      "family": "psychometrics",
+      "keywords": [],
+      "label": "Disattenuate",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Observed Pearson correlation between the two measured variables.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Observed correlation",
+          "name": "r",
+          "required": true,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "Reliability of the first variable (Cronbach's alpha, ...), in (0, 1].",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Reliability of X",
+          "name": "reliability_x",
+          "required": true,
+          "type_token": "float"
+        },
+        {
+          "default": 1.0,
+          "help": "Reliability of the second variable, in (0, 1] (default 1.0).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": 1.0,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Reliability of Y",
+          "name": "reliability_y",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "If set, report a 95% CI on the corrected correlation.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 4.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Sample size",
+          "name": "n",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "observed_r, corrected_r, max_attainable_r, attenuation_ratio[, ci_low/ci_high].",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "psychometrics.disattenuate",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Psychometrics",
+      "column_effect": null,
+      "description": "IRT ability estimation (Rasch/2PL/3PL) from item responses.",
+      "family": "psychometrics",
+      "keywords": [],
+      "label": "Fit IRT",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Column naming the subject.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Subject column",
+          "name": "subject_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Column naming the item.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Item column",
+          "name": "item_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Binary (0/1 or True/False) item score column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Score column",
+          "name": "score_col",
+          "required": true,
+          "type_token": "str"
+        },
+        {
+          "default": "rasch",
+          "help": "rasch (discrimination=1), 2pl, or 3pl.",
+          "hints": {
+            "choices": [
+              "rasch",
+              "2pl",
+              "3pl"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Model",
+          "name": "model",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "eap",
+          "help": "EAP (default, robust for extreme scores), MAP, or MLE.",
+          "hints": {
+            "choices": [
+              "eap",
+              "map",
+              "mle"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Ability method",
+          "name": "ability_method",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Long-format responses: one row per subject-item with a binary score.",
+          "label": "Responses",
+          "name": "responses",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "IRTResult",
+          "direction": "out",
+          "help": "Per-subject abilities, per-item parameters, and fit statistics.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "psychometrics.fit_irt",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Psychometrics",
+      "column_effect": null,
+      "description": "Internal-consistency reliability (Cronbach's alpha / KR-20).",
+      "family": "psychometrics",
+      "keywords": [],
+      "label": "Reliability",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": null,
+          "help": "Wide-form item columns; leave unset to pivot long responses.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Item columns",
+          "name": "item_cols",
+          "required": false,
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Long-format subject column (requires score_col).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Subject column",
+          "name": "subject_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Long-format item column (requires score_col).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Item column",
+          "name": "item_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Long-format score column.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Score column",
+          "name": "score_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "cronbach_alpha",
+          "help": "cronbach_alpha or kr20.",
+          "hints": {
+            "choices": [
+              "cronbach_alpha",
+              "kr20"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Method",
+          "name": "method",
+          "required": false,
+          "type_token": "str"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "Wide item matrix (one column per item), or long responses with subject/item/score columns.",
+          "label": "Data",
+          "name": "frame",
+          "required": true
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "out",
+          "help": "alpha, kr20, n_items, n_subjects, and alpha_if_dropped per item.",
+          "label": null,
+          "name": "result",
+          "required": true
+        }
+      ],
+      "type": "psychometrics.reliability",
       "version": 1
     },
     {
@@ -14180,7 +15498,7 @@
       "advisor_persona": "researcher",
       "category": "Statistics",
       "column_effect": null,
-      "description": "Fit a Bayesian GLM (optionally hierarchical), via bambi/PyMC, summarized with ArviZ.",
+      "description": "Fit a Bayesian GLM (optionally hierarchical, one random term per grouping level, optional priors), via bambi/PyMC, summarized with ArviZ.",
       "family": "stats",
       "keywords": [],
       "label": "Fit Bayesian Model",
@@ -14248,7 +15566,7 @@
         },
         {
           "default": null,
-          "help": "Grouping-factor column; setting this fits a hierarchical (random-intercept/slope) model.",
+          "help": "Grouping-factor column(s); setting this fits a hierarchical (random-intercept/slope) model, one random term per level.",
           "hints": {
             "choices": null,
             "connection_kind": null,
@@ -14261,10 +15579,19 @@
             "step": null,
             "widget": "column"
           },
-          "label": "Grouping factor",
+          "label": "Grouping factors",
           "name": "groups",
           "required": false,
-          "type_token": "str"
+          "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional bambi prior dict passed to Model(priors=...); leave unset for default priors.",
+          "hints": null,
+          "label": "Prior overrides",
+          "name": "priors",
+          "required": false,
+          "type_token": "dict[str, any]"
         },
         {
           "default": null,
@@ -14350,7 +15677,7 @@
         }
       ],
       "type": "stats.fit_bayesian_model",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": "researcher",
@@ -14721,7 +16048,7 @@
       "advisor_persona": "researcher",
       "category": "Statistics",
       "column_effect": null,
-      "description": "Fit a linear mixed-effects / hierarchical model with random intercepts and slopes, grouped (statsmodels MixedLM).",
+      "description": "Fit a linear mixed-effects / hierarchical model with random intercepts and slopes, grouped (statsmodels MixedLM); nested_groups adds variance-component levels below groups.",
       "family": "stats",
       "keywords": [],
       "label": "Fit Mixed Model",
@@ -14789,7 +16116,7 @@
         },
         {
           "default": null,
-          "help": "Grouping-factor column (e.g. subject/site/region).",
+          "help": "Grouping-factor column (e.g. subject/site/region) -- the outermost level.",
           "hints": {
             "choices": null,
             "connection_kind": null,
@@ -14806,6 +16133,26 @@
           "name": "groups",
           "required": true,
           "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Additional levels nested below `groups`, modelled as variance components (e.g. classroom within school). Cannot be combined with random_effects.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Nested groups",
+          "name": "nested_groups",
+          "required": false,
+          "type_token": "list[str]"
         }
       ],
       "ports": [
@@ -14829,7 +16176,7 @@
         }
       ],
       "type": "stats.fit_mixed_model",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -17012,7 +18359,7 @@
         "detail": null,
         "kind": "passthrough"
       },
-      "description": "Append recency-weighted aggregate columns (linear or exponential decay).",
+      "description": "Append recency-weighted aggregate columns (positional or date-aware decay).",
       "family": "timeseries",
       "keywords": [],
       "label": "Time-Weighted Aggregate",
@@ -17100,6 +18447,94 @@
           "name": "window",
           "required": false,
           "type_token": "int"
+        },
+        {
+          "default": null,
+          "help": "Half-life in `unit` units for date-aware decay (0.5**(delta/half_life)). Unset uses the legacy positional weighting.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Half-life",
+          "name": "half_life",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": "D",
+          "help": "Pandas time unit for the half-life deltas (D, h, m, s, ...).",
+          "hints": {
+            "choices": [
+              "D",
+              "h",
+              "m",
+              "s",
+              "ms",
+              "us",
+              "ns"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Time unit",
+          "name": "unit",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Per-row anchor: a column name or a fixed timestamp string. Defaults to the latest date in each group.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Anchor date",
+          "name": "anchor",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Partition the weighting by this column (per-subject decay).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Group column",
+          "name": "group_col",
+          "required": false,
+          "type_token": "str"
         }
       ],
       "ports": [
@@ -17123,7 +18558,7 @@
         }
       ],
       "type": "timeseries.time_weighted_aggregate",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,

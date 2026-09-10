@@ -28,9 +28,14 @@ from emergentflow.stats.errors import InvalidModelSpecError
 from emergentflow.stats.registry import ModelSpec, get_model_spec
 
 #: Structured-spec fields whose value is a single column name (validated against df.columns).
-_SCALAR_COLUMN_FIELDS = ("target", "groups", "weights")
+#: ``groups`` accepts either a single column name OR a list of column names (one random term
+#: per level in the Bayesian family, issue #164 Gap 2) -- the scalar check's isinstance
+#: guard already co-exists with the list check below.
+_SCALAR_COLUMN_FIELDS = ("target", "weights")
 #: Structured-spec fields whose value is a list of column names.
-_LIST_COLUMN_FIELDS = ("fixed_effects", "random_effects", "linear_terms")
+_LIST_COLUMN_FIELDS = ("fixed_effects", "random_effects", "linear_terms", "nested_groups")
+#: Fields that accept a single column name OR a list of column names.
+_OR_LIST_COLUMN_FIELDS = ("groups",)
 
 
 def _prepare_model_spec(
@@ -80,6 +85,18 @@ def _prepare_model_spec(
                 f"spec {field!r} must be a list of column names, got {type(value).__name__}."
             )
         for col in value or []:
+            if col not in columns:
+                raise InvalidModelSpecError(
+                    f"spec {field!r} references column {col!r}, which is not in the input "
+                    f"frame; available columns: {sorted(columns)!r}."
+                )
+
+    for field in _OR_LIST_COLUMN_FIELDS:
+        value = spec.get(field)
+        if value is None:
+            continue
+        cols = value if isinstance(value, (list, tuple)) else [value]
+        for col in cols:
             if col not in columns:
                 raise InvalidModelSpecError(
                     f"spec {field!r} references column {col!r}, which is not in the input "

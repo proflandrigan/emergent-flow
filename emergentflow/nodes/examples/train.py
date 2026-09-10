@@ -30,7 +30,7 @@ class TrainClassifier(NodeDefinition):
     """Train a logistic-regression classifier and report inspectable metrics."""
 
     type = "ml.train_classifier"
-    version = 2
+    version = 3
     family = "ml"
     label = "Train Classifier"
     category = "Machine Learning"
@@ -69,6 +69,14 @@ class TrainClassifier(NodeDefinition):
             hints=ValidationHints(widget="column"),
         ),
         ParamSpec(
+            name="weight_col",
+            type_token="str",
+            default=None,
+            label="Weights column",
+            help="Optional column of per-row sample weights forwarded to the fit.",
+            hints=ValidationHints(widget="column"),
+        ),
+        ParamSpec(
             name="test_size",
             type_token="float",
             default=0.25,
@@ -86,7 +94,7 @@ class TrainClassifier(NodeDefinition):
         ),
     ]
 
-    def _args(self, node: Node) -> tuple[str, list[str] | None, float, int]:
+    def _args(self, node: Node) -> tuple[str, list[str] | None, float, int, str | None]:
         values = {p.name: p.value for p in node.params}
         target = values.get("target")
         features = values.get("features")
@@ -96,26 +104,29 @@ class TrainClassifier(NodeDefinition):
         random_state = values.get("random_state", 0)
         if random_state is None:
             random_state = 0
+        weight_col = values.get("weight_col")
         return (
             cast(str, target),
             cast("list[str] | None", features),
             cast(float, test_size),
             cast(int, random_state),
+            cast("str | None", weight_col),
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        target, features, test_size, random_state = self._args(node)
+        target, features, test_size, random_state, weight_col = self._args(node)
+        codegen_weight = f", weight_col={weight_col!r}" if weight_col else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('result')} = ef.ml.train_classifier({ctx.in_var('frame')}, "
                 f"target={target!r}, features={features!r}, test_size={test_size!r}, "
-                f"random_state={random_state!r})"
+                f"random_state={random_state!r}{codegen_weight})"
             ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        target, features, test_size, random_state = self._args(node)
+        target, features, test_size, random_state, weight_col = self._args(node)
         return {
             "result": train_classifier(
                 inputs["frame"],
@@ -123,5 +134,6 @@ class TrainClassifier(NodeDefinition):
                 features=features,
                 test_size=test_size,
                 random_state=random_state,
+                weight_col=weight_col,
             )
         }

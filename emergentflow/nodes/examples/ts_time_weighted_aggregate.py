@@ -25,14 +25,14 @@ if TYPE_CHECKING:
 
 @register
 class TsTimeWeightedAggregate(NodeDefinition):
-    """Append recency-weighted aggregate columns (linear or exponential decay)."""
+    """Append recency-weighted aggregate columns (positional or date-aware decay)."""
 
     type = "timeseries.time_weighted_aggregate"
-    version = 1
+    version = 2
     family = "timeseries"
     label = "Time-Weighted Aggregate"
     category = "Time Series"
-    description = "Append recency-weighted aggregate columns (linear or exponential decay)."
+    description = "Append recency-weighted aggregate columns (positional or date-aware decay)."
 
     column_effect = ColumnEffect(kind=ColumnEffectKind.PASSTHROUGH)
 
@@ -87,6 +87,43 @@ class TsTimeWeightedAggregate(NodeDefinition):
             help="Rolling window size. If unset, uses all preceding rows.",
             hints=ValidationHints(min=1),
         ),
+        ParamSpec(
+            name="half_life",
+            type_token="float",
+            default=None,
+            label="Half-life",
+            help="Half-life in `unit` units for date-aware decay (0.5**(delta/half_life)). "
+            "Unset uses the legacy positional weighting.",
+            hints=ValidationHints(min=0, widget="number"),
+        ),
+        ParamSpec(
+            name="unit",
+            type_token="str",
+            default="D",
+            label="Time unit",
+            help="Pandas time unit for the half-life deltas (D, h, m, s, ...).",
+            hints=ValidationHints(
+                choices=cast("list[ParamValue]", ["D", "h", "m", "s", "ms", "us", "ns"]),
+                widget="select",
+            ),
+        ),
+        ParamSpec(
+            name="anchor",
+            type_token="str",
+            default=None,
+            label="Anchor date",
+            help="Per-row anchor: a column name or a fixed timestamp string. "
+            "Defaults to the latest date in each group.",
+            hints=ValidationHints(widget="text"),
+        ),
+        ParamSpec(
+            name="group_col",
+            type_token="str",
+            default=None,
+            label="Group column",
+            help="Partition the weighting by this column (per-subject decay).",
+            hints=ValidationHints(widget="column"),
+        ),
     ]
 
     def _args(self, node: Node) -> dict[str, Any]:
@@ -96,17 +133,28 @@ class TsTimeWeightedAggregate(NodeDefinition):
             "date_col": cast(str, values.get("date_col")),
             "decay": cast(str, values.get("decay", "linear")),
             "window": cast("int | None", values.get("window")),
+            "half_life": cast("float | None", values.get("half_life")),
+            "unit": cast(str, values.get("unit", "D")),
+            "anchor": cast("str | None", values.get("anchor")),
+            "group_col": cast("str | None", values.get("group_col")),
         }
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         args = self._args(node)
+        codegen_half_life = f", half_life={args['half_life']!r}" if args["half_life"] else ""
+        codegen_unit = (
+            f", unit={args['unit']!r}" if (args["half_life"] and args["unit"] != "D") else ""
+        )
+        codegen_anchor = f", anchor={args['anchor']!r}" if args["anchor"] else ""
+        codegen_group = f", group_col={args['group_col']!r}" if args["group_col"] else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('result')} = ef.timeseries.time_weighted_aggregate("
                 f"{ctx.in_var('frame')}, columns={args['columns']!r}, "
                 f"date_col={args['date_col']!r}, decay={args['decay']!r}, "
-                f"window={args['window']!r})"
+                f"window={args['window']!r}{codegen_half_life}{codegen_unit}"
+                f"{codegen_anchor}{codegen_group})"
             ),
         )
 
@@ -119,5 +167,9 @@ class TsTimeWeightedAggregate(NodeDefinition):
                 date_col=args["date_col"],
                 decay=args["decay"],
                 window=args["window"],
+                half_life=args["half_life"],
+                unit=args["unit"],
+                anchor=args["anchor"],
+                group_col=args["group_col"],
             )
         }

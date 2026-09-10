@@ -30,7 +30,7 @@ class TrainRegressor(NodeDefinition):
     """Fit a linear-regression model and return a FittedModel."""
 
     type = "ml.train_regressor"
-    version = 1
+    version = 2
     family = "ml"
     label = "Train Regressor"
     category = "Machine Learning"
@@ -68,33 +68,45 @@ class TrainRegressor(NodeDefinition):
             help="Columns to use as features; empty/unset uses every other column.",
             hints=ValidationHints(widget="column"),
         ),
+        ParamSpec(
+            name="weight_col",
+            type_token="str",
+            default=None,
+            label="Weights column",
+            help="Optional column of per-row sample weights forwarded to the fit.",
+            hints=ValidationHints(widget="column"),
+        ),
     ]
 
-    def _args(self, node: Node) -> tuple[str, list[str] | None]:
+    def _args(self, node: Node) -> tuple[str, list[str] | None, str | None]:
         values = {p.name: p.value for p in node.params}
         target = values.get("target")
         features = values.get("features")
+        weight_col = values.get("weight_col")
         return (
             cast(str, target),
             cast("list[str] | None", features),
+            cast("str | None", weight_col),
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        target, features = self._args(node)
+        target, features, weight_col = self._args(node)
+        codegen_weight = f", weight_col={weight_col!r}" if weight_col else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('model')} = ef.ml.train_regressor({ctx.in_var('frame')}, "
-                f"target={target!r}, features={features!r})"
+                f"target={target!r}, features={features!r}{codegen_weight})"
             ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        target, features = self._args(node)
+        target, features, weight_col = self._args(node)
         return {
             "model": train_regressor(
                 inputs["frame"],
                 target=target,
                 features=features,
+                weight_col=weight_col,
             )
         }

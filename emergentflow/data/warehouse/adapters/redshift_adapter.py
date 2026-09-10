@@ -20,6 +20,9 @@ from emergentflow.data.warehouse.protocol import (
     MissingDriverError,
     QueryRequest,
     QueryResult,
+    WriteNotEnabledError,
+    WriteRequest,
+    WriteResult,
 )
 
 try:
@@ -197,3 +200,11 @@ class RedshiftAdapter:
             return df[list(RELATION_SCHEMA_COLUMNS)]
         finally:
             conn.close()
+
+    def write(
+        self,
+        request: WriteRequest,
+        df: pd.DataFrame,
+        credentials: Mapping[str, str],
+    ) -> WriteResult:
+        raise WriteNotEnabledError(request.connection)

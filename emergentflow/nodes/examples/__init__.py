@@ -24,6 +24,10 @@ from .build_report import BuildReport
 from .calibrate_model import CalibrateModel
 from .callout import CalloutNode
 from .cast_types import CastTypes
+from .causal_did import CausalDid
+from .causal_estimate_effect import CausalEstimateEffect
+from .causal_fit_propensity import CausalFitPropensity
+from .causal_sensitivity import CausalSensitivity
 from .chi_square import ChiSquare
 from .clean_text import CleanText
 from .cluster_detect import ClusterDetect
@@ -118,6 +122,9 @@ from .predict import Predict
 from .prepare_interactions import PrepareInteractions
 from .proportion_confint import ProportionConfint
 from .proportions import TestProportions
+from .psychometrics_disattenuate import PsychometricsDisattenuate
+from .psychometrics_fit_irt import PsychometricsFitIrt
+from .psychometrics_reliability import PsychometricsReliability
 from .query_builder import QueryBuilder
 from .recommend_build_sequences import RecommendBuildSequences
 from .recommend_by_embedding import RecommendByEmbedding
@@ -140,6 +147,7 @@ from .reduce_dimensions import ReduceDimensions
 from .report import GenerateHtmlSummary
 from .reshape import Reshape
 from .sample_rows import SampleRows
+from .save_frame import SaveFrame
 from .save_model import SaveModel
 from .scale_features import ScaleFeatures
 from .seasonal_decompose import SeasonalDecompose
@@ -176,6 +184,7 @@ from .viz_plot_projection import VizPlotProjection
 from .viz_plot_qq import VizPlotQQ
 from .viz_plot_residuals import VizPlotResiduals
 from .wilcoxon import Wilcoxon
+from .write_table import WriteTable
 
 __all__ = [
     "Anova",
@@ -188,6 +197,10 @@ __all__ = [
     "CalibrateModel",
     "CalloutNode",
     "CastTypes",
+    "CausalDid",
+    "CausalEstimateEffect",
+    "CausalFitPropensity",
+    "CausalSensitivity",
     "ChiSquare",
     "CleanText",
     "ClusterDetect",
@@ -284,6 +297,9 @@ __all__ = [
     "ProportionConfint",
     "Predict",
     "PrepareInteractions",
+    "PsychometricsDisattenuate",
+    "PsychometricsFitIrt",
+    "PsychometricsReliability",
     "QueryBuilder",
     "Recommend",
     "RecommendByEmbedding",
@@ -302,6 +318,7 @@ __all__ = [
     "ReduceDimensions",
     "Reshape",
     "SampleRows",
+    "SaveFrame",
     "SaveModel",
     "ScaleFeatures",
     "SeasonalDecompose",
@@ -340,4 +357,5 @@ __all__ = [
     "VizPlotQQ",
     "VizPlotResiduals",
     "Wilcoxon",
+    "WriteTable",
 ]

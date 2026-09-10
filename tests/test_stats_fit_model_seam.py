@@ -206,3 +206,135 @@ def test_missing_optional_dependency_raises_typed_error(monkeypatch):
         from emergentflow.stats import registry as _reg
 
         _reg._REGISTRY.pop("_TestBayesModel", None)
+
+
+def _make_mixedlm_df(seed: int = 0, n_groups: int = 30, per_group: int = 40) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    school = np.repeat(np.arange(n_groups), per_group)
+    u = rng.normal(0, 3, n_groups)[school]
+    x = rng.normal(0, 1, n_groups * per_group)
+    y = 2.0 * x + u + rng.normal(0, 1, n_groups * per_group)
+    return pd.DataFrame(
+        {
+            "y": y,
+            "x": x,
+            "school_id": school.astype(str),
+            "cl": np.tile(np.arange(n_groups * per_group // 10), 10).astype(str),
+        }
+    )
+
+
+def test_mixedlm_rejects_cov_type_at_spec_validation():
+    # MixedLM.fit() has no robust-covariance surface (issue #164 Bug 1); cov_type must be
+    # rejected at spec-validation time, not leak through to statsmodels and die cryptically.
+    df = _make_mixedlm_df()
+    with pytest.raises(InvalidModelSpecError, match="cov_type"):
+        fit_model(
+            df,
+            model="MixedLM",
+            spec={
+                "target": "y",
+                "fixed_effects": ["x"],
+                "groups": "school_id",
+                "cov_type": "cluster",
+                "cov_group": "cl",
+            },
+        )
+
+
+def test_mixedlm_fits_without_cov_type():
+    df = _make_mixedlm_df()
+    fm = fit_model(
+        df,
+        model="MixedLM",
+        spec={"target": "y", "fixed_effects": ["x"], "groups": "school_id"},
+    )
+    assert isinstance(fm, FittedStatsModel)
+    assert fm.model == "MixedLM"
+    assert set(fm.coefficients["term"]) >= {"Intercept", "x"}
+
+
+def test_survival_ops_re_exported_on_ef_stats():
+    # Issue #164 Gap 7: fit_survival/survival_curve live in emergentflow.stats.survival and
+    # must be reachable at ef.stats.* like every other stats op, not raise AttributeError.
+    import emergentflow as ef
+    from emergentflow.stats import fit_survival as _fit_survival
+    from emergentflow.stats import survival_curve as _survival_curve
+
+    assert ef.stats.fit_survival is _fit_survival
+    assert ef.stats.survival_curve is _survival_curve
+
+
+def _make_nested_mixedlm_df(seed: int = 1) -> pd.DataFrame:
+    rng = np.random.default_rng(seed)
+    n_school, rooms_per_school, students_per_room = 12, 8, 20
+    school_ids = np.repeat(np.arange(n_school), rooms_per_school * students_per_room)
+    room_local = np.tile(np.repeat(np.arange(rooms_per_school), students_per_room), n_school)
+    room_ids = school_ids * 100 + room_local
+    u_school = rng.normal(0, 3, n_school)[school_ids]
+    u_room = rng.normal(0, 2, n_school * rooms_per_school)[
+        school_ids * rooms_per_school + room_local
+    ]
+    x = rng.normal(0, 1, len(school_ids))
+    y = 2.0 * x + u_school + u_room + rng.normal(0, 1, len(school_ids))
+    return pd.DataFrame(
+        {
+            "y": y,
+            "x": x,
+            "school": school_ids.astype(str),
+            "room": room_ids.astype(str),
+        }
+    )
+
+
+def test_mixedlm_nested_groups_vc_formula():
+    # Issue #164 Gap 2: nested_groups adds variance-component levels below `groups`.
+    df = _make_nested_mixedlm_df()
+    fm = fit_model(
+        df,
+        model="MixedLM",
+        spec={
+            "target": "y",
+            "fixed_effects": ["x"],
+            "groups": "school",
+            "nested_groups": ["room"],
+        },
+    )
+    assert isinstance(fm, FittedStatsModel)
+    assert set(fm.coefficients["term"]) >= {"Intercept", "x"}
+    level_icc = fm.fit_stats.get("level_icc")
+    assert level_icc is not None
+    assert "room" in level_icc
+    assert "residual" in level_icc
+    assert level_icc["room"] > 0
+
+
+def test_mixedlm_rejects_random_effects_with_nested_groups():
+    df = _make_nested_mixedlm_df()
+    with pytest.raises(InvalidModelSpecError, match="random_effects"):
+        fit_model(
+            df,
+            model="MixedLM",
+            spec={
+                "target": "y",
+                "fixed_effects": ["x"],
+                "groups": "school",
+                "random_effects": ["x"],
+                "nested_groups": ["room"],
+            },
+        )
+
+
+def test_mixedlm_unknown_nested_group_column_raises():
+    df = _make_nested_mixedlm_df()
+    with pytest.raises(InvalidModelSpecError, match="nested_groups"):
+        fit_model(
+            df,
+            model="MixedLM",
+            spec={
+                "target": "y",
+                "fixed_effects": ["x"],
+                "groups": "school",
+                "nested_groups": ["nope"],
+            },
+        )

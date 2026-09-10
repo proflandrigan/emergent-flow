@@ -17,6 +17,8 @@ import {
   FlaskConical,
   Code2,
   LayoutGrid,
+  ArrowLeftRight,
+  Ruler,
   type LucideIcon,
 } from "lucide-react";
 
@@ -129,6 +131,18 @@ export const FAMILY: Record<string, FamilyMeta> = {
     color: "var(--fam-script)",
     soft: "var(--fam-script-soft)",
     Icon: Code2,
+  },
+  causal: {
+    label: "Causal Inference",
+    color: "var(--fam-causal)",
+    soft: "var(--fam-causal-soft)",
+    Icon: ArrowLeftRight,
+  },
+  psychometrics: {
+    label: "Psychometrics",
+    color: "var(--fam-psychometrics)",
+    soft: "var(--fam-psychometrics-soft)",
+    Icon: Ruler,
   },
   layout: {
     label: "Layout",

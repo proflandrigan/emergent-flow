@@ -34,13 +34,14 @@ class FitBayesianModel(NodeDefinition):
     """Fit a Bayesian GLM (optionally hierarchical), via bambi/PyMC, summarized with ArviZ."""
 
     type = "stats.fit_bayesian_model"
-    version = 1
+    version = 2
     family = "stats"
     label = "Fit Bayesian Model"
     category = "Statistics"
     advisor_persona = "researcher"
     description = (
-        "Fit a Bayesian GLM (optionally hierarchical), via bambi/PyMC, summarized with ArviZ."
+        "Fit a Bayesian GLM (optionally hierarchical, one random term per grouping level, "
+        "optional priors), via bambi/PyMC, summarized with ArviZ."
     )
 
     ports = [
@@ -85,14 +86,22 @@ class FitBayesianModel(NodeDefinition):
         ),
         ParamSpec(
             name="groups",
-            type_token="str",
+            type_token="list[str]",
             default=None,
-            label="Grouping factor",
+            label="Grouping factors",
             help=(
-                "Grouping-factor column; setting this fits a"
-                " hierarchical (random-intercept/slope) model."
+                "Grouping-factor column(s); setting this fits a hierarchical "
+                "(random-intercept/slope) model, one random term per level."
             ),
             hints=ValidationHints(widget="column"),
+        ),
+        ParamSpec(
+            name="priors",
+            type_token="dict[str, any]",
+            default=None,
+            label="Prior overrides",
+            help="Optional bambi prior dict passed to Model(priors=...); leave unset for "
+            "default priors.",
         ),
         ParamSpec(
             name="family",
@@ -146,6 +155,7 @@ class FitBayesianModel(NodeDefinition):
             "fixed_effects",
             "random_effects",
             "groups",
+            "priors",
             "family",
             "seed",
             "draws",

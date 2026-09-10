@@ -20,6 +20,8 @@ from emergentflow.data.warehouse.protocol import (
     MissingDriverError,
     QueryRequest,
     QueryResult,
+    WriteRequest,
+    WriteResult,
 )
 
 try:
@@ -194,3 +196,29 @@ class PostgresAdapter:
         df["schema"] = schema
         df["table"] = relation
         return df[list(RELATION_SCHEMA_COLUMNS)]
+
+    def write(
+        self,
+        request: WriteRequest,
+        df: pd.DataFrame,
+        credentials: Mapping[str, str],
+    ) -> WriteResult:
+        """Write *df* to *request.table* per the request's mode (issue #164 Gap 6).
+
+        Uses ``pandas.to_sql`` with SQLAlchemy. ``"append"`` maps to ``if_exists="append"``,
+        ``"truncate"`` to ``if_exists="replace"`` (drop + recreate), and ``"error"`` to
+        ``if_exists="fail"`` (raises if the table exists).
+        """
+        _require_driver()
+        start = time.monotonic()
+        engine = self._engine(credentials)
+        if_exists = {"append": "append", "truncate": "replace", "error": "fail"}[request.mode]
+        df.to_sql(request.table, engine, if_exists=if_exists, index=False)
+        elapsed_ms = (time.monotonic() - start) * 1000
+        return WriteResult(
+            table=request.table,
+            mode=request.mode,
+            rows_written=len(df),
+            dialect="postgres",
+            elapsed_ms=elapsed_ms,
+        )
