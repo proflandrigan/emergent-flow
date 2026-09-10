@@ -42,6 +42,10 @@ class SaveFrame(NodeDefinition):
 
     column_effect = ColumnEffect(kind=ColumnEffectKind.PASSTHROUGH)
 
+    # Effectful: a cached result would skip the write on re-run (and never recreate a deleted
+    # file), so never serve this node from the execution cache.
+    cacheable = False
+
     ports = [
         PortSpec(
             name="frame",

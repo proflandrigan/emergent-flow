@@ -138,7 +138,8 @@ class TuneModel(NodeDefinition):
         n_iter = values.get("n_iter", 10)
         cv = values.get("cv", 5)
         scoring = values.get("scoring")
-        weight_col = values.get("weight_col")
+        # "" from the UI must mean "unset" on both paths
+        weight_col = values.get("weight_col") or None
         return (
             cast(str, estimator),
             cast("dict[str, list[Any]]", param_dists),

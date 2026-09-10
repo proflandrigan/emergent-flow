@@ -147,3 +147,16 @@ secret-free.**
   drop-in `ConnectionProfile` resolver behind the same boundary.
 - **Result caching across runs** (warehouse queries are slow and metered) is a caching `WarehouseClient`
   decorator, layered later without touching nodes — the ADR-0017 caching-decorator deferral, generalized.
+
+## Amendment — writes behind an explicit opt-in (issue #164 Gap 6, 2026-09)
+
+The "Writes / DML / DDL" deferral above is superseded. `ef.data.write_table` (and the
+`data.write_table` node) materialises a DataFrame as a warehouse table through a second
+delegated effect, `WarehouseClient.write`, mirroring `run`. The read-only default stands:
+a connection profile refuses writes unless `write_enabled = true`, and that single flag now
+gates **both** `write_table` and any `query(read_only=False)` statement (`WriteNotEnabledError`).
+Write support is an optional adapter capability (`WritableWarehouseAdapter`): DuckDB and
+Postgres implement it, BigQuery and Redshift do not yet and raise the distinct
+`WriteNotSupportedError` (no profile setting can change that). `mode="truncate"` keeps the table
+definition (TRUNCATE + append in one transaction); DuckDB appends match columns by name and quote
+every identifier. Local Hive-partitioned dataset writes live in `ef.data.save_frame`.

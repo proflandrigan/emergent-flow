@@ -264,6 +264,11 @@ register_model(
 )
 
 
+#: ``level_icc`` keys reserved for the top-level group and the residual share; a
+#: ``nested_groups`` column with one of these names would silently overwrite them.
+_MIXEDLM_RESERVED_LEVELS = frozenset({"group", "residual"})
+
+
 def _mixedlm_re_formula(random_effects: list[str] | None) -> str | None:
     """Build the ``re_formula`` for random slopes; ``None`` means random-intercept-only
     (statsmodels' default when ``re_formula`` is omitted)."""
@@ -277,8 +282,9 @@ def _mixedlm_vc_formula(nested_groups: list[str] | None) -> dict[str, str] | Non
 
     ``["classroom", "teacher"]`` -> ``{"classroom": "0 + C(classroom)",
     "teacher": "0 + C(teacher)"}``. Each becomes an independent variance component
-    within the top-level ``groups`` factor, which is how statsmodels expresses
-    crossed/nested random effects under a single grouping (issue #164 Gap 2).
+    *nested within* the top-level ``groups`` factor (issue #164 Gap 2). This expresses
+    nesting only -- a truly crossed random effect (e.g. teachers shared across schools)
+    is not expressible as a within-group variance component.
     """
     if not nested_groups:
         return None
@@ -295,9 +301,12 @@ def _fit_mixedlm(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
 
     ``groups`` names the outermost grouping level; ``nested_groups`` (optional) names
     additional levels below it, modelled as independent variance components via
-    statsmodels' ``vc_formula``. statsmodels forbids ``vc_formula`` together with a
-    ``re_formula`` (random slopes), so a request for both raises ``InvalidModelSpecError``
-    (issue #164 Gap 2).
+    statsmodels' ``vc_formula``. ``random_effects`` (random slopes) and ``nested_groups``
+    combine freely. statsmodels only adds its default random intercept when *neither*
+    ``re_formula`` nor ``vc_formula`` is given, so when a ``vc_formula`` is present the
+    top-level intercept is requested explicitly via ``re_formula="1"`` -- otherwise the
+    ``groups`` variance is silently absorbed into the first nested component (issue #164
+    Gap 2).
     """
     if spec.get("cov_type", "nonrobust") != "nonrobust":
         raise InvalidModelSpecError(
@@ -309,16 +318,43 @@ def _fit_mixedlm(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
     formula = _ols_formula(spec)
     random_effects = spec.get("random_effects") or []
     nested_groups = spec.get("nested_groups") or []
-    if nested_groups and random_effects:
+    groups_col = spec["groups"]
+    if not df.index.is_unique:
         raise InvalidModelSpecError(
-            "MixedLM cannot combine `random_effects` (a re_formula) with `nested_groups` "
-            "(a vc_formula): statsmodels' MixedLM.fit() accepts one or the other, not both. "
-            "Model slope terms with `random_effects` OR add nesting levels with "
-            "`nested_groups`, not both."
+            "MixedLM requires a unique DataFrame index (statsmodels aligns the variance-"
+            "component design by index label); call df.reset_index(drop=True) first."
         )
+    if df[groups_col].isna().any():
+        raise InvalidModelSpecError(
+            f"groups column {groups_col!r} contains missing values; drop or fill them before "
+            "fitting MixedLM."
+        )
+    if nested_groups:
+        if len(set(nested_groups)) != len(nested_groups):
+            raise InvalidModelSpecError(f"nested_groups contains duplicates: {nested_groups!r}.")
+        if groups_col in nested_groups:
+            raise InvalidModelSpecError(
+                f"nested_groups must not repeat the top-level groups column {groups_col!r}."
+            )
+        clash = [c for c in nested_groups if c in _MIXEDLM_RESERVED_LEVELS]
+        if clash:
+            raise InvalidModelSpecError(
+                f"nested_groups {clash!r} clash with the reserved level_icc keys "
+                f"{sorted(_MIXEDLM_RESERVED_LEVELS)!r}; rename the column."
+            )
+        na_cols = [c for c in nested_groups if df[c].isna().any()]
+        if na_cols:
+            raise InvalidModelSpecError(
+                f"nested_groups columns {na_cols!r} contain missing values; drop or fill them "
+                "before fitting MixedLM."
+            )
     re_formula = _mixedlm_re_formula(random_effects)
     vc_formula = _mixedlm_vc_formula(nested_groups)
-    groups = df[spec["groups"]]
+    if vc_formula is not None and re_formula is None:
+        # statsmodels drops the default random intercept when exog_vc is present; keep the
+        # top-level `groups` intercept explicitly so the 3-level decomposition is correct.
+        re_formula = "1"
+    groups = df[groups_col]
     model = smf.mixedlm(
         formula,
         data=df,
@@ -348,7 +384,7 @@ register_model(
         archetype="fit_model",
         fitter=_fit_mixedlm,
         required_spec_fields=("target", "groups"),
-        optional_spec_fields=("fixed_effects", "random_effects", "nested_groups"),
+        optional_spec_fields=("fixed_effects", "random_effects", "nested_groups", "cov_type"),
         description="Linear mixed-effects / hierarchical model with random intercepts and "
         "slopes, grouped (statsmodels MixedLM). `nested_groups` adds variance-component "
         "levels below `groups`.",

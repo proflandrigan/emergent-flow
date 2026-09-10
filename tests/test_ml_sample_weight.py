@@ -168,3 +168,151 @@ def test_helper_rejects_estimator_without_sample_weight():
 
     # **kwargs counts as accepting sample_weight
     assert isinstance(_resolve_sample_weight(df, "w", est=_KwargsFit()), pd.Series)
+
+
+def test_weight_col_is_never_auto_selected_as_a_feature():
+    df = _make_df().drop(columns="g")
+    df["w"] = df["y"] - df["y"].min() + 1.0  # positive, finite, and a pure function of the target
+    assert fit_estimator(df, estimator="Ridge", target="y", weight_col="w").feature_names == ["x"]
+    assert train_regressor(df, target="y", weight_col="w").feature_names == ["x"]
+    rf = train_random_forest(df, target="y", task="regression", weight_col="w")
+    assert rf.feature_names == ["x"]
+    clf_df = df.assign(y=(df["y"] > df["y"].median()).astype(int))
+    assert train_classifier(clf_df, target="y", weight_col="w").feature_names == ["x"]
+    model, _ = grid_search(
+        df, estimator="Ridge", param_grid={"alpha": [0.1, 1.0]}, target="y", cv=3, weight_col="w"
+    )
+    assert model.feature_names == ["x"]
+    model, _ = tune_model(
+        df,
+        estimator="Ridge",
+        param_distributions={"alpha": [0.1, 1.0]},
+        target="y",
+        n_iter=2,
+        cv=3,
+        weight_col="w",
+    )
+    assert model.feature_names == ["x"]
+    cv = cross_validate(df, estimator="Ridge", target="y", cv=3, scoring="r2", weight_col="w")
+    assert (cv["test_score"] < 0.999).all()  # the leaked weight would have scored a perfect 1.0
+    with pytest.raises(ValueError, match="auxiliary"):
+        fit_estimator(df, estimator="Ridge", target="y", features=["x", "w"], weight_col="w")
+
+
+def test_group_col_is_never_auto_selected_as_a_feature():
+    df = _make_df().drop(columns="w")
+    df["g"] = np.argsort(np.argsort(df["y"].to_numpy()))  # a group id that ranks the target
+    res = cross_validate(
+        df, estimator="Ridge", target="y", cv=3, cv_strategy="grouped", group_col="g", scoring="r2"
+    )
+    assert (res["test_score"] < 0.999).all()
+
+
+def test_weight_col_must_be_numeric_non_bool():
+    df = _make_df()
+    df["flag"] = df["w"] > 1.0
+    with pytest.raises(ValueError, match="flag"):
+        fit_estimator(df, estimator="Ridge", target="y", features=["x"], weight_col="flag")
+    df["label"] = "a"
+    with pytest.raises(ValueError, match="label"):
+        fit_estimator(df, estimator="Ridge", target="y", features=["x"], weight_col="label")
+
+
+def test_grid_search_zero_weight_fold_raises_instead_of_arbitrary_best():
+    # sklearn refuses all-zero weights at fit time, but a fold whose *test* rows all carry zero
+    # weight scores NaN silently: with KFold's contiguous folds, zeroing the first 20 of 60 rows
+    # makes every candidate's mean_test_score NaN and the "best" model arbitrary.
+    df = _make_df(n=60)
+    df["w"] = np.where(np.arange(len(df)) < 20, 0.0, 1.0)
+    with pytest.raises(ValueError, match="finite cross-validation score"):
+        grid_search(
+            df,
+            estimator="Ridge",
+            param_grid={"alpha": [0.1, 1.0]},
+            target="y",
+            features=["x"],
+            cv=3,
+            weight_col="w",
+        )
+
+
+def test_fit_estimator_non_fit_archetype_weight_col_is_typed():
+    from emergentflow.ml.errors import UnsupportedEstimatorOptionError
+
+    df = _make_df()
+    with pytest.raises(UnsupportedEstimatorOptionError, match="fit-archetype"):
+        fit_estimator(df, estimator="KMeans", features=["x"], weight_col="w")
+
+
+def test_compare_models_weight_col_runs_and_never_uses_the_weight_as_a_feature():
+    from emergentflow.ml import compare_models
+
+    df = _make_df(n=200).drop(columns="g")
+    comparison, best = compare_models(
+        df, task="regression", target="y", cv=3, weight_col="w", estimators=["Ridge", "Lasso"]
+    )
+    assert best.feature_names == ["x"]
+    assert set(comparison["status"]) == {"ok"}
+    with pytest.raises(ValueError, match="weight_col"):
+        compare_models(df, task="regression", target="y", cv=3, weight_col="nope")
+
+
+def test_compare_models_reports_estimators_without_sample_weight_support():
+    import inspect
+
+    from emergentflow.ml import compare_models
+    from emergentflow.ml.registry import get_estimator_spec, keys_for_archetype
+
+    def _accepts_weight(key: str) -> bool:
+        params = inspect.signature(get_estimator_spec(key).sklearn_class.fit).parameters
+        return "sample_weight" in params or any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()
+        )
+
+    regressors = [
+        k for k in keys_for_archetype("fit") if get_estimator_spec(k).task == "regression"
+    ]
+    unsupported = [k for k in regressors if not _accepts_weight(k)]
+    if not unsupported:
+        pytest.skip("every curated regressor accepts sample_weight")
+    df = _make_df(n=200).drop(columns="g")
+    comparison, _ = compare_models(
+        df,
+        task="regression",
+        target="y",
+        cv=3,
+        weight_col="w",
+        estimators=["Ridge", unsupported[0]],
+    )
+    status = comparison.set_index("estimator")["status"]
+    assert status["Ridge"] == "ok"
+    assert "sample_weight" in status[unsupported[0]]
+
+
+def test_fit_pipeline_weight_col_reaches_the_final_step():
+    from emergentflow.ml import fit_pipeline
+    from emergentflow.ml.errors import UnsupportedEstimatorOptionError
+
+    df = _make_df(n=200).drop(columns="g")
+    steps = [{"estimator": "StandardScaler"}, {"estimator": "Ridge"}]
+    plain = fit_pipeline(df, steps=steps, target="y")
+    weighted = fit_pipeline(df, steps=steps, target="y", weight_col="w")
+    assert weighted.feature_names == ["x"]
+    assert plain.estimator[-1].coef_ != pytest.approx(weighted.estimator[-1].coef_)
+    with pytest.raises(UnsupportedEstimatorOptionError, match="final step"):
+        fit_pipeline(
+            df, steps=[{"estimator": "StandardScaler"}, {"estimator": "KMeans"}], weight_col="w"
+        )
+
+
+def test_ml_nodes_treat_empty_weight_col_as_unset():
+    from emergentflow.nodes.examples import FitEstimator
+
+    df = _make_df(n=120).drop(columns="g")
+    defn = FitEstimator()
+    node = defn.instantiate(estimator="Ridge", target="y", features=["x"], weight_col="")
+    executed = defn.execute(node, inputs={"frame": df.copy()})["model"]
+    scope = {"frame": df.copy()}
+    exec(defn.preview(node).render(), scope)  # noqa: S102 - test-only on our own emitted code
+    assert executed.feature_names == scope["model"].feature_names
+    assert executed.estimator.coef_ == pytest.approx(scope["model"].estimator.coef_)

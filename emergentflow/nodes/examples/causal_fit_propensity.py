@@ -36,7 +36,7 @@ class CausalFitPropensity(NodeDefinition):
     """Fit a propensity model; return scores/weights and a balance diagnostics table."""
 
     type = "causal.fit_propensity"
-    version = 1
+    version = 2
     family = "causal"
     label = "Fit Propensity"
     category = "Causal Inference"
@@ -92,6 +92,13 @@ class CausalFitPropensity(NodeDefinition):
             ),
         ),
         ParamSpec(
+            name="params",
+            type_token="dict[str, any]",
+            default={},
+            label="Estimator params",
+            help='Constructor kwargs for the propensity estimator (e.g. {"C": 0.5}).',
+        ),
+        ParamSpec(
             name="trim",
             type_token="list[float]",
             default=[0.01, 0.99],
@@ -117,13 +124,17 @@ class CausalFitPropensity(NodeDefinition):
             "treatment": cast(str, values.get("treatment")),
             "covariates": cast("list[str]", values.get("covariates")),
             "estimator": cast(str, values.get("estimator", "LogisticRegression")),
+            "params": cast("dict[str, Any] | None", values.get("params") or None),
             "trim": cast("tuple[float, float] | None", tuple(trim) if trim else None),
             "effect": cast(str, values.get("effect", "ATE")),
         }
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         args = self._args(node)
-        codegen_trim = f", trim={args['trim']!r}" if args["trim"] else ""
+        # Always emit trim: `[]` means "no trimming" (None) on the execute path, and omitting the
+        # kwarg would make the compiled script fall back to the op default (0.01, 0.99).
+        codegen_trim = f", trim={args['trim']!r}"
+        codegen_params = f", params={args['params']!r}" if args["params"] is not None else ""
         codegen_effect = f", effect={args['effect']!r}" if args["effect"] != "ATE" else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
@@ -131,7 +142,7 @@ class CausalFitPropensity(NodeDefinition):
                 f"{ctx.out_var('result')} = ef.causal.fit_propensity("
                 f"{ctx.in_var('frame')}, treatment={args['treatment']!r}, "
                 f"covariates={args['covariates']!r}, estimator={args['estimator']!r}"
-                f"{codegen_trim}{codegen_effect})\n"
+                f"{codegen_params}{codegen_trim}{codegen_effect})\n"
                 f"{ctx.out_var('balance')} = {ctx.out_var('result')}.balance"
             ),
         )
@@ -143,6 +154,7 @@ class CausalFitPropensity(NodeDefinition):
             treatment=args["treatment"],
             covariates=args["covariates"],
             estimator=args["estimator"],
+            params=args["params"],
             trim=args["trim"],
             effect=args["effect"],
         )

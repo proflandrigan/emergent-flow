@@ -398,5 +398,9 @@ module = [
     # imported lazily inside `emergentflow/stats/survival.py`, absent from the bare
     # `uv sync --locked` CI env (like torch/litellm/pymc).
     "lifelines.*",
+    # The optional `emergentflow[psychometrics]` extra (issue #164 Gap 3): girth ships no
+    # type stubs and is imported lazily inside `emergentflow/psychometrics/irt.py`, absent
+    # from the bare `uv sync --locked` CI env (like torch/litellm/pymc).
+    "girth.*",
 ]
 ignore_missing_imports = true

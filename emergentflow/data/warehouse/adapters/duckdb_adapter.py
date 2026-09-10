@@ -14,6 +14,7 @@ from collections.abc import Mapping
 import duckdb
 import pandas as pd
 
+from emergentflow.data.errors import DataError
 from emergentflow.data.warehouse.protocol import (
     RELATION_SCHEMA_COLUMNS,
     ColumnSchema,
@@ -34,6 +35,22 @@ def _escape_literal(value: str) -> str:
     of the literal and injecting arbitrary SQL.
     """
     return value.replace("'", "''")
+
+
+def _quote_ident(name: str) -> str:
+    """Quote a (possibly schema-qualified) identifier for DDL/DML.
+
+    Every dotted part is double-quoted with embedded quotes doubled, so a caller-supplied
+    table name can never break out of the identifier position: ``junk; DROP TABLE victim``
+    becomes a table literally named that string, and reserved words / names with spaces work.
+    """
+    return ".".join('"' + part.replace('"', '""') + '"' for part in name.split("."))
+
+
+def _split_table(table: str) -> tuple[str, str]:
+    """Split ``schema.table`` into ``(schema, table)``; an unqualified name lives in ``main``."""
+    schema, _, name = table.rpartition(".")
+    return (schema or "main"), name
 
 
 class DuckDBAdapter:
@@ -180,46 +197,55 @@ class DuckDBAdapter:
     ) -> WriteResult:
         """Write *df* to *request.table* per the request's mode (issue #164 Gap 6).
 
-        ``"append"`` appends rows (creating/registering the table if absent);
-        ``"truncate"`` drops the table if present and recreates it from *df*;
-        ``"error"`` refuses when the table already exists. Requires a writable
-        connection (a file-backed DuckDB is opened read-write for the write).
+        ``"append"`` appends rows matched by column NAME (``INSERT ... BY NAME``, so a
+        reordered frame never lands one column's values in another), creating the table if
+        absent; ``"truncate"`` deletes every row and appends, keeping the table definition;
+        ``"error"`` refuses when the table already exists. ``table`` may be ``schema.table``
+        (unqualified names live in ``main``); every identifier is quoted. The create/delete/
+        insert runs in ONE transaction, so a failed insert (e.g. a frame whose columns do not
+        match) rolls back and the existing rows survive. Requires a file-backed DuckDB (the
+        profile's ``path`` coordinate): an in-memory database cannot persist a write, so a
+        path-less profile is refused instead of reporting a success nobody can read back.
         """
-        import time
-
         start = time.monotonic()
         path = credentials.get("path")
-        if path and path != ":memory:":
-            conn = duckdb.connect(path, read_only=False)
-        else:
-            conn = duckdb.connect(":memory:", read_only=False)
-
-        table = request.table
+        if not path or path == ":memory:":
+            raise DataError(
+                "connection has no `path` coordinate; an in-memory DuckDB cannot persist a "
+                "write. Point the profile at a .duckdb file to write tables."
+            )
+        schema, name = _split_table(request.table)
+        qtable = _quote_ident(request.table)
+        conn = duckdb.connect(path, read_only=False)
         try:
             exists = (
-                len(
-                    conn.execute(
-                        "SELECT 1 FROM information_schema.tables "
-                        f"WHERE table_name = '{_escape_literal(table)}'"
-                    ).fetchall()
-                )
-                > 0
+                conn.execute(
+                    "SELECT 1 FROM information_schema.tables "
+                    "WHERE table_schema = ? AND table_name = ?",
+                    [schema, name],
+                ).fetchone()
+                is not None
             )
             if request.mode == "error" and exists:
                 raise RuntimeError(
-                    f"table {table!r} already exists (mode='error'); pass mode='append' or "
-                    "'truncate' to write anyway."
+                    f"table {request.table!r} already exists (mode='error'); pass mode='append' "
+                    "or 'truncate' to write anyway."
                 )
-            if request.mode == "truncate" and exists:
-                conn.execute(f"DROP TABLE {table}")
-                exists = False
-            if not exists:
-                conn.execute(f"CREATE TABLE {table} AS SELECT * FROM df")
-            else:
-                conn.execute(f"INSERT INTO {table} SELECT * FROM df")
+            conn.begin()
+            try:
+                if not exists:
+                    conn.execute(f"CREATE TABLE {qtable} AS SELECT * FROM df")
+                else:
+                    if request.mode == "truncate":
+                        conn.execute(f"DELETE FROM {qtable}")
+                    conn.execute(f"INSERT INTO {qtable} BY NAME SELECT * FROM df")
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
             elapsed_ms = (time.monotonic() - start) * 1000
             return WriteResult(
-                table=table,
+                table=request.table,
                 mode=request.mode,
                 rows_written=len(df),
                 dialect="duckdb",

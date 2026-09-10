@@ -149,7 +149,8 @@ class CrossValidate(NodeDefinition):
         scoring = values.get("scoring")
         cv_strategy = values.get("cv_strategy") or "kfold"
         group_col = values.get("group_col")
-        weight_col = values.get("weight_col")
+        # "" from the UI must mean "unset" on both paths
+        weight_col = values.get("weight_col") or None
         return (
             cast(str, estimator),
             cast(str, target),

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from emergentflow.nodes.examples import (
     CausalDid,
@@ -113,3 +114,117 @@ def test_sensitivity_equivalence():
     executed = defn.execute(node, inputs={"effect": effect.copy()})["result"]
     scope = _run_codegen(defn, node, {"effect": effect.copy()})
     pd.testing.assert_frame_equal(executed, scope["result"])
+
+
+def test_sensitivity_difference_scale_equivalence():
+    df = _confounded_df()
+    effect = CausalEstimateEffect().execute(
+        CausalEstimateEffect().instantiate(
+            outcome="y", treatment="t", covariates=["x1"], method="aipw"
+        ),
+        inputs={"frame": df.copy()},
+    )["result"]
+    defn = CausalSensitivity()
+    node = defn.instantiate(method="e_value", scale="difference", sd=float(df["y"].std()))
+    executed = defn.execute(node, inputs={"effect": effect.copy()})["result"]
+    scope = _run_codegen(defn, node, {"effect": effect.copy()})
+    pd.testing.assert_frame_equal(executed, scope["result"])
+
+
+def test_sensitivity_rosenbaum_equivalence():
+    rng = np.random.default_rng(5)
+    pairs = pd.DataFrame({"o_t": rng.binomial(1, 0.6, 200), "o_c": rng.binomial(1, 0.3, 200)})
+    defn = CausalSensitivity()
+    node = defn.instantiate(
+        method="rosenbaum", treated_outcome_col="o_t", control_outcome_col="o_c", gamma=1.5
+    )
+    executed = defn.execute(node, inputs={"matched": pairs.copy()})["result"]
+    scope = _run_codegen(defn, node, {"matched": pairs.copy()})
+    pd.testing.assert_frame_equal(executed, scope["result"])
+    assert executed.iloc[0]["direction"] == "treated_higher"
+
+
+def test_fit_propensity_empty_trim_is_equivalent_and_untrimmed():
+    # ADR-0002: trim=[] means "no trimming" (None) on both paths; the compiled script used to fall
+    # back to the op default (0.01, 0.99), so its max weight was 100 while execute's was unbounded.
+    df = _confounded_df()
+    defn = CausalFitPropensity()
+    node = defn.instantiate(treatment="t", covariates=["x1"], trim=[])
+    executed = defn.execute(node, inputs={"frame": df.copy()})
+    scope = _run_codegen(defn, node, {"frame": df.copy()})
+    result_key = [
+        k for k in scope if k not in ("frame", "balance", "__builtins__") and not k.startswith("ef")
+    ]
+    codegen_result = scope[result_key[0]]
+    pd.testing.assert_series_equal(executed["result"].weights, codegen_result.weights)
+    trimmed = defn.execute(defn.instantiate(treatment="t", covariates=["x1"]), inputs={"frame": df})
+    assert executed["result"].weights.max() >= trimmed["result"].weights.max()
+
+
+def test_fit_propensity_params_reach_the_estimator():
+    df = _confounded_df()
+    defn = CausalFitPropensity()
+    strong = defn.instantiate(treatment="t", covariates=["x1"], params={"C": 1e-3})
+    default = defn.instantiate(treatment="t", covariates=["x1"])
+    s = defn.execute(strong, inputs={"frame": df.copy()})["result"].scores
+    d = defn.execute(default, inputs={"frame": df.copy()})["result"].scores
+    assert s.std() < d.std()  # heavy regularisation flattens the scores
+    scope = _run_codegen(defn, strong, {"frame": df.copy()})
+    pd.testing.assert_frame_equal(
+        defn.execute(strong, inputs={"frame": df.copy()})["balance"], scope["balance"]
+    )
+
+
+def test_estimate_effect_matching_caliper_and_seed_equivalence():
+    df = _confounded_df(n=600)
+    defn = CausalEstimateEffect()
+    node = defn.instantiate(
+        outcome="y",
+        treatment="t",
+        covariates=["x1"],
+        method="matching",
+        caliper=None,
+        random_state=3,
+    )
+    executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+    scope = _run_codegen(defn, node, {"frame": df.copy()})
+    pd.testing.assert_frame_equal(executed, scope["result"])
+    narrow = defn.instantiate(
+        outcome="y", treatment="t", covariates=["x1"], method="matching", caliper=0.01
+    )
+    assert (
+        defn.execute(narrow, inputs={"frame": df.copy()})["result"].iloc[0]["effective_n"]
+        < executed.iloc[0]["effective_n"]
+    )
+
+
+def test_did_empty_cluster_col_is_equivalent():
+    df = _panel_df()
+    defn = CausalDid()
+    node = defn.instantiate(
+        outcome="y",
+        unit_col="unit",
+        time_col="per",
+        treated_col="treat",
+        post_col="post",
+        cluster_col="",
+    )
+    executed = defn.execute(node, inputs={"frame": df.copy()})["result"]
+    scope = _run_codegen(defn, node, {"frame": df.copy()})
+    pd.testing.assert_frame_equal(executed, scope["result"])
+
+
+def test_estimate_effect_node_dropdown_matches_registry_and_op():
+    from emergentflow.causal import keys_for_archetype
+    from emergentflow.causal.errors import UnknownMethodError
+
+    method_spec = next(p for p in CausalEstimateEffect.params if p.name == "method")
+    assert list(method_spec.hints.choices) == keys_for_archetype("estimate_effect")
+    df = _confounded_df(n=200)
+    with pytest.raises(UnknownMethodError):
+        CausalEstimateEffect().execute(
+            CausalEstimateEffect().instantiate(
+                outcome="y", treatment="t", covariates=["x1"], method="tmle"
+            ),
+            inputs={"frame": df},
+        )

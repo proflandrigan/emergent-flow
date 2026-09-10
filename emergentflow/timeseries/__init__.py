@@ -19,11 +19,13 @@ See ``docs/sdk-design-philosophy.md`` and ``docs/public-api-conventions.md``.
 
 from __future__ import annotations
 
+import numbers
 from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
 import pandas as pd
+from numpy.lib.stride_tricks import sliding_window_view
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from statsmodels.tsa.seasonal import seasonal_decompose as _sm_seasonal_decompose
 from statsmodels.tsa.statespace.sarimax import SARIMAX
@@ -415,55 +417,105 @@ def _exponential_weighted_mean(values: np.ndarray) -> float:
     return float(np.average(values, weights=weights))
 
 
+#: ``0.5 ** 1074`` underflows to exactly 0.0; refuse a trailing window whose oldest row is more
+#: than this many half-lives before its newest row (the weights would be all-zero noise).
+_MAX_HALF_LIVES = 1000.0
+
+
+def _as_naive_utc(values: pd.Series, *, assume_tz: Any) -> np.ndarray:
+    """Return *values* as a ``datetime64[ns]`` array with any timezone folded into UTC.
+
+    tz-aware inputs are converted to UTC and made naive; naive inputs are localised to
+    *assume_tz* first when one is given (so a naive ``anchor`` is read in the frame's own
+    zone), otherwise taken as-is.
+    """
+    s = pd.to_datetime(values)
+    if s.dt.tz is None:
+        if assume_tz is None:
+            return s.to_numpy(dtype="datetime64[ns]")
+        s = s.dt.tz_localize(assume_tz)
+    return s.dt.tz_convert("UTC").dt.tz_localize(None).to_numpy(dtype="datetime64[ns]")
+
+
 def _resolve_anchor(
     df: pd.DataFrame, *, anchor: str | pd.Timestamp | None
 ) -> pd.Series | pd.Timestamp | None:
-    """Resolve *anchor* to a fixed timestamp, a per-row date column, or ``None``.
+    """Resolve *anchor* to a per-row as-of Series (a column name), a fixed Timestamp, or None.
 
-    A string that names a column of *df* becomes a per-row anchor date (parsed with
-    ``pd.to_datetime``); any other non-``None`` value is coerced to a fixed
-    :class:`pd.Timestamp`. ``None`` stays unresolved -- the per-partition default
-    (the partition's most recent ``date_col``) is applied inside the weighting
-    loop so grouped calls anchor each group to its own latest observation.
+    Raises :class:`TimeseriesError` when the value is neither a column of *df* nor a
+    parseable timestamp, so a mistyped column name lands as a typed error instead of a raw
+    pandas ``DateParseError``.
     """
+    if anchor is None:
+        return None
     if isinstance(anchor, str) and anchor in df.columns:
-        return pd.to_datetime(df[anchor])
-    if anchor is not None:
-        return pd.Timestamp(anchor)
-    return None
+        try:
+            return pd.to_datetime(df[anchor])
+        except (ValueError, TypeError) as exc:
+            raise TimeseriesError(
+                f"anchor column {anchor!r} could not be parsed as datetimes."
+            ) from exc
+    if isinstance(anchor, pd.Timestamp):
+        return anchor
+    try:
+        ts = pd.Timestamp(anchor)
+    except (ValueError, TypeError) as exc:
+        raise TimeseriesError(
+            f"anchor {anchor!r} is neither a column of the frame nor a parseable timestamp."
+        ) from exc
+    if pd.isna(ts):
+        raise TimeseriesError(
+            f"anchor {anchor!r} is neither a column of the frame nor a parseable timestamp."
+        )
+    return ts
 
 
 def _date_weighted_mean(
     values: np.ndarray,
     dates: np.ndarray,
-    anchor_dt: np.ndarray | np.datetime64,
     *,
     half_life: float,
     unit_td: pd.Timedelta,
     window: int | None,
 ) -> np.ndarray:
-    """Trailing-window weighted mean using date-decay weights.
+    """Half-life-weighted mean of *values* over *dates* (both already sorted ascending).
 
-    Each row's weight is ``0.5 ** (delta / half_life)`` where ``delta`` is the
-    elapsed time between that row's date and its anchor, measured in *unit_td*.
-    *anchor_dt* is either a single datetime broadcast to every row or one per row.
-    ``window=None`` expands over all preceding rows; a positive *window* uses a
-    trailing ``window``-row window with ``min_periods=window`` (early rows are
-    ``NaN``, mirroring the positional path). Row 0 of every partition is its own
-    value (single-row weighted mean), matching the existing expanding output.
+    Row ``j`` is ``sum_i w_ij v_i / sum_i w_ij`` over ``i <= j`` with
+    ``w_ij = 0.5 ** ((date_j - date_i) / (half_life * unit_td))``. Weights are never
+    materialised in absolute terms (``0.5 ** big`` underflows to 0, ``0.5 ** -big`` overflows):
+    the expanding form delegates to pandas' numerically stable ``ewm(times=)`` recursion, and
+    the rolling form measures each window's elapsed time from its own newest row, refusing
+    windows that span more than ``_MAX_HALF_LIVES`` half-lives. Missing values are skipped (the
+    weights renormalise over the observed rows); a row whose window holds no observed value is
+    ``NaN``, as are the first ``window - 1`` rows of a rolling window.
     """
-    delta = (anchor_dt - dates) / unit_td
-    weights = 0.5 ** (delta / half_life)
-    if window is None:
-        num = np.cumsum(values * weights)
-        den = np.cumsum(weights)
-        out = np.full(len(values), np.nan)
-        ok = den > 0
-        out[ok] = num[ok] / den[ok]
+    n = len(values)
+    out = np.full(n, np.nan, dtype=float)
+    if n == 0:
         return out
-    num = pd.Series(values * weights).rolling(window, min_periods=window).sum()
-    den = pd.Series(weights).rolling(window, min_periods=window).sum()
-    return (num / den).where(den > 0).to_numpy()
+    half_life_td = unit_td * float(half_life)
+    if window is None:
+        s = pd.Series(values, index=pd.DatetimeIndex(dates))
+        ewm = s.ewm(halflife=half_life_td, times=s.index, adjust=True)
+        return ewm.mean().to_numpy(dtype=float)
+    if n < window:
+        return out
+    v_win = sliding_window_view(values, window)
+    d_win = sliding_window_view(dates.astype("datetime64[ns]").astype(np.int64), window)
+    elapsed = (d_win[:, -1:] - d_win) / float(half_life_td.value)  # in half-lives, >= 0
+    span = float(elapsed.max())
+    if span > _MAX_HALF_LIVES:
+        raise TimeseriesError(
+            f"a trailing window spans {span:.0f} half-lives (more than {_MAX_HALF_LIVES:.0f}); "
+            "the older weights would underflow to zero. Increase half_life, shrink window, or "
+            "use a coarser unit."
+        )
+    weights = 0.5**elapsed
+    observed = ~np.isnan(v_win)
+    num = np.where(observed, v_win * weights, 0.0).sum(axis=1)
+    den = np.where(observed, weights, 0.0).sum(axis=1)
+    out[window - 1 :] = np.where(den > 0, num / np.where(den > 0, den, 1.0), np.nan)
+    return out
 
 
 def _date_weighted_aggregate(
@@ -477,37 +529,68 @@ def _date_weighted_aggregate(
     anchor: str | pd.Timestamp | None,
     group_col: str | None,
 ) -> pd.DataFrame:
-    """Date-aware (half-life) weighting, computed independently per partition."""
+    """Date-aware (half-life) weighting, computed independently per partition.
+
+    Each partition is sorted by ``date_col`` before weighting and the result is scattered
+    back by position, so input row order does not matter and no later observation leaks into
+    an earlier row. ``anchor`` applies an *as-of* cutoff: output row ``j`` only uses rows dated
+    at or before ``anchor_j`` (and at or before ``date_j``).
+    """
     result = df.copy()
-    dates_all = pd.to_datetime(result[date_col]).to_numpy()
+    n = len(result)
+    out_cols = [f"{col}_tw_halflife" for col in columns]
+    if n == 0:
+        for name in out_cols:
+            result[name] = pd.Series(dtype=float, index=result.index)
+        return result
+
+    dates_raw = pd.to_datetime(result[date_col])
+    if dates_raw.isna().any():
+        raise TimeseriesError(
+            f"date_col {date_col!r} contains missing (NaT) values; drop or fill them before "
+            "weighting."
+        )
+    tz = dates_raw.dt.tz
+    dates_all = _as_naive_utc(dates_raw, assume_tz=None)
+
     resolved = _resolve_anchor(result, anchor=anchor)
-    if isinstance(resolved, pd.Timestamp):
-        resolved = np.datetime64(resolved)
+    anchor_all: np.ndarray | None
+    if resolved is None:
+        anchor_all = None
+    elif isinstance(resolved, pd.Series):
+        if resolved.isna().any():
+            raise TimeseriesError(f"anchor column {anchor!r} contains missing (NaT) values.")
+        anchor_all = _as_naive_utc(resolved, assume_tz=tz)
+    else:
+        anchor_all = np.repeat(_as_naive_utc(pd.Series([resolved]), assume_tz=tz), n)
 
     if group_col is None:
-        partitions = [np.arange(len(result))]
+        partitions = [np.arange(n)]
     else:
-        partitions = list(result.groupby(group_col, sort=False, dropna=False).indices.values())
+        groups = result.groupby(group_col, sort=False, dropna=False, observed=True)
+        partitions = [pos for pos in groups.indices.values() if len(pos)]
 
-    for col in columns:
+    for col, name in zip(columns, out_cols, strict=True):
         values_all = result[col].to_numpy(dtype=float)
-        out = np.full(len(result), np.nan, dtype=float)
+        out = np.full(n, np.nan, dtype=float)
         for pos in partitions:
-            if isinstance(resolved, pd.Series):
-                anchor_dt = resolved.to_numpy(dtype="datetime64[ns]")[pos]
-            elif resolved is not None:
-                anchor_dt = resolved
-            else:
-                anchor_dt = dates_all[pos].max()
-            out[pos] = _date_weighted_mean(
-                values_all[pos],
-                dates_all[pos],
-                anchor_dt,
-                half_life=half_life,
-                unit_td=unit_td,
-                window=window,
+            order = np.argsort(dates_all[pos], kind="stable")
+            p = pos[order]
+            dates = dates_all[p]
+            base = _date_weighted_mean(
+                values_all[p], dates, half_life=half_life, unit_td=unit_td, window=window
             )
-        result[f"{col}_tw_halflife"] = out
+            if anchor_all is None:
+                out[p] = base
+                continue
+            # As-of: the last sorted row dated <= anchor_j, but never beyond row j itself.
+            last_ok = np.searchsorted(dates, anchor_all[p], side="right") - 1
+            take = np.minimum(last_ok, np.arange(len(p)))
+            asof = np.full(len(p), np.nan, dtype=float)
+            valid = take >= 0
+            asof[valid] = base[take[valid]]
+            out[p] = asof
+        result[name] = out
     return result
 
 
@@ -524,28 +607,34 @@ def time_weighted_aggregate(
     anchor: str | pd.Timestamp | None = None,
     group_col: str | None = None,
 ) -> pd.DataFrame:
-    """Append recency-weighted aggregate columns ``{col}_tw_{decay}``.
+    """Append recency-weighted aggregate columns ``{col}_tw_{decay}`` / ``{col}_tw_halflife``.
 
     Two weighting modes:
 
     * **Positional** (``half_life=None``, the default): ``decay="linear"`` weights
-      observations ``1, 2, ..., n`` (most recent highest); ``decay="exponential"``
-      weights them ``alpha**(n-1), ..., 1`` with a fixed ``alpha=0.5``. With
-      ``window`` given, the weighting is computed over a trailing rolling window;
-      otherwise over all preceding rows (expanding). In this mode ``date_col`` is
-      ordering-only and is assumed to already be chronological -- pass
-      ``half_life`` to use the dates themselves.
-    * **Date-aware** (``half_life`` set): each row is weighted
-      ``0.5 ** (delta / half_life)``, where ``delta`` is the elapsed time between
-      the row's ``date_col`` and its anchor, measured in ``unit``. ``anchor``
-      either names a column (a per-row reference date, e.g. each subject's own
-      measurement date) or is a fixed timestamp; it defaults to the most recent
-      ``date_col`` within each partition.
+      observations ``1, 2, ..., n`` (most recent highest); ``decay="exponential"`` weights
+      them ``alpha**(n-1), ..., 1`` with a fixed ``alpha=0.5``. With ``window`` given, the
+      weighting is computed over a trailing rolling window; otherwise over all preceding rows
+      (expanding). In this mode ``date_col`` is ordering-only and is assumed to already be
+      chronological -- pass ``half_life`` to use the dates themselves.
+    * **Date-aware** (``half_life`` set; ``decay`` is ignored): row ``j`` is the weighted
+      mean of the rows ``i <= j`` in ``date_col`` order within its partition, with weights
+      ``0.5 ** ((date_j - date_i) / half_life)`` measured in ``unit`` -- an observation loses
+      half its weight every ``half_life`` units of elapsed time (an exponentially weighted
+      mean over irregular time, computed with pandas' numerically stable recursion; with
+      ``window`` the mean runs over the trailing ``window`` rows instead). Rows are sorted by
+      ``date_col`` within each partition before weighting and scattered back to the input
+      order, so row order does not matter and no later observation leaks into an earlier row.
+      ``anchor`` is an optional *as-of* cutoff: a fixed timestamp excludes rows dated after
+      it; a column name gives every row its own cutoff (e.g. each subject's measurement
+      date), so a row's mean only uses observations dated at or before its anchor. Because
+      the weights are normalised, moving the anchor never rescales the result -- the cutoff
+      is its only effect. Missing values are skipped (the weights renormalise over the
+      observed rows); ``NaT`` dates raise. Output columns are ``{col}_tw_halflife``.
 
     ``group_col`` partitions the computation: every weighting mode is computed
     independently within each group rather than over the whole frame (without it,
-    a per-subject decay silently mixes subjects together). Output columns are
-    ``{col}_tw_halflife`` in date-aware mode. Returns an augmented copy; never
+    a per-subject decay silently mixes subjects together). Returns an augmented copy; never
     mutates ``df``.
     """
     _validate_columns(df, columns)
@@ -557,28 +646,49 @@ def time_weighted_aggregate(
         raise TimeseriesError(f"decay must be one of {list(_DECAY_METHODS)!r}; got {decay!r}.")
     if window is not None and window < 1:
         raise TimeseriesError(f"window must be >= 1; got {window}.")
+    if group_col is not None and group_col not in df.columns:
+        raise TimeseriesError(
+            f"unknown group_col {group_col!r}; expected one of {list(df.columns)!r}."
+        )
 
     if half_life is not None:
-        if half_life <= 0:
-            raise TimeseriesError(f"half_life must be > 0; got {half_life}.")
+        if (
+            isinstance(half_life, bool)
+            or not isinstance(half_life, numbers.Real)
+            or not np.isfinite(half_life)
+            or half_life <= 0
+        ):
+            raise TimeseriesError(f"half_life must be a finite number > 0; got {half_life!r}.")
+        if not isinstance(unit, str) or not unit:
+            raise TimeseriesError(
+                f"unit must be a pandas offset alias such as 'W', 'D', 'h', 'min' or 's'; "
+                f"got {unit!r}."
+            )
         try:
             unit_td = pd.Timedelta(1, unit=unit)
-        except ValueError as exc:
+        except (ValueError, TypeError) as exc:
             raise TimeseriesError(
                 f"unit must be a valid pandas offset unit; got {unit!r}."
             ) from exc
+        try:
+            half_life_td = unit_td * float(half_life)
+        except (OverflowError, ValueError, pd.errors.OutOfBoundsTimedelta) as exc:
+            raise TimeseriesError(
+                f"half_life={half_life!r} {unit!r} exceeds the range pandas can represent as a "
+                "Timedelta (about 292 years); use a smaller half_life or a coarser unit."
+            ) from exc
+        if half_life_td <= pd.Timedelta(0):
+            raise TimeseriesError(
+                f"half_life={half_life!r} {unit!r} is below the 1 ns resolution of the dates."
+            )
         new_columns = [f"{col}_tw_halflife" for col in columns]
         _check_new_columns(df, new_columns)
-        if group_col is not None and group_col not in df.columns:
-            raise TimeseriesError(
-                f"unknown group_col {group_col!r}; expected one of {list(df.columns)!r}."
-            )
         return _date_weighted_aggregate(
             df,
             columns=columns,
             date_col=date_col,
             window=window,
-            half_life=half_life,
+            half_life=float(half_life),
             unit_td=unit_td,
             anchor=anchor,
             group_col=group_col,
@@ -586,10 +696,6 @@ def time_weighted_aggregate(
 
     new_columns = [f"{col}_tw_{decay}" for col in columns]
     _check_new_columns(df, new_columns)
-    if group_col is not None and group_col not in df.columns:
-        raise TimeseriesError(
-            f"unknown group_col {group_col!r}; expected one of {list(df.columns)!r}."
-        )
 
     # Positional mode -- backwards compatible.
     fn = _linear_weighted_mean if decay == "linear" else _exponential_weighted_mean
@@ -601,13 +707,19 @@ def time_weighted_aggregate(
             else:
                 weighted = df[col].expanding().apply(fn, raw=True)
         else:
-            out = pd.Series(np.nan, index=df.index, dtype=float)
-            for _, grp in df.groupby(group_col, sort=False, dropna=False):
+            # Positional scatter (not ``.loc`` on labels): a duplicated index must not break
+            # or fan out the assignment.
+            out = np.full(len(df), np.nan, dtype=float)
+            groups = df.groupby(group_col, sort=False, dropna=False, observed=True)
+            for pos in groups.indices.values():
+                if not len(pos):
+                    continue
+                sub = df[col].iloc[pos]
                 if window is not None:
-                    sub = grp[col].rolling(window, min_periods=window).apply(fn, raw=True)
+                    part = sub.rolling(window, min_periods=window).apply(fn, raw=True)
                 else:
-                    sub = grp[col].expanding().apply(fn, raw=True)
-                out.loc[grp.index] = sub.to_numpy()
-            weighted = out
+                    part = sub.expanding().apply(fn, raw=True)
+                out[pos] = part.to_numpy(dtype=float)
+            weighted = pd.Series(out, index=df.index)
         result[f"{col}_tw_{decay}"] = weighted
     return result

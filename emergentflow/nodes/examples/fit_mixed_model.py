@@ -100,7 +100,7 @@ class FitMixedModel(NodeDefinition):
             label="Nested groups",
             help=(
                 "Additional levels nested below `groups`, modelled as variance "
-                "components (e.g. classroom within school). Cannot be combined with "
+                "components (e.g. classroom within school). Combines freely with "
                 "random_effects."
             ),
             hints=ValidationHints(widget="column"),

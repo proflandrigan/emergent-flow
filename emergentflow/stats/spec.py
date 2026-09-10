@@ -28,14 +28,17 @@ from emergentflow.stats.errors import InvalidModelSpecError
 from emergentflow.stats.registry import ModelSpec, get_model_spec
 
 #: Structured-spec fields whose value is a single column name (validated against df.columns).
-#: ``groups`` accepts either a single column name OR a list of column names (one random term
-#: per level in the Bayesian family, issue #164 Gap 2) -- the scalar check's isinstance
+#: ``groups`` accepts either a single column name OR a list of column names, but the list form
+#: is Bayesian-only (one random term per level in the Bayesian family, issue #164 Gap 2); every
+#: other model requires a single column name, enforced below. The scalar check's isinstance
 #: guard already co-exists with the list check below.
 _SCALAR_COLUMN_FIELDS = ("target", "weights")
 #: Structured-spec fields whose value is a list of column names.
 _LIST_COLUMN_FIELDS = ("fixed_effects", "random_effects", "linear_terms", "nested_groups")
 #: Fields that accept a single column name OR a list of column names.
 _OR_LIST_COLUMN_FIELDS = ("groups",)
+#: Structured-spec fields whose value must be a JSON object (dict).
+_DICT_FIELDS = ("priors",)
 
 
 def _prepare_model_spec(
@@ -50,7 +53,10 @@ def _prepare_model_spec(
     * an unknown spec field (not in the model's required + optional fields),
     * a missing/empty required spec field,
     * a ``target`` / ``groups`` value that is not a column of *df*,
-    * a ``fixed_effects`` / ``random_effects`` entry that is not a column of *df*.
+    * a ``fixed_effects`` / ``random_effects`` entry that is not a column of *df*,
+    * a list-valued ``groups`` on a non-Bayesian model (only ``BayesianGLM`` accepts one
+      random term per level),
+    * a non-dict ``priors``.
 
     Does not mutate *df* or *spec*; returns a shallow-copied normalized spec dict.
     """
@@ -96,12 +102,25 @@ def _prepare_model_spec(
         if value is None:
             continue
         cols = value if isinstance(value, (list, tuple)) else [value]
+        if isinstance(value, (list, tuple)) and model_spec.archetype != "bayesian_fit":
+            raise InvalidModelSpecError(
+                f"spec {field!r} must be a single column name for model {model!r}; a list of "
+                "grouping columns is only supported by the Bayesian family (BayesianGLM). Use "
+                "'nested_groups' to add levels below 'groups' in MixedLM."
+            )
         for col in cols:
             if col not in columns:
                 raise InvalidModelSpecError(
                     f"spec {field!r} references column {col!r}, which is not in the input "
                     f"frame; available columns: {sorted(columns)!r}."
                 )
+
+    for field in _DICT_FIELDS:
+        value = spec.get(field)
+        if value is not None and not isinstance(value, dict):
+            raise InvalidModelSpecError(
+                f"spec {field!r} must be a dict (JSON object), got {type(value).__name__}."
+            )
 
     family_given = spec.get("family") is not None
     link_given = spec.get("link") is not None

@@ -2369,7 +2369,7 @@
         }
       ],
       "type": "causal.did",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -2505,6 +2505,46 @@
           "name": "n_boot",
           "required": false,
           "type_token": "int"
+        },
+        {
+          "default": 0,
+          "help": "Seed for the bootstrap draws and for matching tie-breaks.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 0.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Random state",
+          "name": "random_state",
+          "required": false,
+          "type_token": "int"
+        },
+        {
+          "default": 0.2,
+          "help": "method='matching': max |logit-score| distance in pooled-SD units for a pair (Austin 2011 default 0.2); unset disables the caliper (greedy full matching).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1e-09,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Caliper (SD)",
+          "name": "caliper",
+          "required": false,
+          "type_token": "float"
         }
       ],
       "ports": [
@@ -2528,7 +2568,7 @@
         }
       ],
       "type": "causal.estimate_effect",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -2603,6 +2643,15 @@
           "type_token": "str"
         },
         {
+          "default": {},
+          "help": "Constructor kwargs for the propensity estimator (e.g. {\"C\": 0.5}).",
+          "hints": null,
+          "label": "Estimator params",
+          "name": "params",
+          "required": false,
+          "type_token": "dict[str, any]"
+        },
+        {
           "default": [
             0.01,
             0.99
@@ -2668,13 +2717,13 @@
         }
       ],
       "type": "causal.fit_propensity",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
       "category": "Causal Inference",
       "column_effect": null,
-      "description": "E-value: how strong must unmeasured confounding be to explain the estimate?",
+      "description": "E-value or Rosenbaum bounds: how strong must unmeasured confounding be?",
       "family": "causal",
       "keywords": [],
       "label": "Sensitivity",
@@ -2682,10 +2731,11 @@
       "params": [
         {
           "default": "e_value",
-          "help": "Sensitivity method; the MVP implements 'e_value'.",
+          "help": "e_value (E-value on an effect frame or risk_ratio) or rosenbaum (bounds on matched pairs).",
           "hints": {
             "choices": [
-              "e_value"
+              "e_value",
+              "rosenbaum"
             ],
             "connection_kind": null,
             "max": null,
@@ -2703,8 +2753,51 @@
           "type_token": "str"
         },
         {
+          "default": "risk_ratio",
+          "help": "e_value: risk_ratio (RR/OR/HR, default) or difference (mean difference; requires sd).",
+          "hints": {
+            "choices": [
+              "risk_ratio",
+              "difference"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Estimate scale",
+          "name": "scale",
+          "required": false,
+          "type_token": "str"
+        },
+        {
           "default": null,
-          "help": "Optional direct risk ratio; overrides the effect frame's estimate.",
+          "help": "e_value with scale='difference': the outcome's standard deviation.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Outcome SD",
+          "name": "sd",
+          "required": false,
+          "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "e_value: optional direct effect value (on `scale`); overrides the effect frame.",
           "hints": {
             "choices": null,
             "connection_kind": null,
@@ -2721,6 +2814,66 @@
           "name": "risk_ratio",
           "required": false,
           "type_token": "float"
+        },
+        {
+          "default": null,
+          "help": "rosenbaum: binary treated-outcome column of the matched frame.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Treated outcome column",
+          "name": "treated_outcome_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "rosenbaum: binary control-outcome column of the matched frame.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Control outcome column",
+          "name": "control_outcome_col",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 2.0,
+          "help": "rosenbaum: hidden-bias magnitude (odds ratio >= 1; 1 = no hidden bias).",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": 1.0,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "number"
+          },
+          "label": "Gamma",
+          "name": "gamma",
+          "required": false,
+          "type_token": "float"
         }
       ],
       "ports": [
@@ -2728,23 +2881,32 @@
           "cardinality": "one",
           "data_type": "DataFrame",
           "direction": "in",
-          "help": "The one-row effect frame from causal.estimate_effect (with 'estimate').",
+          "help": "method='e_value': one-row effect frame with 'estimate' (and ci_low/ci_high). Frames from causal.estimate_effect / causal.did are mean differences: set scale='difference' and sd.",
           "label": "Effect",
           "name": "effect",
-          "required": true
+          "required": false
+        },
+        {
+          "cardinality": "one",
+          "data_type": "DataFrame",
+          "direction": "in",
+          "help": "method='rosenbaum': matched-pair frame with one treated and one control binary outcome per row.",
+          "label": "Matched pairs",
+          "name": "matched",
+          "required": false
         },
         {
           "cardinality": "one",
           "data_type": "DataFrame",
           "direction": "out",
-          "help": "One-row frame with point_evalue and bound_evalue.",
+          "help": "One-row frame: point_evalue/bound_evalue (e_value) or gamma/p_low/p_high (rosenbaum).",
           "label": null,
           "name": "result",
           "required": true
         }
       ],
       "type": "causal.sensitivity",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -7167,7 +7329,7 @@
         },
         {
           "default": "append",
-          "help": "append (default), truncate (drop+recreate), or error (refuse if exists).",
+          "help": "append (default), truncate (delete rows, keep the table, then append), or error (refuse if exists).",
           "hints": {
             "choices": [
               "append",
@@ -9170,6 +9332,26 @@
           "name": "sort_by",
           "required": false,
           "type_token": "str"
+        },
+        {
+          "default": null,
+          "help": "Optional column of per-row sample weights forwarded to every candidate's fit.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Weights column",
+          "name": "weight_col",
+          "required": false,
+          "type_token": "str"
         }
       ],
       "ports": [
@@ -9202,7 +9384,7 @@
         }
       ],
       "type": "ml.compare_models",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -10414,6 +10596,26 @@
           "name": "features",
           "required": false,
           "type_token": "list[str]"
+        },
+        {
+          "default": null,
+          "help": "Optional column of per-row sample weights forwarded to the final step's fit.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "column"
+          },
+          "label": "Weights column",
+          "name": "weight_col",
+          "required": false,
+          "type_token": "str"
         }
       ],
       "ports": [
@@ -10437,7 +10639,7 @@
         }
       ],
       "type": "ml.pipeline",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -12009,14 +12211,14 @@
           "cardinality": "one",
           "data_type": "DataFrame",
           "direction": "out",
-          "help": "observed_r, corrected_r, max_attainable_r, attenuation_ratio[, ci_low/ci_high].",
+          "help": "observed_r, corrected_r, max_attainable_r, attenuation_ratio, out_of_range[, ci_low/ci_high].",
           "label": null,
           "name": "result",
           "required": true
         }
       ],
       "type": "psychometrics.disattenuate",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,
@@ -16136,7 +16338,7 @@
         },
         {
           "default": null,
-          "help": "Additional levels nested below `groups`, modelled as variance components (e.g. classroom within school). Cannot be combined with random_effects.",
+          "help": "Additional levels nested below `groups`, modelled as variance components (e.g. classroom within school). Combines freely with random_effects.",
           "hints": {
             "choices": null,
             "connection_kind": null,
@@ -18407,7 +18609,7 @@
         },
         {
           "default": "linear",
-          "help": "Decay method for recency weighting.",
+          "help": "Decay method for positional weighting; ignored when half_life is set.",
           "hints": {
             "choices": [
               "linear",
@@ -18450,13 +18652,13 @@
         },
         {
           "default": null,
-          "help": "Half-life in `unit` units for date-aware decay (0.5**(delta/half_life)). Unset uses the legacy positional weighting.",
+          "help": "Half-life in `unit` units for date-aware decay: an observation loses half its weight every half_life units of elapsed time. Unset uses the positional weighting.",
           "hints": {
             "choices": null,
             "connection_kind": null,
             "max": null,
             "max_length": null,
-            "min": 0.0,
+            "min": 1e-09,
             "min_length": null,
             "pattern": null,
             "ref_supported": false,
@@ -18470,12 +18672,13 @@
         },
         {
           "default": "D",
-          "help": "Pandas time unit for the half-life deltas (D, h, m, s, ...).",
+          "help": "Pandas offset unit for the half-life (W, D, h, min, s, ...).",
           "hints": {
             "choices": [
+              "W",
               "D",
               "h",
-              "m",
+              "min",
               "s",
               "ms",
               "us",
@@ -18498,7 +18701,7 @@
         },
         {
           "default": null,
-          "help": "Per-row anchor: a column name or a fixed timestamp string. Defaults to the latest date in each group.",
+          "help": "Optional as-of cutoff: a column name (each row's own cutoff date) or a fixed timestamp. Rows dated after the cutoff are excluded from the mean.",
           "hints": {
             "choices": null,
             "connection_kind": null,
@@ -18558,7 +18761,7 @@
         }
       ],
       "type": "timeseries.time_weighted_aggregate",
-      "version": 2
+      "version": 3
     },
     {
       "advisor_persona": null,

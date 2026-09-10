@@ -24,7 +24,9 @@ from emergentflow.data.warehouse.protocol import (
     QueryResult,
     QueryTimeoutError,
     WarehouseAdapter,
+    WritableWarehouseAdapter,
     WriteNotEnabledError,
+    WriteNotSupportedError,
     WriteRequest,
     WriteResult,
     dry_run_result,
@@ -87,6 +89,10 @@ class AdapterWarehouseClient:
         if request.dry_run:
             return dry_run_result(self.dry_run(request))
         profile, credentials = self._resolve(request.connection)
+        if not request.read_only and not profile.write_enabled:
+            # ADR 0018: write_enabled is the single gate for anything that can mutate the
+            # warehouse -- a DML/DDL statement sent with read_only=False included.
+            raise WriteNotEnabledError(request.connection)
         adapter = self._adapter_for(profile.dialect)
         timeout_s = profile.limits.get("timeout_s")
         result = self._execute_with_timeout(adapter, request, credentials, timeout_s)
@@ -124,9 +130,19 @@ class AdapterWarehouseClient:
         ADR 0018 defaults connections to read-only; this is the single gate that
         enforces it for the write path. A profile without ``write_enabled`` raises
         :class:`WriteNotEnabledError` naming the exact setting to change; a resolved,
-        explicitly-writable profile delegates the write to its dialect adapter.
+        explicitly-writable profile delegates the write to its dialect adapter. The
+        request's ``dialect`` must match the profile's, and the adapter must implement
+        ``write`` (``WritableWarehouseAdapter``) -- otherwise :class:`WriteNotSupportedError`.
         """
         profile, credentials = self._resolve(request.connection)
         if not profile.write_enabled:
             raise WriteNotEnabledError(request.connection)
-        return self._adapter_for(profile.dialect).write(request, df, credentials)
+        if request.dialect != profile.dialect:
+            raise ValueError(
+                f"write_table dialect {request.dialect!r} does not match connection "
+                f"{request.connection!r}, whose dialect is {profile.dialect!r}."
+            )
+        adapter = self._adapter_for(profile.dialect)
+        if not isinstance(adapter, WritableWarehouseAdapter):
+            raise WriteNotSupportedError(profile.dialect)
+        return adapter.write(request, df, credentials)

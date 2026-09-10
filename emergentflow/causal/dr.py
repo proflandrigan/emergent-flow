@@ -6,7 +6,7 @@ Doubly-robust and IPW effect estimation with honest uncertainty (issue #164 Gap 
 ``ef.causal.estimate_effect`` computes an average treatment effect on an observational
 sample with acknowledged selection bias, via one of four methods:
 
-* ``"ipw"``               -- inverse-probability weighting (Hajek estimator).
+* ``"ipw"``               -- inverse-probability weighting (Hajek / self-normalised estimator).
 * ``"aipw"``              -- doubly robust augmentation; consistent if EITHER the
     propensity model OR the outcome model is correctly specified.
 * ``"matching"``          -- 1:1 nearest-neighbour propensity matching (see matching.py).
@@ -22,6 +22,7 @@ difference for ``matching``).
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Callable
 from typing import Any
 
@@ -33,27 +34,30 @@ from scipy import stats as scipy_stats
 from sklearn.linear_model import LogisticRegression
 
 from emergentflow.api import public_op
-from emergentflow.causal.errors import CausalError, UnknownMethodError
-from emergentflow.causal.matching import match_nearest
+from emergentflow.causal.errors import CausalError, InvalidTreatmentError
+from emergentflow.causal.matching import _DEFAULT_CALIPER, match_nearest
 from emergentflow.causal.propensity import _propensity_design, _validate_binary_treatment
-from emergentflow.stats.catalog import _cov_kwargs
+from emergentflow.causal.registry import get_estimator_spec
+from emergentflow.stats.catalog import _cov_kwargs, _patsy_term
 
 __all__ = ["estimate_effect"]
 
-_EFFECT_METHODS = ("ipw", "aipw", "matching", "regression_adjust")
 _Z = 1.959963984540054  # z_{0.975}
+_P_CLIP = 1e-6
 
 
 def _treat_param_name(results: Any, treatment: str) -> str:
     """Return the exact coefficient name for *treatment* in a statsmodels result.
 
-    patsy keeps the bare column name for a plain identifier; a categorical treatment
-    would be mangled, but this family requires binary 0/1 so the bare name is expected.
+    patsy keeps the bare column name for a plain identifier and wraps a non-identifier
+    column as ``Q('...')``; a categorical treatment would be mangled, but this family
+    requires binary 0/1 so one of those two forms is expected.
     """
-    if treatment in results.params.index:
-        return treatment
+    for candidate in (treatment, _patsy_term(treatment)):
+        if candidate in results.params.index:
+            return candidate
     for name in results.params.index:
-        if name == treatment or name.startswith(f"{treatment}["):
+        if name.startswith(f"{treatment}[") or name.startswith(f"{_patsy_term(treatment)}["):
             return name
     raise CausalError(
         f"could not locate the treatment coefficient for {treatment!r} in "
@@ -62,25 +66,73 @@ def _treat_param_name(results: Any, treatment: str) -> str:
 
 
 def _regression_formula(outcome: str, treatment: str, covariates: list[str] | None) -> str:
-    if covariates:
-        return f"{outcome} ~ {treatment} + " + " + ".join(covariates)
-    return f"{outcome} ~ {treatment}"
+    rhs = [_patsy_term(treatment)] + [_patsy_term(c) for c in (covariates or [])]
+    return f"{_patsy_term(outcome)} ~ " + " + ".join(rhs)
+
+
+def _fit_propensity_probs(design: pd.DataFrame, t: np.ndarray) -> np.ndarray:
+    """Logistic propensity scores, clipped away from 0/1 so the IPW weights stay finite."""
+    est = LogisticRegression(max_iter=1000).fit(design, t)
+    return est.predict_proba(design)[:, 1].clip(_P_CLIP, 1 - _P_CLIP)
+
+
+def _hajek(y: np.ndarray, tt: np.ndarray, p: np.ndarray) -> tuple[float, np.ndarray]:
+    """Hajek (self-normalised) IPW ATE and its per-unit influence function.
+
+    ``mu1 = sum(w1 y) / sum(w1)`` and ``mu0 = sum(w0 y) / sum(w0)`` with ``w1 = t/p`` and
+    ``w0 = (1-t)/(1-p)``. Unlike the Horvitz-Thompson form ``mean((t/p - (1-t)/(1-p)) y)``
+    the weights are normalised within each arm, so the estimate is invariant to shifting
+    ``y`` by a constant. The influence function of each ratio estimator is
+    ``w (y - mu) / mean(w)``.
+    """
+    w1 = tt / p
+    w0 = (1.0 - tt) / (1.0 - p)
+    mu1 = float((w1 * y).sum() / w1.sum())
+    mu0 = float((w0 * y).sum() / w0.sum())
+    infl = w1 * (y - mu1) / w1.mean() - w0 * (y - mu0) / w0.mean()
+    return mu1 - mu0, infl
+
+
+def _aipw(
+    y: np.ndarray, tt: np.ndarray, p: np.ndarray, design: pd.DataFrame
+) -> tuple[float, np.ndarray]:
+    """Doubly-robust (AIPW) ATE and its per-unit influence function.
+
+    Fits per-arm linear outcome models on *design* and returns ``(mean(DR_i), DR_i - mean)``.
+    """
+    X = sm.add_constant(design)
+    mu1 = sm.OLS(y[tt == 1], X.iloc[tt == 1]).fit()
+    mu0 = sm.OLS(y[tt == 0], X.iloc[tt == 0]).fit()
+    m1 = np.asarray(mu1.predict(X), dtype=float)
+    m0 = np.asarray(mu0.predict(X), dtype=float)
+    dr = (tt / p * (y - m1) + m1) - ((1.0 - tt) / (1.0 - p) * (y - m0) + m0)
+    point = float(dr.mean())
+    return point, dr - point
 
 
 def _point_model(
-    df: pd.DataFrame,
     *,
     outcome: str,
     treatment: str,
     covariates: list[str] | None,
     method: str,
+    caliper: float | None,
+    random_state: int,
 ) -> Callable[[pd.DataFrame], float]:
     """Return a callable computing just the point estimate on any compatible frame."""
+    covs = covariates or []
+
     if method == "matching":
-        covs = covariates or []
 
         def _matching_point(d2: pd.DataFrame) -> float:
-            pairs = match_nearest(d2, treatment=treatment, covariates=covs, outcome=outcome)
+            pairs = match_nearest(
+                d2,
+                treatment=treatment,
+                covariates=covs,
+                outcome=outcome,
+                caliper=caliper,
+                random_state=random_state,
+            )
             return float(pairs["difference"].mean())
 
         return _matching_point
@@ -94,50 +146,16 @@ def _point_model(
 
         return _regress_point
 
-    covs = covariates or []
-
     def _score_point(d2: pd.DataFrame) -> float:
-        t2 = _validate_binary_treatment(d2, treatment)
+        tt2 = _validate_binary_treatment(d2, treatment).to_numpy()
         design2 = _propensity_design(d2, covs)
+        y2 = d2[outcome].to_numpy(dtype=float)
+        p2 = _fit_propensity_probs(design2, tt2)
         if method == "aipw":
-            return float(_aipw_point(d2, t2, design2, outcome))
-        est = LogisticRegression(max_iter=1000).fit(design2, t2)
-        p2 = est.predict_proba(design2)[:, 1]
-        y2 = d2[outcome].to_numpy()
-        tt2 = t2.to_numpy()
-        score = (tt2 / np.clip(p2, 1e-6, 1) - (1 - tt2) / np.clip(1 - p2, 1e-6, 1)) * y2
-        return float(score.mean())
+            return _aipw(y2, tt2, p2, design2)[0]
+        return _hajek(y2, tt2, p2)[0]
 
     return _score_point
-
-
-def _aipw_point(
-    df: pd.DataFrame,
-    t: pd.Series,
-    design: pd.DataFrame,
-    outcome: str,
-) -> float:
-    """Doubly-robust score averaged over *df* using already-fit inputs' structure.
-
-    Fits per-arm linear outcome models on ``design`` and returns
-    ``mean(DR_i)``. Re-fits the propensity model inside (nothing is reused across
-    calls, keeping the bootstrap path self-contained).
-    """
-    from sklearn.linear_model import LogisticRegression
-
-    y = df[outcome].to_numpy()
-    tt = t.to_numpy()
-    est = LogisticRegression(max_iter=1000).fit(design, t)
-    p = est.predict_proba(design)[:, 1]
-    X = sm.add_constant(design)
-    mu1 = sm.OLS(y[tt == 1], X.iloc[tt == 1]).fit()
-    mu0 = sm.OLS(y[tt == 0], X.iloc[tt == 0]).fit()
-    m1 = mu1.predict(X)
-    m0 = mu0.predict(X)
-    dr = (tt / np.clip(p, 1e-6, 1) * (y - m1) + m1) - (
-        (1 - tt) / np.clip(1 - p, 1e-6, 1) * (y - m0) + m0
-    )
-    return float(dr.mean())
 
 
 def _closed_form(
@@ -148,8 +166,14 @@ def _closed_form(
     covariates: list[str] | None,
     method: str,
     cluster_col: str | None,
+    p: np.ndarray | None,
+    pairs: pd.DataFrame | None,
 ) -> tuple[float, float, float, float]:
-    """Analytical ``(point, se, ci_low, ci_high)`` with no resampling."""
+    """Analytical ``(point, se, ci_low, ci_high)`` with no resampling.
+
+    *p* (propensity scores) is pre-fitted by the caller for ``ipw``/``aipw``; *pairs* is the
+    pre-computed match frame for ``matching``.
+    """
     t = _validate_binary_treatment(df, treatment)
     n = len(df)
 
@@ -157,10 +181,6 @@ def _closed_form(
         formula = _regression_formula(outcome, treatment, covariates)
         spec: dict[str, object] = {"cov_type": "nonrobust"}
         if cluster_col is not None:
-            if cluster_col not in df.columns:
-                raise CausalError(
-                    f"unknown cluster_col {cluster_col!r}; expected one of {list(df.columns)!r}."
-                )
             spec = {"cov_type": "cluster", "cov_group": cluster_col}
         cov_kwargs = _cov_kwargs(df, spec)
         results = smf.ols(formula, data=df).fit(**cov_kwargs)
@@ -172,42 +192,24 @@ def _closed_form(
         return point, se, lo, hi
 
     if method == "matching":
-        pairs = match_nearest(df, treatment=treatment, covariates=covariates or [], outcome=outcome)
-        diffs = pairs["difference"].to_numpy()
+        assert pairs is not None  # supplied by estimate_effect
+        diffs = pairs["difference"].to_numpy(dtype=float)
         point = float(diffs.mean())
         se = float(diffs.std(ddof=1) / np.sqrt(len(diffs))) if len(diffs) > 1 else float("nan")
         return point, se, point - _Z * se, point + _Z * se
 
     # ipw / aipw: influence-function sandwich.
-    covs = covariates or []
-    design = _propensity_design(df, covs)
-    y = df[outcome].to_numpy()
+    assert p is not None  # supplied by estimate_effect
+    y = df[outcome].to_numpy(dtype=float)
     tt = t.to_numpy()
-    est = LogisticRegression(max_iter=1000).fit(design, t)
-    p = est.predict_proba(design)[:, 1].clip(1e-6, 1 - 1e-6)
-
     if method == "ipw":
-        score = (tt / p - (1 - tt) / (1 - p)) * y
-        point = float(score.mean())
-        infl = pd.Series(score - point, index=df.index, dtype=float)
-    elif method == "aipw":
-        X = sm.add_constant(design)
-        mu1 = sm.OLS(y[tt == 1], X.iloc[tt == 1]).fit()
-        mu0 = sm.OLS(y[tt == 0], X.iloc[tt == 0]).fit()
-        m1 = mu1.predict(X)
-        m0 = mu0.predict(X)
-        dr = (tt / p * (y - m1) + m1) - ((1 - tt) / (1 - p) * (y - m0) + m0)
-        point = float(dr.mean())
-        infl = pd.Series(dr - point, index=df.index, dtype=float)
-    else:  # pragma: no cover - guarded by _EFFECT_METHODS
-        raise UnknownMethodError(f"unknown method {method!r}.")
+        point, infl_arr = _hajek(y, tt, p)
+    else:
+        point, infl_arr = _aipw(y, tt, p, _propensity_design(df, covariates or []))
+    infl = pd.Series(infl_arr, index=df.index, dtype=float)
 
     if cluster_col is not None:
-        if cluster_col not in df.columns:
-            raise CausalError(
-                f"unknown cluster_col {cluster_col!r}; expected one of {list(df.columns)!r}."
-            )
-        cluster_sums = infl.groupby(df[cluster_col], sort=False).sum()
+        cluster_sums = infl.groupby(df[cluster_col].to_numpy(), sort=False).sum()
         var = float((cluster_sums**2).sum()) / (n * (n - 1))
     else:
         var = float((infl**2).sum()) / (n * (n - 1))
@@ -223,9 +225,15 @@ def _bootstrap_ci(
     n_boot: int,
     random_state: int,
 ) -> tuple[float, float, float]:
-    """Bootstrap ``(se, lo, hi)``; cluster bootstrap when ``cluster_col`` is given."""
+    """Bootstrap ``(se, lo, hi)``; cluster bootstrap when ``cluster_col`` is given.
+
+    Draws that fail (e.g. a resample with no matchable pair) are dropped and counted; if any
+    were dropped a ``RuntimeWarning`` reports how many, and if all failed a ``CausalError``
+    is raised.
+    """
     rng = np.random.default_rng(random_state)
     boot: list[float] = []
+    n_failed = 0
     if cluster_col is not None:
         clusters = df[cluster_col].unique()
         for _ in range(n_boot):
@@ -234,21 +242,35 @@ def _bootstrap_ci(
             try:
                 boot.append(float(point_fn(boot_df)))
             except Exception:  # noqa: BLE001 - a dropped draw is not fatal
-                continue
+                n_failed += 1
     else:
         idx = np.arange(len(df))
         for _ in range(n_boot):
-            sample = df.iloc[rng.choice(idx, size=len(idx), replace=True)]
+            # reset_index: a resample carries duplicate labels, which must not fan out in
+            # any label-based lookup downstream.
+            sample = df.iloc[rng.choice(idx, size=len(idx), replace=True)].reset_index(drop=True)
             try:
                 boot.append(float(point_fn(sample)))
             except Exception:  # noqa: BLE001
-                continue
+                n_failed += 1
     if not boot:
         raise CausalError("all bootstrap draws failed; cannot compute a bootstrap interval.")
+    if n_failed:
+        warnings.warn(
+            f"{n_failed} of {n_boot} bootstrap draws failed and were dropped; the interval is "
+            f"based on {len(boot)} draws.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
     boot_arr = np.asarray(boot)
-    se = float(boot_arr.std(ddof=1))
+    se = float(boot_arr.std(ddof=1)) if len(boot_arr) > 1 else float("nan")
     lo, hi = float(np.percentile(boot_arr, 2.5)), float(np.percentile(boot_arr, 97.5))
     return se, lo, hi
+
+
+def _kish_effective_n(weights: np.ndarray) -> float:
+    """Kish effective sample size ``(sum w)^2 / sum(w^2)``."""
+    return float(weights.sum() ** 2 / (weights**2).sum())
 
 
 @public_op(name="ef.causal.estimate_effect")
@@ -262,45 +284,106 @@ def estimate_effect(
     cluster_col: str | None = None,
     n_boot: int = 0,
     random_state: int = 0,
+    caliper: float | None = _DEFAULT_CALIPER,
 ) -> pd.DataFrame:
     """Estimate an average treatment effect with honest uncertainty.
 
-    ``method`` is one of ``"aipw"`` (default; doubly robust), ``"ipw"``,
-    ``"matching"``, or ``"regression_adjust"``. ``covariates`` is the adjustment set;
-    non-numeric covariates are one-hot encoded for the models. ``treatment`` must be a
-    binary 0/1 column; ``outcome`` any continuous column.
+    ``method`` is one of the registered ``estimate_effect`` estimators (see
+    ``ef.causal.keys_for_archetype("estimate_effect")``): ``"aipw"`` (default; doubly
+    robust), ``"ipw"`` (Hajek / self-normalised inverse-probability weighting -- invariant
+    to shifting the outcome by a constant), ``"matching"`` (1:1 nearest-neighbour
+    propensity matching within ``caliper`` SDs of the logit score; ``caliper=None`` disables
+    the caliper; ``random_state`` breaks exact ties), or ``"regression_adjust"``.
+    ``covariates`` is the adjustment set; non-numeric covariates are one-hot encoded for the
+    models. ``treatment`` must be a binary 0/1 column with both arms present; ``outcome``
+    any continuous column. Missing values in the outcome, treatment or covariates raise.
 
     Inference honours nested/clustered data:
 
     * ``cluster_col`` computes a cluster-robust (sandwich) SE over whole groups, so
       repeated measures per subject get honest SEs without a second mechanism
       (``regression_adjust`` reuses the ``cov_type="cluster"`` path from
-      ``ef.stats.fit_model``).
+      ``ef.stats.fit_model``). The closed-form ``matching`` SE has no cluster form: pass
+      ``n_boot > 0`` to get a cluster bootstrap instead.
     * ``n_boot`` > 0 runs a bootstrap (cluster bootstrap over ``cluster_col`` when
       given, row bootstrap otherwise) and returns the 95% percentile CI. With
       ``n_boot=0`` a closed-form SE is used (sandwich for ``ipw``/``aipw``, fitted-model
       SE for ``regression_adjust``, paired-difference SE for ``matching``).
 
     Returns a one-row, tidy ``pd.DataFrame`` with columns ``estimate``, ``std_err``,
-    ``ci_low``, ``ci_high``, ``p_value``, ``method``, ``n_treated``, ``n_control``,
-    ``effective_n``. Never mutates ``df``.
+    ``ci_low``, ``ci_high``, ``p_value``, ``method``, ``n_treated``, ``n_control`` (sample
+    counts), and ``effective_n``: the Kish effective sample size of the IPW weights for
+    ``ipw``/``aipw``, the number of matched pairs for ``matching``, and the sample size for
+    ``regression_adjust``. Never mutates ``df``.
     """
+    get_estimator_spec(method, "estimate_effect")  # raises UnknownMethodError
     if outcome not in df.columns:
         raise CausalError(f"unknown outcome {outcome!r}; expected one of {list(df.columns)!r}.")
-    if method not in _EFFECT_METHODS:
-        raise UnknownMethodError(
-            f"unknown method {method!r}; expected one of {list(_EFFECT_METHODS)!r}."
-        )
     for col in covariates or []:
         if col not in df.columns:
             raise CausalError(f"unknown covariate {col!r}; expected one of {list(df.columns)!r}.")
+    if cluster_col is not None and cluster_col not in df.columns:
+        raise CausalError(
+            f"unknown cluster_col {cluster_col!r}; expected one of {list(df.columns)!r}."
+        )
+    if cluster_col is not None and df[cluster_col].isna().any():
+        raise CausalError(
+            f"cluster_col {cluster_col!r} contains missing values; a row without a cluster would "
+            "silently drop out of the cluster-robust variance. Drop or fill them first."
+        )
+    if cluster_col is not None and method == "matching" and n_boot == 0:
+        raise CausalError(
+            "cluster_col has no closed-form SE for method='matching'; pass n_boot > 0 to run a "
+            "cluster bootstrap over cluster_col instead."
+        )
     t = _validate_binary_treatment(df, treatment)
     n_treated = int((t == 1).sum())
     n_control = int(len(df) - n_treated)
+    if n_treated == 0 or n_control == 0:
+        raise InvalidTreatmentError(
+            f"treatment {treatment!r} must contain both treated (1) and control (0) units; "
+            f"found n_treated={n_treated}, n_control={n_control}."
+        )
+    if df[outcome].isna().any():
+        raise CausalError(
+            f"outcome {outcome!r} contains missing values; drop or impute them before "
+            "estimating an effect."
+        )
+    na_covs = [c for c in covariates or [] if df[c].isna().any()]
+    if na_covs:
+        raise CausalError(
+            f"covariates {na_covs!r} contain missing values; drop or impute them before "
+            "estimating an effect."
+        )
+
+    p: np.ndarray | None = None
+    pairs: pd.DataFrame | None = None
+    if method in ("ipw", "aipw"):
+        design = _propensity_design(df, covariates or [])
+        p = _fit_propensity_probs(design, t.to_numpy())
+        tt = t.to_numpy()
+        effective_n = _kish_effective_n(tt / p + (1.0 - tt) / (1.0 - p))
+    elif method == "matching":
+        pairs = match_nearest(
+            df,
+            treatment=treatment,
+            covariates=covariates or [],
+            outcome=outcome,
+            caliper=caliper,
+            random_state=random_state,
+        )
+        effective_n = float(len(pairs))
+    else:
+        effective_n = float(len(df))
 
     if n_boot > 0:
         point_fn = _point_model(
-            df, outcome=outcome, treatment=treatment, covariates=covariates, method=method
+            outcome=outcome,
+            treatment=treatment,
+            covariates=covariates,
+            method=method,
+            caliper=caliper,
+            random_state=random_state,
         )
         point = float(point_fn(df))
         se, lo, hi = _bootstrap_ci(
@@ -314,12 +397,15 @@ def estimate_effect(
             covariates=covariates,
             method=method,
             cluster_col=cluster_col,
+            p=p,
+            pairs=pairs,
         )
 
-    p_value = float(
-        2.0 * (1.0 - scipy_stats.norm.cdf(abs(point / se))) if se and se > 0 else float("nan")
+    p_value = (
+        float(2.0 * scipy_stats.norm.sf(abs(point / se)))
+        if np.isfinite(se) and se > 0
+        else float("nan")
     )
-    effective_n = float(min(n_treated, n_control))
 
     return pd.DataFrame(
         [

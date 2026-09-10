@@ -29,7 +29,7 @@ class CausalDid(NodeDefinition):
     """Two-way fixed-effects difference-in-differences with pre-trend test."""
 
     type = "causal.did"
-    version = 1
+    version = 2
     family = "causal"
     label = "Diff-in-Diff"
     category = "Causal Inference"
@@ -117,14 +117,18 @@ class CausalDid(NodeDefinition):
             "time_col": cast(str, values.get("time_col")),
             "treated_col": cast(str, values.get("treated_col")),
             "post_col": cast(str, values.get("post_col")),
-            "covariates": cast("list[str] | None", values.get("covariates")),
-            "cluster_col": cast("str | None", values.get("cluster_col")),
+            "covariates": cast("list[str] | None", values.get("covariates") or None),
+            "cluster_col": cast("str | None", values.get("cluster_col") or None),
         }
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         args = self._args(node)
-        codegen_cov = f", covariates={args['covariates']!r}" if args["covariates"] else ""
-        codegen_cluster = f", cluster_col={args['cluster_col']!r}" if args["cluster_col"] else ""
+        codegen_cov = (
+            f", covariates={args['covariates']!r}" if args["covariates"] is not None else ""
+        )
+        codegen_cluster = (
+            f", cluster_col={args['cluster_col']!r}" if args["cluster_col"] is not None else ""
+        )
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(

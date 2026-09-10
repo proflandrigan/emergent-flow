@@ -309,20 +309,23 @@ def test_mixedlm_nested_groups_vc_formula():
     assert level_icc["room"] > 0
 
 
-def test_mixedlm_rejects_random_effects_with_nested_groups():
+def test_mixedlm_accepts_random_effects_with_nested_groups():
+    # statsmodels fits a re_formula (random slopes) and a vc_formula (nested variance
+    # components) together; the earlier "one or the other" guard was a false premise.
     df = _make_nested_mixedlm_df()
-    with pytest.raises(InvalidModelSpecError, match="random_effects"):
-        fit_model(
-            df,
-            model="MixedLM",
-            spec={
-                "target": "y",
-                "fixed_effects": ["x"],
-                "groups": "school",
-                "random_effects": ["x"],
-                "nested_groups": ["room"],
-            },
-        )
+    fitted = fit_model(
+        df,
+        model="MixedLM",
+        spec={
+            "target": "y",
+            "fixed_effects": ["x"],
+            "groups": "school",
+            "random_effects": ["x"],
+            "nested_groups": ["room"],
+        },
+    )
+    assert fitted.results.k_re == 2
+    assert "room Var" in set(fitted.coefficients["term"])
 
 
 def test_mixedlm_unknown_nested_group_column_raises():

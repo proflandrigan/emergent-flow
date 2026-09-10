@@ -114,7 +114,8 @@ class TrainRandomForest(NodeDefinition):
         random_state = values.get("random_state", 0)
         if random_state is None:
             random_state = 0
-        weight_col = values.get("weight_col")
+        # "" from the UI must mean "unset" on both paths
+        weight_col = values.get("weight_col") or None
         return (
             cast(str, target),
             cast("list[str] | None", features),

@@ -31,7 +31,7 @@ class CausalEstimateEffect(NodeDefinition):
     """Estimate an average treatment effect with honest uncertainty."""
 
     type = "causal.estimate_effect"
-    version = 1
+    version = 2
     family = "causal"
     label = "Estimate Effect"
     category = "Causal Inference"
@@ -104,6 +104,23 @@ class CausalEstimateEffect(NodeDefinition):
             help=">0 runs a bootstrap (cluster bootstrap when cluster_col is set).",
             hints=ValidationHints(min=0, widget="number"),
         ),
+        ParamSpec(
+            name="random_state",
+            type_token="int",
+            default=0,
+            label="Random state",
+            help="Seed for the bootstrap draws and for matching tie-breaks.",
+            hints=ValidationHints(min=0, widget="number"),
+        ),
+        ParamSpec(
+            name="caliper",
+            type_token="float",
+            default=0.2,
+            label="Caliper (SD)",
+            help="method='matching': max |logit-score| distance in pooled-SD units for a pair "
+            "(Austin 2011 default 0.2); unset disables the caliper (greedy full matching).",
+            hints=ValidationHints(min=1e-9, widget="number"),
+        ),
     ]
 
     def _args(self, node: Node) -> dict[str, Any]:
@@ -113,21 +130,29 @@ class CausalEstimateEffect(NodeDefinition):
             "treatment": cast(str, values.get("treatment")),
             "covariates": cast("list[str] | None", values.get("covariates")),
             "method": cast(str, values.get("method", "aipw")),
-            "cluster_col": cast("str | None", values.get("cluster_col")),
+            "cluster_col": cast("str | None", values.get("cluster_col") or None),
             "n_boot": cast(int, values.get("n_boot") or 0),
+            "random_state": cast(int, values.get("random_state") or 0),
+            # None (param cleared in the UI) disables the caliper, matching the op's contract.
+            "caliper": cast("float | None", values.get("caliper")),
         }
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         args = self._args(node)
-        codegen_cluster = f", cluster_col={args['cluster_col']!r}" if args["cluster_col"] else ""
+        codegen_cluster = (
+            f", cluster_col={args['cluster_col']!r}" if args["cluster_col"] is not None else ""
+        )
         codegen_boot = f", n_boot={args['n_boot']!r}" if args["n_boot"] else ""
+        codegen_seed = f", random_state={args['random_state']!r}" if args["random_state"] else ""
+        codegen_caliper = f", caliper={args['caliper']!r}" if args["caliper"] != 0.2 else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('result')} = ef.causal.estimate_effect("
                 f"{ctx.in_var('frame')}, outcome={args['outcome']!r}, "
                 f"treatment={args['treatment']!r}, covariates={args['covariates']!r}, "
-                f"method={args['method']!r}{codegen_cluster}{codegen_boot})"
+                f"method={args['method']!r}{codegen_cluster}{codegen_boot}"
+                f"{codegen_seed}{codegen_caliper})"
             ),
         )
 
@@ -142,5 +167,7 @@ class CausalEstimateEffect(NodeDefinition):
                 method=args["method"],
                 cluster_col=args["cluster_col"],
                 n_boot=args["n_boot"],
+                random_state=args["random_state"],
+                caliper=args["caliper"],
             )
         }

@@ -48,6 +48,12 @@ def _escape_literal(value: str) -> str:
     return value.replace("'", "''")
 
 
+def _split_table(table: str) -> tuple[str | None, str]:
+    """Split ``schema.table`` into ``(schema, table)``; ``(None, table)`` when unqualified."""
+    schema, _, name = table.rpartition(".")
+    return (schema or None), name
+
+
 class PostgresAdapter:
     """A ``WarehouseAdapter`` for PostgreSQL.
 
@@ -205,15 +211,29 @@ class PostgresAdapter:
     ) -> WriteResult:
         """Write *df* to *request.table* per the request's mode (issue #164 Gap 6).
 
-        Uses ``pandas.to_sql`` with SQLAlchemy. ``"append"`` maps to ``if_exists="append"``,
-        ``"truncate"`` to ``if_exists="replace"`` (drop + recreate), and ``"error"`` to
-        ``if_exists="fail"`` (raises if the table exists).
+        ``table`` may be ``schema.table`` (split on the last dot and passed to pandas as
+        ``schema=``). ``"append"`` -> ``to_sql(if_exists="append")``; ``"error"`` ->
+        ``if_exists="fail"``; ``"truncate"`` -> ``TRUNCATE TABLE`` (a plain ``DELETE`` on
+        non-PostgreSQL engines) followed by an append, so the table's column types,
+        constraints, indexes and grants survive. Everything runs in ONE transaction
+        (``engine.begin()``): a failed insert rolls the truncate back and the old rows remain.
         """
         _require_driver()
         start = time.monotonic()
         engine = self._engine(credentials)
-        if_exists = {"append": "append", "truncate": "replace", "error": "fail"}[request.mode]
-        df.to_sql(request.table, engine, if_exists=if_exists, index=False)
+        schema, name = _split_table(request.table)
+        with engine.begin() as conn:
+            if request.mode == "truncate":
+                if _sa.inspect(conn).has_table(name, schema=schema):
+                    preparer = conn.dialect.identifier_preparer
+                    parts = ([schema] if schema else []) + [name]
+                    qualified = ".".join(preparer.quote(p) for p in parts)
+                    verb = "TRUNCATE TABLE" if conn.dialect.name == "postgresql" else "DELETE FROM"
+                    conn.execute(_sa.text(f"{verb} {qualified}"))
+                df.to_sql(name, conn, schema=schema, if_exists="append", index=False)
+            else:
+                if_exists = {"append": "append", "error": "fail"}[request.mode]
+                df.to_sql(name, conn, schema=schema, if_exists=if_exists, index=False)
         elapsed_ms = (time.monotonic() - start) * 1000
         return WriteResult(
             table=request.table,

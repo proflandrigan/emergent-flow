@@ -15,12 +15,14 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from sklearn.linear_model import LogisticRegression
 
 from emergentflow.causal.errors import CausalError
 from emergentflow.causal.propensity import _propensity_design, _validate_binary_treatment
 
 __all__ = ["match_nearest"]
 
+#: Default caliper in SD units of the logit propensity score (Austin 2011).
 _DEFAULT_CALIPER = 0.2
 
 
@@ -30,7 +32,7 @@ def match_nearest(
     treatment: str,
     covariates: list[str],
     outcome: str,
-    caliper: float | None = 0.2,
+    caliper: float | None = _DEFAULT_CALIPER,
     random_state: int = 0,
 ) -> pd.DataFrame:
     """Nearest-neighbour propensity matching (1:1, no replacement).
@@ -46,28 +48,36 @@ def match_nearest(
 
     Treated units are matched in descending propensity order so the hardest-to-match
     extreme-score units are handled while close controls are still available (a
-    material balance improvement; Austin 2011). Deterministic given ``random_state``
-    (ties on score are broken by that seed). Never mutates ``df``.
+    material balance improvement; Austin 2011). Controls are shuffled once with
+    ``random_state`` before the stable nearest-distance sort, so exact ties on score are
+    broken by that seed (deterministic given ``random_state``). Everything is positional:
+    a frame with a duplicated index (e.g. a bootstrap resample) matches correctly, and
+    ``treated_index``/``control_index`` report the original index labels. Never mutates
+    ``df``.
     """
     if outcome not in df.columns:
         raise CausalError(f"unknown outcome {outcome!r}; expected one of {list(df.columns)!r}.")
-    t = _validate_binary_treatment(df, treatment)
+    t = _validate_binary_treatment(df, treatment).to_numpy()
     design = _propensity_design(df, covariates)
-
-    from sklearn.linear_model import LogisticRegression
 
     est = LogisticRegression(max_iter=1000)
     est.fit(design, t)
-    logit = est.decision_function(design)
-    scores = pd.Series(logit, index=df.index)
+    logit = np.asarray(est.decision_function(design), dtype=float)
+    y = df[outcome].to_numpy(dtype=float)
+    labels = np.asarray(df.index)
 
-    treated_ids = df.index[t == 1]
-    control_ids = df.index[t == 0]
-    if len(treated_ids) == 0 or len(control_ids) == 0:
+    pos_t = np.flatnonzero(t == 1)
+    pos_c = np.flatnonzero(t == 0)
+    if len(pos_t) == 0 or len(pos_c) == 0:
         raise CausalError("matching requires both treated and control units.")
 
-    sc_tr = scores.loc[treated_ids].to_numpy()
-    sc_ct = scores.loc[control_ids].to_numpy()
+    # Seeded shuffle of the controls: the stable argsort below then breaks exact score ties
+    # by this order, which makes `random_state` the documented tie-breaker.
+    rng = np.random.default_rng(random_state)
+    pos_c = pos_c[rng.permutation(len(pos_c))]
+
+    sc_tr = logit[pos_t]
+    sc_ct = logit[pos_c]
 
     if caliper is not None:
         if caliper <= 0:
@@ -77,13 +87,12 @@ def match_nearest(
     else:
         bound = float("inf")
 
-    used = np.zeros(len(control_ids), dtype=bool)
+    used = np.zeros(len(pos_c), dtype=bool)
     pairs: list[dict[str, Any]] = []
-    # Match hardest-to-match treated units first (descending propensity), per Austin
-    # (2011): the extreme-score treated are matched while close controls are still
-    # available, which materially improves covariate balance versus arbitrary order.
-    for t_i, t_score in sorted(zip(treated_ids, sc_tr, strict=True), key=lambda x: -x[1]):
-        # Order controls by score distance; ties broken by the stable argsort.
+    # Match hardest-to-match treated units first (descending propensity), per Austin (2011).
+    for ti in np.argsort(-sc_tr, kind="stable"):
+        t_pos = pos_t[ti]
+        t_score = sc_tr[ti]
         dist = np.abs(sc_ct - t_score)
         order = np.argsort(dist, kind="stable")
         chosen: int | None = None
@@ -97,16 +106,16 @@ def match_nearest(
         if chosen is None:
             continue
         used[chosen] = True
-        c_id = control_ids[chosen]
+        c_pos = pos_c[chosen]
         pairs.append(
             {
-                "treated_index": t_i,
-                "control_index": c_id,
+                "treated_index": labels[t_pos],
+                "control_index": labels[c_pos],
                 "score_treated": float(t_score),
                 "score_control": float(sc_ct[chosen]),
-                "outcome_treated": float(df.loc[t_i, outcome]),
-                "outcome_control": float(df.loc[c_id, outcome]),
-                "difference": float(df.loc[t_i, outcome] - df.loc[c_id, outcome]),
+                "outcome_treated": float(y[t_pos]),
+                "outcome_control": float(y[c_pos]),
+                "difference": float(y[t_pos] - y[c_pos]),
             }
         )
     if not pairs:

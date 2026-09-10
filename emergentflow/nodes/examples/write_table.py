@@ -45,6 +45,10 @@ class WriteTable(NodeDefinition):
     column_effect = ColumnEffect(kind=ColumnEffectKind.PASSTHROUGH)
     requires = frozenset({ClientKind.WAREHOUSE})
 
+    # Effectful: a cached result would skip the warehouse write on re-run (mode="append"
+    # would silently stop appending), so never serve this node from the execution cache.
+    cacheable = False
+
     ports = [
         PortSpec(
             name="frame",
@@ -90,7 +94,8 @@ class WriteTable(NodeDefinition):
             type_token="str",
             default="append",
             label="Mode",
-            help="append (default), truncate (drop+recreate), or error (refuse if exists).",
+            help="append (default), truncate (delete rows, keep the table, then append), or error "
+            "(refuse if exists).",
             hints=ValidationHints(choices=cast("list[ParamValue]", _MODE_CHOICES), widget="select"),
         ),
     ]

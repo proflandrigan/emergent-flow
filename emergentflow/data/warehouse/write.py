@@ -39,9 +39,10 @@ def write_table(
     """Materialize *df* as a warehouse table via the injected client.
 
     ``table`` is the target relation (optionally ``schema.table``); ``mode`` is
-    ``"append"`` (default), ``"truncate"`` (drop + recreate), or ``"error"`` (refuse
-    if the table already exists). ``connection`` names a connection profile;
-    ``dialect`` is its sqlglot dialect key. ``client`` is the injected
+    ``"append"`` (default), ``"truncate"`` (delete every row, keep the table definition,
+    then append -- one transaction), or ``"error"`` (refuse if the table already exists).
+    ``connection`` names a connection profile; ``dialect`` is its sqlglot dialect key
+    (validated, and it must match the profile's dialect). ``client`` is the injected
     ``WarehouseClient`` — passed via ``execute(graph, clients=Clients(warehouse=...))``
     or the compiled module's ``main(clients=...)``.
 
@@ -63,6 +64,9 @@ def write_table(
         raise ValueError(f"table must be a non-empty string, got {table!r}")
     if mode not in _WRITE_MODES:
         raise ValueError(f"unknown mode {mode!r}; expected one of {list(_WRITE_MODES)!r}.")
+    from emergentflow.data.warehouse.query import _validate_dialect
+
+    _validate_dialect(dialect)  # raises UnknownDialectError for a non-sqlglot key
     request = WriteRequest(
         table=table,
         dialect=dialect,

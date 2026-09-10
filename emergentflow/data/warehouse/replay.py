@@ -372,10 +372,12 @@ class ReplayWarehouseClient:
         """Refuse writes: a replay client never performs a real warehouse write.
 
         The equivalence / test seam must not silently pretend a write happened. This
-        deliberately raises :class:`WriteNotEnabledError` (a read-only-style refusal)
+        deliberately raises :class:`WriteNotSupportedError`
         so a graph that reaches a write against a replay client fails loudly instead of
         producing a fake success the ADR-0002 gate would then compare, invalid.
         """
-        from emergentflow.data.warehouse.protocol import WriteNotEnabledError
+        from emergentflow.data.warehouse.protocol import WriteNotSupportedError
 
-        raise WriteNotEnabledError(request.connection)
+        raise WriteNotSupportedError(
+            request.dialect, "a replay client never performs a real warehouse write"
+        )

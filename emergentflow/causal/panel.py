@@ -12,12 +12,13 @@ parallel-trends test.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
 
 from emergentflow.api import public_op
 from emergentflow.causal.errors import CausalError
-from emergentflow.stats.catalog import _cov_kwargs
+from emergentflow.stats.catalog import _cov_kwargs, _patsy_term
 
 __all__ = ["did"]
 
@@ -33,6 +34,16 @@ def _validate_column(df: pd.DataFrame, col: str, require_binary: bool = False) -
             )
 
 
+def _scratch_name(df: pd.DataFrame, base: str) -> str:
+    """A helper-column name that does not collide with any existing column of *df*."""
+    name = base
+    k = 0
+    while name in df.columns:
+        k += 1
+        name = f"{base}_{k}"
+    return name
+
+
 def _pre_trend_p(
     df: pd.DataFrame,
     *,
@@ -41,35 +52,37 @@ def _pre_trend_p(
     time_col: str,
     treated_col: str,
     post_col: str,
+    period_col: str,
 ) -> float:
     """Linear parallel-trends test over the pre-period only.
 
-    Restricts to rows where ``post == 0``, converts ``time_col`` to a 0-based numeric
-    period, and fits ``outcome ~ C(unit) + period + treated:period``. The
-    ``treated:period`` coefficient captures whether the treated arm's pre-period trend
-    deviates from the control arm's; its two-sided p-value is the parallel-trends test.
-    (The ``treated`` main effect is absorbed by the unit FE and patsy drops it.)
+    Restricts to rows where ``post == 0`` and fits
+    ``outcome ~ C(unit) + C(time) + period:treated`` with SEs clustered on ``unit_col``,
+    where ``period`` is the 0-based numeric index of ``time_col``. The ``period:treated``
+    coefficient is the treated arm's differential linear pre-trend; its two-sided
+    cluster-robust p-value is the test. The period fixed effects absorb any *common* trend,
+    so under staggered adoption (where the pre-period composition of the two arms shifts
+    over time) a shared non-linear trend no longer loads onto the differential slope --
+    without them the test rejected true parallel trends essentially always in that design.
+    (The ``treated`` main effect is absorbed by the unit FE.) Returns ``nan`` when the
+    pre-period cannot support the fit.
     """
-    pre = df[df[post_col] == 0].copy()
-    if len(pre) < 4:
+    pre = df[df[post_col] == 0]
+    if len(pre) < 4 or pre[time_col].nunique() < 2 or pre[treated_col].nunique() < 2:
         return float("nan")
-    pre["_period"] = pre[time_col].astype("category").cat.codes.astype(float)
-
-    def _fit(sub: pd.DataFrame):
-        if len(sub) < 3:
-            return None
-        try:
-            # treated:period is estimable (unit FE absorbs the treated main effect); a
-            # separate categorical period FE is unnecessary since _period is linear.
-            formula = f"{outcome} ~ C({unit_col}) + _period + _period:{treated_col}"
-            return smf.ols(formula, data=sub).fit()
-        except Exception:  # noqa: BLE001 - return NaN on rank-deficiency
-            return None
-
-    model = _fit(pre)
-    if model is None:
+    pre = pre.copy()
+    pre[period_col] = pre[time_col].astype("category").cat.codes.astype(float)
+    formula = (
+        f"{_patsy_term(outcome)} ~ C({_patsy_term(unit_col)}) + C({_patsy_term(time_col)}) + "
+        f"{period_col}:{treated_col}"
+    )
+    try:
+        model = smf.ols(formula, data=pre).fit(
+            cov_type="cluster", cov_kwds={"groups": pre[unit_col]}
+        )
+    except Exception:  # noqa: BLE001 - return NaN on rank-deficiency / too few clusters
         return float("nan")
-    interact = f"_period:{treated_col}"
+    interact = f"{period_col}:{treated_col}"
     for name in model.params.index:
         if name == interact or name.endswith(f":{treated_col}"):
             return float(model.pvalues[name])
@@ -98,8 +111,19 @@ def did(
     unit get honest SEs by default) -- the same ``cov_type="cluster"`` path as
     ``ef.stats.fit_model``.
 
+    Rows with a missing value in any model column are dropped before fitting. The design
+    must be identified: both arms present, ``post`` varying, the interaction non-constant,
+    at least two clusters, and a full-rank design matrix -- otherwise a ``CausalError`` is
+    raised instead of statsmodels' silent minimum-norm solution.
+
+    Caveat -- staggered adoption: with units treated at different times the TWFE coefficient
+    is a variance-weighted average of every 2x2 comparison, including ones where
+    already-treated units act as controls (Goodman-Bacon 2021). When effects are
+    heterogeneous across adoption cohorts it can fall outside the range of the cohort
+    effects; prefer a common adoption date or an event-study / stacked design in that case.
+
     Returns a one-row, tidy ``pd.DataFrame`` with columns ``estimate``, ``std_err``,
-    ``ci_low``, ``ci_high``, ``p_value``, ``n_obs``, ``n_units_treated``,
+    ``ci_low``, ``ci_high``, ``p_value``, ``n_obs`` (rows used), ``n_units_treated``,
     ``n_units_control``, ``pre_trend_p`` (the parallel-trends test). Never mutates ``df``.
     """
     for col in (outcome, unit_col, time_col, treated_col, post_col):
@@ -108,43 +132,73 @@ def did(
     _validate_column(df, post_col, require_binary=True)
     for c in covariates or []:
         _validate_column(df, c)
-
-    work = df.copy()
-    # Explicit interaction column: treated (numeric) x post (numeric) => cleaner param name.
-    work["_treated_num"] = work[treated_col].astype(int)
-    work["_post_num"] = work[post_col].astype(int)
-    work["_did"] = work["_treated_num"] * work["_post_num"]
-
-    rhs = ["C(" + unit_col + ")", "C(" + time_col + ")", "_did"] + list(covariates or [])
     if cluster_col is not None:
         _validate_column(df, cluster_col)
-    spec: dict[str, object] = {
-        "cov_type": "cluster",
-        "cov_group": cluster_col if cluster_col is not None else unit_col,
-    }
-    cov_kwargs = _cov_kwargs(work, spec)
-    model = smf.ols(f"{outcome} ~ " + " + ".join(rhs), data=work).fit(**cov_kwargs)
 
-    if "_did" not in model.params.index:
+    model_cols = [outcome, unit_col, time_col, treated_col, post_col, *(covariates or [])]
+    if cluster_col is not None:
+        model_cols.append(cluster_col)
+    # Drop incomplete rows up front: patsy drops them silently while the cluster groups
+    # would keep their full length, and the two must line up.
+    work = df.dropna(subset=model_cols).copy()
+    if work.empty:
+        raise CausalError("no complete rows remain after dropping missing values.")
+
+    treated_num = _scratch_name(work, "_treated_num")
+    post_num = _scratch_name(work, "_post_num")
+    did_col = _scratch_name(work, "_did")
+    period_col = _scratch_name(work, "_period")
+    work[treated_num] = work[treated_col].astype(int)
+    work[post_num] = work[post_col].astype(int)
+    work[did_col] = work[treated_num] * work[post_num]
+
+    if (work[treated_num] == 0).sum() == 0:
         raise CausalError(
-            "the DiD interaction was not estimable; check that there are treated units "
-            "with post-treatment observations."
+            "the DiD design has no control (never-treated) units; the effect is not identified."
         )
-    estimate = float(model.params["_did"])
-    se = float(model.bse["_did"])
-    lo = float(model.conf_int().loc["_did", 0])
-    hi = float(model.conf_int().loc["_did", 1])
-    p_value = float(model.pvalues["_did"])
+    if work[post_num].nunique() < 2:
+        raise CausalError("post_col must vary (both pre- and post-treatment periods are needed).")
+    if work[did_col].nunique() < 2:
+        raise CausalError(
+            "the treated:post interaction is constant; check that treated units are observed in "
+            "post-treatment periods."
+        )
+    group_col = cluster_col if cluster_col is not None else unit_col
+    if work[group_col].nunique() < 2:
+        raise CausalError(
+            f"cluster-robust SEs need at least two clusters in {group_col!r}; found one."
+        )
 
-    n_units_treated = int(work.loc[work["_treated_num"] == 1, unit_col].nunique())
-    n_units_control = int(work.loc[work["_treated_num"] == 0, unit_col].nunique())
+    rhs = [f"C({_patsy_term(unit_col)})", f"C({_patsy_term(time_col)})", did_col]
+    rhs += [_patsy_term(c) for c in covariates or []]
+    formula = f"{_patsy_term(outcome)} ~ " + " + ".join(rhs)
+    spec: dict[str, object] = {"cov_type": "cluster", "cov_group": group_col}
+    cov_kwargs = _cov_kwargs(work, spec)
+    ols = smf.ols(formula, data=work)
+    exog = np.asarray(ols.exog, dtype=float)
+    if np.linalg.matrix_rank(exog) < exog.shape[1]:
+        raise CausalError(
+            "the DiD design matrix is rank deficient (the treated:post interaction is collinear "
+            "with the unit/time fixed effects or covariates); the effect is not identified."
+        )
+    model = ols.fit(**cov_kwargs)
+
+    estimate = float(model.params[did_col])
+    se = float(model.bse[did_col])
+    lo = float(model.conf_int().loc[did_col, 0])
+    hi = float(model.conf_int().loc[did_col, 1])
+    p_value = float(model.pvalues[did_col])
+
+    n_units_treated = int(work.loc[work[treated_num] == 1, unit_col].nunique())
+    n_units_control = int(work.loc[work[treated_num] == 0, unit_col].nunique())
     pre_trend_p = _pre_trend_p(
         work,
         outcome=outcome,
         unit_col=unit_col,
         time_col=time_col,
-        treated_col="_treated_num",
-        post_col="_post_num",
+        treated_col=treated_num,
+        post_col=post_num,
+        period_col=period_col,
     )
 
     return pd.DataFrame(

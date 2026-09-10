@@ -299,13 +299,7 @@ def train_classifier(
     if target not in df.columns:
         raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
 
-    feature_names = features if features is not None else [c for c in df.columns if c != target]
-
-    unknown = [c for c in feature_names if c not in df.columns]
-    if unknown:
-        raise ValueError(f"unknown features {unknown!r}; expected one of {list(df.columns)!r}.")
-    if target in feature_names:
-        raise ValueError(f"target {target!r} must not also appear in features {feature_names!r}.")
+    feature_names = _resolve_features_for_fit(df, features, target=target, exclude=(weight_col,))
 
     X = df[feature_names]
     y = df[target]
@@ -354,13 +348,7 @@ def train_regressor(
     if target not in df.columns:
         raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
 
-    feature_names = features if features is not None else [c for c in df.columns if c != target]
-
-    unknown = [c for c in feature_names if c not in df.columns]
-    if unknown:
-        raise ValueError(f"unknown features {unknown!r}; expected one of {list(df.columns)!r}.")
-    if target in feature_names:
-        raise ValueError(f"target {target!r} must not also appear in features {feature_names!r}.")
+    feature_names = _resolve_features_for_fit(df, features, target=target, exclude=(weight_col,))
 
     X = df[feature_names]
     y = df[target]
@@ -399,13 +387,7 @@ def train_random_forest(
     if target not in df.columns:
         raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
 
-    feature_names = features if features is not None else [c for c in df.columns if c != target]
-
-    unknown = [c for c in feature_names if c not in df.columns]
-    if unknown:
-        raise ValueError(f"unknown features {unknown!r}; expected one of {list(df.columns)!r}.")
-    if target in feature_names:
-        raise ValueError(f"target {target!r} must not also appear in features {feature_names!r}.")
+    feature_names = _resolve_features_for_fit(df, features, target=target, exclude=(weight_col,))
 
     X = df[feature_names]
     y = df[target]
@@ -803,19 +785,34 @@ def train_test_split(
 
 
 def _resolve_features_for_fit(
-    df: pd.DataFrame, features: list[str] | None, *, target: str | None
+    df: pd.DataFrame,
+    features: list[str] | None,
+    *,
+    target: str | None,
+    exclude: tuple[str | None, ...] = (),
 ) -> list[str]:
-    """Resolve the feature-column list for a fit call, mirroring the train_* validation above.
+    """Resolve the feature-column list for a fit call.
 
-    Defaults to every column except ``target`` when ``features`` is not given. Validates that
-    every named feature exists in ``df`` and that ``target`` (if given) is not also a feature.
+    Defaults to every column except ``target`` and the auxiliary columns in ``exclude``
+    (``weight_col`` / ``group_col``) when ``features`` is not given: a per-row weight or
+    grouping id is never a feature -- auto-selecting it leaks the target whenever the weight
+    is derived from it and forces callers to supply the column again at inference time.
+    Validates that every named feature exists in ``df``, that ``target`` (if given) is not
+    also a feature, and that no ``exclude`` column was named explicitly as a feature.
     """
-    feature_names = features if features is not None else [c for c in df.columns if c != target]
+    skip = {target, *(c for c in exclude if c is not None)}
+    feature_names = features if features is not None else [c for c in df.columns if c not in skip]
     unknown = [c for c in feature_names if c not in df.columns]
     if unknown:
         raise ValueError(f"unknown features {unknown!r}; expected one of {list(df.columns)!r}.")
     if target is not None and target in feature_names:
         raise ValueError(f"target {target!r} must not also appear in features {feature_names!r}.")
+    clash = [c for c in exclude if c is not None and c in feature_names]
+    if clash:
+        raise ValueError(
+            f"columns {clash!r} are auxiliary (weight_col / group_col) and must not also "
+            f"appear in features {feature_names!r}."
+        )
     return feature_names
 
 
@@ -824,8 +821,8 @@ def _resolve_sample_weight(
 ) -> pd.Series | None:
     """Validate *weight_col* and return it as a Series, or ``None`` when unset.
 
-    When *weight_col* is set, it must name an existing column whose values are
-    finite and non-negative; when *est* is given, ``est.fit`` must accept a
+    When *weight_col* is set, it must name an existing numeric (non-boolean) column whose
+    values are finite and non-negative; when *est* is given, ``est.fit`` must accept a
     ``sample_weight`` parameter (or ``**kwargs``). Raises ``ValueError`` or
     :class:`~emergentflow.ml.errors.UnsupportedEstimatorOptionError` otherwise.
     """
@@ -836,6 +833,11 @@ def _resolve_sample_weight(
             f"unknown weight_col {weight_col!r}; expected one of {list(df.columns)!r}."
         )
     w = df[weight_col]
+    if pd.api.types.is_bool_dtype(w) or not pd.api.types.is_numeric_dtype(w):
+        raise ValueError(
+            f"weight_col {weight_col!r} must be a numeric (non-boolean) column; got dtype "
+            f"{w.dtype}."
+        )
     if not np.isfinite(w.to_numpy(dtype=float)).all():
         raise ValueError("weight_col must be finite (no NaN or infinite values).")
     if (w < 0).any():
@@ -943,7 +945,9 @@ def fit_estimator(
             raise ValueError(f"estimator {estimator!r} requires a target column.")
         if target not in df.columns:
             raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
-        feature_names = _resolve_features_for_fit(df, features, target=target)
+        feature_names = _resolve_features_for_fit(
+            df, features, target=target, exclude=(weight_col,)
+        )
         est = spec.sklearn_class(**kwargs)
         sample_weight = _resolve_sample_weight(df, weight_col, est=est)
         fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
@@ -957,7 +961,7 @@ def fit_estimator(
         )
 
     if weight_col is not None and spec.archetype != "fit":
-        raise ValueError(
+        raise UnsupportedEstimatorOptionError(
             f"weight_col is only supported for fit-archetype (supervised) estimators; "
             f"{estimator!r} is a {spec.archetype}-archetype estimator."
         )
@@ -1134,6 +1138,7 @@ def fit_pipeline(
     steps: list[dict[str, Any]],
     target: str | None = None,
     features: list[str] | None = None,
+    weight_col: str | None = None,
 ) -> FittedModel:
     """Fit an ordered chain of curated estimators as one sklearn ``Pipeline``.
 
@@ -1159,6 +1164,10 @@ def fit_pipeline(
     or if the final step is not a ``fit``/``cluster_detect``/``outlier_detect``-archetype
     estimator. A ``fit`` final step requires ``target`` (mirroring :func:`fit_estimator`);
     ``cluster_detect`` and ``outlier_detect`` final steps ignore ``target`` entirely.
+    ``weight_col`` (optional) names a column of per-row sample weights forwarded to the *final*
+    step's ``fit`` as ``<step>__sample_weight``; it is validated against that final estimator
+    (not the ``Pipeline`` wrapper, whose ``fit(**params)`` would accept anything) and is only
+    supported for a ``fit``-archetype final step.
 
     Deterministic given a ``random_state`` kwarg where the underlying estimators accept one.
     Never mutates ``df``.
@@ -1185,13 +1194,16 @@ def fit_pipeline(
             f"pipeline's final step {final_step['estimator']!r} must be a fit, "
             "cluster_detect, or outlier_detect-archetype estimator."
         )
-    sk_steps.append(
-        (
-            f"{len(transform_steps)}_{final_step['estimator']}",
-            final_spec.sklearn_class(**final_kwargs),
-        )
-    )
+    final_name = f"{len(transform_steps)}_{final_step['estimator']}"
+    final_est = final_spec.sklearn_class(**final_kwargs)
+    sk_steps.append((final_name, final_est))
     pipe = _SkPipeline(sk_steps)
+    if weight_col is not None and final_spec.archetype != "fit":
+        raise UnsupportedEstimatorOptionError(
+            "weight_col is only supported when the pipeline's final step is a fit-archetype "
+            f"(supervised) estimator; {final_step['estimator']!r} is a "
+            f"{final_spec.archetype}-archetype estimator."
+        )
 
     if final_spec.archetype == "fit":
         if target is None:
@@ -1200,8 +1212,16 @@ def fit_pipeline(
             )
         if target not in df.columns:
             raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
-        feature_names = _resolve_features_for_fit(df, features, target=target)
-        pipe.fit(df[feature_names], df[target])
+        feature_names = _resolve_features_for_fit(
+            df, features, target=target, exclude=(weight_col,)
+        )
+        # Validate against the FINAL estimator: Pipeline.fit(**params) accepts any kwarg, so
+        # the wrapper itself would pass the sample_weight support guard for any estimator.
+        sample_weight = _resolve_sample_weight(df, weight_col, est=final_est)
+        fit_kwargs = (
+            {f"{final_name}__sample_weight": sample_weight} if sample_weight is not None else {}
+        )
+        pipe.fit(df[feature_names], df[target], **fit_kwargs)
         return FittedModel(
             estimator_type="Pipeline",
             task=final_spec.task or "classification",
@@ -1255,7 +1275,9 @@ def grid_search(
     exactly as they would on a directly-fit estimator) and ``cv_results`` is a NEW, tidy
     DataFrame (one row per parameter combination, sorted by rank) with one ``param_<name>``
     column per searched kwarg plus ``mean_test_score``, ``std_test_score``, ``rank_test_score``,
-    and ``mean_fit_time``. ``df`` is never mutated.
+    and ``mean_fit_time``. ``df`` is never mutated. ``weight_col`` weights both the fit and
+    the fold scoring (``GridSearchCV`` forwards ``sample_weight`` to the scorer), unlike
+    :func:`cross_validate`, which scores unweighted.
     """
     spec, base_kwargs = _resolve_estimator_and_kwargs(estimator, None)
     if spec.archetype != "fit":
@@ -1274,12 +1296,18 @@ def grid_search(
     if target not in df.columns:
         raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
 
-    feature_names = _resolve_features_for_fit(df, features, target=target)
+    feature_names = _resolve_features_for_fit(df, features, target=target, exclude=(weight_col,))
     base_est = spec.sklearn_class(**base_kwargs)
     sample_weight = _resolve_sample_weight(df, weight_col, est=base_est)
     grid = GridSearchCV(base_est, param_grid=param_grid, cv=cv, scoring=scoring)
     grid_fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
     grid.fit(df[feature_names], df[target], **grid_fit_kwargs)
+    if not np.isfinite(np.asarray(grid.cv_results_["mean_test_score"], dtype=float)).any():
+        raise ValueError(
+            "no parameter combination produced a finite cross-validation score (every fold "
+            "scored NaN -- e.g. all-zero sample weights or a failing scorer); the search has "
+            "no best candidate."
+        )
 
     model = FittedModel(
         estimator_type=spec.key,
@@ -1338,7 +1366,9 @@ def tune_model(
     exactly as they would on a directly-fit estimator) and ``cv_results`` is a NEW, tidy
     DataFrame (one row per sampled parameter combination, sorted by rank) with one
     ``param_<name>`` column per searched kwarg plus ``mean_test_score``, ``std_test_score``,
-    ``rank_test_score``, and ``mean_fit_time``. ``df`` is never mutated.
+    ``rank_test_score``, and ``mean_fit_time``. ``df`` is never mutated. ``weight_col``
+    weights both the fit and the fold scoring (``RandomizedSearchCV`` forwards
+    ``sample_weight`` to the scorer), unlike :func:`cross_validate`, which scores unweighted.
     """
     spec, base_kwargs = _resolve_estimator_and_kwargs(estimator, None)
     if spec.archetype != "fit":
@@ -1357,7 +1387,7 @@ def tune_model(
     if target not in df.columns:
         raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
 
-    feature_names = _resolve_features_for_fit(df, features, target=target)
+    feature_names = _resolve_features_for_fit(df, features, target=target, exclude=(weight_col,))
     base_est = spec.sklearn_class(**base_kwargs)
     sample_weight = _resolve_sample_weight(df, weight_col, est=base_est)
     grid = RandomizedSearchCV(
@@ -1370,6 +1400,12 @@ def tune_model(
     )
     grid_fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
     grid.fit(df[feature_names], df[target], **grid_fit_kwargs)
+    if not np.isfinite(np.asarray(grid.cv_results_["mean_test_score"], dtype=float)).any():
+        raise ValueError(
+            "no parameter combination produced a finite cross-validation score (every fold "
+            "scored NaN -- e.g. all-zero sample weights or a failing scorer); the search has "
+            "no best candidate."
+        )
 
     model = FittedModel(
         estimator_type=spec.key,
@@ -1423,8 +1459,13 @@ def cross_validate(
     Returns a NEW, tidy DataFrame, one row per fold, with columns ``fold`` (0-indexed),
     ``test_score``, ``fit_time``, ``score_time``. When ``cv_strategy="grouped"`` the
     chosen splitter is reported in an additional ``splitter`` column
-    (``"StratifiedGroupKFold"`` for binary/multiclass targets,
-    ``"GroupKFold"`` for continuous ones). ``df`` is never mutated.
+    (``"StratifiedGroupKFold"`` for classification estimators with a binary/multiclass
+    target, ``"GroupKFold"`` otherwise -- including integer-valued regression targets).
+
+    ``weight_col`` weights the per-fold *fit* only: sklearn's ``cross_validate`` does not
+    route ``sample_weight`` to the scorer, so ``test_score`` is unweighted. :func:`grid_search`
+    and :func:`tune_model` differ -- ``GridSearchCV``/``RandomizedSearchCV`` forward the weights
+    to the scorer, so their fold scores are weighted. ``df`` is never mutated.
     """
     spec, kwargs = _resolve_estimator_and_kwargs(estimator, params)
     if spec.archetype != "fit":
@@ -1435,7 +1476,9 @@ def cross_validate(
     if target not in df.columns:
         raise ValueError(f"unknown target {target!r}; expected one of {list(df.columns)!r}.")
 
-    feature_names = _resolve_features_for_fit(df, features, target=target)
+    feature_names = _resolve_features_for_fit(
+        df, features, target=target, exclude=(weight_col, group_col)
+    )
     est = spec.sklearn_class(**kwargs)
     sample_weight = _resolve_sample_weight(df, weight_col, est=est)
     cv_params = {"sample_weight": sample_weight} if sample_weight is not None else {}
@@ -1447,10 +1490,15 @@ def cross_validate(
     if cv_strategy == "grouped":
         if not group_col or group_col not in df.columns:
             raise ValueError(f"group_col {group_col!r} must be a valid column for grouped CV.")
-        # StratifiedGroupKFold requires a discrete target; fall back to GroupKFold for
-        # continuous targets so grouped CV is available to every fit-archetype estimator
-        # (issue #164 Bug 2).
-        if type_of_target(df[target]) in ("binary", "multiclass"):
+        # Stratify only for classification estimators (issue #164 Bug 2): `type_of_target`
+        # labels ANY integer-valued column "multiclass", which would route an int regression
+        # target into StratifiedGroupKFold (crashing on unique values, or silently
+        # mis-splitting). The registry's `task` is the authority on what the target is.
+        stratifiable = spec.task == "classification" and type_of_target(df[target]) in (
+            "binary",
+            "multiclass",
+        )
+        if stratifiable:
             cv_obj = StratifiedGroupKFold(n_splits=cv, shuffle=True, random_state=0)
             splitter_name = "StratifiedGroupKFold"
         else:
@@ -1508,6 +1556,7 @@ def compare_models(
     estimators: list[str] | None = None,
     cv: int = 5,
     sort_by: str | None = None,
+    weight_col: str | None = None,
 ) -> tuple[pd.DataFrame, FittedModel]:
     """Cross-validate every curated fit-archetype estimator matching *task* and rank them.
 
@@ -1552,8 +1601,12 @@ def compare_models(
     Raises ``ValueError`` if *task* is not one of ``FOREST_TASKS``, if ``target`` is missing
     from ``df``, if no candidate estimators exist for *task*, if any explicit ``estimators``
     entry is not a ``fit``-archetype estimator matching *task*, if ``sort_by`` is not one of
-    the task's scoring metric names, or if every candidate estimator failed to fit. ``df`` is
-    never mutated.
+    the task's scoring metric names, or if every candidate estimator failed to fit.
+    ``weight_col`` (optional) names a column of per-row sample weights forwarded to every
+    candidate's ``fit`` (and, via sklearn's ``cross_validate`` routing, NOT to the scorers --
+    fold scores are unweighted, see :func:`cross_validate`); a candidate whose ``fit`` does
+    not accept ``sample_weight`` is reported with a ``status`` naming that limitation instead
+    of aborting the comparison. ``df`` is never mutated.
     """
     if task not in FOREST_TASKS:
         raise ValueError(f"unknown task {task!r}; expected one of {list(FOREST_TASKS)!r}.")
@@ -1574,9 +1627,12 @@ def compare_models(
         if candidate_spec.task != task:
             raise ValueError(f"{key!r} is a {candidate_spec.task!r} estimator; expected {task!r}.")
 
-    feature_names = _resolve_features_for_fit(df, features, target=target)
+    feature_names = _resolve_features_for_fit(df, features, target=target, exclude=(weight_col,))
     X = df[feature_names]
     y = df[target]
+    sample_weight = _resolve_sample_weight(df, weight_col)
+    cv_params = {"sample_weight": sample_weight} if sample_weight is not None else None
+    fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
 
     if task == "classification":
         scoring = {"accuracy": "accuracy", "f1": "f1_weighted"}
@@ -1603,7 +1659,11 @@ def compare_models(
         est = row_spec.sklearn_class(**row_kwargs)
         row: dict[str, Any] = {"estimator": key, "status": "ok"}
         try:
-            cv_result = _sk_cross_validate(est, X, y, cv=cv, scoring=list(scoring.values()))
+            if sample_weight is not None:
+                _resolve_sample_weight(df, weight_col, est=est)  # typed: no sample_weight support
+            cv_result = _sk_cross_validate(
+                est, X, y, cv=cv, scoring=list(scoring.values()), params=cv_params
+            )
         except Exception as exc:  # noqa: BLE001 -- one incompatible curated estimator (e.g.
             # MultinomialNB on negative features) must not abort comparing the rest; its row
             # is marked failed instead, mirroring how sklearn's own cross_validate already
@@ -1637,7 +1697,7 @@ def compare_models(
 
     best_key = cast(str, fit_rows.iloc[0]["estimator"])
     best_spec, best_kwargs = _resolve_estimator_and_kwargs(best_key, None)
-    best_estimator = best_spec.sklearn_class(**best_kwargs).fit(X, y)
+    best_estimator = best_spec.sklearn_class(**best_kwargs).fit(X, y, **fit_kwargs)
     best_model = FittedModel(
         estimator_type=best_key,
         task=task,

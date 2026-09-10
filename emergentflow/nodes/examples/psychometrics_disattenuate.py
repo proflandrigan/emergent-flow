@@ -31,7 +31,7 @@ class PsychometricsDisattenuate(NodeDefinition):
     """Correct an observed correlation for measurement error; report the attainable ceiling."""
 
     type = "psychometrics.disattenuate"
-    version = 1
+    version = 2
     family = "psychometrics"
     label = "Disattenuate"
     category = "Psychometrics"
@@ -42,7 +42,10 @@ class PsychometricsDisattenuate(NodeDefinition):
             name="result",
             direction=Direction.OUT,
             data_type="DataFrame",
-            help="observed_r, corrected_r, max_attainable_r, attenuation_ratio[, ci_low/ci_high].",
+            help=(
+                "observed_r, corrected_r, max_attainable_r, attenuation_ratio, "
+                "out_of_range[, ci_low/ci_high]."
+            ),
         ),
     ]
     params = [
@@ -91,7 +94,7 @@ class PsychometricsDisattenuate(NodeDefinition):
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         args = self._args(node)
-        codegen_n = f", n={args['n']!r}" if args["n"] else ""
+        codegen_n = f", n={args['n']!r}" if args["n"] is not None else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(

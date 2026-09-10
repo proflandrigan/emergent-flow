@@ -33,8 +33,9 @@ class PropensityResult:
 
     Attributes
     ----------
-    scores: per-row P(treat=1 | covariates), clipped to the ``trim`` bounds
-        (``pd.Series``, aligned to the input frame's index).
+    scores: per-row P(treat=1 | covariates), raw (un-clipped) so overlap can be judged;
+        the ``trim`` bounds clip the scores that feed ``weights`` and define the support
+        that ``overlap`` reports against (``pd.Series``, aligned to the input frame's index).
     weights: per-row IPW (``"ATE"``) or ATT weights, trimmed per ``trim``
         (``pd.Series``, aligned to the input frame's index).
     balance: tidy frame, one row per covariate: standardized mean difference
@@ -52,11 +53,17 @@ class PropensityResult:
 
 
 def _validate_binary_treatment(df: pd.DataFrame, treatment: str) -> pd.Series:
-    """Validate *treatment* names a binary 0/1 column and return it as 0/1 ints."""
+    """Validate *treatment* names a complete, binary 0/1 column and return it as 0/1 ints."""
     if treatment not in df.columns:
         raise CausalError(f"unknown treatment {treatment!r}; expected one of {list(df.columns)!r}.")
+    if len(df) == 0:
+        raise InvalidTreatmentError("the input frame has no rows.")
     t = df[treatment]
-    vals = pd.unique(t.dropna())
+    if t.isna().any():
+        raise InvalidTreatmentError(
+            f"treatment {treatment!r} contains missing values; drop or impute them first."
+        )
+    vals = pd.unique(t)
     if not set(vals).issubset({0, 1}):
         raise InvalidTreatmentError(
             f"treatment {treatment!r} must be binary (0/1 or True/False); "
@@ -96,6 +103,12 @@ def _propensity_design(df: pd.DataFrame, covariates: list[str]) -> pd.DataFrame:
         raise CausalError(
             f"covariates produced an empty numeric design matrix; check {covariates!r}."
         )
+    if design.isna().any().any():
+        na_cols = [c for c in design.columns if design[c].isna().any()]
+        raise CausalError(
+            f"covariates produced missing values in the design matrix ({na_cols!r}); drop or "
+            "impute them before fitting a propensity model."
+        )
     return design
 
 
@@ -133,9 +146,13 @@ def _balance_frame(
         xc = x[control]
         mt, mc = float(xt.mean()), float(xc.mean())
         vt, vc = float(xt.var(ddof=1)), float(xc.var(ddof=1))
+        # A zero-variance covariate must report nan, not a spurious SMD from floating-point
+        # noise in the weighted variance (3e-16 is not "positive variance"); the tolerance is
+        # relative to the covariate's scale.
+        tol = 1e-12 * max(1.0, mt**2, mc**2)
         pooled = np.sqrt((vt + vc) / 2.0)
-        smd_before = (mt - mc) / pooled if pooled > 0 else float("nan")
-        vr_before = vt / vc if vc > 0 else float("nan")
+        smd_before = (mt - mc) / pooled if pooled**2 > tol else float("nan")
+        vr_before = vt / vc if vc > tol else float("nan")
 
         wt = weights[treated]
         wc = weights[control]
@@ -152,8 +169,10 @@ def _balance_frame(
             else float("nan")
         )
         spooled = np.sqrt((swt + swc) / 2.0) if np.isfinite(swt) and np.isfinite(swc) else np.nan
-        smd_after = (swmt - swmc) / spooled if spooled and spooled > 0 else float("nan")
-        vr_after = swt / swc if (np.isfinite(swc) and swc > 0) else float("nan")
+        smd_after = (
+            (swmt - swmc) / spooled if np.isfinite(spooled) and spooled**2 > tol else float("nan")
+        )
+        vr_after = swt / swc if (np.isfinite(swc) and swc > tol) else float("nan")
         rows.append(
             {
                 "covariate": col,

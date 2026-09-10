@@ -93,3 +93,20 @@ def test_non_grouped_cv_has_no_splitter_column():
         scoring="r2",
     )
     assert "splitter" not in res.columns
+
+
+def test_grouped_cv_integer_regression_target_uses_groupkfold():
+    df = _make_grouped_df(n_subjects=10, measures=2)
+    df["y_int"] = np.arange(len(df))  # integer-valued regression target, every value unique
+    res = cross_validate(
+        df,
+        estimator="Ridge",
+        target="y_int",
+        features=["x"],
+        cv=4,
+        cv_strategy="grouped",
+        group_col="sid",
+        scoring="r2",
+    )
+    assert (res["splitter"] == "GroupKFold").all()
+    assert len(res) == 4

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from emergentflow.stats.shapes import COEFFICIENT_COLUMNS, POSTERIOR_COLUMNS
@@ -95,6 +96,21 @@ def mixedlm_coefficient_frame(results: Any) -> pd.DataFrame:
                 "ci_high": float("nan"),
             }
         )
+    vcomp = np.asarray(getattr(results, "vcomp", []), dtype=float)
+    if vcomp.size:
+        vc_names = list(results.model.exog_vc.names)
+        for name, var in zip(vc_names, vcomp, strict=True):
+            rows.append(
+                {
+                    "term": f"{name} Var",
+                    "estimate": float(var),
+                    "std_err": float("nan"),
+                    "statistic": float("nan"),
+                    "p_value": float("nan"),
+                    "ci_low": float("nan"),
+                    "ci_high": float("nan"),
+                }
+            )
     rows.append(
         {
             "term": "Residual Var",
@@ -112,31 +128,26 @@ def mixedlm_coefficient_frame(results: Any) -> pd.DataFrame:
 def mixedlm_fit_stats(results: Any) -> dict[str, Any]:
     """JSON-native fit statistics for a MixedLM fit, including ICC and convergence status.
 
-    ``icc`` (intraclass correlation) is the top-level random-intercept variance over total
-    variance (random intercept + residual); well-defined for any MixedLM fit since a random
-    intercept is always present (statsmodels' default when no ``re_formula`` is given).
+    ``icc`` (intraclass correlation) is the top-level random-intercept variance over the total
+    variance (random intercept + every variance component + residual). The top-level intercept
+    is always present: ``_fit_mixedlm`` requests it explicitly (``re_formula="1"``) whenever a
+    ``vc_formula`` would otherwise suppress statsmodels' default.
 
-    When the model carries variance components (``vc_formula`` / ``nested_groups``,
-    issue #164 Gap 2), ``level_icc`` reports each variance component's share of the total
-    (one entry per named component plus ``residual``). NOTE: statsmodels folds the top-level
-    ``groups`` random-intercept variance into the ``vcomp`` array when a ``vc_formula`` is
-    present (``cov_re`` is then empty), so ``level_icc`` covers the nested components and
-    residual; the plain ``icc`` is then ``nan`` because the groups slice is not separable in
-    that model shape. Without a ``vc_formula``, ``level_icc`` is absent and ``icc`` is the
-    usual single-level ICC.
+    When the model carries variance components (``vc_formula`` / ``nested_groups``, issue #164
+    Gap 2), ``level_icc`` reports every level's share of the total variance: ``"group"`` (the
+    top-level ``groups`` intercept), one entry per nested component (named after its column,
+    taken from ``results.model.exog_vc.names``), and ``"residual"``. Without a ``vc_formula``
+    ``level_icc`` is absent and ``icc`` is the usual single-level ICC.
     """
     residual_var = float(results.scale)
-    vcomp = getattr(results, "vcomp", None)
     cov_re = getattr(results, "cov_re", None)
-    has_vc = vcomp is not None and len(vcomp) > 0
-
-    group_var = float(cov_re.iloc[0, 0]) if cov_re is not None and not cov_re.empty else 0.0
-
-    vc_total = float(vcomp.sum()) if vcomp is not None else 0.0
-    # With a vc_formula the merged components (including the folded groups slice) sit in
-    # vcomp, so the denominator is vc_total + residual; without vc it is group + residual.
-    total = (vc_total + residual_var) if has_vc else (group_var + residual_var)
-    icc = group_var / total if total and not has_vc else float("nan")
+    group_var = (
+        float(cov_re.iloc[0, 0]) if cov_re is not None and not cov_re.empty else float("nan")
+    )
+    vcomp = np.asarray(getattr(results, "vcomp", []), dtype=float)
+    has_vc = vcomp.size > 0
+    total = group_var + float(vcomp.sum()) + residual_var
+    icc = group_var / total if np.isfinite(total) and total > 0 else float("nan")
 
     stats: dict[str, Any] = {
         "aic": float(results.aic) if results.aic is not None else float("nan"),
@@ -148,17 +159,16 @@ def mixedlm_fit_stats(results: Any) -> dict[str, Any]:
     }
 
     if has_vc:
-        assert vcomp is not None  # narrowed by has_vc
-        # statsmodels labels each variance component as a ``<name> Var`` param.
-        vc_names = [
-            str(n).removesuffix(" Var") for n in results.params.index if str(n).endswith(" Var")
-        ]
-        level_shares: dict[str, float] = {}
-        for name, var in zip(
-            vc_names or [f"vc_{i}" for i in range(len(vcomp))], vcomp, strict=False
-        ):
-            level_shares[name] = float(var) / total if total else float("nan")
-        level_shares["residual"] = residual_var / total if total else float("nan")
+        vc_names = list(results.model.exog_vc.names)
+        finite_total = np.isfinite(total) and total > 0
+
+        def _share(v: float) -> float:
+            return float(v) / total if finite_total else float("nan")
+
+        level_shares: dict[str, float] = {"group": _share(group_var)}
+        for name, var in zip(vc_names, vcomp, strict=True):
+            level_shares[str(name)] = _share(var)
+        level_shares["residual"] = _share(residual_var)
         stats["level_icc"] = level_shares
     return stats
 

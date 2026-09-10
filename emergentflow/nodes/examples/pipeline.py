@@ -37,7 +37,7 @@ class Pipeline(NodeDefinition):
     """Fit an ordered chain of curated estimators as one sklearn Pipeline."""
 
     type = "ml.pipeline"
-    version = 1
+    version = 2
     family = "ml"
     label = "Pipeline"
     category = "Machine Learning"
@@ -86,37 +86,51 @@ class Pipeline(NodeDefinition):
             help="Columns to use as features; empty/unset uses every other column.",
             hints=ValidationHints(widget="column"),
         ),
+        ParamSpec(
+            name="weight_col",
+            type_token="str",
+            default=None,
+            label="Weights column",
+            help="Optional column of per-row sample weights forwarded to the final step's fit.",
+            hints=ValidationHints(widget="column"),
+        ),
     ]
 
-    def _args(self, node: Node) -> tuple[list[dict[str, Any]], str | None, list[str] | None]:
+    def _args(
+        self, node: Node
+    ) -> tuple[list[dict[str, Any]], str | None, list[str] | None, str | None]:
         values = {p.name: p.value for p in node.params}
         steps = values.get("steps") or []
         target = values.get("target")
         features = values.get("features")
+        weight_col = values.get("weight_col") or None
         return (
             cast("list[dict[str, Any]]", steps),
             cast("str | None", target),
             cast("list[str] | None", features),
+            cast("str | None", weight_col),
         )
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
-        steps, target, features = self._args(node)
+        steps, target, features, weight_col = self._args(node)
+        codegen_weight = f", weight_col={weight_col!r}" if weight_col is not None else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(
                 f"{ctx.out_var('model')} = ef.ml.fit_pipeline("
                 f"{ctx.in_var('frame')}, steps={steps!r}, target={target!r}, "
-                f"features={features!r})"
+                f"features={features!r}{codegen_weight})"
             ),
         )
 
     def execute(self, node: Node, inputs: dict[str, Any]) -> dict[str, Any]:
-        steps, target, features = self._args(node)
+        steps, target, features, weight_col = self._args(node)
         return {
             "model": fit_pipeline(
                 inputs["frame"],
                 steps=steps,
                 target=target,
                 features=features,
+                weight_col=weight_col,
             )
         }

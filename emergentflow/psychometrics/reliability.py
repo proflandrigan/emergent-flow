@@ -49,8 +49,19 @@ def _wide_item_matrix(
                 raise PsychometricsError(
                     f"unknown column {col!r}; expected one of {list(df.columns)!r}."
                 )
+        dup = df.duplicated(subset=[subject_col, item_col])
+        if dup.any():
+            raise PsychometricsError(
+                f"{int(dup.sum())} duplicate (subject, item) response(s) found; each subject may "
+                "answer each item once. Aggregate or drop the duplicates before computing "
+                "reliability."
+            )
         matrix = df.pivot_table(
-            index=subject_col, columns=item_col, values=score_col, aggfunc="first"
+            index=subject_col,
+            columns=item_col,
+            values=score_col,
+            aggfunc="first",
+            observed=True,
         )
     else:
         raise PsychometricsError("reliability needs item_cols (wide) or score_col (long format).")
@@ -94,8 +105,9 @@ def reliability(
 
     ``item_cols`` is the wide form: the item columns directly. Otherwise a long-format
     pivot is built from ``(subject_col, item_col)`` with ``score_col`` as the value.
-    ``method`` is ``"cronbach_alpha"`` or ``"kr20"`` (KR-20, the equivalent formula for
-    binary items -- reported alongside alpha as ``kr20`` when all items are 0/1).
+    ``method`` is ``"cronbach_alpha"`` (default) or ``"kr20"`` (KR-20, the equivalent formula
+    for dichotomous items; raises unless every item is 0/1). ``kr20`` is reported alongside
+    ``alpha`` whenever all items are binary, regardless of ``method``.
 
     Returns a tidy frame carrying ``alpha`` (Cronbach's alpha), ``kr20`` (nan unless all
     items are binary), ``n_items``, ``n_subjects`` (complete cases), and a
@@ -111,6 +123,11 @@ def reliability(
     )
     if method not in ("cronbach_alpha", "kr20"):
         raise PsychometricsError(f"unknown method {method!r}; expected 'cronbach_alpha' or 'kr20'.")
+    if method == "kr20" and not is_binary:
+        raise PsychometricsError(
+            "method='kr20' requires dichotomous (0/1) items, but not every item is binary; "
+            "use method='cronbach_alpha' for polytomous/Likert items."
+        )
     m = matrix.dropna(axis=0, how="any")
     if m.shape[0] < 2 or m.shape[1] < 2:
         raise PsychometricsError(

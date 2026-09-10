@@ -28,7 +28,7 @@ class TsTimeWeightedAggregate(NodeDefinition):
     """Append recency-weighted aggregate columns (positional or date-aware decay)."""
 
     type = "timeseries.time_weighted_aggregate"
-    version = 2
+    version = 3
     family = "timeseries"
     label = "Time-Weighted Aggregate"
     category = "Time Series"
@@ -73,7 +73,7 @@ class TsTimeWeightedAggregate(NodeDefinition):
             type_token="str",
             default="linear",
             label="Decay",
-            help="Decay method for recency weighting.",
+            help="Decay method for positional weighting; ignored when half_life is set.",
             hints=ValidationHints(
                 choices=cast("list[ParamValue]", ["linear", "exponential"]),
                 widget="select",
@@ -92,18 +92,18 @@ class TsTimeWeightedAggregate(NodeDefinition):
             type_token="float",
             default=None,
             label="Half-life",
-            help="Half-life in `unit` units for date-aware decay (0.5**(delta/half_life)). "
-            "Unset uses the legacy positional weighting.",
-            hints=ValidationHints(min=0, widget="number"),
+            help="Half-life in `unit` units for date-aware decay: an observation loses half its "
+            "weight every half_life units of elapsed time. Unset uses the positional weighting.",
+            hints=ValidationHints(min=1e-9, widget="number"),
         ),
         ParamSpec(
             name="unit",
             type_token="str",
             default="D",
             label="Time unit",
-            help="Pandas time unit for the half-life deltas (D, h, m, s, ...).",
+            help="Pandas offset unit for the half-life (W, D, h, min, s, ...).",
             hints=ValidationHints(
-                choices=cast("list[ParamValue]", ["D", "h", "m", "s", "ms", "us", "ns"]),
+                choices=cast("list[ParamValue]", ["W", "D", "h", "min", "s", "ms", "us", "ns"]),
                 widget="select",
             ),
         ),
@@ -112,8 +112,8 @@ class TsTimeWeightedAggregate(NodeDefinition):
             type_token="str",
             default=None,
             label="Anchor date",
-            help="Per-row anchor: a column name or a fixed timestamp string. "
-            "Defaults to the latest date in each group.",
+            help="Optional as-of cutoff: a column name (each row's own cutoff date) or a fixed "
+            "timestamp. Rows dated after the cutoff are excluded from the mean.",
             hints=ValidationHints(widget="text"),
         ),
         ParamSpec(
@@ -135,18 +135,19 @@ class TsTimeWeightedAggregate(NodeDefinition):
             "window": cast("int | None", values.get("window")),
             "half_life": cast("float | None", values.get("half_life")),
             "unit": cast(str, values.get("unit", "D")),
-            "anchor": cast("str | None", values.get("anchor")),
-            "group_col": cast("str | None", values.get("group_col")),
+            "anchor": cast("str | None", values.get("anchor") or None),
+            "group_col": cast("str | None", values.get("group_col") or None),
         }
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:
         args = self._args(node)
-        codegen_half_life = f", half_life={args['half_life']!r}" if args["half_life"] else ""
-        codegen_unit = (
-            f", unit={args['unit']!r}" if (args["half_life"] and args["unit"] != "D") else ""
+        has_half_life = args["half_life"] is not None
+        codegen_half_life = f", half_life={args['half_life']!r}" if has_half_life else ""
+        codegen_unit = f", unit={args['unit']!r}" if (has_half_life and args["unit"] != "D") else ""
+        codegen_anchor = f", anchor={args['anchor']!r}" if args["anchor"] is not None else ""
+        codegen_group = (
+            f", group_col={args['group_col']!r}" if args["group_col"] is not None else ""
         )
-        codegen_anchor = f", anchor={args['anchor']!r}" if args["anchor"] else ""
-        codegen_group = f", group_col={args['group_col']!r}" if args["group_col"] else ""
         return CodeFragment(
             imports=["import emergentflow as ef"],
             body=(

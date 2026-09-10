@@ -82,7 +82,8 @@ class TrainRegressor(NodeDefinition):
         values = {p.name: p.value for p in node.params}
         target = values.get("target")
         features = values.get("features")
-        weight_col = values.get("weight_col")
+        # "" from the UI must mean "unset" on both paths
+        weight_col = values.get("weight_col") or None
         return (
             cast(str, target),
             cast("list[str] | None", features),

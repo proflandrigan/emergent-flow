@@ -180,17 +180,31 @@ diffed = ef.timeseries.difference(
 ### Time-Weighted Aggregate
 
 ```python
+# Positional: weights 1..n over a trailing window of 7 rows
 weighted = ef.timeseries.time_weighted_aggregate(
     df, columns=["value"], date_col="date", decay="linear", window=7,
 )
+
+# Date-aware: an observation loses half its weight every 14 days, per subject
+weighted = ef.timeseries.time_weighted_aggregate(
+    df, columns=["value"], date_col="date", half_life=14, unit="D", group_col="subject",
+)
 ```
 
-`ef.timeseries.time_weighted_aggregate(df, *, columns, date_col, decay="linear", window=None)`
-appends recency-weighted rolling-mean columns `{col}_tw_{decay}`. `decay="linear"` weights
-observations `1, 2, ..., n` (most recent weighted more); `decay="exponential"` weights them by a
-fixed decay factor. With `window` given, weights are computed over a trailing rolling window;
-otherwise over all preceding rows (expanding). `date_col` must exist and row order is assumed to
-already be chronological.
+`ef.timeseries.time_weighted_aggregate(df, *, columns, date_col, decay="linear", window=None,
+half_life=None, unit="D", anchor=None, group_col=None)` appends recency-weighted mean columns.
+
+- **Positional mode** (`half_life=None`): `decay="linear"` weights observations `1, 2, ..., n`
+  (most recent weighted more); `decay="exponential"` weights them by a fixed decay factor. With
+  `window` given, weights are computed over a trailing rolling window; otherwise over all
+  preceding rows (expanding). `date_col` must exist and row order is assumed to already be
+  chronological. Output columns are `{col}_tw_{decay}`.
+- **Date-aware mode** (`half_life` set): each row is the weighted mean of the rows at or before
+  it (in `date_col` order) with weights `0.5 ** (elapsed / half_life)`, `elapsed` measured in
+  `unit` (`W`, `D`, `h`, `min`, `s`, ...). Rows are sorted by date within each `group_col`
+  partition, so input order does not matter. `anchor` is an optional as-of cutoff (a fixed
+  timestamp, or a column holding each row's own cutoff date): rows dated after the cutoff are
+  excluded. Output columns are `{col}_tw_halflife`; `decay` is ignored.
 
 ## 5. Chaining Transforms for ML
 

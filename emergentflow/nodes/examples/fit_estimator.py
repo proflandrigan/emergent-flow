@@ -106,7 +106,8 @@ class FitEstimator(NodeDefinition):
         target = values.get("target")
         features = values.get("features")
         params = values.get("params") or {}
-        weight_col = values.get("weight_col")
+        # "" from the UI must mean "unset" on both paths
+        weight_col = values.get("weight_col") or None
         return (
             cast(str, estimator),
             cast(str, target),
