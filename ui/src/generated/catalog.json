@@ -2777,13 +2777,13 @@
         },
         {
           "default": null,
-          "help": "e_value with scale='difference': the outcome's standard deviation.",
+          "help": "e_value with scale='difference': the outcome's standard deviation (must be finite and > 0).",
           "hints": {
             "choices": null,
             "connection_kind": null,
             "max": null,
             "max_length": null,
-            "min": null,
+            "min": 1e-09,
             "min_length": null,
             "pattern": null,
             "ref_supported": false,
@@ -7300,18 +7300,23 @@
             "pattern": null,
             "ref_supported": false,
             "step": null,
-            "widget": "text"
+            "widget": "connection"
           },
           "label": "Connection",
           "name": "connection",
           "required": true,
-          "type_token": "str"
+          "type_token": "ConnectionRef"
         },
         {
-          "default": null,
+          "default": "duckdb",
           "help": "sqlglot dialect key (duckdb, postgres, ...).",
           "hints": {
-            "choices": null,
+            "choices": [
+              "duckdb",
+              "bigquery",
+              "redshift",
+              "postgres"
+            ],
             "connection_kind": null,
             "max": null,
             "max_length": null,
@@ -7320,11 +7325,11 @@
             "pattern": null,
             "ref_supported": false,
             "step": null,
-            "widget": "text"
+            "widget": "select"
           },
           "label": "Dialect",
           "name": "dialect",
-          "required": true,
+          "required": false,
           "type_token": "str"
         },
         {
@@ -12153,7 +12158,7 @@
             "connection_kind": null,
             "max": 1.0,
             "max_length": null,
-            "min": 0.0,
+            "min": 1e-09,
             "min_length": null,
             "pattern": null,
             "ref_supported": false,
@@ -12173,7 +12178,7 @@
             "connection_kind": null,
             "max": 1.0,
             "max_length": null,
-            "min": 0.0,
+            "min": 1e-09,
             "min_length": null,
             "pattern": null,
             "ref_supported": false,

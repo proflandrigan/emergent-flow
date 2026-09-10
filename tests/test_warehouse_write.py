@@ -7,6 +7,7 @@ and the ``data.write_table`` node's client wiring.
 
 from __future__ import annotations
 
+import duckdb
 import pandas as pd
 import pytest
 
@@ -302,3 +303,116 @@ def test_write_table_node_codegen_equivalence_with_recording_client(frame):
     pd.testing.assert_frame_equal(executed, scope["result"])
     assert executed_client.writes[0][0] == codegen_client.writes[0][0]
     pd.testing.assert_frame_equal(executed_client.writes[0][1], codegen_client.writes[0][1])
+
+
+def _raw_duckdb(duckdb_client) -> duckdb.DuckDBPyConnection:
+    coords = duckdb_client._store.get("dw").coordinates
+    return duckdb.connect(coords["path"], read_only=True)
+
+
+def test_duckdb_truncate_refuses_missing_column_without_data_loss(duckdb_client, frame):
+    """A truncate whose frame lacks a table column must refuse BEFORE deleting (issue #164
+    follow-up): INSERT BY NAME would otherwise treat the missing column as NULL and destroy
+    every existing row."""
+    from emergentflow.data import DataError
+
+    write_table(frame, table="t1", connection="dw", dialect="duckdb", client=duckdb_client)
+    missing = frame.drop(columns=["b"])
+    with pytest.raises(DataError, match="do not match"):
+        write_table(
+            missing,
+            table="t1",
+            connection="dw",
+            dialect="duckdb",
+            mode="truncate",
+            client=duckdb_client,
+        )
+    out = _rows(duckdb_client, "SELECT * FROM t1")
+    assert len(out) == 3 and list(out.columns) == ["a", "b"]
+
+
+def test_duckdb_append_refuses_missing_column_without_null_pollution(duckdb_client, frame):
+    """Append with a missing column likewise refuses instead of inserting NULL rows."""
+    from emergentflow.data import DataError
+
+    write_table(frame, table="t1", connection="dw", dialect="duckdb", client=duckdb_client)
+    with pytest.raises(DataError, match="do not match"):
+        write_table(
+            frame.drop(columns=["a"]),
+            table="t1",
+            connection="dw",
+            dialect="duckdb",
+            mode="append",
+            client=duckdb_client,
+        )
+    assert _rows(duckdb_client, "SELECT count(*) AS n FROM t1")["n"].iloc[0] == 3
+
+
+def test_duckdb_empty_frame_create_keeps_types_and_appends(duckdb_client):
+    """Writing an empty frame to a NEW table must not lock in junk column types."""
+    write_table(
+        pd.DataFrame(
+            {
+                "a": pd.Series([], dtype="int64"),
+                "b": pd.Series([], dtype=str),
+            }
+        ),
+        table="empty_t",
+        connection="dw",
+        dialect="duckdb",
+        client=duckdb_client,
+    )
+    conn = _raw_duckdb(duckdb_client)
+    cols = conn.execute(
+        "SELECT column_name, data_type FROM information_schema.columns "
+        "WHERE table_name = 'empty_t' ORDER BY ordinal_position"
+    ).fetchall()
+    conn.close()
+    assert cols[1][1] == "VARCHAR"
+    write_table(
+        pd.DataFrame({"a": [1], "b": ["x"]}),
+        table="empty_t",
+        connection="dw",
+        dialect="duckdb",
+        client=duckdb_client,
+    )
+    out = _rows(duckdb_client, "SELECT * FROM empty_t")
+    assert out.to_dict("records") == [{"a": 1, "b": "x"}]
+
+
+def test_duckdb_read_only_false_dml_via_execute(duckdb_client, frame):
+    """A DML request sent with read_only=False runs on an open read-write connection.
+
+    The profile's write_enabled gate already fires in the client's run(); once it passes,
+    the adapter must not still open the file read-only (issue #164 follow-up), which would
+    make the documented read_only=False path never able to run DML."""
+    write_table(frame, table="t1", connection="dw", dialect="duckdb", client=duckdb_client)
+    request = QueryRequest(
+        sql="INSERT INTO t1 VALUES (4, 'w')",
+        dialect="duckdb",
+        connection="dw",
+        read_only=False,
+    )
+    duckdb_client.run(request)
+    assert _rows(duckdb_client, "SELECT count(*) AS n FROM t1")["n"].iloc[0] == 4
+
+
+def test_write_table_node_uses_connection_ref_and_dialect_select():
+    """The write_table node must declare its connection param as a ConnectionRef (profile
+    picker) and its dialect as a select with the family's choices/default -- a free-text
+    spec would strand the only effectful warehouse node outside the family's UI contract
+    (issue #164 follow-up)."""
+    from emergentflow.data.warehouse.params import (
+        CONNECTION_REF_TOKEN,
+        CONNECTION_WIDGET,
+    )
+    from emergentflow.nodes.examples.write_table import WriteTable
+
+    defn = WriteTable()
+    conn = next(p for p in defn.params if p.name == "connection")
+    assert conn.type_token == CONNECTION_REF_TOKEN
+    assert conn.hints.widget == CONNECTION_WIDGET
+    dial = next(p for p in defn.params if p.name == "dialect")
+    assert dial.default == "duckdb"
+    assert dial.hints.widget == "select"
+    assert dial.hints.choices == ["duckdb", "bigquery", "redshift", "postgres"]

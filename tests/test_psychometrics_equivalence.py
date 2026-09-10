@@ -70,3 +70,43 @@ def test_fit_irt_node_equivalence():
     pd.testing.assert_frame_equal(executed.abilities, codegen_result.abilities)
     pd.testing.assert_frame_equal(executed.items, codegen_result.items)
     pd.testing.assert_frame_equal(executed.fit, codegen_result.fit)
+
+
+def test_reliability_cleared_long_format_column_raises_same_error_both_paths():
+    """A long-format config whose score_col is an EMPTY string (a cleared canvas column)
+    must raise the same error on the codegen and execute paths -- execute used to pass
+    score_col='' (raising "unknown column ''") while codegen omitted it (raising "requires
+    score_col"), a codegen/execute divergence (ADR 0002, issue #164 follow-up)."""
+    from emergentflow.psychometrics.errors import PsychometricsError
+
+    defn = PsychometricsReliability()
+    base_params = {
+        "item_cols": None,
+        "subject_col": "subject",
+        "item_col": "item",
+        "score_col": "",
+        "method": "cronbach_alpha",
+    }
+    node = defn.instantiate(**base_params)
+    frame = pd.DataFrame({"subject": ["a", "b"], "item": ["i1", "i1"], "score": [1, 0]})
+
+    with pytest.raises(PsychometricsError) as exc_exec:
+        defn.execute(node, inputs={"frame": frame.copy()})
+    exec_msg = str(exc_exec.value)
+
+    with pytest.raises(PsychometricsError) as exc_code:
+        _run_codegen(defn, node, {"frame": frame.copy()})
+    assert str(exc_code.value) == exec_msg
+    assert "requires" in exec_msg or "unknown column" not in exec_msg
+
+
+def test_disattenuate_zero_reliability_fails_graph_validation():
+    """reliability_x=0.0 must fail node validation (the op requires (0, 1]), not sail
+    through and crash at execute time (issue #164 follow-up)."""
+    defn = PsychometricsDisattenuate()
+    good = defn.instantiate(r=0.5, reliability_x=0.9)
+    assert defn.validate_node(good) == []
+    bad = defn.instantiate(r=0.5, reliability_x=0.0)
+    errors = defn.validate_node(bad)
+    assert errors, "reliability_x=0.0 must be a validation error"
+    assert any("reliability_x" in e for e in errors)

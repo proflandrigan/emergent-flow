@@ -110,3 +110,51 @@ def test_grouped_cv_integer_regression_target_uses_groupkfold():
     )
     assert (res["splitter"] == "GroupKFold").all()
     assert len(res) == 4
+
+
+def test_grouped_cv_classification_falls_back_to_groupkfold_when_strata_degenerate():
+    # A small grouped classification set where a class has fewer members than n_splits:
+    # StratifiedGroupKFold cannot split it (raises ValueError), and the grouped CV must
+    # degrade to GroupKFold the way the regression path already does -- not crash.
+    df = pd.DataFrame(
+        {
+            "x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            "y": [0, 0, 0, 1, 1, 1],
+            "sid": ["a", "b", "c", "d", "e", "f"],
+        }
+    )
+    res = cross_validate(
+        df,
+        estimator="LogisticRegression",
+        target="y",
+        features=["x"],
+        cv=5,
+        cv_strategy="grouped",
+        group_col="sid",
+        scoring="accuracy",
+    )
+    assert (res["splitter"] == "GroupKFold").all()
+    assert len(res) == 5
+
+
+def test_grouped_cv_classification_still_uses_stratified_when_splittable():
+    # The fallback must only trigger on a genuine degenerate-strata case; a normal grouped
+    # classification set keeps the stratified splitter.
+    df = pd.DataFrame(
+        {
+            "x": list(range(24)),
+            "y": [i % 2 for i in range(24)],
+            "sid": [f"g{i % 6}" for i in range(24)],
+        }
+    )
+    res = cross_validate(
+        df,
+        estimator="LogisticRegression",
+        target="y",
+        features=["x"],
+        cv=3,
+        cv_strategy="grouped",
+        group_col="sid",
+        scoring="accuracy",
+    )
+    assert (res["splitter"] == "StratifiedGroupKFold").all()

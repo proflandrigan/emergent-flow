@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from emergentflow.clients import ClientKind
 from emergentflow.data import write_table
+from emergentflow.data.warehouse.params import connection_param
 from emergentflow.data.warehouse.protocol import WarehouseClient
 from emergentflow.ir.common import Direction
 from emergentflow.ir.node import Node
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
 
 _MODE_CHOICES = ["append", "truncate", "error"]
+_DIALECT_CHOICES = ["duckdb", "bigquery", "redshift", "postgres"]
 
 
 @register
@@ -73,21 +75,18 @@ class WriteTable(NodeDefinition):
             help="Target table (optionally schema.table).",
             hints=ValidationHints(widget="text"),
         ),
-        ParamSpec(
-            name="connection",
-            type_token="str",
-            required=True,
-            label="Connection",
+        connection_param(
             help="Connection profile name (must have write_enabled=true).",
-            hints=ValidationHints(widget="text"),
         ),
         ParamSpec(
             name="dialect",
             type_token="str",
-            required=True,
+            default="duckdb",
             label="Dialect",
             help="sqlglot dialect key (duckdb, postgres, ...).",
-            hints=ValidationHints(widget="text"),
+            hints=ValidationHints(
+                choices=cast("list[ParamValue]", _DIALECT_CHOICES), widget="select"
+            ),
         ),
         ParamSpec(
             name="mode",
@@ -105,7 +104,7 @@ class WriteTable(NodeDefinition):
         return {
             "table": cast(str, values.get("table")),
             "connection": cast(str, values.get("connection")),
-            "dialect": cast(str, values.get("dialect")),
+            "dialect": cast(str, values.get("dialect", "duckdb")),
             "mode": cast(str, values.get("mode", "append")),
         }
 

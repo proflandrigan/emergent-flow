@@ -133,8 +133,12 @@ class CausalEstimateEffect(NodeDefinition):
             "cluster_col": cast("str | None", values.get("cluster_col") or None),
             "n_boot": cast(int, values.get("n_boot") or 0),
             "random_state": cast(int, values.get("random_state") or 0),
-            # None (param cleared in the UI) disables the caliper, matching the op's contract.
-            "caliper": cast("float | None", values.get("caliper")),
+            # `values.get("caliper", 0.2)`: an ABSENT param (raw IR / older graphs) must fall
+            # back to the declared default 0.2 (as instantiate would fill it), while an
+            # explicitly-cleared (None) param still disables the caliper (greedy matching),
+            # matching the op's contract. This keeps absent-and-default behavior identical to
+            # a graph that persisted the value.
+            "caliper": cast("float | None", values.get("caliper", 0.2)),
         }
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:

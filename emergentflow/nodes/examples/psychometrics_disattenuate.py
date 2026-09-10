@@ -63,7 +63,9 @@ class PsychometricsDisattenuate(NodeDefinition):
             required=True,
             label="Reliability of X",
             help="Reliability of the first variable (Cronbach's alpha, ...), in (0, 1].",
-            hints=ValidationHints(min=0.0, max=1.0, widget="number"),
+            # min=1e-9 (not 0.0): the op rejects reliability <= 0, so a 0 value must fail
+            # graph validation rather than pass and crash at run time.
+            hints=ValidationHints(min=1e-9, max=1.0, widget="number"),
         ),
         ParamSpec(
             name="reliability_y",
@@ -71,7 +73,7 @@ class PsychometricsDisattenuate(NodeDefinition):
             default=1.0,
             label="Reliability of Y",
             help="Reliability of the second variable, in (0, 1] (default 1.0).",
-            hints=ValidationHints(min=0.0, max=1.0, widget="number"),
+            hints=ValidationHints(min=1e-9, max=1.0, widget="number"),
         ),
         ParamSpec(
             name="n",

@@ -27,7 +27,7 @@ from emergentflow.data.warehouse.protocol import (
 try:
     import sqlalchemy as _sa
 except ImportError:
-    _sa = None
+    _sa = None  # type: ignore[assignment]  # optional extra: None until [postgres] installed
 
 _EXTRA = "emergentflow[postgres]"
 

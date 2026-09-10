@@ -119,7 +119,9 @@ class CausalFitPropensity(NodeDefinition):
 
     def _args(self, node: Node) -> dict[str, Any]:
         values = {p.name: p.value for p in node.params}
-        trim = cast("list[float] | None", values.get("trim"))
+        # `values.get("trim", [0.01, 0.99])`: an ABSENT param falls back to the declared
+        # default (as instantiate would fill it); `[]` (or None) still means "no trimming".
+        trim = cast("list[float] | None", values.get("trim", [0.01, 0.99]))
         return {
             "treatment": cast(str, values.get("treatment")),
             "covariates": cast("list[str]", values.get("covariates")),

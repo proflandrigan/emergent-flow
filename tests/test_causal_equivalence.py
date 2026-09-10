@@ -228,3 +228,43 @@ def test_estimate_effect_node_dropdown_matches_registry_and_op():
             ),
             inputs={"frame": df},
         )
+
+
+def test_estimate_effect_absent_caliper_uses_declared_default():
+    """A graph whose IR omits the ``caliper`` param must behave as the declared default 0.2
+    (not as caliper=None/greedy matching) -- the node's ParamSpec default and the op's default
+    agree, so absent == explicitly-0.2 (issue #164 follow-up)."""
+    df = _confounded_df()
+    defn = CausalEstimateEffect()
+    absent = defn.instantiate(outcome="y", treatment="t", covariates=["x1"], method="matching")
+    assert next(p.value for p in absent.params if p.name == "caliper") == 0.2  # declared default
+    explicit = defn.instantiate(
+        outcome="y", treatment="t", covariates=["x1"], method="matching", caliper=0.2
+    )
+    r_absent = defn.execute(absent, inputs={"frame": df.copy()})["result"]
+    r_explicit = defn.execute(explicit, inputs={"frame": df.copy()})["result"]
+    pd.testing.assert_frame_equal(r_absent, r_explicit)
+
+
+def test_fit_propensity_absent_trim_uses_declared_default():
+    """An absent ``trim`` param must fall back to the declared default (0.01, 0.99), not
+    disable trimming -- absent == explicitly-[0.01, 0.99] (issue #164 follow-up)."""
+    df = _confounded_df()
+    defn = CausalFitPropensity()
+    absent = defn.instantiate(treatment="t", covariates=["x1"])
+    assert next(p.value for p in absent.params if p.name == "trim") == [0.01, 0.99]
+    explicit = defn.instantiate(treatment="t", covariates=["x1"], trim=[0.01, 0.99])
+    r_absent = defn.execute(absent, inputs={"frame": df.copy()})["result"]
+    r_explicit = defn.execute(explicit, inputs={"frame": df.copy()})["result"]
+    pd.testing.assert_series_equal(r_absent.weights, r_explicit.weights)
+    pd.testing.assert_frame_equal(r_absent.balance, r_explicit.balance)
+
+
+def test_sensitivity_sd_zero_fails_graph_validation():
+    """causal.sensitivity sd=0.0 must fail node validation (the op requires sd > 0), not
+    pass validation and crash at execute time (issue #164 follow-up)."""
+    defn = CausalSensitivity()
+    bad = defn.instantiate(sd=0.0, scale="difference")
+    errors = defn.validate_node(bad)
+    assert errors
+    assert any("sd" in e for e in errors)

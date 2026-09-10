@@ -316,3 +316,36 @@ def test_ml_nodes_treat_empty_weight_col_as_unset():
     exec(defn.preview(node).render(), scope)  # noqa: S102 - test-only on our own emitted code
     assert executed.feature_names == scope["model"].feature_names
     assert executed.estimator.coef_ == pytest.approx(scope["model"].estimator.coef_)
+
+
+def test_all_zero_weight_col_raises_clear_error_everywhere():
+    # An all-zero sample-weight column makes every fit degenerate; sklearn surfaces it as a
+    # cryptic "All the N fits failed" out of cross_validate / grid_search, so the SDK must
+    # reject it up front with a clear message (issue #164 follow-up).
+    df = _make_df(n=60)
+    df["w0"] = 0.0
+    match = "at least one non-zero"
+    for call in (
+        lambda: fit_estimator(df, estimator="Ridge", target="y", features=["x"], weight_col="w0"),
+        lambda: train_regressor(df, target="y", features=["x"], weight_col="w0"),
+        lambda: cross_validate(df, estimator="Ridge", target="y", features=["x"], weight_col="w0"),
+        lambda: grid_search(
+            df,
+            estimator="Ridge",
+            target="y",
+            features=["x"],
+            weight_col="w0",
+            param_grid={"alpha": [1.0]},
+        ),
+    ):
+        with pytest.raises(ValueError, match=match):
+            call()
+
+
+def test_partially_zero_weight_col_still_accepted():
+    # Zero weights on SOME rows are legitimate (e.g. down-weighting noisy rows); only an
+    # all-zero column is degenerate.
+    df = _make_df(n=60)
+    df["w_part"] = np.where(np.arange(60) < 20, 0.0, 1.0)
+    out = cross_validate(df, estimator="Ridge", target="y", features=["x"], weight_col="w_part")
+    assert len(out) == 5

@@ -100,9 +100,13 @@ class PsychometricsReliability(NodeDefinition):
         values = {p.name: p.value for p in node.params}
         return {
             "item_cols": cast("list[str] | None", values.get("item_cols")),
-            "subject_col": cast("str | None", values.get("subject_col")),
-            "item_col": cast("str | None", values.get("item_col")),
-            "score_col": cast("str | None", values.get("score_col")),
+            # `or None`: an empty string (a cleared canvas column) must be treated exactly like
+            # no column, on BOTH the codegen and execute paths -- otherwise execute passes
+            # score_col="" (raising "unknown column ''") while codegen omits it (raising a
+            # different "requires score_col" error), a codegen/execute divergence (ADR 0002).
+            "subject_col": cast("str | None", values.get("subject_col") or None),
+            "item_col": cast("str | None", values.get("item_col") or None),
+            "score_col": cast("str | None", values.get("score_col") or None),
             "method": cast(str, values.get("method", "cronbach_alpha")),
         }
 

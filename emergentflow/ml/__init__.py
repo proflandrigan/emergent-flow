@@ -842,6 +842,13 @@ def _resolve_sample_weight(
         raise ValueError("weight_col must be finite (no NaN or infinite values).")
     if (w < 0).any():
         raise ValueError("weight_col must be non-negative.")
+    if not (w > 0).any():
+        # Reject up front with a clear message instead of leaking sklearn's cryptic "All the N
+        # fits failed ... your model is misconfigured" out of cross_validate/grid_search/tune_model.
+        raise ValueError(
+            "weight_col must contain at least one non-zero value; an all-zero sample-weight "
+            "column makes every fit degenerate."
+        )
     if est is not None:
         params = inspect.signature(est.fit).parameters
         if "sample_weight" not in params and not any(
@@ -1499,8 +1506,17 @@ def cross_validate(
             "multiclass",
         )
         if stratifiable:
-            cv_obj = StratifiedGroupKFold(n_splits=cv, shuffle=True, random_state=0)
-            splitter_name = "StratifiedGroupKFold"
+            # fall back to GroupKFold when StratifiedGroupKFold cannot split at all (a
+            # degenerate class has fewer members than n_splits): the regression path already
+            # degrades to GroupKFold, so a small grouped *classification* set must not crash
+            # where an identical regression set succeeds (issue #164 Bug 2 follow-up).
+            try:
+                cv_obj = StratifiedGroupKFold(n_splits=cv, shuffle=True, random_state=0)
+                next(cv_obj.split(df[feature_names], df[target], groups=df[group_col]))
+                splitter_name = "StratifiedGroupKFold"
+            except ValueError:
+                cv_obj = GroupKFold(n_splits=cv)
+                splitter_name = "GroupKFold"
         else:
             cv_obj = GroupKFold(n_splits=cv)
             splitter_name = "GroupKFold"

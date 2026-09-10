@@ -101,8 +101,11 @@ class CausalSensitivity(NodeDefinition):
             type_token="float",
             default=None,
             label="Outcome SD",
-            help="e_value with scale='difference': the outcome's standard deviation.",
-            hints=ValidationHints(widget="number"),
+            help="e_value with scale='difference': the outcome's standard deviation "
+            "(must be finite and > 0).",
+            # min=1e-9 (not 0.0): scale='difference' + sd=0 violates the op's "sd > 0" guard,
+            # so 0 must fail graph validation, not crash at run time.
+            hints=ValidationHints(min=1e-9, widget="number"),
         ),
         ParamSpec(
             name="risk_ratio",
