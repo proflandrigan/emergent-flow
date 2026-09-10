@@ -56,8 +56,8 @@ def test_postgres_split_table():
 
 
 def test_postgres_write_append_and_transactional_truncate(tmp_path, monkeypatch):
+    sa = pytest.importorskip("sqlalchemy")
     import pandas as pd
-    import sqlalchemy as sa
 
     from emergentflow.data.warehouse.protocol import WriteRequest
 

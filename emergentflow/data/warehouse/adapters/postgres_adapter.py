@@ -8,8 +8,10 @@ lives only behind this extra, never on the hard-dep path).
 
 from __future__ import annotations
 
+import importlib
 import time
 from collections.abc import Mapping
+from typing import Any
 
 import pandas as pd
 
@@ -24,10 +26,11 @@ from emergentflow.data.warehouse.protocol import (
     WriteResult,
 )
 
+_sa: Any
 try:
-    import sqlalchemy as _sa
+    _sa = importlib.import_module("sqlalchemy")
 except ImportError:
-    _sa = None  # type: ignore[assignment]  # optional extra: None until [postgres] installed
+    _sa = None
 
 _EXTRA = "emergentflow[postgres]"
 
