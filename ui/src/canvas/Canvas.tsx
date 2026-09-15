@@ -186,15 +186,21 @@ export function Canvas(): JSX.Element {
           : trace.highlightedNodeIds.has(n.id)
             ? "traced"
             : "dimmed";
+        // efNodes carry their trace styling inline (EfNode.tsx: accent ring / dimmed opacity)
+        // so the ring can outrank status styling and dimming can min with the skipped opacity.
+        // Only non-efNode types (group/composite/note/callout/snapshot) get the CSS classes --
+        // applying both would double-dim efNodes (wrapper opacity x inline opacity) and draw a
+        // doubled accent ring.
+        const isEfNode = n.type === "efNode";
         return {
           ...n,
           className:
-            mode === "traced"
+            !isEfNode && mode === "traced"
               ? "ef-trace-traced"
-              : mode === "dimmed"
+              : !isEfNode && mode === "dimmed"
                 ? "ef-trace-dimmed"
                 : undefined,
-          data: n.type === "efNode" ? { ...n.data, trace: mode } : n.data,
+          data: isEfNode ? { ...n.data, trace: mode } : n.data,
         };
       }),
     [rawNodes, trace],

@@ -306,7 +306,6 @@ export function toRFNode(
     type: "efNode",
     position: node.position,
     selected,
-    className: traceClassName,
     data: {
       label: node.label ?? node.type,
       family: family ?? null,

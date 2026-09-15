@@ -338,16 +338,16 @@ function efNodeModel(overrides?: Partial<NodeModel>): NodeModel {
 }
 
 describe("toRFNode (trace mode)", () => {
-  test('sets className "ef-trace-traced" when passed "traced" for a standard efNode', () => {
+  test('leaves className undefined for a traced efNode (inline ring handles tracing)', () => {
     const rf = toRFNode(efNodeModel(), false, null, null, null, null, "traced") as ReturnType<typeof toRFNode>;
 
-    expect(rf.className).toBe("ef-trace-traced");
+    expect(rf.className).toBeUndefined();
   });
 
-  test('sets className "ef-trace-dimmed" when passed "dimmed"', () => {
+  test('leaves className undefined for a dimmed efNode (inline opacity handles dimming)', () => {
     const rf = toRFNode(efNodeModel(), false, null, null, null, null, "dimmed") as ReturnType<typeof toRFNode>;
 
-    expect(rf.className).toBe("ef-trace-dimmed");
+    expect(rf.className).toBeUndefined();
   });
 
   test('leaves className undefined when passed "none"', () => {
@@ -363,6 +363,18 @@ describe("toRFNode (trace mode)", () => {
     if (rf.type === "efNode") {
       expect(rf.data.trace).toBe("traced");
     }
+  });
+
+  test('sets className "ef-trace-traced" for a non-efNode type (noteNode)', () => {
+    const rf = toRFNode(noteModel(), false, null, null, null, null, "traced") as ReturnType<typeof toRFNode>;
+
+    expect(rf.className).toBe("ef-trace-traced");
+  });
+
+  test('sets className "ef-trace-dimmed" for a non-efNode type (noteNode)', () => {
+    const rf = toRFNode(noteModel(), false, null, null, null, null, "dimmed") as ReturnType<typeof toRFNode>;
+
+    expect(rf.className).toBe("ef-trace-dimmed");
   });
 });
 
