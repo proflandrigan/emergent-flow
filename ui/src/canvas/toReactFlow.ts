@@ -20,6 +20,11 @@ const COMPOSITE_NODE_TYPE = "layout.composite";
 const SNAPSHOT_NODE_TYPE = "layout.snapshot";
 const CALLOUT_NODE_TYPE = "layout.callout";
 
+// Trace state projected onto a node/edge: "traced" highlights the active trace path, "dimmed"
+// marks nodes/edges outside it, "none" means tracing is inactive. A shared TraceMode will be
+// introduced later; this local alias keeps the module type-checking on its own.
+export type TraceMode = "traced" | "dimmed" | "none";
+
 // A group container auto-sizes to fit its members plus this padding on every side. The
 // footprint constants are a rough per-node bounding box (matches EfNode's typical rendered
 // size) used only to size the container BEFORE React Flow has measured real node sizes --
@@ -175,7 +180,14 @@ export function toRFNode(
   results: Record<string, Payload> | null | undefined,
   family: string | null | undefined,
   description: string | null | undefined,
+  traceMode: TraceMode,
 ): RFNode<EfNodeData> | RFNode<NoteNodeData> | RFNode<GroupNodeData> | RFNode<CompositeNodeData> | RFNode<SnapshotNodeData> | RFNode<CalloutNodeData> {
+  const traceClassName =
+    traceMode === "traced"
+      ? "ef-trace-traced"
+      : traceMode === "dimmed"
+        ? "ef-trace-dimmed"
+        : undefined;
   if (node.type === COMPOSITE_NODE_TYPE) {
     const paramValue = (name: string): unknown =>
       node.params.find((p) => p.name === name)?.value;
@@ -186,6 +198,7 @@ export function toRFNode(
       type: "compositeNode",
       position: node.position,
       selected,
+      className: traceClassName,
       data: {
         label: typeof label === "string" ? label : "Composite",
         ports: node.ports.map((port) => ({
@@ -208,6 +221,7 @@ export function toRFNode(
       type: "groupNode",
       position: node.position,
       selected,
+      className: traceClassName,
       data: {
         label: typeof label === "string" ? label : "Group",
         color: typeof color === "string" ? color : "slate",
@@ -226,6 +240,7 @@ export function toRFNode(
       type: "calloutNode",
       position: node.position,
       selected,
+      className: traceClassName,
       style: { zIndex: -2 },
       data: {
         label: typeof label === "string" ? label : "Callout",
@@ -246,6 +261,7 @@ export function toRFNode(
       type: "noteNode",
       position: node.position,
       selected,
+      className: traceClassName,
       data: {
         content: typeof content === "string" ? content : "",
         color: typeof color === "string" ? color : "yellow",
@@ -270,6 +286,7 @@ export function toRFNode(
       type: "snapshotNode",
       position: node.position,
       selected,
+      className: traceClassName,
       data: {
         payload,
         portName: typeof paramValue("port_name") === "string"
@@ -289,6 +306,7 @@ export function toRFNode(
     type: "efNode",
     position: node.position,
     selected,
+    className: traceClassName,
     data: {
       label: node.label ?? node.type,
       family: family ?? null,
@@ -301,6 +319,7 @@ export function toRFNode(
       })),
       status: status ?? null,
       results: results ?? null,
+      trace: traceMode,
     },
   };
 }
@@ -310,6 +329,7 @@ export function toRFEdge(
   selected: boolean,
   compatible: boolean | null | undefined,
   reason: string | null | undefined,
+  traceMode: TraceMode,
 ): RFEdge<EfEdgeData> {
   return {
     id: edge.id,
@@ -319,7 +339,7 @@ export function toRFEdge(
     target: edge.target.node_id,
     targetHandle: edge.target.port_id,
     selected,
-    data: { incompatible: compatible === false, reason: reason ?? null },
+    data: { incompatible: compatible === false, reason: reason ?? null, trace: traceMode },
   };
 }
 

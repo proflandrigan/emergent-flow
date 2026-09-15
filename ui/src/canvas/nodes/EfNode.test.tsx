@@ -202,4 +202,104 @@ describe("EfNode", () => {
     expect(container.querySelector(".ef-tooltip")).not.toBeInTheDocument();
     expect(screen.getByText("Load CSV")).toBeInTheDocument();
   });
+
+  test("traced node renders an accent ring", () => {
+    const data: EfNodeData = {
+      label: "Load CSV",
+      ports: [],
+      status: null,
+      results: null,
+      trace: "traced",
+    };
+
+    renderEfNode(data);
+
+    expect(screen.getByTestId("ef-node").style.border).toContain(
+      "var(--accent)",
+    );
+    expect(screen.getByTestId("ef-node").style.boxShadow).toContain(
+      "var(--accent)",
+    );
+  });
+
+  test("traced node outranks an ok status border", () => {
+    const data: EfNodeData = {
+      label: "Load CSV",
+      ports: [],
+      status: "ok",
+      results: null,
+      trace: "traced",
+    };
+
+    renderEfNode(data);
+
+    expect(screen.getByTestId("ef-node").style.border).toContain(
+      "var(--accent)",
+    );
+    expect(screen.getByTestId("ef-node").style.border).not.toContain(
+      "var(--success)",
+    );
+  });
+
+  test("dimmed node reduces opacity", () => {
+    const data: EfNodeData = {
+      label: "Load CSV",
+      ports: [],
+      status: null,
+      results: null,
+      trace: "dimmed",
+    };
+
+    renderEfNode(data);
+
+    expect(screen.getByTestId("ef-node")).toHaveStyle({ opacity: 0.35 });
+  });
+
+  test("dimmed + skipped stays at the dimmer opacity", () => {
+    const data: EfNodeData = {
+      label: "Load CSV",
+      ports: [],
+      status: "skipped",
+      results: null,
+      trace: "dimmed",
+    };
+
+    renderEfNode(data);
+
+    expect(screen.getByTestId("ef-node")).toHaveStyle({ opacity: 0.35 });
+  });
+
+  test("no trace leaves default styling", () => {
+    const data: EfNodeData = {
+      label: "Load CSV",
+      ports: [],
+      status: null,
+      results: null,
+      trace: "none",
+    };
+
+    renderEfNode(data);
+
+    const node = screen.getByTestId("ef-node");
+    expect(node).not.toHaveStyle({ opacity: 0.35 });
+    expect(node.style.boxShadow).not.toContain("var(--accent)");
+    expect(node.style.border).toContain("var(--border-subtle)");
+    expect(node.getAttribute("data-trace")).toBe("none");
+  });
+
+  test("data-trace attribute is set for traced", () => {
+    const data: EfNodeData = {
+      label: "Load CSV",
+      ports: [],
+      status: null,
+      results: null,
+      trace: "traced",
+    };
+
+    renderEfNode(data);
+
+    expect(screen.getByTestId("ef-node").getAttribute("data-trace")).toBe(
+      "traced",
+    );
+  });
 });

@@ -8,7 +8,7 @@ import { create } from "zustand";
 import type { CatalogNode } from "../catalog/types";
 import type { Graph } from "../generated/ir";
 import { useExecutionStore } from "./executionStore";
-import { layeredLayout, separateOverlappingNodes } from "../canvas/layout";
+import { expandLayout, layeredLayout, separateOverlappingNodes } from "../canvas/layout";
 import { computeGroupBounds, NODE_FOOTPRINT_WIDTH, NODE_FOOTPRINT_HEIGHT, GROUP_PADDING } from "../canvas/toReactFlow";
 import { newId } from "./ids";
 import { edgeToIR, fromIR, nodeToIR, toIR } from "./ir";
@@ -93,6 +93,7 @@ export interface GraphStore extends CanvasModel {
   loadIR: (graph: Graph, options?: { reflow?: boolean }) => void;
   loadModel: (model: CanvasModel, options?: { reflow?: boolean }) => void;
   tidyLayout: () => void;
+  expandLayout: () => void;
   reset: () => void;
   pushHistory: (txn: string) => void;
   undo: () => void;
@@ -667,6 +668,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   tidyLayout() {
     get().pushHistory("tidyLayout");
     set((state) => ({ nodes: layeredLayout(state.nodes, state.edges) }));
+  },
+
+  expandLayout() {
+    get().pushHistory("expandLayout");
+    set((state) => ({ nodes: expandLayout(state.nodes, state.edges) }));
   },
 
   reset() {

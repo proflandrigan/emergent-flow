@@ -24,7 +24,7 @@ const edge: EdgeModel = {
 
 describe("toRFEdge", () => {
   test("compatible === false marks the edge incompatible and carries the reason", () => {
-    const rfEdge = toRFEdge(edge, false, false, "Expected int, got str");
+    const rfEdge = toRFEdge(edge, false, false, "Expected int, got str", "none");
 
     expect(rfEdge.type).toBe("efEdge");
     expect(rfEdge.source).toBe("a");
@@ -36,21 +36,29 @@ describe("toRFEdge", () => {
   });
 
   test("null verdict (unknown) does not mark the edge incompatible", () => {
-    const rfEdge = toRFEdge(edge, false, null, null);
+    const rfEdge = toRFEdge(edge, false, null, null, "none");
 
     expect(rfEdge.data?.incompatible).toBe(false);
   });
 
   test("undefined verdict (not yet validated) does not mark the edge incompatible", () => {
-    const rfEdge = toRFEdge(edge, false, undefined, undefined);
+    const rfEdge = toRFEdge(edge, false, undefined, undefined, "none");
 
     expect(rfEdge.data?.incompatible).toBe(false);
   });
 
   test("selected flag passes through", () => {
-    const rfEdge = toRFEdge(edge, true, undefined, undefined);
+    const rfEdge = toRFEdge(edge, true, undefined, undefined, "none");
 
     expect(rfEdge.selected).toBe(true);
+  });
+
+  test('sets data.trace === "dimmed" when passed "dimmed", and "none" for "none"', () => {
+    const dimmed = toRFEdge(edge, false, null, null, "dimmed");
+    const none = toRFEdge(edge, false, null, null, "none");
+
+    expect(dimmed.data?.trace).toBe("dimmed");
+    expect(none.data?.trace).toBe("none");
   });
 });
 
@@ -73,7 +81,7 @@ function noteModel(overrides?: Partial<NodeModel>): NodeModel {
 
 describe("toRFNode (notes.markdown)", () => {
   test("produces a noteNode with content / color / anchorId from params", () => {
-    const rf = toRFNode(noteModel(), false, null, null, null, null) as ReturnType<typeof toRFNode>;
+    const rf = toRFNode(noteModel(), false, null, null, null, null, "none") as ReturnType<typeof toRFNode>;
 
     expect(rf.type).toBe("noteNode");
     if (rf.type === "noteNode") {
@@ -86,7 +94,7 @@ describe("toRFNode (notes.markdown)", () => {
   test("missing color param falls back to yellow", () => {
     const rf = toRFNode(
       noteModel({ params: [{ name: "content", typeToken: "str", value: "hi" }] }),
-      false, null, null, null, null,
+      false, null, null, null, null, "none",
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "noteNode") {
@@ -100,7 +108,7 @@ describe("toRFNode (notes.markdown)", () => {
         { name: "content", typeToken: "str", value: "hi" },
         { name: "color", typeToken: "str", value: 42 },
       ] }),
-      false, null, null, null, null,
+      false, null, null, null, null, "none",
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "noteNode") {
@@ -114,7 +122,7 @@ describe("toRFNode (notes.markdown)", () => {
         { name: "content", typeToken: "str", value: "hi" },
         { name: "color", typeToken: "str", value: "blue" },
       ] }),
-      false, null, null, null, null,
+      false, null, null, null, null, "none",
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "noteNode") {
@@ -129,7 +137,7 @@ describe("toRFNode (notes.markdown)", () => {
         { name: "color", typeToken: "str", value: "blue" },
         { name: "anchor_id", typeToken: "str | null", value: null },
       ] }),
-      false, null, null, null, null,
+      false, null, null, null, null, "none",
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "noteNode") {
@@ -138,7 +146,7 @@ describe("toRFNode (notes.markdown)", () => {
   });
 
   test("noteNode passes id / position / selected through", () => {
-    const rf = toRFNode(noteModel(), true, null, null, null, null) as ReturnType<typeof toRFNode>;
+    const rf = toRFNode(noteModel(), true, null, null, null, null, "none") as ReturnType<typeof toRFNode>;
 
     expect(rf.id).toBe("n1");
     expect(rf.position).toEqual({ x: 100, y: 200 });
@@ -164,7 +172,7 @@ function groupModel(overrides?: Partial<NodeModel>): NodeModel {
 
 describe("toRFNode (layout.group)", () => {
   test("produces a groupNode with label / color from params", () => {
-    const rf = toRFNode(groupModel(), false, null, null, null, null) as ReturnType<typeof toRFNode>;
+    const rf = toRFNode(groupModel(), false, null, null, null, null, "none") as ReturnType<typeof toRFNode>;
 
     expect(rf.type).toBe("groupNode");
     if (rf.type === "groupNode") {
@@ -176,7 +184,7 @@ describe("toRFNode (layout.group)", () => {
   test("missing color param falls back to slate", () => {
     const rf = toRFNode(
       groupModel({ params: [{ name: "label", typeToken: "str", value: "Test" }] }),
-      false, null, null, null, null,
+      false, null, null, null, null, "none",
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "groupNode") {
@@ -190,7 +198,7 @@ describe("toRFNode (layout.group)", () => {
         { name: "label", typeToken: "str", value: "Test" },
         { name: "color", typeToken: "str", value: 42 },
       ] }),
-      false, null, null, null, null,
+      false, null, null, null, null, "none",
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "groupNode") {
@@ -201,7 +209,7 @@ describe("toRFNode (layout.group)", () => {
   test("missing label param falls back to Group", () => {
     const rf = toRFNode(
       groupModel({ params: [{ name: "color", typeToken: "str", value: "green" }] }),
-      false, null, null, null, null,
+      false, null, null, null, null, "none",
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "groupNode") {
@@ -215,7 +223,7 @@ describe("toRFNode (layout.group)", () => {
         { name: "label", typeToken: "str", value: 42 },
         { name: "color", typeToken: "str", value: "green" },
       ] }),
-      false, null, null, null, null,
+      false, null, null, null, null, "none",
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "groupNode") {
@@ -224,7 +232,7 @@ describe("toRFNode (layout.group)", () => {
   });
 
   test("groupNode passes id / position / selected through", () => {
-    const rf = toRFNode(groupModel(), true, null, null, null, null) as ReturnType<typeof toRFNode>;
+    const rf = toRFNode(groupModel(), true, null, null, null, null, "none") as ReturnType<typeof toRFNode>;
 
     expect(rf.id).toBe("g1");
     expect(rf.position).toEqual({ x: 100, y: 200 });
@@ -258,7 +266,7 @@ function compositeModel(overrides?: Partial<NodeModel>): NodeModel {
 
 describe("toRFNode (layout.composite)", () => {
   test("produces a compositeNode with label / ports / memberCount from model", () => {
-    const rf = toRFNode(compositeModel(), false, null, null, null, null) as ReturnType<typeof toRFNode>;
+    const rf = toRFNode(compositeModel(), false, null, null, null, null, "none") as ReturnType<typeof toRFNode>;
 
     expect(rf.type).toBe("compositeNode");
     if (rf.type === "compositeNode") {
@@ -274,7 +282,7 @@ describe("toRFNode (layout.composite)", () => {
   test("missing label falls back to Composite", () => {
     const rf = toRFNode(
       compositeModel({ params: [] }),
-      false, null, null, null, null,
+      false, null, null, null, null, "none",
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "compositeNode") {
@@ -286,7 +294,7 @@ describe("toRFNode (layout.composite)", () => {
   test("non-string label falls back to Composite", () => {
     const rf = toRFNode(
       compositeModel({ params: [{ name: "label", typeToken: "str", value: 42 }] }),
-      false, null, null, null, null,
+      false, null, null, null, null, "none",
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "compositeNode") {
@@ -298,7 +306,7 @@ describe("toRFNode (layout.composite)", () => {
   test("no subgraph reports 0 members", () => {
     const rf = toRFNode(
       compositeModel({ subgraph: undefined }),
-      false, null, null, null, null,
+      false, null, null, null, null, "none",
     ) as ReturnType<typeof toRFNode>;
 
     if (rf.type === "compositeNode") {
@@ -308,11 +316,53 @@ describe("toRFNode (layout.composite)", () => {
   });
 
   test("passes id / position / selected through", () => {
-    const rf = toRFNode(compositeModel(), true, null, null, null, null) as ReturnType<typeof toRFNode>;
+    const rf = toRFNode(compositeModel(), true, null, null, null, null, "none") as ReturnType<typeof toRFNode>;
 
     expect(rf.id).toBe("comp1");
     expect(rf.position).toEqual({ x: 300, y: 100 });
     expect(rf.selected).toBe(true);
+  });
+});
+
+function efNodeModel(overrides?: Partial<NodeModel>): NodeModel {
+  return {
+    id: "ef1",
+    type: "data.load_csv",
+    label: "CSV",
+    paradigm: "functional",
+    params: [],
+    ports: [],
+    position: { x: 0, y: 0 },
+    ...overrides,
+  };
+}
+
+describe("toRFNode (trace mode)", () => {
+  test('sets className "ef-trace-traced" when passed "traced" for a standard efNode', () => {
+    const rf = toRFNode(efNodeModel(), false, null, null, null, null, "traced") as ReturnType<typeof toRFNode>;
+
+    expect(rf.className).toBe("ef-trace-traced");
+  });
+
+  test('sets className "ef-trace-dimmed" when passed "dimmed"', () => {
+    const rf = toRFNode(efNodeModel(), false, null, null, null, null, "dimmed") as ReturnType<typeof toRFNode>;
+
+    expect(rf.className).toBe("ef-trace-dimmed");
+  });
+
+  test('leaves className undefined when passed "none"', () => {
+    const rf = toRFNode(efNodeModel(), false, null, null, null, null, "none") as ReturnType<typeof toRFNode>;
+
+    expect(rf.className).toBeUndefined();
+  });
+
+  test('standard efNode sets data.trace === "traced" when passed "traced"', () => {
+    const rf = toRFNode(efNodeModel(), false, null, null, null, null, "traced") as ReturnType<typeof toRFNode>;
+
+    expect(rf.type).toBe("efNode");
+    if (rf.type === "efNode") {
+      expect(rf.data.trace).toBe("traced");
+    }
   });
 });
 
@@ -416,7 +466,7 @@ describe("applyGroupNesting", () => {
     const group: NodeModel = groupModel({ id: "g1" });
     const nodeModels = [member1, member2, group];
 
-    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null, "none"));
     const result = applyGroupNesting(nodeModels, rfNodes);
 
     const groupRf = result.find((n) => n.id === "g1");
@@ -451,7 +501,7 @@ describe("applyGroupNesting", () => {
     const group: NodeModel = groupModel({ id: "g1" });
     const nodeModels = [member1, member2, group];
 
-    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null, "none"));
     const result = applyGroupNesting(nodeModels, rfNodes);
 
     const m1Rf = result.find((n) => n.id === "m1");
@@ -479,7 +529,7 @@ describe("applyGroupNesting", () => {
     };
     const nodeModels = [ungrouped];
 
-    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null, "none"));
     const result = applyGroupNesting(nodeModels, rfNodes);
 
     const resultNode = result.find((n) => n.id === "n1");
@@ -499,7 +549,7 @@ describe("applyGroupNesting", () => {
     };
     const nodeModels = [member];
 
-    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null, "none"));
     const result = applyGroupNesting(nodeModels, rfNodes);
 
     const resultNode = result.find((n) => n.id === "m1");
@@ -510,7 +560,7 @@ describe("applyGroupNesting", () => {
     const group: NodeModel = groupModel({ id: "g1" });
     const nodeModels = [group];
 
-    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null, "none"));
     const result = applyGroupNesting(nodeModels, rfNodes);
 
     const resultGroup = result.find((n) => n.id === "g1");
@@ -609,7 +659,7 @@ describe("applyCollapsedGroups", () => {
     const group: NodeModel = groupModel({ id: "g1" });
     const nodeModels = [member, group];
 
-    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null, "none"));
 
     const result = applyCollapsedGroups(nodeModels, new Set(), rfNodes);
 
@@ -640,7 +690,7 @@ describe("applyCollapsedGroups", () => {
     const group: NodeModel = groupModel({ id: "g1" });
     const nodeModels = [member1, member2, group];
 
-    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null, "none"));
     const result = applyCollapsedGroups(nodeModels, new Set(["g1"]), rfNodes);
 
     expect(result.map((n) => n.id)).toEqual(["g1"]);
@@ -660,7 +710,7 @@ describe("applyCollapsedGroups", () => {
     const group: NodeModel = groupModel({ id: "g1" });
     const nodeModels = [member, group];
 
-    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null, "none"));
     const result = applyCollapsedGroups(nodeModels, new Set(["g1"]), rfNodes);
 
     const groupNode = result.find((n) => n.id === "g1");
@@ -682,7 +732,7 @@ describe("applyCollapsedGroups", () => {
     const group: NodeModel = groupModel({ id: "g1" });
     const nodeModels = [member, group];
 
-    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null));
+    const rfNodes = nodeModels.map((n) => toRFNode(n, false, null, null, null, null, "none"));
     const result = applyCollapsedGroups(nodeModels, new Set(), rfNodes);
 
     expect(result.length).toBe(2);

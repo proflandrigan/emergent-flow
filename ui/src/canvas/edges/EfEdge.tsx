@@ -14,6 +14,7 @@ import {
 } from "@xyflow/react";
 import { familyMeta } from "../../theme/family";
 import type { EfNodeData } from "../nodes/EfNode";
+import type { TraceMode } from "../toReactFlow";
 
 // React Flow v12 constrains edge `data` to `Record<string, unknown>`, so the data interface
 // must carry an index signature; extending Record satisfies that without weakening the named
@@ -21,6 +22,7 @@ import type { EfNodeData } from "../nodes/EfNode";
 export interface EfEdgeData extends Record<string, unknown> {
   incompatible?: boolean;
   reason?: string | null;
+  trace?: TraceMode;
 }
 
 type EfEdgeType = Edge<EfEdgeData, "efEdge">;
@@ -51,15 +53,22 @@ export function EfEdge(props: EdgeProps<EfEdgeType>): JSX.Element {
   const meta = familyMeta(sourceFamily ?? "");
 
   const incompatible = props.data?.incompatible ?? false;
-  const strokeColor = incompatible
-    ? "var(--danger)"
-    : props.selected || hovered
-      ? meta.color
-      : "var(--border-strong)";
+  const traceMode = props.data?.trace;
+  const strokeColor = traceMode === "traced"
+    ? "var(--accent)"
+    : traceMode === "dimmed"
+      ? "var(--border-subtle)"
+      : incompatible
+        ? "var(--danger)"
+        : props.selected || hovered
+          ? meta.color
+          : "var(--border-strong)";
+  const strokeWidth = traceMode === "traced" ? 2.5 : traceMode === "dimmed" ? 1 : incompatible ? 2 : 1.5;
   const style = {
     ...props.style,
     stroke: strokeColor,
-    strokeWidth: incompatible ? 2 : 1.5,
+    strokeWidth,
+    ...(traceMode === "dimmed" ? { opacity: 0.4 } : {}),
   };
 
   return (

@@ -84,6 +84,43 @@ describe("tidy layout button", () => {
   });
 });
 
+describe("expand layout button", () => {
+  test("clicking Expand layout repositions nodes", () => {
+    const store = useGraphStore.getState();
+    const aId = store.addNodeFromSpec(
+      {
+        type: "test",
+        label: "A",
+        version: 1,
+        ports: [],
+        params: [],
+        paradigm: "functional",
+        family: "test",
+        description: "",
+      },
+      { x: 0, y: 0 },
+    );
+    const bId = store.addNodeFromSpec(
+      {
+        type: "test",
+        label: "B",
+        version: 1,
+        ports: [],
+        params: [],
+        paradigm: "functional",
+        family: "test",
+        description: "",
+      },
+      { x: 0, y: 0 },
+    );
+    render(<IRToolbar />);
+    fireEvent.click(screen.getByTestId("expand-layout"));
+
+    const nodesAfter = useGraphStore.getState().nodes;
+    expect(nodesAfter[aId].position).not.toEqual(nodesAfter[bId].position);
+  });
+});
+
 describe("File menu", () => {
   test("renders the File button", () => {
     render(<IRToolbar />);

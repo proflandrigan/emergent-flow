@@ -19,6 +19,7 @@ import type { NodeStatus, Payload } from "../../store/execution";
 import { Tooltip } from "../../ui/Tooltip";
 import { isDetailed } from "./lod";
 import { familyMeta } from "../../theme/family";
+import type { TraceMode } from "../toReactFlow";
 
 // React Flow v12 constrains node `data` to `Record<string, unknown>`, so the data interface
 // must carry an index signature; extending Record satisfies that without weakening the named
@@ -35,6 +36,7 @@ export interface EfNodeData extends Record<string, unknown> {
   }[];
   status?: NodeStatus | null; // from /execute statuses
   results?: Record<string, Payload> | null; // outPortName -> payload
+  trace?: TraceMode;
 }
 
 const boxStyleBase: CSSProperties = {
@@ -145,10 +147,23 @@ export function EfNode({ data }: NodeProps<EfNodeType>): JSX.Element {
       break;
   }
 
+  if (data.trace === "traced") {
+    boxStyle.border = "2px solid var(--accent)";
+    boxStyle.boxShadow = `var(--shadow-2), 0 0 0 3px var(--accent)`;
+  }
+
+  if (data.trace === "dimmed") {
+    boxStyle.opacity = Math.min(
+      typeof boxStyle.opacity === "number" ? boxStyle.opacity : 1,
+      0.35,
+    );
+  }
+
   return (
     <div
       style={boxStyle}
       data-testid="ef-node"
+      data-trace={data.trace}
       className={data.status === "running" ? "ef-node--running" : undefined}
     >
       {description ? (

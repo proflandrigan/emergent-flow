@@ -99,4 +99,51 @@ describe("EfEdge", () => {
 
     expect(path.getAttribute("style")).toContain("var(--fam-data)");
   });
+
+  test("traced edge draws the accent stroke at 2.5 width", () => {
+    mockUseNodesData.mockReturnValue(null);
+
+    const { container } = render(
+      <svg>
+        <EfEdge {...makeProps({ trace: "traced" })} />
+      </svg>,
+    );
+
+    const path = container.querySelector(".react-flow__edge-path");
+    expect(path).toBeTruthy();
+    expect(path!.getAttribute("style")).toContain("var(--accent)");
+    expect(path!.getAttribute("style")).toContain("2.5");
+  });
+
+  test("dimmed edge is faint with subtle stroke and opacity 0.4", () => {
+    mockUseNodesData.mockReturnValue(null);
+
+    const { container } = render(
+      <svg>
+        <EfEdge {...makeProps({ trace: "dimmed" })} />
+      </svg>,
+    );
+
+    const path = container.querySelector(".react-flow__edge-path");
+    expect(path).toBeTruthy();
+    expect(path!.getAttribute("style")).toContain("var(--border-subtle)");
+    expect(path!.getAttribute("style")).toContain("stroke-width: 1");
+    expect(path!.getAttribute("style")).toContain("opacity: 0.4");
+  });
+
+  test("trace none keeps normal styling with no opacity override", () => {
+    mockUseNodesData.mockReturnValue(null);
+
+    const { container } = render(
+      <svg>
+        <EfEdge {...makeProps({ trace: "none" })} />
+      </svg>,
+    );
+
+    const path = container.querySelector(".react-flow__edge-path");
+    expect(path).toBeTruthy();
+    expect(path!.getAttribute("style")).toContain("var(--border-strong)");
+    expect(path!.getAttribute("style")).toContain("1.5");
+    expect(path!.getAttribute("style")).not.toContain("opacity");
+  });
 });

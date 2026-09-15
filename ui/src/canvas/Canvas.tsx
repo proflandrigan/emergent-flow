@@ -57,6 +57,9 @@ import {
   toRFEdge,
   toRFNode,
 } from "./toReactFlow";
+import { computeTrace } from "./trace";
+import type { TraceMode } from "./toReactFlow";
+import "./CanvasTrace.css";
 import { fromIR } from "../store/ir";
 import { useSubgraphStore, currentSubgraph } from "../store/subgraphStore";
 
@@ -132,7 +135,7 @@ export function Canvas(): JSX.Element {
   const activeEdges = subgraphModel?.edges ?? edges;
   const isInSubgraph = breadcrumbs.length > 0;
 
-  const rfNodes = useMemo(() => {
+  const rawNodes = useMemo(() => {
     const nodeModels = Object.values(activeNodes);
     const base = nodeModels.map((n) =>
       toRFNode(
@@ -142,6 +145,7 @@ export function Canvas(): JSX.Element {
         results[n.id],
         familyByType[n.type] ?? null,
         descriptionByType[n.type] ?? null,
+        "none" as TraceMode,
       ),
     );
     const nested = applyGroupNesting(nodeModels, base);
@@ -152,9 +156,9 @@ export function Canvas(): JSX.Element {
     }
     return collapsed;
   }, [activeNodes, selNodes, statuses, results, familyByType, descriptionByType, collapsedGroupIds, isInSubgraph]);
-  const rfEdges = useMemo(() => {
+  const rawEdges = useMemo(() => {
     const base = Object.values(activeEdges).map((e) =>
-      toRFEdge(e, !!selEdges[e.id], edgeCompatibility[e.id], reasons[e.id]),
+      toRFEdge(e, !!selEdges[e.id], edgeCompatibility[e.id], reasons[e.id], "none" as TraceMode),
     );
     return reanchorEdgesForCollapsedGroups(Object.values(activeNodes), collapsedGroupIds, base);
   }, [activeEdges, selEdges, edgeCompatibility, reasons, activeNodes, collapsedGroupIds]);
@@ -162,6 +166,51 @@ export function Canvas(): JSX.Element {
   const selectedNodeIds = useMemo(
     () => Object.keys(selNodes).filter((id) => selNodes[id]),
     [selNodes],
+  );
+
+  const trace = useMemo(
+    () =>
+      computeTrace(
+        selectedNodeIds,
+        rawNodes.map((n) => n.id),
+        rawEdges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
+      ),
+    [selectedNodeIds, rawNodes, rawEdges],
+  );
+
+  const rfNodes = useMemo(
+    () =>
+      rawNodes.map((n) => {
+        const mode: TraceMode = !trace.active
+          ? "none"
+          : trace.highlightedNodeIds.has(n.id)
+            ? "traced"
+            : "dimmed";
+        return {
+          ...n,
+          className:
+            mode === "traced"
+              ? "ef-trace-traced"
+              : mode === "dimmed"
+                ? "ef-trace-dimmed"
+                : undefined,
+          data: n.type === "efNode" ? { ...n.data, trace: mode } : n.data,
+        };
+      }),
+    [rawNodes, trace],
+  );
+
+  const rfEdges = useMemo(
+    () =>
+      rawEdges.map((e) => {
+        const mode: TraceMode = !trace.active
+          ? "none"
+          : trace.highlightedEdgeIds.has(e.id)
+            ? "traced"
+            : "dimmed";
+        return { ...e, data: { ...e.data, trace: mode } };
+      }),
+    [rawEdges, trace],
   );
 
   const canGroup = selectedNodeIds.length > 1;
@@ -213,15 +262,12 @@ export function Canvas(): JSX.Element {
 
   const onSelectionChange = useCallback(
     (params: { nodes: Node[]; edges: Edge[] }) => {
-      if (isInSubgraph) {
-        return;
-      }
       replaceSelection(
         params.nodes.map((n) => n.id),
         params.edges.length > 0 ? params.edges.map((e) => e.id) : undefined,
       );
     },
-    [isInSubgraph, replaceSelection],
+    [replaceSelection],
   );
 
   const onConnect = useCallback(
@@ -434,7 +480,7 @@ export function Canvas(): JSX.Element {
         onlyRenderVisibleElements
         nodesDraggable={!isInSubgraph}
         nodesConnectable={!isInSubgraph}
-        elementsSelectable={!isInSubgraph}
+        elementsSelectable
         style={
           {
             "--xy-selection-background-color": "var(--accent-soft)",
@@ -457,7 +503,7 @@ export function Canvas(): JSX.Element {
           }
         />
       </ReactFlow>
-      {(selectedNodeIds.length > 1 || canUngroup) && (
+      {!isInSubgraph && (selectedNodeIds.length > 1 || canUngroup) && (
         <SelectionToolbar
           count={selectedNodeIds.length}
           onRunSelectedOnly={() => {

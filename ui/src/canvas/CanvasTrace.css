@@ -1,0 +1,10 @@
+/* Downstream trace: highlight the active path, dim everything else (click-to-trace). */
+.react-flow__node.ef-trace-traced {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-md);
+}
+
+.react-flow__node.ef-trace-dimmed {
+  opacity: 0.35;
+}

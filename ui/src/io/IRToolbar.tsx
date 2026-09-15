@@ -115,6 +115,10 @@ export function IRToolbar(): JSX.Element {
     useGraphStore.getState().tidyLayout();
   }
 
+  function handleExpandLayout() {
+    useGraphStore.getState().expandLayout();
+  }
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     // Reset now so re-selecting the same file still fires `change`.
@@ -428,6 +432,14 @@ export function IRToolbar(): JSX.Element {
           onClick={handleTidyLayout}
         >
           Tidy layout
+        </Button>
+
+        <Button
+          variant="ghost"
+          data-testid="expand-layout"
+          onClick={handleExpandLayout}
+        >
+          Expand layout
         </Button>
 
         <div

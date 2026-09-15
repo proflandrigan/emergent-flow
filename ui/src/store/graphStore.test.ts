@@ -787,3 +787,72 @@ describe("extractToComposite", () => {
     expect(nodes[n2]).toBeDefined();
   });
 });
+
+describe("expandLayout", () => {
+  test("repositions nodes and leaves prior positions behind", () => {
+    const model: CanvasModel = {
+      schemaVersion: 2,
+      name: "expand",
+      paradigm: "functional",
+      nodes: {
+        a: {
+          id: "a",
+          type: "data.load_csv",
+          label: "a",
+          paradigm: "functional",
+          position: { x: 0, y: 0 },
+          ports: [
+            {
+              id: "a-out",
+              name: "out",
+              direction: "out",
+              dataType: "any",
+              cardinality: "one",
+            },
+          ],
+          params: [],
+        },
+        b: {
+          id: "b",
+          type: "data.load_csv",
+          label: "b",
+          paradigm: "functional",
+          position: { x: 0, y: 0 },
+          ports: [
+            {
+              id: "b-in",
+              name: "in",
+              direction: "in",
+              dataType: "any",
+              cardinality: "one",
+            },
+          ],
+          params: [],
+        },
+      },
+      edges: {
+        e1: {
+          id: "e1",
+          source: { node_id: "a", port_id: "a-out" },
+          target: { node_id: "b", port_id: "b-in" },
+        },
+      },
+      groupMeta: {},
+      params: {},
+    };
+
+    useGraphStore.getState().loadModel(model);
+
+    // Both nodes start at the same position.
+    const before = useGraphStore.getState().nodes;
+    expect(before.a.position).toEqual({ x: 0, y: 0 });
+    expect(before.b.position).toEqual({ x: 0, y: 0 });
+
+    useGraphStore.getState().expandLayout();
+
+    const { nodes } = useGraphStore.getState();
+    expect(nodes.a.position).not.toEqual(nodes.b.position);
+    // The chained edge a -> b places b downstream of a.
+    expect(nodes.b.position.x).toBeGreaterThan(nodes.a.position.x);
+  });
+});
