@@ -80,4 +80,18 @@ describe("buildReportHtml", () => {
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<script>");
   });
+
+  test("html payloads are rendered in a script-less sandboxed iframe", () => {
+    const cards = collectReportCards({
+      a: card("a", 0, 0, "T", [{ kind: "result", source: "n1:h", caption: "" }]),
+    });
+    const html = buildReportHtml({
+      graphName: "g",
+      cards,
+      results: { n1: { h: { kind: "html", value: "<script>alert(1)</script>" } as Payload } },
+    });
+    expect(html).toContain('sandbox=""');
+    expect(html).not.toContain("allow-scripts");
+    expect(html).not.toContain("<script>");
+  });
 });

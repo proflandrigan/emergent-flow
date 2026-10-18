@@ -550,7 +550,7 @@ def create_mcp_server() -> Any:
                     {
                         "kind": "result",
                         "source": f"{node_id}:{port_name}",
-                        "caption": block.get("caption") or "",
+                        "caption": str(block.get("caption") or ""),
                     }
                 )
                 if (node_id, port_name) not in pairs:

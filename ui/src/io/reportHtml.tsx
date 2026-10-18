@@ -30,6 +30,13 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
+// PayloadView / ReportView render `html` payloads in `<iframe sandbox="allow-scripts">`, which is
+// right for the live inspector but would run payload script when the exported file is opened.
+// Strip it to a fully-sandboxed iframe (no scripts) in the static export.
+function lockDownIframes(markup: string): string {
+  return markup.replace(/ sandbox="[^"]*"/g, ' sandbox=""');
+}
+
 function paramValue(node: NodeModel, name: string): unknown {
   return node.params.find((p) => p.name === name)?.value;
 }
@@ -67,14 +74,14 @@ function renderBlock(
   results: Record<string, Record<string, Payload>>,
 ): string {
   if (block.kind === "markdown") {
-    return renderToStaticMarkup(
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.text}</ReactMarkdown>,
+    return lockDownIframes(
+      renderToStaticMarkup(<ReactMarkdown remarkPlugins={[remarkGfm]}>{block.text}</ReactMarkdown>),
     );
   }
   const split = splitSource(block.source);
   const payload = split ? results[split.nodeId]?.[split.port] : undefined;
   let out = payload
-    ? `<div>${renderToStaticMarkup(<PayloadView payload={payload} />)}</div>`
+    ? `<div>${lockDownIframes(renderToStaticMarkup(<PayloadView payload={payload} />))}</div>`
     : `<p class="muted">No result available (graph not run).</p>`;
   if (block.caption !== "") {
     out += `<p class="caption">${escapeHtml(block.caption)}</p>`;
@@ -103,6 +110,7 @@ export function buildReportHtml(opts: {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'">
 <title>${escapeHtml(opts.graphName)}</title>
 <style>${STYLE}</style>
 </head>
