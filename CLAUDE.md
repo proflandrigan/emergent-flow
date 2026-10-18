@@ -315,6 +315,15 @@ switches a persona mid-chat with a slash command (e.g. `/data-scientist`), detec
 system prompt plus a graph slice into a single LLM call and parses the response into a
 `set_params`-only `GraphMutation`, without opening a full chat session.
 
+### Result cards (`reports.result_card`, ADR 0022)
+
+A presentation-only node (codegen no-op, `execute` returns `{}`) that shows markdown prose plus
+live results of wired upstream outputs directly on the canvas (`ui/src/canvas/nodes/ResultCardNode.tsx`,
+block model in `ui/src/canvas/resultCardBlocks.ts`). Blocks live in the `blocks_json` param as
+`markdown` / `result` (`source` = `"<node_id>:<out_port_name>"`). Agents create them with the MCP
+`add_result_card` / `set_result_card` tools; the canvas can export all cards as standalone HTML
+(`ui/src/io/reportHtml.tsx`).
+
 ### Connection profiles (`emergentflow/connections/`)
 
 A unified, secret-free connection-profile store (`~/.config/emergentflow/connections.toml`)

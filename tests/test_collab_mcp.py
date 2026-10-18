@@ -807,6 +807,119 @@ class TestEditingTools:
         assert params["anchor_id"] == anchor["node_id"]
         assert params["color"] == "yellow"
 
+    @staticmethod
+    def _out_port_name(session_id: str, node_id: str) -> str:
+        from emergentflow.ir.common import Direction
+
+        node = session_mod.get_default_store().get(session_id).graph.nodes[node_id]
+        return next(p.name for p in node.ports if p.direction == Direction.OUT)
+
+    def test_add_result_card(self) -> None:
+        import json
+
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+        src = self._add_node(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+        port_name = self._out_port_name(session.id, src["node_id"])
+
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "add_result_card",
+                {
+                    "session_id": session.id,
+                    "title": "Summary",
+                    "blocks": [
+                        {"kind": "markdown", "text": "# Hi"},
+                        {
+                            "kind": "result",
+                            "node_id": src["node_id"],
+                            "port_name": port_name,
+                            "caption": "data",
+                        },
+                    ],
+                },
+            )
+        )
+        stored = session_mod.get_default_store().get(session.id)
+        card = stored.graph.nodes[result["node_id"]]
+        assert card.type == "reports.result_card"
+        params = {p.name: p.value for p in card.params}
+        assert json.loads(params["blocks_json"]) == [
+            {"kind": "markdown", "text": "# Hi"},
+            {"kind": "result", "source": f"{src['node_id']}:{port_name}", "caption": "data"},
+        ]
+        assert params["title"] == "Summary"
+        targeting = [e for e in stored.graph.edges.values() if e.target.node_id == card.id]
+        assert len(targeting) == 1
+        assert targeting[0].source.node_id == src["node_id"]
+
+    def test_add_result_card_rejects_bad_port(self) -> None:
+        from fastmcp.exceptions import ToolError
+
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+        src = self._add_node(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+
+        with pytest.raises(ToolError):
+            _run_async(
+                _call_tool(
+                    mcp,
+                    "add_result_card",
+                    {
+                        "session_id": session.id,
+                        "blocks": [
+                            {
+                                "kind": "result",
+                                "node_id": src["node_id"],
+                                "port_name": "no_such_port",
+                            }
+                        ],
+                    },
+                )
+            )
+
+    def test_set_result_card_replaces_blocks_without_duplicate_edges(self) -> None:
+        import json
+
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+        src = self._add_node(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+        port_name = self._out_port_name(session.id, src["node_id"])
+        block = {"kind": "result", "node_id": src["node_id"], "port_name": port_name}
+
+        added = _run_async(
+            _call_tool(mcp, "add_result_card", {"session_id": session.id, "blocks": [block]})
+        )
+        _run_async(
+            _call_tool(
+                mcp,
+                "set_result_card",
+                {
+                    "session_id": session.id,
+                    "card_node_id": added["node_id"],
+                    "blocks": [{"kind": "markdown", "text": "new"}, block],
+                    "title": "Renamed",
+                },
+            )
+        )
+        stored = session_mod.get_default_store().get(session.id)
+        card = stored.graph.nodes[added["node_id"]]
+        params = {p.name: p.value for p in card.params}
+        assert params["title"] == "Renamed"
+        assert json.loads(params["blocks_json"]) == [
+            {"kind": "markdown", "text": "new"},
+            {"kind": "result", "source": f"{src['node_id']}:{port_name}", "caption": ""},
+        ]
+        targeting = [e for e in stored.graph.edges.values() if e.target.node_id == card.id]
+        assert len(targeting) == 1
+
     def test_delete_edge(self) -> None:
         from emergentflow.collab.mcp import create_mcp_server
 

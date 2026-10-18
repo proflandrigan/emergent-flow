@@ -146,6 +146,7 @@ from .redact_pii import RedactPii
 from .reduce_dimensions import ReduceDimensions
 from .report import GenerateHtmlSummary
 from .reshape import Reshape
+from .result_card import ResultCard
 from .sample_rows import SampleRows
 from .save_frame import SaveFrame
 from .save_model import SaveModel
@@ -317,6 +318,7 @@ __all__ = [
     "RedactPii",
     "ReduceDimensions",
     "Reshape",
+    "ResultCard",
     "SampleRows",
     "SaveFrame",
     "SaveModel",

@@ -141,4 +141,21 @@ describe("SelectionToolbar", () => {
 
     expect(onExtractToComposite).toHaveBeenCalledTimes(1);
   });
+
+  test("clicking Summarize calls onSummarize once", () => {
+    const onSummarize = vi.fn();
+
+    render(
+      <SelectionToolbar
+        count={2}
+        onRunSelectedOnly={vi.fn()}
+        onRunToSelected={vi.fn()}
+        onSummarize={onSummarize}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("summarize-selection"));
+
+    expect(onSummarize).toHaveBeenCalledTimes(1);
+  });
 });

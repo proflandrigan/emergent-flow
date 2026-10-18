@@ -40,6 +40,7 @@ import { CompositeNode } from "./nodes/CompositeNode";
 import { NoteNode } from "./nodes/NoteNode";
 import { CalloutNode } from "./nodes/CalloutNode";
 import { SnapshotNode } from "./nodes/SnapshotNode";
+import { ResultCardNode } from "./nodes/ResultCardNode";
 import { FindNodeModal } from "./FindNodeModal";
 import { ProblemsPanel } from "./ProblemsPanel";
 import { NodeContextMenu } from "./NodeContextMenu";
@@ -63,7 +64,7 @@ import "./CanvasTrace.css";
 import { fromIR } from "../store/ir";
 import { useSubgraphStore, currentSubgraph } from "../store/subgraphStore";
 
-const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode, compositeNode: CompositeNode, snapshotNode: SnapshotNode, calloutNode: CalloutNode };
+const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode, compositeNode: CompositeNode, snapshotNode: SnapshotNode, calloutNode: CalloutNode, resultCardNode: ResultCardNode };
 const edgeTypes: EdgeTypes = { efEdge: EfEdge };
 
 export function Canvas(): JSX.Element {
@@ -83,6 +84,7 @@ export function Canvas(): JSX.Element {
   const ungroupSelection = useGraphStore((s) => s.ungroupSelection);
   const extractToComposite = useGraphStore((s) => s.extractToComposite);
   const addCalloutAroundSelection = useGraphStore((s) => s.addCalloutAroundSelection);
+  const createResultCardForSelection = useGraphStore((s) => s.createResultCardForSelection);
 
   const selNodes = useSelectionStore((s) => s.nodes);
   const selEdges = useSelectionStore((s) => s.edges);
@@ -304,6 +306,11 @@ export function Canvas(): JSX.Element {
     addCalloutAroundSelection(selectedNodeIds);
   }, [selectedNodeIds, addCalloutAroundSelection]);
 
+  const handleSummarize = useCallback(() => {
+    if (selectedNodeIds.length < 1) return;
+    createResultCardForSelection(selectedNodeIds);
+  }, [selectedNodeIds, createResultCardForSelection]);
+
   const onNodeDragStop = useCallback(() => {
     if (isInSubgraph) {
       return;
@@ -522,6 +529,7 @@ export function Canvas(): JSX.Element {
           onUngroup={canUngroup ? () => ungroupSelection(selectedNodeIds) : undefined}
           onExtractToComposite={canGroup ? () => extractToComposite(selectedNodeIds) : undefined}
           onCallout={canGroup ? handleCallout : undefined}
+          onSummarize={selectedNodeIds.length >= 1 ? handleSummarize : undefined}
         />
       )}
       {contextMenu && (
