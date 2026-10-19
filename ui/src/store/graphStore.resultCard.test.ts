@@ -59,4 +59,21 @@ describe("createResultCardForSelection", () => {
   test("returns null when nothing eligible is selected", () => {
     expect(useGraphStore.getState().createResultCardForSelection(["missing"])).toBeNull();
   });
+
+  test("is a single undo step; redo restores it", () => {
+    useGraphStore.setState({
+      nodes: { a: makeNode("a", 0, 0), b: makeNode("b", 0, 200) },
+    });
+    const cardId = useGraphStore.getState().createResultCardForSelection(["a", "b"]) as string;
+
+    useGraphStore.getState().undo();
+    let state = useGraphStore.getState();
+    expect(Object.keys(state.nodes).sort()).toEqual(["a", "b"]);
+    expect(Object.keys(state.edges)).toHaveLength(0);
+
+    useGraphStore.getState().redo();
+    state = useGraphStore.getState();
+    expect(state.nodes[cardId]).toBeTruthy();
+    expect(Object.values(state.edges).filter((e) => e.target.node_id === cardId)).toHaveLength(2);
+  });
 });

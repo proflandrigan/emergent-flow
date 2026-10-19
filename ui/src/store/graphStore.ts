@@ -417,6 +417,10 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     if (!spec) {
       return null;
     }
+    // The steps below each push their own history entry; collapse them into ONE undo step by
+    // restoring the pre-action history plus a single pre-action snapshot at the end.
+    const pastBefore = get().past;
+    const preSnap = snapshot(get());
     const x = Math.max(...selected.map((n) => n.position.x + NODE_FOOTPRINT_WIDTH)) + 80;
     const y = Math.min(...selected.map((n) => n.position.y));
     const cardId = get().addNodeFromSpec(spec, { x, y });
@@ -453,6 +457,11 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
         ...resultBlocks,
       ]),
     );
+    const past = [...pastBefore, preSnap];
+    if (past.length > HISTORY_LIMIT) {
+      past.shift();
+    }
+    set({ past, future: [], _lastTxn: null });
     return cardId;
   },
 
