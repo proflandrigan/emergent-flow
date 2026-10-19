@@ -207,3 +207,17 @@ class TestCheckpointAuth:
                     assert resp_ok.status_code in (200, 404), (method, path, resp_ok.text)
         finally:
             configure_session_auth(required=False)
+
+
+def test_apply_with_invalid_author_leaves_session_untouched(client: TestClient) -> None:
+    """A body whose author fails Checkpoint validation must not half-apply the mutation."""
+    session_id = client.post("/sessions", json={}).json()["id"]
+    r = client.post(
+        f"/sessions/{session_id}/apply",
+        json={"mutation": _add_nodes_mutation(), "author": 123},
+    )
+    assert r.status_code == 422
+    session = client.get(f"/sessions/{session_id}").json()
+    assert session["version"] == 0
+    assert session["graph"]["nodes"] == {}
+    assert session["collab"]["checkpoints"] == {}

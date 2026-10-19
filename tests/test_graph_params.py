@@ -473,6 +473,33 @@ class TestExecute:
         assert execute(g)["comp"] == {"out": 3}
         assert execute(g, params={"p": 7})["comp"] == {"out": 7}
 
+    def test_composite_subgraph_var_does_not_shadow_outer_param_kwarg(self) -> None:
+        """A subgraph node whose generated variable equals an outer graph-param kwarg name must
+        not shadow it inside the nested function (UnboundLocalError at run time)."""
+        pname = "graph_param_sink_out"  # == the sink's generated "<label>_<port>" variable
+        sink = Node(
+            id="sink",
+            type=_GraphParamSink.type,
+            label=_GraphParamSink.label,
+            ports=[Port(id="sink-out", name="out", direction=Direction.OUT, data_type="int")],
+            params=[Param(name="value", type_token="int", ref=pname)],
+        )
+        composite = Node(
+            id="comp",
+            type="layout.composite",
+            label="Composite",
+            ports=[Port(id="comp-out", name="out", direction=Direction.OUT, data_type="int")],
+            subgraph=Graph(nodes={"sink": sink}),
+        )
+        g = Graph(params={pname: Param(name=pname, type_token="int", value=3)})
+        g.nodes["comp"] = composite
+
+        ns: dict[str, Any] = {}
+        exec(compile(compile_to_code(g), "<generated>", "exec"), ns)
+        assert ns["main"]() == {"composite_out": 3}
+        assert ns["main"](**{pname: 9}) == {"composite_out": 9}
+        assert execute(g)["comp"] == {"out": 3}
+
 
 # ---------------------------------------------------------------------------
 # Reproducibility

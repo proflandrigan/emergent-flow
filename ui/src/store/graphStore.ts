@@ -171,6 +171,13 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     set((state) => {
       const nodes = { ...state.nodes };
       delete nodes[nodeId];
+      // Deleting a group node must release its members, or they keep a dangling group_id
+      // (an invalid IR: group_id must reference an existing node).
+      for (const [id, node] of Object.entries(nodes)) {
+        if (node.groupId === nodeId) {
+          nodes[id] = { ...node, groupId: null };
+        }
+      }
       const edges: Record<string, EdgeModel> = {};
       for (const [id, edge] of Object.entries(state.edges)) {
         if (edge.source.node_id !== nodeId && edge.target.node_id !== nodeId) {

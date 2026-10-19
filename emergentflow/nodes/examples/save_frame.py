@@ -106,7 +106,8 @@ class SaveFrame(NodeDefinition):
             "path": cast(str, values.get("path")),
             "format": cast(str, values.get("format", "parquet")),
             "mode": cast(str, values.get("mode", "overwrite")),
-            "partition_by": cast("list[str] | None", values.get("partition_by")),
+            # "" (a cleared canvas field) must mean "unset" on both codegen and execute paths
+            "partition_by": cast("list[str] | None", values.get("partition_by") or None),
         }
 
     def codegen(self, node: Node, ctx: CodegenContext) -> CodeFragment:

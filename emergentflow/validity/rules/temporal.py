@@ -134,6 +134,9 @@ class RandomSplitOnTemporalGraph(ValidityRule):
             (n for n in graph.nodes.values() if n.type == "ml.train_test_split"),
             key=lambda n: n.id,
         ):
+            # strategy="temporal" is the documented fix: that split sorts by time, no shuffle.
+            if {p.name: p.value for p in split.params}.get("strategy") == "temporal":
+                continue
             findings.append(
                 ValidityFinding(
                     rule_id=self.id,

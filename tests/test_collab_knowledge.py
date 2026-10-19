@@ -396,3 +396,22 @@ def test_knowledge_module_never_eagerly_imported() -> None:
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "ok"
+
+
+def test_save_persist_failure_does_not_leave_phantom_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = KnowledgeStore(tmp_path / "k.json")
+    entry = KnowledgeEntry(slug="s", description="d", subgraph=Graph(), created_by="human")
+
+    def boom() -> None:
+        raise OSError("disk full")
+
+    with monkeypatch.context() as m:
+        m.setattr(store, "_persist", boom)
+        with pytest.raises(OSError):
+            store.save(entry)
+    # The failed save left nothing behind, so a retry succeeds rather than 'duplicate slug'.
+    assert store.list() == []
+    store.save(entry)
+    assert [e.slug for e in store.list()] == ["s"]

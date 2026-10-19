@@ -488,3 +488,17 @@ def test_execute_graph_stream_sse_includes_cached_flag(monkeypatch, tmp_path) ->
     # Upstream node (n-load) should be cached; downstream may or may not be.
     assert second_ok[0]["node_id"] == "n-load"
     assert second_ok[0]["cached"] is True
+
+
+def test_artifact_store_node_id_cannot_escape_root(tmp_path):
+    """A client-supplied node id with path separators must not write outside the store root."""
+    from emergentflow.server.artifacts import ArtifactStore
+
+    root = tmp_path / "store"
+    store = ArtifactStore(root=root)
+    evil = "../../escaped"
+    store.put(evil, {"out": 1}, label="x")
+    assert not list(tmp_path.glob("escaped*"))
+    assert not list(tmp_path.parent.glob("escaped*"))
+    assert store.get(evil) == {"out": 1}
+    assert all(p.parent == root for p in root.rglob("*") if p.is_file())

@@ -155,3 +155,11 @@ def test_loader_node_versions_bumped() -> None:
     assert LoadCsv.version > 2
     assert LoadParquet.version > 2
     assert LoadJson.version > 2
+
+
+def test_load_csv_literal_path_with_glob_metacharacters(tmp_path):
+    import emergentflow as ef
+
+    path = tmp_path / "report[2024].csv"
+    path.write_text("a\n1\n")
+    assert ef.data.load_csv(str(path))["a"].tolist() == [1]

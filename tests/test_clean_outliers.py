@@ -480,3 +480,20 @@ def test_detect_outliers_node_equivalence_with_by() -> None:
         executed_result.drop(columns=["is_outlier", "outlier_score"]),
         codegen_result.drop(columns=["is_outlier", "outlier_score"]),
     )
+
+
+def test_detect_outliers_by_with_duplicate_index():
+    import pandas as pd
+
+    import emergentflow as ef
+
+    df = pd.DataFrame(
+        {"g": ["a", "b", "a", "b", "a", "b"], "x": [1.0, 50, 2, 60, 100, 70]},
+        index=[0, 0, 1, 1, 2, 2],
+    )
+    got = ef.clean.detect_outliers(df, by="g", method="zscore", threshold=1)
+    want = ef.clean.detect_outliers(df.reset_index(drop=True), by="g", method="zscore", threshold=1)
+    assert list(got.index) == [0, 0, 1, 1, 2, 2]
+    assert got["is_outlier"].tolist() == want["is_outlier"].tolist()
+    dropped = ef.clean.detect_outliers(df, by="g", method="zscore", threshold=1, action="drop")
+    assert len(dropped) == int((~want["is_outlier"]).sum())

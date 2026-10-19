@@ -294,3 +294,19 @@ def test_query_truncated_when_result_genuinely_exceeds_max_rows() -> None:
     )
     assert result.row_count == 5
     assert result.truncated is True
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT * INTO newt FROM t",
+        "WITH d AS (DELETE FROM t RETURNING *) SELECT * FROM d",
+        "WITH d AS (INSERT INTO t VALUES (1) RETURNING *) SELECT * FROM d",
+    ],
+)
+def test_read_only_rejects_writes_nested_in_a_select(sql):
+    from emergentflow.data.warehouse.query import ReadOnlyViolationError, _validate_read_only_sql
+
+    with pytest.raises(ReadOnlyViolationError):
+        _validate_read_only_sql(sql, "postgres", True)
+    assert _validate_read_only_sql(sql, "postgres", False) == sql

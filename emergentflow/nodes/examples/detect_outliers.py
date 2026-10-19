@@ -142,7 +142,8 @@ class DetectOutliers(NodeDefinition):
         combine = values.get("combine") or "any"
         drop = values.get("drop") or False
         action = values.get("action") or "flag"
-        by = values.get("by")
+        # "" from the UI must mean "unset" on both paths (codegen omits a falsy `by`)
+        by = values.get("by") or None
         return (
             cast("list[str] | None", columns),
             cast(str, method),

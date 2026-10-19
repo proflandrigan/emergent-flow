@@ -124,9 +124,10 @@ class TrainTestSplit(NodeDefinition):
         if random_state is None:
             random_state = 0
         strategy = values.get("strategy") or "random"
-        stratify_col = values.get("stratify_col")
-        group_col = values.get("group_col")
-        time_col = values.get("time_col")
+        # "" (a cleared canvas column) must mean "unset" on both codegen and execute paths
+        stratify_col = values.get("stratify_col") or None
+        group_col = values.get("group_col") or None
+        time_col = values.get("time_col") or None
         return {
             "test_size": cast(float, test_size),
             "random_state": cast(int, random_state),

@@ -20,7 +20,9 @@ compatibility with connections.toml files written before this module existed.
 
 from __future__ import annotations
 
+import contextlib
 import os
+import tempfile
 import tomllib
 from pathlib import Path
 from typing import Annotated, Literal
@@ -287,8 +289,17 @@ def save_profiles(store: ProfileStore, path: str | os.PathLike[str] | None = Non
     for profile in store.list():
         body = profile.model_dump(exclude={"name"}, exclude_none=True)
         document[profile.name] = body
-    with file_path.open("wb") as fh:
-        tomli_w.dump(document, fh)
+    # Atomic replace: write to a sibling temp file, then os.replace into place. A failure
+    # mid-dump (or a concurrent loader) must never see a truncated/empty connections file.
+    fd, tmp_name = tempfile.mkstemp(dir=file_path.parent, prefix=".connections-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            tomli_w.dump(document, fh)
+        os.replace(tmp_name, file_path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_name)
+        raise
 
 
 def test_connection(

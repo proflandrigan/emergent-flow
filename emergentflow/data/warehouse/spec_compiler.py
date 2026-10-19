@@ -34,12 +34,32 @@ def _validate_dialect(dialect: str) -> None:
         ) from exc
 
 
+def _parse_table_ref(name: str) -> exp.Table:
+    """Parse a relation name like ``"sales"``, ``"main.sales"`` or ``"db.main.sales"``.
+
+    Dotted names become qualified ``catalog.db.table`` parts instead of one quoted identifier
+    (``"main.sales"``), which no warehouse would resolve.
+    """
+    parts = name.split(".")
+    if len(parts) > 3 or not all(parts):
+        return exp.Table(this=exp.to_identifier(name))
+    table = exp.Table(this=exp.to_identifier(parts[-1]))
+    if len(parts) >= 2:
+        table.set("db", exp.to_identifier(parts[-2]))
+    if len(parts) == 3:
+        table.set("catalog", exp.to_identifier(parts[0]))
+    return table
+
+
 def _parse_column_ref(col: str) -> exp.Expression:
-    """Parse a column reference like ``"revenue"`` or ``"t.revenue"`` into a sqlglot Column."""
+    """Parse a column reference like ``"revenue"``, ``"t.revenue"`` or ``"main.t.revenue"``."""
     parts = col.split(".")
-    if len(parts) == 2:
-        return exp.Column(this=exp.to_identifier(parts[1]), table=exp.to_identifier(parts[0]))
-    return exp.Column(this=exp.to_identifier(col))
+    if len(parts) > 4 or not all(parts):
+        return exp.Column(this=exp.to_identifier(col))
+    column = exp.Column(this=exp.to_identifier(parts[-1]))
+    for key, part in zip(("table", "db", "catalog"), reversed(parts[:-1]), strict=False):
+        column.set(key, exp.to_identifier(part))
+    return column
 
 
 def _build_select_expression(item: str | dict) -> exp.Expression:
@@ -203,7 +223,7 @@ def _build_join(
     relation = join_spec.get("relation")
     if not relation:
         raise SpecValidationError("Join spec missing 'relation' key.")
-    table_expr = exp.Table(this=exp.to_identifier(relation))
+    table_expr = _parse_table_ref(relation)
 
     if join_type == "CROSS":
         return table_expr, None
@@ -253,7 +273,7 @@ def compile_spec(spec: dict[str, Any], dialect: str) -> str:
         raise SpecValidationError("Query spec missing 'source' (the base relation).")
 
     # FROM
-    from_expr = exp.Table(this=exp.to_identifier(source))
+    from_expr = _parse_table_ref(source)
     select_node = exp.Select().from_(from_expr)
 
     # SELECT

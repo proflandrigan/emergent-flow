@@ -291,6 +291,10 @@ def detect_outliers(
 
     # Grouped path: compute fences within each subset, preserving original row order.
     if by_cols:
+        # Work on positional labels so a duplicated/non-unique index on ``df`` cannot break
+        # the reassembly below; the caller's index is restored at the end.
+        original_index = df.index
+        df = df.reset_index(drop=True)
         parts = [
             detect_outliers(
                 sub,
@@ -306,14 +310,16 @@ def detect_outliers(
             for _, sub in df.groupby(by_cols, sort=False, dropna=False)
         ]
         if not parts:
+            df.index = original_index
             if effective_drop or effective_clip:
                 return df.copy()
             result = df.copy()
             result[flag_column] = False
             result[score_column] = float("nan")
             return result
-        out = pd.concat(parts)
-        return out.reindex([i for i in df.index if i in out.index])
+        out = pd.concat(parts).sort_index()
+        out.index = original_index[out.index]
+        return out
 
     result = df.copy()
     if not target:
