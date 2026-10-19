@@ -342,3 +342,15 @@ def test_unsupported_join_type_raises() -> None:
             },
             "duckdb",
         )
+
+
+def test_schema_qualified_source_and_columns_are_not_one_quoted_identifier():
+    from emergentflow.data.warehouse.spec_compiler import compile_spec
+
+    sql = compile_spec({"source": "main.sales", "select": ["main.sales.amount"]}, "duckdb")
+    assert sql == "SELECT main.sales.amount FROM main.sales"
+    joined = compile_spec(
+        {"source": "s", "join": [{"relation": "main.r", "on": [{"left": "s.a", "right": "r.b"}]}]},
+        "duckdb",
+    )
+    assert "JOIN main.r ON" in joined

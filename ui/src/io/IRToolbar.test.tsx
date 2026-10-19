@@ -147,6 +147,12 @@ describe("File menu", () => {
     expect(screen.getByTestId("file-menu-import")).toBeInTheDocument();
   });
 
+  test("Export report (HTML) exists and is disabled with no result cards", () => {
+    render(<IRToolbar />);
+    fireEvent.click(screen.getByTestId("file-menu-toggle"));
+    expect(screen.getByTestId("file-menu-export-report")).toBeDisabled();
+  });
+
   test("Rename is disabled when there is no current flow", () => {
     render(<IRToolbar />);
     fireEvent.click(screen.getByTestId("file-menu-toggle"));

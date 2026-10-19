@@ -78,6 +78,7 @@ and the optional-extra boundary; it governs [Epic 15](../../epics/epic-15-recomm
 | ADR | Decision | Status |
 | :-- | :------- | :----- |
 | [0021](./0021-recommender-systems-architecture.md) | Recommender systems are a parallel `recommend` family with their own archetypes, representations, and optional-extra boundary — not an extension of the sklearn estimator adapter | Accepted |
+| [0022](./0022-result-cards.md) | Result cards: a presentation-only `reports.result_card` node shows prose and live upstream results directly on the canvas | Accepted |
 
 ## Conventions
 

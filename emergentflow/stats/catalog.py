@@ -76,12 +76,14 @@ _GLM_LINKS: dict[str, dict[str, Any]] = {
 _COV_TYPES = ("nonrobust", "HC0", "HC1", "HC2", "HC3", "cluster")
 
 
-def _cov_kwargs(df: pd.DataFrame, spec: dict[str, Any]) -> dict[str, Any]:
+def _cov_kwargs(df: pd.DataFrame, spec: dict[str, Any], model: Any = None) -> dict[str, Any]:
     """Translate validated cov_type/cov_group spec fields into statsmodels fit kwargs.
 
     ``cov_type="nonrobust"`` or omitting the field entirely reproduces today's bare
     ``.fit()`` (statsmodels' default). ``cov_type="cluster"`` requires ``cov_group``
-    and passes ``cov_kwds={"groups": df[cov_group]}``.
+    and passes ``cov_kwds={"groups": df[cov_group]}``. When the (unfitted) formula *model* is
+    given, the groups of rows patsy dropped for missing values are dropped too, so the cluster
+    labels stay aligned with the rows the model actually uses.
     """
     cov_type = spec.get("cov_type", "nonrobust")
     if cov_type == "nonrobust":
@@ -100,7 +102,13 @@ def _cov_kwargs(df: pd.DataFrame, spec: dict[str, Any]) -> dict[str, Any]:
                 f"cov_group {cov_group!r} is not a column of the input frame; "
                 f"available columns: {sorted(df.columns)!r}."
             )
-        cov_kwargs["cov_kwds"] = {"groups": df[cov_group]}
+        groups = df[cov_group]
+        dropped = getattr(getattr(model, "data", None), "missing_row_idx", None)
+        if dropped is not None and len(dropped):
+            keep = np.ones(len(groups), dtype=bool)
+            keep[np.asarray(dropped, dtype=int)] = False
+            groups = groups[keep]
+        cov_kwargs["cov_kwds"] = {"groups": groups}
     return cov_kwargs
 
 
@@ -132,7 +140,8 @@ def _ols_formula(spec: dict[str, Any]) -> str:
 def _fit_ols(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
     """Fit an OLS model from a validated structured spec and wrap it in a FittedStatsModel."""
     formula = _ols_formula(spec)
-    results = smf.ols(formula, data=df).fit(**_cov_kwargs(df, spec))
+    ols_model = smf.ols(formula, data=df)
+    results = ols_model.fit(**_cov_kwargs(df, spec, ols_model))
     fixed = spec.get("fixed_effects") or []
     # Undo Q()-quoting in the fitted term names so the tidy coefficient frame reports the raw
     # column name a caller passed in, not the internal Patsy formula artifact.
@@ -165,7 +174,8 @@ def _fit_wls(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
     """Fit a WLS model from a validated structured spec."""
     formula = _ols_formula(spec)
     weights = df[spec["weights"]]
-    results = smf.wls(formula, data=df, weights=weights).fit(**_cov_kwargs(df, spec))
+    wls_model = smf.wls(formula, data=df, weights=weights)
+    results = wls_model.fit(**_cov_kwargs(df, spec, wls_model))
     fixed = spec.get("fixed_effects") or []
     term_map = {_patsy_term(col): col for col in fixed}
     coefficients = ols_coefficient_frame(results)
@@ -199,7 +209,8 @@ def _fit_gls(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
     exists so GLS is a selectable, distinct model key using statsmodels' own GLS estimator.
     """
     formula = _ols_formula(spec)
-    results = smf.gls(formula, data=df).fit(**_cov_kwargs(df, spec))
+    gls_model = smf.gls(formula, data=df)
+    results = gls_model.fit(**_cov_kwargs(df, spec, gls_model))
     fixed = spec.get("fixed_effects") or []
     term_map = {_patsy_term(col): col for col in fixed}
     coefficients = ols_coefficient_frame(results)
@@ -236,7 +247,8 @@ def _fit_glm(df: pd.DataFrame, spec: dict[str, Any]) -> FittedStatsModel:
     glm_kwargs: dict[str, Any] = {"family": family_cls(link=link_cls())}
     if "weights" in spec and spec["weights"] is not None:
         glm_kwargs["var_weights"] = df[spec["weights"]]
-    results = smf.glm(formula, data=df, **glm_kwargs).fit(**_cov_kwargs(df, spec))
+    glm_model = smf.glm(formula, data=df, **glm_kwargs)
+    results = glm_model.fit(**_cov_kwargs(df, spec, glm_model))
     fixed = spec.get("fixed_effects") or []
     term_map = {_patsy_term(col): col for col in fixed}
     coefficients = ols_coefficient_frame(results)

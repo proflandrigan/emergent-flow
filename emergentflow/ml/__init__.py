@@ -23,6 +23,7 @@ import contextlib
 import importlib.util
 import inspect
 import json
+import math
 import sys
 import time
 import warnings
@@ -250,13 +251,20 @@ def evaluate(model: FittedModel, df: pd.DataFrame) -> EvaluationResult:
             if hasattr(model.estimator, "predict_proba"):
                 proba = model.estimator.predict_proba(df[model.feature_names])
                 if y_true.nunique() >= 2:
+                    # ``pos_label`` must be passed explicitly: with non-numeric (e.g. string)
+                    # labels sklearn cannot infer the positive class for these two metrics and
+                    # raises, which would silently drop them (and everything after) here.
                     with contextlib.suppress(ValueError):
                         metrics["roc_auc"] = float(roc_auc_score(y_true, proba[:, 1]))
+                    with contextlib.suppress(ValueError):
                         metrics["average_precision"] = float(
-                            average_precision_score(y_true, proba[:, 1])
+                            average_precision_score(y_true, proba[:, 1], pos_label=pos_label)
                         )
-                        metrics["brier"] = float(brier_score_loss(y_true, proba[:, 1]))
-                        metrics["positive_rate"] = float(pd.Series(y_true).eq(pos_label).mean())
+                    with contextlib.suppress(ValueError):
+                        metrics["brier"] = float(
+                            brier_score_loss(y_true, proba[:, 1], pos_label=pos_label)
+                        )
+                    metrics["positive_rate"] = float(pd.Series(y_true).eq(pos_label).mean())
         # else: fewer than 2 classes in `classes_` (a degenerate single-class fit) --
         # precision/recall/f1/roc_auc are undefined, so only `accuracy` is reported.
     return EvaluationResult(task=model.task, n=int(df.shape[0]), metrics=metrics)
@@ -776,8 +784,12 @@ def train_test_split(
     elif strategy == "temporal":
         if not time_col or time_col not in df.columns:
             raise ValueError(f"time_col {time_col!r} must be a valid column for temporal split.")
-        sorted_df = df.sort_values(time_col)
-        cutoff = int(len(sorted_df) * (1 - test_size))
+        sorted_df = df.sort_values(time_col, kind="stable")
+        # Size the test slice (not the train slice) so it matches sklearn's ``ceil(test_size * n)``;
+        # ``int(n * (1 - test_size))`` truncates float noise (10 * (1 - 0.8) = 1.999...) and
+        # gives the test side one row too many. Round to 9 places to absorb the noise.
+        n_test = math.ceil(round(len(sorted_df) * test_size, 9))
+        cutoff = len(sorted_df) - n_test
         train_df = sorted_df.iloc[:cutoff]
         test_df = sorted_df.iloc[cutoff:]
 

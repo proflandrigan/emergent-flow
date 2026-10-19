@@ -11,10 +11,35 @@ estimated cost and reason; a human decision resumes or cancels.
 from __future__ import annotations
 
 import os
+import threading
 from typing import Any
 
 # Default budget ceiling in USD (can be overridden via environment variable)
 DEFAULT_BUDGET_CEILING_USD = 1.0
+
+
+# Budget gates whose human approval (status CLOSED) has already been spent on one run. Sessions
+# are process-local in-memory state, so a process-local set keeps the same lifetime.
+_consumed_approvals: set[str] = set()
+_consumed_lock = threading.Lock()
+
+
+def _consume_approval(session_id: str) -> bool:
+    """Spend one unconsumed CLOSED ``budget_check`` gate on *session_id*, if any exists."""
+    from emergentflow.collab.gates import GateStatus
+    from emergentflow.collab.session import get_default_store as get_default_session_store
+
+    session = get_default_session_store().get(session_id)
+    with _consumed_lock:
+        for gate in session.collab.gates.values():
+            if (
+                gate.phase == "budget_check"
+                and gate.status == GateStatus.CLOSED
+                and gate.id not in _consumed_approvals
+            ):
+                _consumed_approvals.add(gate.id)
+                return True
+    return False
 
 
 def get_budget_ceiling() -> float:
@@ -70,6 +95,11 @@ def check_budget_and_open_gate(
     Otherwise, return None to proceed with execution.
     """
     if estimated_cost <= budget_ceiling:
+        return None
+
+    # The gate text says "Close this gate to approve execution": honor that approval once,
+    # instead of re-opening a fresh gate on every attempt (which made approval impossible).
+    if _consume_approval(session_id):
         return None
 
     from emergentflow.collab.gates import Gate, GateKind

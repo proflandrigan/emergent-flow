@@ -16,6 +16,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import threading
 import time
 from collections.abc import Generator, Iterator
 from dataclasses import asdict, dataclass
@@ -1451,6 +1452,11 @@ def _profile_from_body(body: dict[str, Any]) -> WarehouseConnectionProfile | Llm
     raise ProfileValidationError(f"Unknown connection kind {kind!r}; must be 'warehouse' or 'llm'.")
 
 
+# Serializes the load -> modify -> save cycle of the connection routes: they run on a thread
+# pool, and without this two concurrent writes each save a store missing the other's change.
+_CONNECTIONS_LOCK = threading.RLock()
+
+
 def create_connection(body: dict[str, Any]) -> dict[str, Any]:
     """Create a new connection profile (POST /connections).
 
@@ -1464,12 +1470,13 @@ def create_connection(body: dict[str, Any]) -> dict[str, Any]:
     name = body.get("name")
     if not name:
         raise ValueError("Connection profile body must include a non-empty 'name'.")
-    store = load_profiles()
-    if name in store:
-        raise ValueError(f"A connection profile named {name!r} already exists.")
-    profile = _profile_from_body(body)
-    store.add(profile)
-    save_profiles(store)
+    with _CONNECTIONS_LOCK:
+        store = load_profiles()
+        if name in store:
+            raise ValueError(f"A connection profile named {name!r} already exists.")
+        profile = _profile_from_body(body)
+        store.add(profile)
+        save_profiles(store)
     return profile.model_dump(mode="json")
 
 
@@ -1487,15 +1494,16 @@ def update_connection(name: str, body: dict[str, Any]) -> dict[str, Any]:
         save_profiles,
     )
 
-    store = load_profiles()
-    if name not in store:
-        raise UnknownConnectionError(f"No connection profile named {name!r} to update.")
-    existing = store.get(name)
-    payload = {**body, "name": name}
-    payload.setdefault("kind", existing.kind)
-    profile = _profile_from_body(payload)
-    store.add(profile)
-    save_profiles(store)
+    with _CONNECTIONS_LOCK:
+        store = load_profiles()
+        if name not in store:
+            raise UnknownConnectionError(f"No connection profile named {name!r} to update.")
+        existing = store.get(name)
+        payload = {**body, "name": name}
+        payload.setdefault("kind", existing.kind)
+        profile = _profile_from_body(payload)
+        store.add(profile)
+        save_profiles(store)
     return profile.model_dump(mode="json")
 
 
@@ -1503,9 +1511,10 @@ def delete_connection(name: str) -> dict[str, Any]:
     """Delete a connection profile by name (DELETE /connections/{name})."""
     from emergentflow.connections.profiles import load_profiles, save_profiles
 
-    store = load_profiles()
-    store.remove(name)  # raises UnknownConnectionError -> 422 if absent
-    save_profiles(store)
+    with _CONNECTIONS_LOCK:
+        store = load_profiles()
+        store.remove(name)  # raises UnknownConnectionError -> 422 if absent
+        save_profiles(store)
     return {"deleted": name}
 
 

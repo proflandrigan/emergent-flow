@@ -13,12 +13,15 @@ import type { GroupNodeData } from "./nodes/GroupNode";
 import type { NoteNodeData } from "./nodes/NoteNode";
 import type { CalloutNodeData } from "./nodes/CalloutNode";
 import type { SnapshotNodeData } from "./nodes/SnapshotNode";
+import type { ResultCardNodeData } from "./nodes/ResultCardNode";
+import { parseBlocks } from "./resultCardBlocks";
 
 const NOTE_NODE_TYPE = "notes.markdown";
 const GROUP_NODE_TYPE = "layout.group";
 const COMPOSITE_NODE_TYPE = "layout.composite";
 const SNAPSHOT_NODE_TYPE = "layout.snapshot";
 const CALLOUT_NODE_TYPE = "layout.callout";
+const RESULT_CARD_NODE_TYPE = "reports.result_card";
 
 // Trace state projected onto a node/edge: "traced" highlights the active trace path, "dimmed"
 // marks nodes/edges outside it, "none" means tracing is inactive. A shared TraceMode will be
@@ -181,7 +184,7 @@ export function toRFNode(
   family: string | null | undefined,
   description: string | null | undefined,
   traceMode: TraceMode,
-): RFNode<EfNodeData> | RFNode<NoteNodeData> | RFNode<GroupNodeData> | RFNode<CompositeNodeData> | RFNode<SnapshotNodeData> | RFNode<CalloutNodeData> {
+): RFNode<EfNodeData> | RFNode<NoteNodeData> | RFNode<GroupNodeData> | RFNode<CompositeNodeData> | RFNode<SnapshotNodeData> | RFNode<CalloutNodeData> | RFNode<ResultCardNodeData> {
   const traceClassName =
     traceMode === "traced"
       ? "ef-trace-traced"
@@ -298,6 +301,25 @@ export function toRFNode(
         caption: typeof paramValue("caption") === "string"
           ? (paramValue("caption") as string)
           : "",
+      },
+    };
+  }
+  if (node.type === RESULT_CARD_NODE_TYPE) {
+    const paramValue = (name: string): unknown =>
+      node.params.find((p) => p.name === name)?.value;
+    const title = paramValue("title");
+    const width = paramValue("width");
+    return {
+      id: node.id,
+      type: "resultCardNode",
+      position: node.position,
+      selected,
+      className: traceClassName,
+      data: {
+        title: typeof title === "string" ? title : "Results",
+        blocks: parseBlocks(paramValue("blocks_json")),
+        width: typeof width === "number" ? width : 480,
+        inPortId: node.ports.find((port) => port.direction === "in")?.id ?? null,
       },
     };
   }

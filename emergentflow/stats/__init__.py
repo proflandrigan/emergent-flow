@@ -590,8 +590,18 @@ def correct_pvalues(
             f"correct_pvalues would overwrite existing column(s) {collisions!r}; "
             f"rename them before calling."
         )
-    pvals = df[p_col].to_numpy()
-    reject, p_adjusted, _, _ = multipletests(pvals, alpha=alpha, method=_CORRECTION_METHODS[method])
+    pvals = pd.to_numeric(df[p_col], errors="coerce").to_numpy(dtype=float)
+    # Missing p-values are not hypotheses: correct over the observed ones only (NaN would
+    # otherwise poison every adjusted value under BH and inflate the Bonferroni family size).
+    observed = ~np.isnan(pvals)
+    p_adjusted = np.full(len(pvals), np.nan)
+    reject = np.zeros(len(pvals), dtype=bool)
+    if observed.any():
+        rej, adj, _, _ = multipletests(
+            pvals[observed], alpha=alpha, method=_CORRECTION_METHODS[method]
+        )
+        p_adjusted[observed] = adj
+        reject[observed] = rej
     result = df.copy()
     result["p_adjusted"] = p_adjusted
     result["reject_null"] = reject
@@ -860,7 +870,8 @@ def cohort_retention(
     if period not in _COHORT_PERIODS:
         raise ValueError(f"unknown period {period!r}; expected one of {list(_COHORT_PERIODS)!r}.")
 
-    work = df[[user_col, date_col]].copy()
+    # Rows missing a user or a date carry no activity; drop them (a NaT period has no ``.n``).
+    work = df[[user_col, date_col]].dropna().copy()
     work["_period"] = pd.to_datetime(work[date_col]).dt.to_period(period)
     work["_cohort"] = work.groupby(user_col)["_period"].transform("min")
     work["_period_number"] = [

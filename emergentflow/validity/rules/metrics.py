@@ -123,15 +123,24 @@ class RankingMetricsOnRandomSplit(ValidityRule):
             if test_feeder is None:
                 continue
             upstream_ids = upstream(graph, test_feeder) | {test_feeder}
+            # An ml.train_test_split with strategy="temporal" is a temporal holdout, not random.
+            splits_upstream = [
+                n
+                for n in graph.nodes.values()
+                if n.id in upstream_ids
+                and n.type in ("ml.train_test_split", "recommend.temporal_split")
+            ]
             random_splits = sorted(
                 n.id
-                for n in graph.nodes.values()
-                if n.type == "ml.train_test_split" and n.id in upstream_ids
+                for n in splits_upstream
+                if n.type == "ml.train_test_split"
+                and {p.name: p.value for p in n.params}.get("strategy") != "temporal"
             )
             temporal_splits = sorted(
                 n.id
-                for n in graph.nodes.values()
-                if n.type == "recommend.temporal_split" and n.id in upstream_ids
+                for n in splits_upstream
+                if n.type == "recommend.temporal_split"
+                or {p.name: p.value for p in n.params}.get("strategy") == "temporal"
             )
             if not random_splits or temporal_splits:
                 continue

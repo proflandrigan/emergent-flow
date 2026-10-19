@@ -447,8 +447,9 @@ class SessionStore:
             previous_graph = session.graph
             previous_version = session.version
             new_graph = apply_mutation(session.graph, mutation)
-            session.graph = new_graph
-            session.version += 1
+            # Build (and thereby validate) the checkpoint BEFORE touching session state: a
+            # caller-supplied author/description that fails validation must not leave the
+            # graph mutated and the version bumped with no checkpoint recorded.
             checkpoint = Checkpoint(
                 kind=CheckpointKind.EDIT,
                 author=author,
@@ -456,8 +457,10 @@ class SessionStore:
                 base_version=previous_version,
                 mutation=mutation,
                 previous_graph=previous_graph,
-                resulting_version=session.version,
+                resulting_version=previous_version + 1,
             )
+            session.graph = new_graph
+            session.version += 1
             session.collab.checkpoints[checkpoint.id] = checkpoint
             self._publish(
                 session_id,

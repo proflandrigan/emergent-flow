@@ -202,9 +202,13 @@ def _assemble(
                 )
 
     # Step 4: Per-node codegen
-    name_map = build_name_map(graph)
     if graph_param_names is None:
+        name_map = build_name_map(graph)
         graph_param_names = build_graph_param_names(graph, name_map)
+    else:
+        # A composite's subgraph is compiled against the ENCLOSING graph's param kwargs, which
+        # its nested function reads by closure: its own variables must not reuse those names.
+        name_map = build_name_map(graph, reserved_names=graph_param_names.values())
     code_fragments: list[CodeFragment] = []
     needs_llm = False
     needs_warehouse = False

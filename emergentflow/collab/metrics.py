@@ -68,7 +68,8 @@ def compare_metrics(
         }
 
     delta = value_b - value_a
-    delta_pct = (delta / value_a * 100) if value_a != 0 else None
+    # abs(): a negative baseline (e.g. a loss or R^2) must not flip the percent-change sign.
+    delta_pct = (delta / abs(value_a) * 100) if value_a != 0 else None
 
     return {
         "before": value_a,

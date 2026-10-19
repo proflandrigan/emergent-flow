@@ -249,6 +249,17 @@ def test_random_split_on_temporal_graph_silent_without_temporal_signal() -> None
     assert "random_split_on_temporal_graph" not in _rule_ids(graph)
 
 
+def test_random_split_on_temporal_graph_silent_when_split_is_temporal() -> None:
+    """strategy="temporal" is the rule's own documented fix; it must not keep firing."""
+    split = _split("split")
+    split = split.model_copy(
+        update={"params": [Param(name="strategy", type_token="str", value="temporal")]}
+    )
+    window = _node("window", "timeseries.ewma", _io("window", "w"))
+    graph = _graph([split, window])
+    assert "random_split_on_temporal_graph" not in _rule_ids(graph)
+
+
 # ---------------------------------------------------------------------------
 # train_serve_skew (Story 5)
 # ---------------------------------------------------------------------------

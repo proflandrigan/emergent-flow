@@ -989,3 +989,60 @@ describe("reanchorEdgesForCollapsedGroups", () => {
     expect(result[0].targetHandle).toBe(GROUP_IN_HANDLE);
   });
 });
+
+describe("toRFNode (reports.result_card)", () => {
+  function cardModel(params: NodeModel["params"], withPort = false): NodeModel {
+    return {
+      id: "rc1",
+      type: "reports.result_card",
+      label: undefined,
+      paradigm: "functional",
+      params,
+      ports: withPort
+        ? [{ id: "rcp1", name: "in0", direction: "in", dataType: "any", cardinality: "one", label: null }]
+        : [],
+      position: { x: 10, y: 20 },
+    };
+  }
+
+  test("maps params to title, blocks and width", () => {
+    const blocks = [
+      { kind: "markdown", text: "hello" },
+      { kind: "result", source: "n1:out", caption: "c" },
+    ];
+    const rf = toRFNode(
+      cardModel([
+        { name: "title", typeToken: "str", value: "My Card" },
+        { name: "blocks_json", typeToken: "str", value: JSON.stringify(blocks) },
+        { name: "width", typeToken: "int", value: 640 },
+      ], true),
+      false, null, null, null, null, "none",
+    ) as ReturnType<typeof toRFNode>;
+
+    expect(rf.type).toBe("resultCardNode");
+    if (rf.type === "resultCardNode") {
+      expect(rf.data.title).toBe("My Card");
+      expect(rf.data.blocks).toEqual(blocks);
+      expect(rf.data.width).toBe(640);
+      expect(rf.data.inPortId).toBe("rcp1");
+    }
+  });
+
+  test("missing or invalid params fall back to defaults", () => {
+    const rf = toRFNode(
+      cardModel([
+        { name: "title", typeToken: "str", value: 5 },
+        { name: "blocks_json", typeToken: "str", value: "{bad" },
+        { name: "width", typeToken: "int", value: "wide" },
+      ]),
+      false, null, null, null, null, "none",
+    ) as ReturnType<typeof toRFNode>;
+
+    if (rf.type === "resultCardNode") {
+      expect(rf.data.title).toBe("Results");
+      expect(rf.data.blocks).toEqual([]);
+      expect(rf.data.width).toBe(480);
+      expect(rf.data.inPortId).toBeNull();
+    }
+  });
+});

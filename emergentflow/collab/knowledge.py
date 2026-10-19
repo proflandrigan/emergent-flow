@@ -155,7 +155,13 @@ class KnowledgeStore:
                 }
             )
             self._entries[stored_entry.slug] = stored_entry
-            self._persist()
+            try:
+                self._persist()
+            except BaseException:
+                # Don't leave an unpersisted entry in memory (a retry would otherwise hit
+                # DuplicateSlugError for an entry that never reached disk).
+                del self._entries[stored_entry.slug]
+                raise
             return stored_entry
 
     def get(self, slug: str) -> KnowledgeEntry:

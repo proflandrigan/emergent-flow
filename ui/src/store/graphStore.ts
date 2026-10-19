@@ -11,6 +11,8 @@ import { useExecutionStore } from "./executionStore";
 import { expandLayout, layeredLayout, separateOverlappingNodes } from "../canvas/layout";
 import { computeGroupBounds, NODE_FOOTPRINT_WIDTH, NODE_FOOTPRINT_HEIGHT, GROUP_PADDING } from "../canvas/toReactFlow";
 import { newId } from "./ids";
+import catalogJson from "../generated/catalog.json";
+import { serializeBlocks, type ResultCardBlock } from "../canvas/resultCardBlocks";
 import { edgeToIR, fromIR, nodeToIR, toIR } from "./ir";
 import { useValidationStore } from "./validationStore";
 import type {
@@ -85,6 +87,7 @@ export interface GraphStore extends CanvasModel {
   pasteNodes: (models: NodeModel[]) => string[];
   groupSelection: (nodeIds: string[]) => string | null;
   addCalloutAroundSelection: (nodeIds: string[]) => string | null;
+  createResultCardForSelection: (nodeIds: string[]) => string | null;
   ungroupSelection: (nodeIds: string[]) => void;
   moveGroup: (groupId: string, position: { x: number; y: number }) => void;
   extractToComposite: (nodeIds: string[]) => string | null;
@@ -168,6 +171,13 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     set((state) => {
       const nodes = { ...state.nodes };
       delete nodes[nodeId];
+      // Deleting a group node must release its members, or they keep a dangling group_id
+      // (an invalid IR: group_id must reference an existing node).
+      for (const [id, node] of Object.entries(nodes)) {
+        if (node.groupId === nodeId) {
+          nodes[id] = { ...node, groupId: null };
+        }
+      }
       const edges: Record<string, EdgeModel> = {};
       for (const [id, edge] of Object.entries(state.edges)) {
         if (edge.source.node_id !== nodeId && edge.target.node_id !== nodeId) {
@@ -392,6 +402,74 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
       nodes: { ...state.nodes, [calloutId]: calloutNode },
     }));
     return calloutId;
+  },
+
+  createResultCardForSelection(nodeIds) {
+    const initial = get();
+    const selected = nodeIds
+      .map((id) => initial.nodes[id])
+      .filter(
+        (n): n is NodeModel =>
+          Boolean(n) &&
+          !n.type.startsWith("layout.") &&
+          n.type !== "notes.markdown" &&
+          n.type !== "reports.result_card",
+      );
+    if (selected.length === 0) {
+      return null;
+    }
+    const spec = (catalogJson as unknown as { nodes: CatalogNode[] }).nodes.find(
+      (entry) => entry.type === "reports.result_card",
+    );
+    if (!spec) {
+      return null;
+    }
+    // The steps below each push their own history entry; collapse them into ONE undo step by
+    // restoring the pre-action history plus a single pre-action snapshot at the end.
+    const pastBefore = get().past;
+    const preSnap = snapshot(get());
+    const x = Math.max(...selected.map((n) => n.position.x + NODE_FOOTPRINT_WIDTH)) + 80;
+    const y = Math.min(...selected.map((n) => n.position.y));
+    const cardId = get().addNodeFromSpec(spec, { x, y });
+    get().setParam(cardId, "title", "Summary");
+    const card = get().nodes[cardId];
+    const inPort = card?.ports.find((p) => p.direction === "in");
+    const resultBlocks: ResultCardBlock[] = [];
+    if (inPort) {
+      const ordered = [...selected].sort(
+        (a, b) => a.position.y - b.position.y || a.position.x - b.position.x,
+      );
+      for (const node of ordered) {
+        const outPorts = node.ports.filter((p) => p.direction === "out").slice(0, 3);
+        for (const port of outPorts) {
+          const edgeId = get().connect(
+            { node_id: node.id, port_id: port.id },
+            { node_id: cardId, port_id: inPort.id },
+          );
+          if (edgeId) {
+            resultBlocks.push({
+              kind: "result",
+              source: `${node.id}:${port.name}`,
+              caption: `${node.label ?? node.type}.${port.name}`,
+            });
+          }
+        }
+      }
+    }
+    get().setParam(
+      cardId,
+      "blocks_json",
+      serializeBlocks([
+        { kind: "markdown", text: "## Summary\n\nDescribe what these results show." },
+        ...resultBlocks,
+      ]),
+    );
+    const past = [...pastBefore, preSnap];
+    if (past.length > HISTORY_LIMIT) {
+      past.shift();
+    }
+    set({ past, future: [], _lastTxn: null });
+    return cardId;
   },
 
   ungroupSelection(nodeIds) {

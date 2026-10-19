@@ -134,6 +134,32 @@ Inspect as you go: `get_graph(session_id)` returns the full session document, an
 `list_sessions()` lists every active session. After each edit, re-read `get_graph()` to confirm the
 graph matches your intent.
 
+### Present your findings: result cards
+
+`reports.result_card` shows tables, charts and metrics from upstream nodes, plus markdown prose,
+directly on the canvas — the human sees the answer without opening any node.
+
+```python
+add_result_card(session_id, title, blocks)
+set_result_card(session_id, card_node_id, blocks, title=None)   # replace blocks (and title)
+```
+
+Block shapes: `{"kind": "markdown", "text": ...}` and
+`{"kind": "result", "node_id": ..., "port_name": ..., "caption": ...}`. `add_result_card` wires each
+referenced OUT port into the card in the same mutation; `set_result_card` adds edges only for newly
+referenced ports. Run/execute the graph afterwards so the card has results to show.
+
+```python
+add_result_card(session_id, "Churn drivers", [
+    {"kind": "markdown", "text": "**Tenure is the strongest churn driver (AUC 0.81).**"},
+    {"kind": "result", "node_id": metrics_id, "port_name": "metrics", "caption": "Holdout metrics"},
+    {"kind": "result", "node_id": plot_id, "port_name": "figure", "caption": "Feature importance"},
+])
+```
+
+Recommended: put the conclusion in the first markdown block, then the supporting result blocks;
+use one card per analysis question.
+
 ## 5. Validate and compile (preflight)
 
 Before executing, preflight the graph:

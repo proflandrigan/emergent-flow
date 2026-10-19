@@ -327,7 +327,7 @@ def load_csv(
                 frame = pd.read_csv(handle, encoding=encoding)
             if source_file:
                 frame = _concat_files([filepath], lambda p: frame, source_file=True)
-    elif _is_glob(filepath):
+    elif _is_glob(filepath) and not Path(filepath).exists():
         files = _resolve_glob(filepath, kind="CSV")
         frame = _concat_files(
             files, lambda p: pd.read_csv(p, encoding=encoding), source_file=source_file
@@ -404,7 +404,7 @@ def load_parquet(
                 frame = pd.read_parquet(handle, columns=columns)
             if source_file:
                 frame = _concat_files([filepath], lambda p: frame, source_file=True)
-    elif _is_glob(filepath):
+    elif _is_glob(filepath) and not Path(filepath).exists():
         files = _resolve_glob(filepath, kind="Parquet")
         frame = _concat_files(
             files, lambda p: pd.read_parquet(p, columns=columns), source_file=source_file
@@ -482,7 +482,7 @@ def load_json(
                 frame = pd.read_json(handle, orient=orient, lines=lines)
             if source_file:
                 frame = _concat_files([filepath], lambda p: frame, source_file=True)
-    elif _is_glob(filepath):
+    elif _is_glob(filepath) and not Path(filepath).exists():
         files = _resolve_glob(filepath, kind="JSON")
         frame = _concat_files(
             files,
@@ -586,7 +586,7 @@ def load_excel(
                 frame = _read_excel(handle, display=filepath)
             if source_file:
                 frame = _concat_files([filepath], lambda p: frame, source_file=True)
-    elif _is_glob(filepath):
+    elif _is_glob(filepath) and not Path(filepath).exists():
         files = _resolve_glob(filepath, kind="Excel")
         frame = _concat_files(files, lambda p: _read_excel(p, display=p), source_file=source_file)
     else:

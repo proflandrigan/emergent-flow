@@ -394,7 +394,17 @@ def test_evaluate_classification_returns_accuracy() -> None:
     result = evaluate(model, df)
     assert isinstance(result, EvaluationResult)
     assert result.task == "classification"
-    assert set(result.metrics.keys()) == {"accuracy", "precision", "recall", "f1", "roc_auc"}
+    # string labels: average_precision/brier/positive_rate are reported too (pos_label passed)
+    assert set(result.metrics.keys()) == {
+        "accuracy",
+        "precision",
+        "recall",
+        "f1",
+        "roc_auc",
+        "average_precision",
+        "brier",
+        "positive_rate",
+    }
     assert 0.0 <= result.metrics["accuracy"] <= 1.0
     assert 0.0 <= result.metrics["precision"] <= 1.0
     assert 0.0 <= result.metrics["recall"] <= 1.0

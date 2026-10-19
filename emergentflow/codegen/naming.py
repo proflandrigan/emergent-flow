@@ -17,6 +17,7 @@ import hashlib
 import keyword
 import unicodedata
 from collections import Counter
+from collections.abc import Collection
 from typing import Any
 
 from pydantic import BaseModel, Field, PrivateAttr
@@ -165,7 +166,7 @@ def _base_name(node: Node) -> str:
 
 
 @public_op(name="ef.codegen.build_name_map")
-def build_name_map(graph: Graph) -> NameMap:
+def build_name_map(graph: Graph, *, reserved_names: Collection[str] = ()) -> NameMap:
     """Assign a stable, readable Python variable name to every OUT port.
 
     Every OUT port's candidate name is always `f"{node_base}_{port_slug}"`
@@ -180,7 +181,13 @@ def build_name_map(graph: Graph) -> NameMap:
     Iteration order is `sorted(graph.nodes.values(), key=node id)` then
     declared port order — never insertion order — so the same graph always
     yields the same map.
+
+    *reserved_names* are identifiers already claimed in an enclosing scope (e.g. the compiled
+    ``main()`` graph-param kwargs, which a composite's nested function reads by closure). A
+    candidate equal to one of them is treated as colliding and gets the hash suffix, so a
+    subgraph variable can never shadow (and make unbound) an outer graph-param name.
     """
+    reserved = frozenset(reserved_names)
     # Pass 1: compute every OUT port's collision candidate name, in
     # deterministic (node id, then declared port order) order.
     entries: list[tuple[str, str, str]] = []
@@ -195,7 +202,9 @@ def build_name_map(graph: Graph) -> NameMap:
 
     # Pass 2: find which candidates collide (shared by more than one OUT port).
     counts = Counter(candidate for _, _, candidate in entries)
-    bare_names = {candidate for candidate in counts if counts[candidate] == 1}
+    bare_names = {
+        candidate for candidate in counts if counts[candidate] == 1 and candidate not in reserved
+    }
 
     # Pass 3: grow the hash-suffix length until every colliding entry's
     # suffixed name is unique among itself and disjoint from the bare names.
@@ -207,7 +216,7 @@ def build_name_map(graph: Graph) -> NameMap:
         suffixed = [
             f"{candidate}_{_hash_suffix(node_id, port_id, length)}"
             for node_id, port_id, candidate in entries
-            if counts[candidate] > 1
+            if counts[candidate] > 1 or candidate in reserved
         ]
         if len(suffixed) == len(set(suffixed)) and bare_names.isdisjoint(suffixed):
             break
@@ -216,7 +225,7 @@ def build_name_map(graph: Graph) -> NameMap:
     # Pass 4: assemble bindings in entries order.
     bindings: list[OutBinding] = []
     for node_id, port_id, candidate in entries:
-        if counts[candidate] == 1:
+        if counts[candidate] == 1 and candidate not in reserved:
             var_name = candidate
         else:
             var_name = f"{candidate}_{_hash_suffix(node_id, port_id, length)}"

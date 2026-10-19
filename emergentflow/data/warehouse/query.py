@@ -39,6 +39,21 @@ __all__ = [
 # Top-level statement types permitted under a read-only connection (ADR 0018).
 _READ_ONLY_ALLOWED = (exp.Select, exp.Union, exp.Intersect, exp.Except)
 
+#: Node types that mutate data or schema. A top-level SELECT can still carry one -- a
+#: data-modifying CTE (``WITH d AS (DELETE ... RETURNING *) SELECT ...``) or ``SELECT ... INTO``
+#: -- so the read-only gate walks the whole statement tree, not just its root.
+_READ_ONLY_FORBIDDEN = (
+    exp.Insert,
+    exp.Update,
+    exp.Delete,
+    exp.Merge,
+    exp.Create,
+    exp.Drop,
+    exp.Alter,
+    exp.Command,
+    exp.Into,
+)
+
 
 class MissingWarehouseClientError(RuntimeError):
     """Raised by ``query()`` when no ``WarehouseClient`` was injected (ADR 0018).
@@ -98,6 +113,14 @@ def _validate_read_only_sql(sql: str, dialect: str, read_only: bool) -> str:
                     f"Statement type {type(stmt).__name__.upper()!r} is not permitted under a "
                     "read-only connection; only SELECT / WITH / set-operations are allowed. "
                     "Enable writes on the connection profile to run a mutating statement."
+                )
+            nested = stmt.find(*_READ_ONLY_FORBIDDEN)
+            if nested is not None:
+                raise ReadOnlyViolationError(
+                    f"Statement contains a nested {type(nested).__name__.upper()!r} operation, "
+                    "which is not permitted under a read-only connection (data-modifying CTEs "
+                    "and SELECT ... INTO are writes). Enable writes on the connection profile "
+                    "to run a mutating statement."
                 )
     return sql
 

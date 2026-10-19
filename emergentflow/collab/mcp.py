@@ -21,6 +21,7 @@ Never imported by ``emergentflow/__init__.py`` or ``emergentflow/collab/__init__
 
 from __future__ import annotations
 
+import json
 import queue
 import time
 from typing import Any
@@ -512,6 +513,54 @@ def create_mcp_server() -> Any:
             f"available ports: {sorted(p.name for p in node.ports)!r}"
         )
 
+    def _normalize_result_card_blocks(
+        graph: Any, blocks: list[dict]
+    ) -> tuple[list[dict], list[tuple[str, str]]]:
+        """Validate agent-friendly result-card *blocks* and convert to the stored format.
+
+        Returns ``(stored_blocks, pairs)`` where ``pairs`` is the unique, ordered list of
+        referenced ``(node_id, port_name)`` OUT ports. Raises ``ValueError`` on bad input.
+        """
+        stored: list[dict] = []
+        pairs: list[tuple[str, str]] = []
+        for i, block in enumerate(blocks):
+            if not isinstance(block, dict):
+                raise ValueError(f"block {i} must be an object, got {type(block).__name__}")
+            kind = block.get("kind")
+            if kind == "markdown":
+                text = block.get("text")
+                if not isinstance(text, str):
+                    raise ValueError(f"block {i}: markdown block requires a string 'text'")
+                stored.append({"kind": "markdown", "text": text})
+            elif kind == "result":
+                node_id = block.get("node_id")
+                port_name = block.get("port_name")
+                if not isinstance(node_id, str) or not node_id:
+                    raise ValueError(f"block {i}: result block requires 'node_id'")
+                if not isinstance(port_name, str) or not port_name:
+                    raise ValueError(f"block {i}: result block requires 'port_name'")
+                if node_id not in graph.nodes:
+                    raise ValueError(f"block {i}: unknown node_id {node_id!r}")
+                port = _find_port(graph.nodes[node_id], port_name, Direction.OUT)
+                if port.direction != Direction.OUT:
+                    raise ValueError(
+                        f"block {i}: port {port_name!r} on node {node_id!r} is not an OUT port"
+                    )
+                stored.append(
+                    {
+                        "kind": "result",
+                        "source": f"{node_id}:{port_name}",
+                        "caption": str(block.get("caption") or ""),
+                    }
+                )
+                if (node_id, port_name) not in pairs:
+                    pairs.append((node_id, port_name))
+            else:
+                raise ValueError(
+                    f"block {i}: unknown kind {kind!r}; expected 'markdown' or 'result'"
+                )
+        return stored, pairs
+
     def _apply_mutation(
         session_id: str,
         mutation: GraphMutation,
@@ -732,5 +781,110 @@ def create_mcp_server() -> Any:
             author=author,
         )
         return _apply_mutation(session_id, mutation, extra={"node_id": note_node_id})
+
+    @mcp.tool()
+    def add_result_card(
+        session_id: str,
+        title: str = "Results",
+        blocks: list[dict] | None = None,
+        *,
+        author: str = "agent",
+        reason: str = "",
+    ) -> dict:
+        """Add a ``reports.result_card`` node to *session_id*'s graph.
+
+        *blocks* is a list of ``{"kind": "markdown", "text": ...}`` or
+        ``{"kind": "result", "node_id": ..., "port_name": ..., "caption": ...}`` dicts.
+        Each referenced OUT port is wired into the card's ``results`` IN port in the same
+        mutation. Returns the common success shape plus the new ``node_id``.
+        """
+        store = get_default_session_store()
+        session = store.get(session_id)
+        graph = session.graph
+        stored_blocks, pairs = _normalize_result_card_blocks(graph, blocks or [])
+        card = default_node_registry.get("reports.result_card")().instantiate(
+            title=title, blocks_json=json.dumps(stored_blocks)
+        )
+        in_port = _find_port(card, "results", Direction.IN)
+        edges = [
+            Edge(
+                id=new_id(),
+                source=PortRef(
+                    node_id=src_id,
+                    port_id=_find_port(graph.nodes[src_id], port_name, Direction.OUT).id,
+                ),
+                target=PortRef(node_id=card.id, port_id=in_port.id),
+            )
+            for src_id, port_name in pairs
+        ]
+        mutation = GraphMutation(
+            base_version=session.version,
+            add_nodes=[card],
+            add_edges=edges,
+            description=reason or f"Added result card: {title}",
+            author=author,
+        )
+        return _apply_mutation(session_id, mutation, extra={"node_id": card.id})
+
+    @mcp.tool()
+    def set_result_card(
+        session_id: str,
+        card_node_id: str,
+        blocks: list[dict],
+        title: str | None = None,
+        *,
+        author: str = "agent",
+        reason: str = "",
+    ) -> dict:
+        """Replace the blocks (and optionally the title) of a ``reports.result_card`` node.
+
+        Edges are added only for referenced OUT ports not already wired into the card.
+        Returns the common success shape plus the edited ``node_id``.
+        """
+        store = get_default_session_store()
+        session = store.get(session_id)
+        graph = session.graph
+        card = graph.nodes.get(card_node_id)
+        if card is None:
+            raise ValueError(f"node {card_node_id!r} not found in session {session_id!r}")
+        if card.type != "reports.result_card":
+            raise ValueError(
+                f"node {card_node_id!r} is of type {card.type!r}, not 'reports.result_card'"
+            )
+        stored_blocks, pairs = _normalize_result_card_blocks(graph, blocks)
+        in_port = _find_port(card, "results", Direction.IN)
+        wired: set[tuple[str, str]] = set()
+        for edge in graph.edges.values():
+            if edge.target.node_id != card_node_id:
+                continue
+            src_node = graph.nodes.get(edge.source.node_id)
+            if src_node is None:
+                continue
+            for port in src_node.ports:
+                if port.id == edge.source.port_id:
+                    wired.add((src_node.id, port.name))
+        edges = [
+            Edge(
+                id=new_id(),
+                source=PortRef(
+                    node_id=src_id,
+                    port_id=_find_port(graph.nodes[src_id], port_name, Direction.OUT).id,
+                ),
+                target=PortRef(node_id=card_node_id, port_id=in_port.id),
+            )
+            for src_id, port_name in pairs
+            if (src_id, port_name) not in wired
+        ]
+        params: dict[str, Any] = {"blocks_json": json.dumps(stored_blocks)}
+        if title is not None:
+            params["title"] = title
+        mutation = GraphMutation(
+            base_version=session.version,
+            add_edges=edges,
+            set_params={card_node_id: params},
+            description=reason or f"Updated result card: {card_node_id}",
+            author=author,
+        )
+        return _apply_mutation(session_id, mutation, extra={"node_id": card_node_id})
 
     return mcp

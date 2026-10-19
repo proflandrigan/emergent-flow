@@ -6,7 +6,9 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Graph } from "../generated/ir";
+import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
+import { collectReportCards, buildReportHtml } from "./reportHtml";
 import { parseImport, serializeIR } from "./irFile";
 import { useFlowStore } from "./flowStore";
 import { Button } from "../ui/Button";
@@ -47,6 +49,8 @@ export function IRToolbar(): JSX.Element {
   const fileMenuRef = useRef<HTMLDivElement | null>(null);
 
   const name = useGraphStore((s) => s.name);
+  const nodes = useGraphStore((s) => s.nodes);
+  const hasResultCards = collectReportCards(nodes).length > 0;
   const currentSlug = useFlowStore((s) => s.currentSlug);
   const isDirty = useFlowStore((s) => s.isDirty);
   const flows = useFlowStore((s) => s.flows);
@@ -102,6 +106,23 @@ export function IRToolbar(): JSX.Element {
     anchor.click();
     // Revoke asynchronously: revoking synchronously right after click() can cancel the
     // download before the browser picks up the blob (observed in Firefox).
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    setFileMenuOpen(false);
+  }
+
+  function handleExportReport() {
+    const graphName = useGraphStore.getState().name || "graph";
+    const html = buildReportHtml({
+      graphName,
+      cards: collectReportCards(useGraphStore.getState().nodes),
+      results: useExecutionStore.getState().results,
+    });
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${slugify(graphName)}-report.html`;
+    anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
     setFileMenuOpen(false);
   }
@@ -277,6 +298,12 @@ export function IRToolbar(): JSX.Element {
       testId: "file-menu-rename",
     },
     { label: "Export JSON", onSelect: handleExport, testId: "file-menu-export" },
+    {
+      label: "Export report (HTML)",
+      onSelect: handleExportReport,
+      disabled: !hasResultCards,
+      testId: "file-menu-export-report",
+    },
     {
       label: "Import JSON",
       onSelect: handleImportClick,

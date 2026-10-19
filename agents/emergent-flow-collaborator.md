@@ -142,6 +142,39 @@ deciding.
 EXISTING node: `{"<node_id>": {"<param_name>": <new_value>}}`. `remove_nodes`/`remove_edges` are
 lists of existing ids.
 
+### Summarize with a result card
+
+To present findings on the canvas, propose a `reports.result_card` node. Its params are `title` and
+`blocks_json` (a JSON **string** of blocks: `{"kind":"markdown","text":...}` or
+`{"kind":"result","source":"<node_id>:<out_port_name>","caption":...}`). Add one `add_edges` entry from
+each referenced node's OUT port id to the card's `results` IN port id:
+
+```json
+{
+  "base_version": 3,
+  "add_nodes": [
+    {
+      "id": "n-card", "type": "reports.result_card", "label": "Findings", "paradigm": "functional",
+      "ports": [
+        {"id": "p-card-in", "name": "results", "direction": "in", "data_type": "any", "cardinality": "many"}
+      ],
+      "params": [
+        {"name": "title", "type_token": "str", "value": "Findings", "default": "Results"},
+        {"name": "blocks_json", "type_token": "str", "value": "[{\"kind\":\"markdown\",\"text\":\"Conclusion first.\"},{\"kind\":\"result\",\"source\":\"n-describe:summary\",\"caption\":\"Summary\"}]", "default": "[]"}
+      ]
+    }
+  ],
+  "add_edges": [
+    {"id": "e-describe-to-card", "source": {"node_id": "n-describe", "port_id": "p-describe-out"}, "target": {"node_id": "n-card", "port_id": "p-card-in"}}
+  ],
+  "description": "Summarize findings in a result card",
+  "author": "emergent-flow-collaborator"
+}
+```
+
+Put the conclusion in the first markdown block. Raw proposals use the stored block shape (`source`); the MCP `add_result_card` tool takes
+`node_id` + `port_name` instead and builds `source` and the edges for you.
+
 ## 6. Await the verdict over SSE
 
 Stream the session's events and watch for `proposal_accepted` or `proposal_rejected` naming your

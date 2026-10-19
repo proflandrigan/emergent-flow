@@ -26,9 +26,11 @@ behaviour, not a silent bug.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import pickle
+import re
 import tempfile
 import threading
 import time
@@ -39,6 +41,20 @@ from emergentflow import __version__
 
 DEFAULT_ARTIFACT_DIRNAME = ".ef-artifacts"
 DEFAULT_ARTIFACT_MAX_MB = 500.0
+
+_SAFE_KEY_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+
+
+def _safe_key(node_id: str) -> str:
+    """Map a node id to a filename-safe key.
+
+    Node ids come from client-supplied graph JSON and are otherwise unconstrained, so an id
+    containing ``/`` or ``..`` must never reach the filesystem path. Ordinary ids (UUIDs,
+    slugs) pass through unchanged; anything else is replaced by a stable digest.
+    """
+    if _SAFE_KEY_RE.match(node_id):
+        return node_id
+    return "h-" + hashlib.sha256(node_id.encode("utf-8")).hexdigest()[:40]
 
 
 class ArtifactStore:
@@ -67,10 +83,10 @@ class ArtifactStore:
         return self._root
 
     def _pkl_path(self, node_id: str) -> Path:
-        return self._root / f"{node_id}.pkl"
+        return self._root / f"{_safe_key(node_id)}.pkl"
 
     def _meta_path(self, node_id: str) -> Path:
-        return self._root / f"{node_id}.meta.json"
+        return self._root / f"{_safe_key(node_id)}.meta.json"
 
     def get(self, node_id: str) -> dict[str, Any] | None:
         """Return the stored outputs dict for *node_id*, or ``None`` on a miss.

@@ -13926,6 +13926,69 @@
     {
       "advisor_persona": null,
       "category": "Reporting",
+      "column_effect": null,
+      "description": "A notebook-style card that shows upstream results (tables, charts, metrics) and prose directly on the canvas.",
+      "family": "reports",
+      "keywords": [],
+      "label": "Result Card",
+      "paradigm": "functional",
+      "params": [
+        {
+          "default": "Results",
+          "help": "Card heading.",
+          "hints": {
+            "choices": null,
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "text"
+          },
+          "label": "Title",
+          "name": "title",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": "[]",
+          "help": "JSON list of ordered blocks. Each block is {\"kind\": \"markdown\", \"text\": str} or {\"kind\": \"result\", \"source\": \"<node_id>:<out_port_name>\", \"caption\": str}.",
+          "hints": null,
+          "label": "Blocks",
+          "name": "blocks_json",
+          "required": false,
+          "type_token": "str"
+        },
+        {
+          "default": 480,
+          "help": "Card width in px.",
+          "hints": null,
+          "label": "Width",
+          "name": "width",
+          "required": false,
+          "type_token": "int"
+        }
+      ],
+      "ports": [
+        {
+          "cardinality": "many",
+          "data_type": "any",
+          "direction": "in",
+          "help": "Upstream outputs shown on the card.",
+          "label": "Results",
+          "name": "results",
+          "required": false
+        }
+      ],
+      "type": "reports.result_card",
+      "version": 1
+    },
+    {
+      "advisor_persona": null,
+      "category": "Reporting",
       "column_effect": {
         "detail": null,
         "kind": "passthrough"

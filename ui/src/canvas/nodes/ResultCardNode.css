@@ -1,0 +1,37 @@
+.result-card-md > *:first-child {
+  margin-top: 0;
+}
+
+.result-card-md > *:last-child {
+  margin-bottom: 0;
+}
+
+.result-card-md p,
+.result-card-md ul,
+.result-card-md ol {
+  margin: 0.4em 0;
+}
+
+.result-card-md h1,
+.result-card-md h2,
+.result-card-md h3 {
+  margin: 0.3em 0;
+  font-size: 1.1em;
+}
+
+.result-card-md ul,
+.result-card-md ol {
+  padding-left: 1.2em;
+}
+
+.result-card-md code {
+  font-size: 0.9em;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+}
+
+.result-card-body img {
+  max-width: 100%;
+  height: auto;
+}

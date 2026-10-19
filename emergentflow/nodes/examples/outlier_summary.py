@@ -104,7 +104,8 @@ class OutlierSummary(NodeDefinition):
         threshold = values.get("threshold")
         if threshold is None:
             threshold = 3.0
-        by = values.get("by")
+        # "" (a cleared canvas column) must mean "unset" on both codegen and execute paths
+        by = values.get("by") or None
         return (
             cast("list[str] | None", columns),
             cast(str, method),
