@@ -785,6 +785,32 @@ describe("Canvas trace modes (issue #167)", () => {
     expect(screen.getByTestId("trace-banner")).not.toHaveAttribute("data-route-empty");
   });
 
+  test("route-pick origin hidden by a collapsed group highlights the group", async () => {
+    const a = add(0, 0);
+    const c = add(400, 0);
+    const d = add(600, 0);
+    link(a, c);
+    link(c, d);
+    const groupId = useGraphStore.getState().groupSelection([c, d]);
+    if (!groupId) throw new Error("expected groupSelection to create a group");
+    const { container } = render(<Canvas />);
+    act(() => {
+      useTraceStore.getState().startRoutePick(c);
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("trace-banner")).toHaveTextContent(/Click a node to route from/);
+    });
+
+    act(() => {
+      useCollapseStore.getState().setCollapsed(groupId, true);
+    });
+
+    await waitFor(() => {
+      expect(nodeEl(container, groupId)).toHaveClass("ef-trace-traced");
+    });
+    expect(traceOf(container, a)).toBe("dimmed");
+  });
+
   test("U shortcut traces upstream; ignored inside inputs", async () => {
     const a = add(0, 0);
     const b = add(200, 0);

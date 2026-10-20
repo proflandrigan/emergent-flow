@@ -208,16 +208,16 @@ export function Canvas(): JSX.Element {
         if (!routeFrom) {
           return { ...computeTrace(selectedNodeIds, nodeIds, traceEdges), routeFound: null };
         }
-        if (!routeTo) {
-          // Picking a target: highlight only the origin so the user sees where the route starts.
-          return { ...computeReach([routeFrom], nodeIds, [], "downstream"), routeFound: null };
-        }
         // An endpoint hidden inside a collapsed group is represented by the group node, mirroring
         // how its edges are re-anchored -- otherwise collapsing would read as "No path".
         const visibleId = (id: string): string => {
           const groupId = activeNodes[id]?.groupId;
           return groupId && collapsedGroupIds.has(groupId) ? groupId : id;
         };
+        if (!routeTo) {
+          // Picking a target: highlight only the origin so the user sees where the route starts.
+          return { ...computeReach([visibleId(routeFrom)], nodeIds, [], "downstream"), routeFound: null };
+        }
         const from = visibleId(routeFrom);
         const to = visibleId(routeTo);
         // Prefer the requested direction; fall back to the reverse so an unordered pair
