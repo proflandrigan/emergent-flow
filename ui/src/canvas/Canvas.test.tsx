@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { CatalogNode } from "../catalog/types";
@@ -7,6 +7,7 @@ import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
 import { useSubgraphStore } from "../store/subgraphStore";
+import { useTraceStore } from "../store/traceStore";
 import { Canvas } from "./Canvas";
 
 const catalogNodes = (catalog as unknown as { nodes: CatalogNode[] }).nodes;
@@ -24,6 +25,8 @@ const loadCsv = requireCatalogNode("data.load_csv");
 beforeEach(() => {
   useGraphStore.getState().reset();
   useExecutionStore.getState().clear();
+  useTraceStore.getState().reset();
+  useSelectionStore.getState().clear();
 });
 
 afterEach(() => {
@@ -553,5 +556,224 @@ describe("Canvas", () => {
         screen.queryByTestId("overlay-modal-close"),
       ).not.toBeInTheDocument(),
     );
+  });
+});
+
+describe("Canvas trace modes (issue #167)", () => {
+  const add = (x = 0, y = 0): string =>
+    useGraphStore.getState().addNodeFromSpec(loadCsv, { x, y });
+
+  const link = (a: string, b: string): void => {
+    const nodes = useGraphStore.getState().nodes;
+    useGraphStore.getState().connect(
+      { node_id: a, port_id: nodes[a].ports[0].id },
+      { node_id: b, port_id: nodes[b].ports[0].id },
+    );
+  };
+
+  const traceOf = (container: HTMLElement, id: string): string | null | undefined =>
+    container
+      .querySelector(`.react-flow__node[data-id="${id}"] [data-trace]`)
+      ?.getAttribute("data-trace");
+
+  const nodeEl = (container: HTMLElement, id: string): Element => {
+    const el = container.querySelector(`.react-flow__node[data-id="${id}"]`);
+    if (!el) throw new Error(`node element ${id} not found`);
+    return el;
+  };
+
+  function setupChainWithStray(): { a: string; b: string; c: string; x: string } {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    const c = add(400, 0);
+    const x = add(0, 300);
+    link(a, b);
+    link(b, c);
+    return { a, b, c, x };
+  }
+
+  function traceUpstreamFromC(container: HTMLElement, c: string): void {
+    fireEvent.contextMenu(nodeEl(container, c), { clientX: 10, clientY: 10 });
+    fireEvent.click(screen.getByTestId("node-context-menu-trace-upstream"));
+  }
+
+  test("Trace upstream from the context menu highlights ancestors and dims the rest", async () => {
+    const { a, b, c, x } = setupChainWithStray();
+    const { container } = render(<Canvas />);
+
+    traceUpstreamFromC(container, c);
+
+    await waitFor(() => {
+      expect(traceOf(container, a)).toBe("traced");
+    });
+    expect(traceOf(container, b)).toBe("traced");
+    expect(traceOf(container, c)).toBe("traced");
+    expect(traceOf(container, x)).toBe("dimmed");
+    expect(screen.getByTestId("trace-banner")).toHaveTextContent(/upstream/);
+  });
+
+  test("default selection trace stays downstream", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    const c = add(400, 0);
+    link(a, b);
+    link(b, c);
+    useSelectionStore.getState().setNodeSelected(b, true);
+
+    const { container } = render(<Canvas />);
+
+    await waitFor(() => {
+      expect(traceOf(container, b)).toBe("traced");
+    });
+    expect(traceOf(container, c)).toBe("traced");
+    expect(traceOf(container, a)).toBe("dimmed");
+  });
+
+  test("Show route on a diamond highlights both branches", async () => {
+    const a = add(0, 0);
+    const b = add(200, -100);
+    const c = add(200, 100);
+    const d = add(400, 0);
+    const e = add(600, 0);
+    link(a, b);
+    link(a, c);
+    link(b, d);
+    link(c, d);
+    link(d, e);
+    useSelectionStore.getState().replaceSelection([a, d]);
+
+    const { container } = render(<Canvas />);
+
+    fireEvent.click(screen.getByTestId("show-route-selection"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("trace-banner")).toHaveTextContent(/Route between/);
+    });
+    for (const id of [a, b, c, d]) {
+      expect(traceOf(container, id)).toBe("traced");
+    }
+    expect(traceOf(container, e)).toBe("dimmed");
+  });
+
+  test("Show route with no path shows an inline message", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    useSelectionStore.getState().replaceSelection([a, b]);
+
+    render(<Canvas />);
+
+    fireEvent.click(screen.getByTestId("show-route-selection"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("trace-banner")).toHaveAttribute("data-route-empty", "true");
+    });
+    expect(screen.getByTestId("trace-banner")).toHaveTextContent(/No path/);
+  });
+
+  test("Route from here then clicking a target shows the route", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    const c = add(400, 0);
+    link(a, b);
+    link(b, c);
+
+    const { container } = render(<Canvas />);
+
+    fireEvent.contextMenu(nodeEl(container, a), { clientX: 10, clientY: 10 });
+    fireEvent.click(screen.getByTestId("node-context-menu-route-from-here"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("trace-banner")).toHaveTextContent(/Click a node/);
+    });
+
+    fireEvent.click(nodeEl(container, c));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("trace-banner")).toHaveTextContent(/Route between/);
+    });
+    for (const id of [a, b, c]) {
+      expect(traceOf(container, id)).toBe("traced");
+    }
+  });
+
+  test("Escape clears the trace mode", async () => {
+    const { c } = setupChainWithStray();
+    const { container } = render(<Canvas />);
+
+    traceUpstreamFromC(container, c);
+    await waitFor(() => {
+      expect(screen.getByTestId("trace-banner")).toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("trace-banner")).toBeNull();
+    });
+    expect(useTraceStore.getState().mode).toBe("selection-downstream");
+  });
+
+  test("U shortcut traces upstream; ignored inside inputs", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    link(a, b);
+    useSelectionStore.getState().setNodeSelected(b, true);
+
+    const { container } = render(<Canvas />);
+
+    fireEvent.keyDown(document, { key: "u" });
+
+    await waitFor(() => {
+      expect(useTraceStore.getState().mode).toBe("reach");
+    });
+    expect(useTraceStore.getState().direction).toBe("upstream");
+    await waitFor(() => {
+      expect(traceOf(container, a)).toBe("traced");
+    });
+
+    act(() => {
+      useTraceStore.getState().reset();
+    });
+
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    try {
+      fireEvent.keyDown(input, { key: "u" });
+      expect(useTraceStore.getState().mode).toBe("selection-downstream");
+    } finally {
+      input.remove();
+    }
+  });
+
+  test("Lens on ml highlights only ml nodes and never moves nodes", async () => {
+    const mlSpec = catalogNodes.find((n) => n.family === "ml" && n.ports.length > 0);
+    if (!mlSpec) {
+      throw new Error("expected an ml catalog node with ports to exist");
+    }
+    const dataId = add(0, 0);
+    const mlId = useGraphStore.getState().addNodeFromSpec(mlSpec, { x: 300, y: 50 });
+    const before = Object.fromEntries(
+      Object.entries(useGraphStore.getState().nodes).map(([id, n]) => [id, { ...n.position }]),
+    );
+
+    const { container } = render(<Canvas />);
+
+    fireEvent.click(screen.getByTestId("lens-chip-ml"));
+
+    await waitFor(() => {
+      expect(traceOf(container, mlId)).toBe("traced");
+    });
+    expect(traceOf(container, dataId)).toBe("dimmed");
+
+    const after = Object.fromEntries(
+      Object.entries(useGraphStore.getState().nodes).map(([id, n]) => [id, { ...n.position }]),
+    );
+    expect(after).toEqual(before);
+
+    fireEvent.click(screen.getByTestId("lens-chip-ml"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("trace-banner")).toBeNull();
+    });
   });
 });
