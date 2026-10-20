@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { CatalogNode } from "../catalog/types";
 import catalog from "../generated/catalog.json";
+import { useCollapseStore } from "../store/collapseStore";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
@@ -737,10 +738,15 @@ describe("Canvas trace modes (issue #167)", () => {
     const a = add(0, 0);
     const b = add(200, 0);
     link(a, b);
+    render(<Canvas />);
+    // Set the route after mount: Canvas resets the trace on mount (subgraph-navigation effect),
+    // so setting it beforehand would make this test pass without exercising the endpoint check.
     act(() => {
       useTraceStore.getState().setRoute(a, b);
     });
-    render(<Canvas />);
+    await waitFor(() => {
+      expect(screen.getByTestId("trace-banner")).toHaveTextContent(/Route between/);
+    });
 
     act(() => {
       useGraphStore.getState().removeNode(b);
@@ -748,6 +754,35 @@ describe("Canvas trace modes (issue #167)", () => {
     await waitFor(() => {
       expect(useTraceStore.getState().mode).toBe("selection-downstream");
     });
+  });
+
+  test("route through a collapsed group endpoint is still found", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    const c = add(400, 0);
+    const d = add(600, 0);
+    link(a, b);
+    link(b, c);
+    link(c, d);
+    const groupId = useGraphStore.getState().groupSelection([c, d]);
+    if (!groupId) throw new Error("expected groupSelection to create a group");
+    const { container } = render(<Canvas />);
+    act(() => {
+      useTraceStore.getState().setRoute(a, d);
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("trace-banner")).toHaveTextContent(/Route between/);
+    });
+
+    act(() => {
+      useCollapseStore.getState().setCollapsed(groupId, true);
+    });
+
+    await waitFor(() => {
+      expect(traceOf(container, b)).toBe("traced");
+    });
+    expect(screen.getByTestId("trace-banner")).toHaveTextContent(/Route between/);
+    expect(screen.getByTestId("trace-banner")).not.toHaveAttribute("data-route-empty");
   });
 
   test("U shortcut traces upstream; ignored inside inputs", async () => {
@@ -812,5 +847,30 @@ describe("Canvas trace modes (issue #167)", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("trace-banner")).toBeNull();
     });
+  });
+
+  test("an active lens family keeps its chip after its last node is deleted", async () => {
+    const mlSpec = catalogNodes.find((n) => n.family === "ml" && n.ports.length > 0);
+    if (!mlSpec) {
+      throw new Error("expected an ml catalog node with ports to exist");
+    }
+    add(0, 0);
+    const mlId = useGraphStore.getState().addNodeFromSpec(mlSpec, { x: 300, y: 50 });
+    render(<Canvas />);
+
+    fireEvent.click(screen.getByTestId("lens-chip-ml"));
+    await waitFor(() => {
+      expect(screen.getByTestId("trace-banner")).toBeInTheDocument();
+    });
+
+    act(() => {
+      useGraphStore.getState().removeNode(mlId);
+    });
+
+    fireEvent.click(screen.getByTestId("lens-chip-ml"));
+    await waitFor(() => {
+      expect(screen.queryByTestId("trace-banner")).toBeNull();
+    });
+    expect(screen.queryByTestId("lens-chip-ml")).toBeNull();
   });
 });

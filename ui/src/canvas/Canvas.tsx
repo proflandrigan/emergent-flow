@@ -212,10 +212,18 @@ export function Canvas(): JSX.Element {
           // Picking a target: highlight only the origin so the user sees where the route starts.
           return { ...computeReach([routeFrom], nodeIds, [], "downstream"), routeFound: null };
         }
+        // An endpoint hidden inside a collapsed group is represented by the group node, mirroring
+        // how its edges are re-anchored -- otherwise collapsing would read as "No path".
+        const visibleId = (id: string): string => {
+          const groupId = activeNodes[id]?.groupId;
+          return groupId && collapsedGroupIds.has(groupId) ? groupId : id;
+        };
+        const from = visibleId(routeFrom);
+        const to = visibleId(routeTo);
         // Prefer the requested direction; fall back to the reverse so an unordered pair
         // (e.g. a two-node selection) still finds the path whichever way it runs.
-        const forward = computeRoute(routeFrom, routeTo, nodeIds, traceEdges);
-        const route = forward.found ? forward : computeRoute(routeTo, routeFrom, nodeIds, traceEdges);
+        const forward = computeRoute(from, to, nodeIds, traceEdges);
+        const route = forward.found ? forward : computeRoute(to, from, nodeIds, traceEdges);
         return { ...route, routeFound: route.found };
       }
       case "lens": {
@@ -228,7 +236,7 @@ export function Canvas(): JSX.Element {
       default:
         return { ...computeTrace(selectedNodeIds, nodeIds, traceEdges), routeFound: null };
     }
-  }, [traceMode, traceDirection, routeFrom, routeTo, lensFamilies, selectedNodeIds, rawNodes, rawEdges, familyByType, activeNodes]);
+  }, [traceMode, traceDirection, routeFrom, routeTo, lensFamilies, selectedNodeIds, rawNodes, rawEdges, familyByType, activeNodes, collapsedGroupIds]);
 
   const presentFamilies = useMemo(() => {
     const found = new Set<string>();
@@ -236,8 +244,11 @@ export function Canvas(): JSX.Element {
       const family = familyByType[activeNodes[n.id]?.type ?? ""];
       if (family) found.add(family);
     }
+    // Keep active lens families listed even once their last node is gone, so the chip can still
+    // be toggled off instead of leaving the whole canvas dimmed with nothing to click.
+    for (const family of lensFamilies) found.add(family);
     return [...found].sort((a, b) => familyMeta(a).label.localeCompare(familyMeta(b).label));
-  }, [rawNodes, activeNodes, familyByType]);
+  }, [rawNodes, activeNodes, familyByType, lensFamilies]);
 
   const nodeName = useCallback(
     (id: string | null): string => {
