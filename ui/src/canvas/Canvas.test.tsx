@@ -713,6 +713,43 @@ describe("Canvas trace modes (issue #167)", () => {
     expect(useTraceStore.getState().mode).toBe("selection-downstream");
   });
 
+  test("reach mode resets once the selection is cleared", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    link(a, b);
+    useSelectionStore.getState().setNodeSelected(b, true);
+    render(<Canvas />);
+
+    fireEvent.keyDown(document, { key: "u" });
+    await waitFor(() => {
+      expect(useTraceStore.getState().mode).toBe("reach");
+    });
+
+    act(() => {
+      useSelectionStore.getState().clear();
+    });
+    await waitFor(() => {
+      expect(useTraceStore.getState().mode).toBe("selection-downstream");
+    });
+  });
+
+  test("route resets when an endpoint is deleted", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    link(a, b);
+    act(() => {
+      useTraceStore.getState().setRoute(a, b);
+    });
+    render(<Canvas />);
+
+    act(() => {
+      useGraphStore.getState().removeNode(b);
+    });
+    await waitFor(() => {
+      expect(useTraceStore.getState().mode).toBe("selection-downstream");
+    });
+  });
+
   test("U shortcut traces upstream; ignored inside inputs", async () => {
     const a = add(0, 0);
     const b = add(200, 0);

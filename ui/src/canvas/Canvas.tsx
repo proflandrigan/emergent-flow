@@ -71,6 +71,18 @@ import { useSubgraphStore, currentSubgraph } from "../store/subgraphStore";
 const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode, compositeNode: CompositeNode, snapshotNode: SnapshotNode, calloutNode: CalloutNode, resultCardNode: ResultCardNode };
 const edgeTypes: EdgeTypes = { efEdge: EfEdge };
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  return (
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT" ||
+    target.isContentEditable
+  );
+}
+
 export function Canvas(): JSX.Element {
   useLiveValidation();
   const catalog = useCatalog();
@@ -466,13 +478,7 @@ export function Canvas(): JSX.Element {
     if (traceMode === "selection-downstream") return undefined;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
-      const t = e.target;
-      if (
-        t instanceof HTMLElement &&
-        (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)
-      ) {
-        return;
-      }
+      if (isEditableTarget(e.target)) return;
       resetTrace();
     }
     document.addEventListener("keydown", onKeyDown);
@@ -484,13 +490,7 @@ export function Canvas(): JSX.Element {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const t = e.target;
-      if (
-        t instanceof HTMLElement &&
-        (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)
-      ) {
-        return;
-      }
+      if (isEditableTarget(e.target)) return;
       const key = e.key.toLowerCase();
       if (key === "u" && selectedNodeIds.length > 0) {
         setReach("upstream");
@@ -505,6 +505,18 @@ export function Canvas(): JSX.Element {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [selectedNodeIds, setReach, startRoutePick, setRoute]);
+
+  // Reach roots are the selection: once it is cleared, drop the sticky mode so the next click
+  // goes back to the default downstream trace instead of silently tracing upstream.
+  useEffect(() => {
+    if (traceMode === "reach" && selectedNodeIds.length === 0) resetTrace();
+  }, [traceMode, selectedNodeIds, resetTrace]);
+
+  // A route endpoint deleted while the route is shown would otherwise read "No path" for a ghost id.
+  useEffect(() => {
+    if (traceMode !== "route") return;
+    if ((routeFrom && !activeNodes[routeFrom]) || (routeTo && !activeNodes[routeTo])) resetTrace();
+  }, [traceMode, routeFrom, routeTo, activeNodes, resetTrace]);
 
   // Node ids from the previous view must not keep highlighting after subgraph navigation.
   useEffect(() => {
@@ -527,22 +539,11 @@ export function Canvas(): JSX.Element {
       }
       return null;
     }
-    if (traceMode === "lens") return `Lens: ${lensFamilies.join(", ")}`;
+    if (traceMode === "lens") return `Lens: ${lensFamilies.map((f) => familyMeta(f).label).join(", ")}`;
     return null;
   }, [traceMode, trace, traceDirection, routePicking, routeFrom, routeTo, lensFamilies, nodeName]);
 
   useEffect(() => {
-    function isEditableTarget(target: EventTarget | null): boolean {
-      if (!(target instanceof HTMLElement)) {
-        return false;
-      }
-      return (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      );
-    }
-
     function onKeyDown(e: KeyboardEvent) {
       if (isEditableTarget(e.target)) {
         return;
