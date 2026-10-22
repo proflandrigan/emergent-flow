@@ -25,7 +25,7 @@ import {
   useSessionAutoSave,
 } from "./io/sessionRecovery";
 import { Palette } from "./palette/Palette";
-import { isEmptyViewState, parseViewHash } from "./io/viewLink";
+import { isEmptyViewState, parseViewHash, withSessionParam } from "./io/viewLink";
 import { useGraphStore } from "./store/graphStore";
 import { useViewLinkStore } from "./store/viewLinkStore";
 import { ProposalPanel } from "./session/ProposalPanel";
@@ -87,6 +87,19 @@ function Divider(): JSX.Element {
       }}
     />
   );
+}
+
+// True when `linkSearch` names the active session and otherwise matches `pageSearch`
+// (order-insensitive), i.e. following it would only add/replace ?session= with the one joined.
+function differsOnlyByActiveSession(linkSearch: string, pageSearch: string): boolean {
+  const active = useSessionStore.getState().sessionId;
+  if (!active || new URLSearchParams(linkSearch).get("session") !== active) return false;
+  const normalize = (search: string) => {
+    const params = new URLSearchParams(withSessionParam(search, null));
+    params.sort();
+    return params.toString();
+  };
+  return normalize(linkSearch) === normalize(pageSearch);
 }
 
 export function App(): JSX.Element {
@@ -260,6 +273,9 @@ export function App(): JSX.Element {
   // Deep links clicked inside the app (chat, reviews) change only the hash -- re-apply it (issue #168).
   // The hash stays in the URL so Back/Forward re-fire hashchange between views. Browsers don't fire
   // hashchange for a link to the CURRENT hash, so a delegated click listener re-applies that case.
+  // An agent's view_url always carries ?session=<id>, but joining in-app (Start chat) leaves the
+  // address bar without it -- the browser would treat that link as a full reload, so a link that
+  // differs only by the ACTIVE session param is pushed onto history and applied in place.
   useEffect(() => {
     function onHashChange() {
       useViewLinkStore.getState().request(parseViewHash(window.location.hash));
@@ -270,18 +286,27 @@ export function App(): JSX.Element {
       const anchor = e.target instanceof Element ? e.target.closest("a[href]") : null;
       if (!(anchor instanceof HTMLAnchorElement)) return;
       if (anchor.target && anchor.target !== "_self") return; // opens elsewhere, not this view
+      if (anchor.hasAttribute("download")) return; // a download, not a navigation
       const here = window.location;
-      // A different hash navigates and fires hashchange -- leave it to onHashChange (no double apply).
-      if (!anchor.hash || anchor.hash !== here.hash) return;
-      if (
-        anchor.origin !== here.origin ||
-        anchor.pathname !== here.pathname ||
-        anchor.search !== here.search
-      ) {
+      if (!anchor.hash || anchor.origin !== here.origin || anchor.pathname !== here.pathname) return;
+      const view = parseViewHash(anchor.hash);
+      if (isEmptyViewState(view)) return;
+      if (anchor.search === here.search) {
+        // A different hash navigates and fires hashchange -- leave it to onHashChange (no double apply).
+        if (anchor.hash === here.hash) useViewLinkStore.getState().request(view);
         return;
       }
-      const view = parseViewHash(anchor.hash);
-      if (!isEmptyViewState(view)) useViewLinkStore.getState().request(view);
+      // A link to another session (or any other query change) keeps normal browser navigation.
+      if (!differsOnlyByActiveSession(anchor.search, here.search)) return;
+      e.preventDefault();
+      // The address bar now carries ?session= (refresh rejoins, Back returns); pushState fires no
+      // hashchange, so apply the view directly.
+      window.history.pushState(
+        window.history.state,
+        "",
+        anchor.pathname + anchor.search + anchor.hash,
+      );
+      useViewLinkStore.getState().request(view);
     }
     window.addEventListener("hashchange", onHashChange);
     document.addEventListener("click", onClick);

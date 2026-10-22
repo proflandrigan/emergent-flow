@@ -363,6 +363,66 @@ test("Back re-applies the previous deep-link view", async () => {
   );
 });
 
+test("a view_url for the active session is applied in place after an in-app join", async () => {
+  mockHealth("ok");
+  render(<App />);
+  // Start chat -> createAndJoin(): the session is joined but the address bar has no ?session=.
+  await useSessionStore.getState().createAndJoin();
+  expect(window.location.search).toBe("");
+  const request = vi.spyOn(useViewLinkStore.getState(), "request");
+
+  // The shape build_view_url emits: <base>/?session=<id>#focus=...
+  const a = document.createElement("a");
+  a.href = `${window.location.origin}/?session=app-test-session#focus=n1`;
+  document.body.appendChild(a);
+  const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+  a.dispatchEvent(click);
+  a.remove();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(click.defaultPrevented).toBe(true); // no full-page navigation
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(request.mock.calls[0][0].focus).toEqual(["n1"]);
+  expect(window.location.search).toBe("?session=app-test-session");
+  expect(window.location.hash).toBe("#focus=n1");
+
+  // Back returns to the pre-push entry (no hash): an empty view, which request() ignores.
+  window.history.back();
+  await waitFor(() => expect(window.location.search).toBe(""));
+  expect(useSessionStore.getState().sessionId).toBe("app-test-session");
+  request.mockRestore();
+});
+
+test("a view_url for a different session keeps normal navigation", async () => {
+  mockHealth("ok");
+  render(<App />);
+  await useSessionStore.getState().createAndJoin();
+  const request = vi.spyOn(useViewLinkStore.getState(), "request");
+
+  const a = document.createElement("a");
+  a.href = `${window.location.origin}/?session=other-session#focus=n1`;
+  document.body.appendChild(a);
+  const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+  // Runs after App's listener: record whether App cancelled it, then cancel so jsdom doesn't
+  // attempt (and log) the cross-document navigation a browser would perform.
+  let preventedByApp: boolean | null = null;
+  document.addEventListener(
+    "click",
+    (e) => {
+      preventedByApp = e.defaultPrevented;
+      e.preventDefault();
+    },
+    { once: true },
+  );
+  a.dispatchEvent(click);
+  a.remove();
+
+  expect(preventedByApp).toBe(false);
+  expect(request).not.toHaveBeenCalled();
+  expect(window.location.search).toBe("");
+  request.mockRestore();
+});
+
 test("bad keys never throw", () => {
   mockHealth("ok");
   window.history.replaceState(null, "", "/#nonsense=1&focus=%E0%A4%A");
