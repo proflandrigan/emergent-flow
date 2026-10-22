@@ -202,22 +202,28 @@ export function Canvas(): JSX.Element {
     [selNodes],
   );
 
+  // A node hidden inside a collapsed group is represented by the group node, mirroring how its
+  // edges are re-anchored -- otherwise a trace rooted at it would read as "No path" / all-dimmed.
+  const visibleId = useCallback(
+    (id: string): string => {
+      const groupId = activeNodes[id]?.groupId;
+      return groupId && collapsedGroupIds.has(groupId) ? groupId : id;
+    },
+    [activeNodes, collapsedGroupIds],
+  );
+
   const trace = useMemo((): TraceResult & { routeFound: boolean | null } => {
     const nodeIds = rawNodes.map((n) => n.id);
     const traceEdges = rawEdges.map((e) => ({ id: e.id, source: e.source, target: e.target }));
     switch (traceMode) {
-      case "reach":
-        return { ...computeReach(selectedNodeIds, nodeIds, traceEdges, traceDirection), routeFound: null };
+      case "reach": {
+        const roots = [...new Set(selectedNodeIds.map(visibleId))];
+        return { ...computeReach(roots, nodeIds, traceEdges, traceDirection), routeFound: null };
+      }
       case "route": {
         if (!routeFrom) {
           return { ...computeTrace(selectedNodeIds, nodeIds, traceEdges), routeFound: null };
         }
-        // An endpoint hidden inside a collapsed group is represented by the group node, mirroring
-        // how its edges are re-anchored -- otherwise collapsing would read as "No path".
-        const visibleId = (id: string): string => {
-          const groupId = activeNodes[id]?.groupId;
-          return groupId && collapsedGroupIds.has(groupId) ? groupId : id;
-        };
         if (!routeTo) {
           // Picking a target: highlight only the origin so the user sees where the route starts.
           return { ...computeReach([visibleId(routeFrom)], nodeIds, [], "downstream"), routeFound: null };
@@ -240,7 +246,7 @@ export function Canvas(): JSX.Element {
       default:
         return { ...computeTrace(selectedNodeIds, nodeIds, traceEdges), routeFound: null };
     }
-  }, [traceMode, traceDirection, routeFrom, routeTo, lensFamilies, selectedNodeIds, rawNodes, rawEdges, familyByType, activeNodes, collapsedGroupIds]);
+  }, [traceMode, traceDirection, routeFrom, routeTo, lensFamilies, selectedNodeIds, rawNodes, rawEdges, familyByType, activeNodes, visibleId]);
 
   const presentFamilies = useMemo(() => {
     const found = new Set<string>();
@@ -575,7 +581,9 @@ export function Canvas(): JSX.Element {
       missing.push(`node "${id}"`);
       return false;
     };
-    const focus = pendingView.focus.filter(knownNode);
+    // Collapse state is per viewer, so a linked node may be hidden in a collapsed group here:
+    // select/trace/centre on the group node that stands in for it (as route mode does).
+    const focus = [...new Set(pendingView.focus.filter(knownNode).map(visibleId))];
     const edge = pendingView.edge && edges[pendingView.edge] ? edges[pendingView.edge] : null;
     if (pendingView.edge && !edge) missing.push(`edge "${pendingView.edge}"`);
     if (focus.length > 0 || edge) replaceSelection(focus, edge ? [edge.id] : undefined);
@@ -606,7 +614,7 @@ export function Canvas(): JSX.Element {
         ...focus,
         ...(route && routeOk ? [route.from, route.to] : []),
         ...(edge ? [edge.source.node_id, edge.target.node_id] : []),
-      ]),
+      ].map(visibleId)),
     ].filter((id) => nodes[id]);
     if (targetIds.length === 1) navigateToNode(targetIds[0]);
     else if (targetIds.length > 1) fitToNodes(targetIds);
@@ -618,6 +626,7 @@ export function Canvas(): JSX.Element {
     nodes,
     edges,
     catalog,
+    visibleId,
     replaceSelection,
     resetTrace,
     setReach,
@@ -627,7 +636,10 @@ export function Canvas(): JSX.Element {
     fitToNodes,
   ]);
 
+  // Link ids resolve against the top-level graph only, so a subgraph-local id would be a dead
+  // link: no "Copy link" (banner or context menu) while browsing a composite.
   const traceLink = useMemo((): Partial<ViewState> | null => {
+    if (isInSubgraph) return null;
     if (traceMode === "reach" && selectedNodeIds.length > 0) {
       return { focus: selectedNodeIds, reach: traceDirection };
     }
@@ -636,7 +648,7 @@ export function Canvas(): JSX.Element {
     }
     if (traceMode === "lens" && lensFamilies.length > 0) return { lens: lensFamilies };
     return null;
-  }, [traceMode, selectedNodeIds, traceDirection, routeFrom, routeTo, routePicking, lensFamilies]);
+  }, [isInSubgraph, traceMode, selectedNodeIds, traceDirection, routeFrom, routeTo, routePicking, lensFamilies]);
 
   const traceBanner = useMemo((): string | null => {
     if (traceMode === "reach") {
@@ -840,7 +852,9 @@ export function Canvas(): JSX.Element {
             setReach("both");
           }}
           onRouteFromHere={() => startRoutePick(contextMenu.nodeId)}
-          onCopyLink={() => void copyViewLink({ focus: [contextMenu.nodeId] })}
+          onCopyLink={
+            isInSubgraph ? undefined : () => void copyViewLink({ focus: [contextMenu.nodeId] })
+          }
           onNodeInfo={() => setInfoNodeId(contextMenu.nodeId)}
           onClose={closeContextMenu}
         />

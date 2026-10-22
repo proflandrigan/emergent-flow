@@ -820,6 +820,27 @@ describe("Canvas trace modes (issue #167)", () => {
     expect(traceOf(container, a)).toBe("dimmed");
   });
 
+  test("reach from a node hidden by a collapsed group traces from the group", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    const c = add(400, 0);
+    link(a, b);
+    link(b, c);
+    const groupId = useGraphStore.getState().groupSelection([b, c]);
+    if (!groupId) throw new Error("expected groupSelection to create a group");
+    useCollapseStore.getState().setCollapsed(groupId, true);
+    const { container } = render(<Canvas />);
+    // Set reach after mount: Canvas resets the trace on mount (subgraph-navigation effect).
+    act(() => {
+      useSelectionStore.getState().replaceSelection([c]);
+      useTraceStore.getState().setReach("upstream");
+    });
+
+    await waitFor(() => expect(traceOf(container, a)).toBe("traced"));
+    expect(nodeEl(container, groupId)).toHaveClass("ef-trace-traced");
+    useCollapseStore.getState().setCollapsed(groupId, false);
+  });
+
   test("U shortcut traces upstream; ignored inside inputs", async () => {
     const a = add(0, 0);
     const b = add(200, 0);
@@ -998,6 +1019,72 @@ describe("Canvas deep links (issue #168)", () => {
 
     await waitFor(() => expect(useSelectionStore.getState().nodes[a]).toBe(true));
     expect(useViewLinkStore.getState().pendingCanvas).toBeNull();
+  });
+
+  test("focus + reach on a node hidden by a collapsed group selects and traces the group", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    const c = add(400, 0);
+    link(a, b);
+    link(b, c);
+    const groupId = useGraphStore.getState().groupSelection([b, c]);
+    if (!groupId) throw new Error("expected groupSelection to create a group");
+    useCollapseStore.getState().setCollapsed(groupId, true);
+    const { container } = render(<Canvas />);
+
+    act(() => useViewLinkStore.getState().request(parseViewHash(`#focus=${c}&reach=up`)));
+
+    await waitFor(() => expect(traceOf(container, a)).toBe("traced"));
+    expect(container.querySelector(`.react-flow__node[data-id="${groupId}"]`)).toHaveClass(
+      "ef-trace-traced",
+    );
+    expect(useSelectionStore.getState().nodes[groupId]).toBe(true);
+    expect(useSelectionStore.getState().nodes[c]).toBeFalsy();
+    expect(useViewLinkStore.getState().notice).toBeNull();
+    useCollapseStore.getState().setCollapsed(groupId, false);
+  });
+
+  test("no Copy link (context menu or trace banner) inside a composite subgraph", async () => {
+    useGraphStore.getState().loadModel({
+      paradigm: "functional",
+      nodes: {
+        comp1: {
+          id: "comp1",
+          type: "layout.composite",
+          label: "Nested",
+          paradigm: "functional",
+          params: [{ name: "label", typeToken: "str", value: "Nested", default: "Composite" }],
+          ports: [],
+          position: { x: 0, y: 0 },
+          groupId: null,
+          subgraph: {
+            paradigm: "functional",
+            nodes: {
+              n1: { id: "n1", type: "data.load_csv", label: null, paradigm: "functional", position: { x: 0, y: 0 }, params: [], ports: [], group_id: null },
+            },
+            edges: {},
+          },
+        },
+      },
+      edges: {},
+    });
+    const { container } = render(<Canvas />);
+    fireEvent.dblClick(container.querySelector('[data-testid="composite-node"]')!);
+    await waitFor(() => expect(useSubgraphStore.getState().breadcrumbs).toHaveLength(1));
+    const n1 = await waitFor(() => {
+      const el = container.querySelector('.react-flow__node[data-id="n1"]');
+      if (!el) throw new Error("n1 not rendered");
+      return el;
+    });
+
+    // Subgraph-local ids never resolve from a link (it is applied against the top-level graph).
+    fireEvent.contextMenu(n1, { clientX: 10, clientY: 10 });
+    expect(screen.getByTestId("node-context-menu-trace-upstream")).toBeInTheDocument();
+    expect(screen.queryByTestId("node-context-menu-copy-link")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("node-context-menu-trace-upstream"));
+    await waitFor(() => expect(screen.getByTestId("trace-banner")).toBeInTheDocument());
+    expect(screen.queryByTestId("trace-banner-copy-link")).toBeNull();
   });
 
   test("Copy link in the trace banner copies the reach view", async () => {

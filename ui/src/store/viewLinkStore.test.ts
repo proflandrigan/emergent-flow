@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { parseViewHash } from "../io/viewLink";
+import { useSessionStore } from "../session/sessionStore";
 import { copyViewLink, useViewLinkStore } from "./viewLinkStore";
 
 beforeEach(() => {
@@ -15,6 +16,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  useSessionStore.setState({ sessionId: null });
+  window.history.replaceState(null, "", "/");
 });
 
 describe("request", () => {
@@ -77,6 +80,30 @@ describe("copyViewLink", () => {
     const s = useViewLinkStore.getState();
     expect(s.fallbackUrl).toBe(url);
     expect(s.notice).toBeNull();
+  });
+
+  test("uses the active session even when the URL has no ?session=", async () => {
+    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    window.history.replaceState(null, "", "/");
+    useSessionStore.setState({ sessionId: "sess-B" });
+    const url = await copyViewLink({ proposal: "p1" });
+    expect(new URL(url).searchParams.get("session")).toBe("sess-B");
+  });
+
+  test("replaces a stale ?session= with the active one, keeping other params", async () => {
+    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    window.history.replaceState(null, "", "/?x=1&session=sess-A");
+    useSessionStore.setState({ sessionId: "sess-B" });
+    const url = new URL(await copyViewLink({ proposal: "p1" }));
+    expect(url.searchParams.get("session")).toBe("sess-B");
+    expect(url.searchParams.get("x")).toBe("1");
+  });
+
+  test("omits ?session= when no session is active", async () => {
+    vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    window.history.replaceState(null, "", "/?session=sess-A");
+    const url = await copyViewLink({ focus: ["n1"] });
+    expect(new URL(url).search).toBe("");
   });
 
   test("falls back when the Clipboard API is missing", async () => {

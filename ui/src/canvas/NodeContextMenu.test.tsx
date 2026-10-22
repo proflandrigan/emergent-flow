@@ -124,6 +124,15 @@ describe("NodeContextMenu", () => {
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 
+  test("omits Copy link to node when onCopyLink is not provided", () => {
+    const props = { ...defaultProps(), onCopyLink: undefined };
+
+    render(<NodeContextMenu x={0} y={0} {...props} />);
+
+    expect(screen.queryByTestId("node-context-menu-copy-link")).toBeNull();
+    expect(screen.getByTestId("node-context-menu-node-info")).toBeInTheDocument();
+  });
+
   test("renders the Node info item", () => {
     render(
       <NodeContextMenu

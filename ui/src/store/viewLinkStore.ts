@@ -5,6 +5,7 @@
 import { create } from "zustand";
 
 import { buildViewUrl, isEmptyViewState, type ViewState } from "../io/viewLink";
+import { useSessionStore } from "../session/sessionStore";
 
 /** The canvas half of a view link: what Canvas applies once React Flow is ready. */
 export type CanvasViewRequest = Pick<ViewState, "focus" | "reach" | "route" | "lens" | "edge">;
@@ -87,12 +88,12 @@ export const useViewLinkStore = create<ViewLinkStore>((set) => ({
 }));
 
 /**
- * Copy a link to `state` (the current origin/path/?session= plus the view hash). Falls back to
- * showing the URL in a select-all box when the Clipboard API is missing or denied.
- * Resolves to the URL.
+ * Copy a link to `state` (the current origin/path, ?session= of the ACTIVE session -- not the
+ * possibly stale one in the address bar -- plus the view hash). Falls back to showing the URL in
+ * a select-all box when the Clipboard API is missing or denied. Resolves to the URL.
  */
 export async function copyViewLink(state: Partial<ViewState>): Promise<string> {
-  const url = buildViewUrl(state);
+  const url = buildViewUrl(state, window.location, useSessionStore.getState().sessionId);
   try {
     if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
     await navigator.clipboard.writeText(url);

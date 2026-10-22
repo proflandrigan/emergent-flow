@@ -6,6 +6,7 @@ import {
   isEmptyViewState,
   parseViewHash,
   type ViewState,
+  withSessionParam,
 } from "./viewLink";
 
 describe("parseViewHash", () => {
@@ -85,6 +86,25 @@ describe("buildViewUrl", () => {
         { origin: "http://127.0.0.1:8765", pathname: "/", search: "?session=s1" },
       ),
     ).toBe("http://127.0.0.1:8765/?session=s1#focus=n1");
+  });
+
+  test("an explicit sessionId replaces a stale ?session= and keeps other params", () => {
+    const loc = { origin: "http://127.0.0.1:8765", pathname: "/", search: "?a=1&session=old" };
+    expect(buildViewUrl({ proposal: "p1" }, loc, "new")).toBe(
+      "http://127.0.0.1:8765/?a=1&session=new#proposal=p1",
+    );
+    expect(buildViewUrl({ proposal: "p1" }, loc, null)).toBe(
+      "http://127.0.0.1:8765/?a=1#proposal=p1",
+    );
+  });
+});
+
+describe("withSessionParam", () => {
+  test("adds, replaces, encodes and removes the session param", () => {
+    expect(withSessionParam("", "s1")).toBe("?session=s1");
+    expect(withSessionParam("?session=a", "b c")).toBe("?session=b+c");
+    expect(withSessionParam("?session=a", null)).toBe("");
+    expect(withSessionParam("?x=1", null)).toBe("?x=1");
   });
 });
 

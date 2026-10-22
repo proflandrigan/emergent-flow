@@ -17,7 +17,8 @@ export interface NodeContextMenuProps {
   onTraceDownstream: () => void;
   onTraceBoth: () => void;
   onRouteFromHere: () => void;
-  onCopyLink: () => void;
+  /** Omitted when no resolvable link exists (inside a composite's subgraph): hides the item. */
+  onCopyLink?: () => void;
   onNodeInfo: () => void;
   onClose: () => void;
 }
@@ -99,14 +100,18 @@ export function NodeContextMenu({
               onClose();
             },
           },
-          {
-            label: "Copy link to node",
-            testId: "node-context-menu-copy-link",
-            onSelect: () => {
-              onCopyLink();
-              onClose();
-            },
-          },
+          ...(onCopyLink
+            ? [
+                {
+                  label: "Copy link to node",
+                  testId: "node-context-menu-copy-link",
+                  onSelect: () => {
+                    onCopyLink();
+                    onClose();
+                  },
+                },
+              ]
+            : []),
           {
             label: "Node info",
             testId: "node-context-menu-node-info",

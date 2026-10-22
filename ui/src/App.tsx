@@ -77,6 +77,19 @@ function clampInspectorWidth(width: number): number {
   );
 }
 
+/**
+ * Drop a consumed #view hash from the address bar (keeping path + ?session=) so re-clicking the
+ * same deep link fires hashchange again. replaceState never fires hashchange, so no re-apply loop.
+ */
+function clearViewHash(): void {
+  if (!window.location.hash) return;
+  window.history.replaceState(
+    window.history.state,
+    "",
+    window.location.pathname + window.location.search,
+  );
+}
+
 function Divider(): JSX.Element {
   return (
     <div
@@ -234,6 +247,7 @@ export function App(): JSX.Element {
     startDirtyTracking();
     useFlowStore.getState().fetchExamples();
     const view = parseViewHash(window.location.hash);
+    clearViewHash();
     const urlSession = new URLSearchParams(window.location.search).get("session");
     if (urlSession) {
       // Apply the #view only once join() has loaded the session graph (issue #168).
@@ -258,9 +272,12 @@ export function App(): JSX.Element {
   }, []);
 
   // Deep links clicked inside the app (chat, reviews) change only the hash -- re-apply it (issue #168).
+  // The hash is cleared once read so clicking the same link again changes the URL and re-fires.
   useEffect(() => {
     function onHashChange() {
-      useViewLinkStore.getState().request(parseViewHash(window.location.hash));
+      const view = parseViewHash(window.location.hash);
+      clearViewHash();
+      useViewLinkStore.getState().request(view);
     }
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);

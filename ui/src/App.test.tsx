@@ -253,6 +253,9 @@ test("applies #focus after joining ?session=", async () => {
   await waitFor(() =>
     expect(useViewLinkStore.getState().notice ?? "").toMatch(/node "n1"/),
   );
+  // The consumed hash is cleared, but ?session= stays so a refresh rejoins.
+  expect(window.location.hash).toBe("");
+  expect(window.location.search).toBe("?session=s1");
 });
 
 test("#proposal opens the proposals panel highlighted", async () => {
@@ -286,6 +289,24 @@ test("hashchange re-applies the view", async () => {
   window.history.replaceState(null, "", "/#review=r9");
   window.dispatchEvent(new HashChangeEvent("hashchange"));
 
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r9"/),
+  );
+});
+
+test("clicking the same deep link twice re-applies it", async () => {
+  mockHealth("ok");
+  render(<App />);
+
+  window.location.hash = "#review=r9";
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r9"/),
+  );
+  expect(window.location.hash).toBe("");
+
+  // Navigating to the identical fragment only fires hashchange if the first one was cleared.
+  useViewLinkStore.getState().setNotice(null);
+  window.location.hash = "#review=r9";
   await waitFor(() =>
     expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r9"/),
   );

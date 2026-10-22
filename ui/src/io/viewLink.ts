@@ -152,9 +152,28 @@ export function formatViewHash(state: Partial<ViewState>): string {
   return parts.length > 0 ? `#${parts.join("&")}` : "";
 }
 
+/**
+ * Rewrite `search`'s `session` param to `sessionId` (removing it when null), keeping every other
+ * query param. The URL's own ?session= can be stale or missing after an in-app join/switch.
+ */
+export function withSessionParam(search: string, sessionId: string | null): string {
+  const params = new URLSearchParams(search);
+  if (sessionId) params.set("session", sessionId);
+  else params.delete("session");
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+/**
+ * Build a shareable URL for `state`. When `sessionId` is given (string or null) it replaces any
+ * ?session= in `location.search`; when omitted the search is kept verbatim.
+ */
 export function buildViewUrl(
   state: Partial<ViewState>,
   location: { origin: string; pathname: string; search: string } = window.location,
+  sessionId?: string | null,
 ): string {
-  return `${location.origin}${location.pathname}${location.search}${formatViewHash(state)}`;
+  const search =
+    sessionId === undefined ? location.search : withSessionParam(location.search, sessionId);
+  return `${location.origin}${location.pathname}${search}${formatViewHash(state)}`;
 }
