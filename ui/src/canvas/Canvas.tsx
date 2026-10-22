@@ -27,7 +27,7 @@ import type { NodeModel } from "../store/model";
 import { useCollapseStore } from "../store/collapseStore";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
-import { useSelectionStore } from "../store/selectionStore";
+import { useSelectionStore, type SelectionStore } from "../store/selectionStore";
 import { useTraceStore } from "../store/traceStore";
 import { familyMeta } from "../theme/family";
 import { useLiveValidation } from "../store/useLiveValidation";
@@ -360,19 +360,23 @@ export function Canvas(): JSX.Element {
   // Read through a ref so onSelectionChange keeps a stable identity (React Flow re-syncs on change).
   const selectionEchoRef = useRef({ visibleId, rawEdges });
   selectionEchoRef.current = { visibleId, rawEdges };
+  // Armed by the deep-link effect with the selection it set when that selection includes a node
+  // hidden in a collapsed group; any other selection change replaces the store objects, disarming it.
+  const deepLinkEchoRef = useRef<Pick<SelectionStore, "nodes" | "edges"> | null>(null);
   const onSelectionChange = useCallback(
     (params: { nodes: Node[]; edges: Edge[] }) => {
       const nodeIds = params.nodes.map((n) => n.id);
       const edgeIds = params.edges.map((e) => e.id);
-      // A selected node hidden in a collapsed group (e.g. from a deep link) isn't a React Flow node,
-      // so React Flow echoes our own selection back without it. Ignore that echo rather than drop
-      // the hidden id; a real user selection differs from what is rendered and still replaces it.
-      const { visibleId, rawEdges } = selectionEchoRef.current;
+      // A hidden node selected by a deep link isn't a React Flow node, so React Flow echoes that
+      // selection back without it. Ignore that one echo rather than drop the hidden id; every other
+      // report (a real user selection, or collapsing a group around the selection) replaces it.
+      const armed = deepLinkEchoRef.current;
+      deepLinkEchoRef.current = null;
       const sel = useSelectionStore.getState();
-      const selected = Object.keys(sel.nodes).filter((id) => sel.nodes[id]);
-      if (selected.some((id) => visibleId(id) !== id)) {
+      if (armed && armed.nodes === sel.nodes && armed.edges === sel.edges) {
+        const { visibleId, rawEdges } = selectionEchoRef.current;
         const renderedEdges = new Set(rawEdges.map((e) => e.id));
-        const shownNodes = selected.filter((id) => visibleId(id) === id);
+        const shownNodes = Object.keys(sel.nodes).filter((id) => sel.nodes[id] && visibleId(id) === id);
         const shownEdges = Object.keys(sel.edges).filter((id) => sel.edges[id] && renderedEdges.has(id));
         const same = (a: string[], b: string[]) =>
           a.length === b.length && a.every((id) => b.includes(id));
@@ -382,6 +386,15 @@ export function Canvas(): JSX.Element {
     },
     [replaceSelection],
   );
+
+  // React Flow reports no change when a pane click deselects only nodes it doesn't render (hidden
+  // in a collapsed group), so clear such a selection here.
+  const onPaneClick = useCallback(() => {
+    deepLinkEchoRef.current = null;
+    const { visibleId } = selectionEchoRef.current;
+    const { nodes: sel } = useSelectionStore.getState();
+    if (Object.keys(sel).some((id) => sel[id] && visibleId(id) !== id)) clearSelection();
+  }, [clearSelection]);
 
   const onConnect = useCallback(
     (c: Connection) => {
@@ -603,7 +616,13 @@ export function Canvas(): JSX.Element {
     const focus = [...new Set(pendingView.focus.filter(knownNode))];
     const edge = pendingView.edge && edges[pendingView.edge] ? edges[pendingView.edge] : null;
     if (pendingView.edge && !edge) missing.push(`edge "${pendingView.edge}"`);
-    if (focus.length > 0 || edge) replaceSelection(focus, edge ? [edge.id] : undefined);
+    if (focus.length > 0 || edge) {
+      replaceSelection(focus, edge ? [edge.id] : undefined);
+      const { nodes: selNow, edges: selEdgesNow } = useSelectionStore.getState();
+      deepLinkEchoRef.current = focus.some((id) => visibleId(id) !== id)
+        ? { nodes: selNow, edges: selEdgesNow }
+        : null;
+    }
     resetTrace();
     const route = pendingView.route;
     // Check BOTH ends (no short-circuit) so both missing ids are reported.
@@ -761,6 +780,7 @@ export function Canvas(): JSX.Element {
         onNodeDragStop={onNodeDragStop}
         onEdgesChange={onEdgesChange}
         onSelectionChange={onSelectionChange}
+        onPaneClick={onPaneClick}
         onConnect={onConnect}
         onNodeDoubleClick={handleNodeDoubleClick}
         onNodeContextMenu={onNodeContextMenu}

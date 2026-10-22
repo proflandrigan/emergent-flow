@@ -1107,6 +1107,55 @@ describe("Canvas deep links (issue #168)", () => {
     expect(traceOf(container, c)).toBe("traced");
   });
 
+  test("collapsing a group around the selected member clears the selection", async () => {
+    add(0, 0);
+    const b = add(200, 0);
+    const c = add(400, 0);
+    const groupId = useGraphStore.getState().groupSelection([b, c]);
+    if (!groupId) throw new Error("expected groupSelection to create a group");
+    useSelectionStore.getState().clear();
+    const { container } = render(<Canvas />);
+    const cEl = await waitFor(() => {
+      const el = container.querySelector(`.react-flow__node[data-id="${c}"]`);
+      if (!el) throw new Error("expected member to render");
+      return el;
+    });
+    act(() => useSelectionStore.getState().replaceSelection([c]));
+    await waitFor(() => expect(cEl).toHaveClass("selected"));
+
+    // Outside a deep link, React Flow's empty report on collapse is authoritative.
+    fireEvent.click(
+      container.querySelector(
+        `.react-flow__node[data-id="${groupId}"] [data-testid="group-node-collapse-toggle"]`,
+      ) as HTMLElement,
+    );
+    await waitFor(() =>
+      expect(container.querySelector(`.react-flow__node[data-id="${c}"]`)).toBeNull(),
+    );
+    await waitFor(() => expect(useSelectionStore.getState().nodes[c]).toBeFalsy());
+    useCollapseStore.getState().setCollapsed(groupId, false);
+  });
+
+  test("a pane click clears a hidden-member selection from a deep link", async () => {
+    add(0, 0);
+    const b = add(200, 0);
+    const c = add(400, 0);
+    const groupId = useGraphStore.getState().groupSelection([b, c]);
+    if (!groupId) throw new Error("expected groupSelection to create a group");
+    useSelectionStore.getState().clear();
+    useCollapseStore.getState().setCollapsed(groupId, true);
+    const { container } = render(<Canvas />);
+    act(() => useViewLinkStore.getState().request(parseViewHash(`#focus=${c}`)));
+    await waitFor(() => expect(useSelectionStore.getState().nodes[c]).toBe(true));
+
+    // React Flow sees nothing selected, so it reports no change; the canvas clears it itself.
+    fireEvent.click(container.querySelector(".react-flow__pane") as HTMLElement);
+    await waitFor(() =>
+      expect(Object.values(useSelectionStore.getState().nodes).some(Boolean)).toBe(false),
+    );
+    useCollapseStore.getState().setCollapsed(groupId, false);
+  });
+
   test("no Copy link (context menu or trace banner) inside a composite subgraph", async () => {
     useGraphStore.getState().loadModel({
       paradigm: "functional",
