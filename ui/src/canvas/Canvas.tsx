@@ -28,8 +28,11 @@ import { useCollapseStore } from "../store/collapseStore";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
+import { useTraceStore } from "../store/traceStore";
+import { familyMeta } from "../theme/family";
 import { useLiveValidation } from "../store/useLiveValidation";
 import { useValidationStore } from "../store/validationStore";
+import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
 import { Tooltip } from "../ui/Tooltip";
 import { runGraph } from "../exec/runGraph";
@@ -43,6 +46,7 @@ import { SnapshotNode } from "./nodes/SnapshotNode";
 import { ResultCardNode } from "./nodes/ResultCardNode";
 import { FindNodeModal } from "./FindNodeModal";
 import { ProblemsPanel } from "./ProblemsPanel";
+import { LensBar } from "./LensBar";
 import { NodeContextMenu } from "./NodeContextMenu";
 import { NodeInfoPanel } from "./NodeInfoPanel";
 import { GraphOverview } from "./GraphOverview";
@@ -58,7 +62,7 @@ import {
   toRFEdge,
   toRFNode,
 } from "./toReactFlow";
-import { computeTrace } from "./trace";
+import { computeLens, computeReach, computeRoute, computeTrace, type TraceResult } from "./trace";
 import type { TraceMode } from "./toReactFlow";
 import "./CanvasTrace.css";
 import { fromIR } from "../store/ir";
@@ -66,6 +70,18 @@ import { useSubgraphStore, currentSubgraph } from "../store/subgraphStore";
 
 const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode, compositeNode: CompositeNode, snapshotNode: SnapshotNode, calloutNode: CalloutNode, resultCardNode: ResultCardNode };
 const edgeTypes: EdgeTypes = { efEdge: EfEdge };
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  return (
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT" ||
+    target.isContentEditable
+  );
+}
 
 export function Canvas(): JSX.Element {
   useLiveValidation();
@@ -92,6 +108,18 @@ export function Canvas(): JSX.Element {
   const setEdgeSelected = useSelectionStore((s) => s.setEdgeSelected);
   const clearSelection = useSelectionStore((s) => s.clear);
   const replaceSelection = useSelectionStore((s) => s.replaceSelection);
+
+  const traceMode = useTraceStore((s) => s.mode);
+  const traceDirection = useTraceStore((s) => s.direction);
+  const routeFrom = useTraceStore((s) => s.routeFrom);
+  const routeTo = useTraceStore((s) => s.routeTo);
+  const routePicking = useTraceStore((s) => s.routePicking);
+  const lensFamilies = useTraceStore((s) => s.families);
+  const toggleFamily = useTraceStore((s) => s.toggleFamily);
+  const setRoute = useTraceStore((s) => s.setRoute);
+  const setReach = useTraceStore((s) => s.setReach);
+  const startRoutePick = useTraceStore((s) => s.startRoutePick);
+  const resetTrace = useTraceStore((s) => s.reset);
 
   const edgeCompatibility = useValidationStore((s) => s.edgeCompatibility);
   const diagnostics = useValidationStore((s) => s.diagnostics);
@@ -170,14 +198,65 @@ export function Canvas(): JSX.Element {
     [selNodes],
   );
 
-  const trace = useMemo(
-    () =>
-      computeTrace(
-        selectedNodeIds,
-        rawNodes.map((n) => n.id),
-        rawEdges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
-      ),
-    [selectedNodeIds, rawNodes, rawEdges],
+  const trace = useMemo((): TraceResult & { routeFound: boolean | null } => {
+    const nodeIds = rawNodes.map((n) => n.id);
+    const traceEdges = rawEdges.map((e) => ({ id: e.id, source: e.source, target: e.target }));
+    switch (traceMode) {
+      case "reach":
+        return { ...computeReach(selectedNodeIds, nodeIds, traceEdges, traceDirection), routeFound: null };
+      case "route": {
+        if (!routeFrom) {
+          return { ...computeTrace(selectedNodeIds, nodeIds, traceEdges), routeFound: null };
+        }
+        // An endpoint hidden inside a collapsed group is represented by the group node, mirroring
+        // how its edges are re-anchored -- otherwise collapsing would read as "No path".
+        const visibleId = (id: string): string => {
+          const groupId = activeNodes[id]?.groupId;
+          return groupId && collapsedGroupIds.has(groupId) ? groupId : id;
+        };
+        if (!routeTo) {
+          // Picking a target: highlight only the origin so the user sees where the route starts.
+          return { ...computeReach([visibleId(routeFrom)], nodeIds, [], "downstream"), routeFound: null };
+        }
+        const from = visibleId(routeFrom);
+        const to = visibleId(routeTo);
+        // Prefer the requested direction; fall back to the reverse so an unordered pair
+        // (e.g. a two-node selection) still finds the path whichever way it runs.
+        const forward = computeRoute(from, to, nodeIds, traceEdges);
+        const route = forward.found ? forward : computeRoute(to, from, nodeIds, traceEdges);
+        return { ...route, routeFound: route.found };
+      }
+      case "lens": {
+        const lensNodes = rawNodes.map((n) => ({
+          id: n.id,
+          family: familyByType[activeNodes[n.id]?.type ?? ""] ?? null,
+        }));
+        return { ...computeLens(new Set(lensFamilies), lensNodes, traceEdges), routeFound: null };
+      }
+      default:
+        return { ...computeTrace(selectedNodeIds, nodeIds, traceEdges), routeFound: null };
+    }
+  }, [traceMode, traceDirection, routeFrom, routeTo, lensFamilies, selectedNodeIds, rawNodes, rawEdges, familyByType, activeNodes, collapsedGroupIds]);
+
+  const presentFamilies = useMemo(() => {
+    const found = new Set<string>();
+    for (const n of rawNodes) {
+      const family = familyByType[activeNodes[n.id]?.type ?? ""];
+      if (family) found.add(family);
+    }
+    // Keep active lens families listed even once their last node is gone, so the chip can still
+    // be toggled off instead of leaving the whole canvas dimmed with nothing to click.
+    for (const family of lensFamilies) found.add(family);
+    return [...found].sort((a, b) => familyMeta(a).label.localeCompare(familyMeta(b).label));
+  }, [rawNodes, activeNodes, familyByType, lensFamilies]);
+
+  const nodeName = useCallback(
+    (id: string | null): string => {
+      if (!id) return "";
+      const model = activeNodes[id];
+      return model?.label ?? model?.type ?? id;
+    },
+    [activeNodes],
   );
 
   const rfNodes = useMemo(
@@ -359,6 +438,15 @@ export function Canvas(): JSX.Element {
     setContextMenu({ nodeId: node.id, x: event.clientX, y: event.clientY });
   }, []);
 
+  const onNodeClick: NodeMouseHandler = useCallback(
+    (_event, node) => {
+      if (routePicking && routeFrom && node.id !== routeFrom) {
+        setRoute(routeFrom, node.id);
+      }
+    },
+    [routePicking, routeFrom, setRoute],
+  );
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onInit = useCallback((instance: any) => {
     reactFlowInstance.current = instance;
@@ -398,17 +486,75 @@ export function Canvas(): JSX.Element {
   }, [contextMenu, closeContextMenu]);
 
   useEffect(() => {
-    function isEditableTarget(target: EventTarget | null): boolean {
-      if (!(target instanceof HTMLElement)) {
-        return false;
-      }
-      return (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      );
+    if (traceMode === "selection-downstream") return undefined;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (isEditableTarget(e.target)) return;
+      resetTrace();
     }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [traceMode, resetTrace]);
 
+  // Trace shortcuts (issue #167): U = upstream reach, D = downstream reach, R = route (one node selected:
+  // pick the target by clicking; two selected: show the route between them). Plain keys only, never in inputs.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isEditableTarget(e.target)) return;
+      const key = e.key.toLowerCase();
+      if (key === "u" && selectedNodeIds.length > 0) {
+        setReach("upstream");
+      } else if (key === "d" && selectedNodeIds.length > 0) {
+        setReach("downstream");
+      } else if (key === "r" && selectedNodeIds.length === 1) {
+        startRoutePick(selectedNodeIds[0]);
+      } else if (key === "r" && selectedNodeIds.length === 2) {
+        setRoute(selectedNodeIds[0], selectedNodeIds[1]);
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [selectedNodeIds, setReach, startRoutePick, setRoute]);
+
+  // Reach roots are the selection: once it is cleared, drop the sticky mode so the next click
+  // goes back to the default downstream trace instead of silently tracing upstream.
+  useEffect(() => {
+    if (traceMode === "reach" && selectedNodeIds.length === 0) resetTrace();
+  }, [traceMode, selectedNodeIds, resetTrace]);
+
+  // A route endpoint deleted while the route is shown would otherwise read "No path" for a ghost id.
+  useEffect(() => {
+    if (traceMode !== "route") return;
+    if ((routeFrom && !activeNodes[routeFrom]) || (routeTo && !activeNodes[routeTo])) resetTrace();
+  }, [traceMode, routeFrom, routeTo, activeNodes, resetTrace]);
+
+  // Node ids from the previous view must not keep highlighting after subgraph navigation.
+  useEffect(() => {
+    resetTrace();
+  }, [breadcrumbs, resetTrace]);
+
+  const traceBanner = useMemo((): string | null => {
+    if (traceMode === "reach") {
+      return trace.active
+        ? `Tracing ${traceDirection === "both" ? "upstream + downstream" : traceDirection} reach`
+        : null;
+    }
+    if (traceMode === "route") {
+      if (routePicking) return `Click a node to route from ${nodeName(routeFrom)}`;
+      if (trace.routeFound === true) {
+        return `Route between ${nodeName(routeFrom)} and ${nodeName(routeTo)}`;
+      }
+      if (trace.routeFound === false) {
+        return `No path between ${nodeName(routeFrom)} and ${nodeName(routeTo)}`;
+      }
+      return null;
+    }
+    if (traceMode === "lens") return `Lens: ${lensFamilies.map((f) => familyMeta(f).label).join(", ")}`;
+    return null;
+  }, [traceMode, trace, traceDirection, routePicking, routeFrom, routeTo, lensFamilies, nodeName]);
+
+  useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (isEditableTarget(e.target)) {
         return;
@@ -485,6 +631,7 @@ export function Canvas(): JSX.Element {
         onConnect={onConnect}
         onNodeDoubleClick={handleNodeDoubleClick}
         onNodeContextMenu={onNodeContextMenu}
+        onNodeClick={onNodeClick}
         onInit={onInit}
         selectionOnDrag
         multiSelectionKeyCode="Shift"
@@ -516,6 +663,23 @@ export function Canvas(): JSX.Element {
           }
         />
       </ReactFlow>
+      {traceBanner && (
+        <div
+          data-testid="trace-banner"
+          data-route-empty={trace.routeFound === false ? "true" : undefined}
+          role="status"
+          style={{
+            position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", zIndex: 10,
+            display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
+            padding: "var(--space-1) var(--space-3)", borderRadius: "var(--radius-md)",
+            background: "var(--surface-2)", border: "1px solid var(--border-subtle)",
+            fontSize: "var(--text-sm)", color: "var(--text-secondary)",
+          }}
+        >
+          <span>{traceBanner}</span>
+          <Button variant="ghost" data-testid="trace-banner-clear" onClick={resetTrace}>Clear (Esc)</Button>
+        </div>
+      )}
       {!isInSubgraph && (selectedNodeIds.length > 1 || canUngroup) && (
         <SelectionToolbar
           count={selectedNodeIds.length}
@@ -530,6 +694,11 @@ export function Canvas(): JSX.Element {
           onExtractToComposite={canGroup ? () => extractToComposite(selectedNodeIds) : undefined}
           onCallout={canGroup ? handleCallout : undefined}
           onSummarize={selectedNodeIds.length >= 1 ? handleSummarize : undefined}
+          onShowRoute={
+            selectedNodeIds.length === 2
+              ? () => setRoute(selectedNodeIds[0], selectedNodeIds[1])
+              : undefined
+          }
         />
       )}
       {contextMenu && (
@@ -545,6 +714,19 @@ export function Canvas(): JSX.Element {
           onRunFromHere={() => {
             void runGraph({ runFrom: contextMenu.nodeId });
           }}
+          onTraceUpstream={() => {
+            replaceSelection([contextMenu.nodeId]);
+            setReach("upstream");
+          }}
+          onTraceDownstream={() => {
+            replaceSelection([contextMenu.nodeId]);
+            setReach("downstream");
+          }}
+          onTraceBoth={() => {
+            replaceSelection([contextMenu.nodeId]);
+            setReach("both");
+          }}
+          onRouteFromHere={() => startRoutePick(contextMenu.nodeId)}
           onNodeInfo={() => setInfoNodeId(contextMenu.nodeId)}
           onClose={closeContextMenu}
         />
@@ -571,6 +753,7 @@ export function Canvas(): JSX.Element {
         />
       )}
       <ProblemsPanel onNavigate={navigateToNode} />
+      <LensBar families={presentFamilies} active={lensFamilies} onToggle={toggleFamily} />
       <div
         style={{
           position: "absolute",

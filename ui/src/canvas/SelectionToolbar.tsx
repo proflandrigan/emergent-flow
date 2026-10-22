@@ -9,6 +9,7 @@ export interface SelectionToolbarProps {
   onExtractToComposite?: () => void;
   onCallout?: () => void;
   onSummarize?: () => void;
+  onShowRoute?: () => void;
 }
 
 export function SelectionToolbar({
@@ -20,6 +21,7 @@ export function SelectionToolbar({
   onExtractToComposite,
   onCallout,
   onSummarize,
+  onShowRoute,
 }: SelectionToolbarProps): JSX.Element {
   return (
     <div
@@ -56,6 +58,11 @@ export function SelectionToolbar({
       >
         Run to selected
       </Button>
+      {onShowRoute && (
+        <Button variant="secondary" data-testid="show-route-selection" onClick={onShowRoute}>
+          Show route
+        </Button>
+      )}
       {onGroup && (
         <Button variant="secondary" data-testid="group-selection" onClick={onGroup}>
           Group

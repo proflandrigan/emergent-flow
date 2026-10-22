@@ -7,6 +7,10 @@ const defaultProps = () => ({
   onRunToHere: vi.fn(),
   onRunThisNode: vi.fn(),
   onRunFromHere: vi.fn(),
+  onTraceUpstream: vi.fn(),
+  onTraceDownstream: vi.fn(),
+  onTraceBoth: vi.fn(),
+  onRouteFromHere: vi.fn(),
   onNodeInfo: vi.fn(),
   onClose: vi.fn(),
 });
