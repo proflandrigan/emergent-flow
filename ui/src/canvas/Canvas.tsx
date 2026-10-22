@@ -357,12 +357,28 @@ export function Canvas(): JSX.Element {
     [isInSubgraph, removeEdge, setEdgeSelected],
   );
 
+  // Read through a ref so onSelectionChange keeps a stable identity (React Flow re-syncs on change).
+  const selectionEchoRef = useRef({ visibleId, rawEdges });
+  selectionEchoRef.current = { visibleId, rawEdges };
   const onSelectionChange = useCallback(
     (params: { nodes: Node[]; edges: Edge[] }) => {
-      replaceSelection(
-        params.nodes.map((n) => n.id),
-        params.edges.length > 0 ? params.edges.map((e) => e.id) : undefined,
-      );
+      const nodeIds = params.nodes.map((n) => n.id);
+      const edgeIds = params.edges.map((e) => e.id);
+      // A selected node hidden in a collapsed group (e.g. from a deep link) isn't a React Flow node,
+      // so React Flow echoes our own selection back without it. Ignore that echo rather than drop
+      // the hidden id; a real user selection differs from what is rendered and still replaces it.
+      const { visibleId, rawEdges } = selectionEchoRef.current;
+      const sel = useSelectionStore.getState();
+      const selected = Object.keys(sel.nodes).filter((id) => sel.nodes[id]);
+      if (selected.some((id) => visibleId(id) !== id)) {
+        const renderedEdges = new Set(rawEdges.map((e) => e.id));
+        const shownNodes = selected.filter((id) => visibleId(id) === id);
+        const shownEdges = Object.keys(sel.edges).filter((id) => sel.edges[id] && renderedEdges.has(id));
+        const same = (a: string[], b: string[]) =>
+          a.length === b.length && a.every((id) => b.includes(id));
+        if (same(nodeIds, shownNodes) && same(edgeIds, shownEdges)) return;
+      }
+      replaceSelection(nodeIds, edgeIds.length > 0 ? edgeIds : undefined);
     },
     [replaceSelection],
   );
@@ -581,9 +597,10 @@ export function Canvas(): JSX.Element {
       missing.push(`node "${id}"`);
       return false;
     };
-    // Collapse state is per viewer, so a linked node may be hidden in a collapsed group here:
-    // select/trace/centre on the group node that stands in for it (as route mode does).
-    const focus = [...new Set(pendingView.focus.filter(knownNode).map(visibleId))];
+    // Keep the RAW linked ids in the selection: collapse state is per viewer, and the trace memo
+    // already roots a hidden member at its collapsed group. Only centring maps through visibleId,
+    // so expanding the group (or re-sharing the banner link) still points at the linked node.
+    const focus = [...new Set(pendingView.focus.filter(knownNode))];
     const edge = pendingView.edge && edges[pendingView.edge] ? edges[pendingView.edge] : null;
     if (pendingView.edge && !edge) missing.push(`edge "${pendingView.edge}"`);
     if (focus.length > 0 || edge) replaceSelection(focus, edge ? [edge.id] : undefined);

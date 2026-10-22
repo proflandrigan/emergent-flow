@@ -253,8 +253,8 @@ test("applies #focus after joining ?session=", async () => {
   await waitFor(() =>
     expect(useViewLinkStore.getState().notice ?? "").toMatch(/node "n1"/),
   );
-  // The consumed hash is cleared, but ?session= stays so a refresh rejoins.
-  expect(window.location.hash).toBe("");
+  // The hash stays in the URL (Back/Forward and refresh keep the view), as does ?session=.
+  expect(window.location.hash).toBe("#focus=n1");
   expect(window.location.search).toBe("?session=s1");
 });
 
@@ -294,7 +294,19 @@ test("hashchange re-applies the view", async () => {
   );
 });
 
-test("clicking the same deep link twice re-applies it", async () => {
+// jsdom queues an anchor's fragment navigation as a task, so let it settle inside the test --
+// otherwise a late hashchange leaks into the next test.
+async function clickLink(href: string, init: MouseEventInit = {}): Promise<void> {
+  const a = document.createElement("a");
+  a.href = href;
+  a.textContent = "link";
+  document.body.appendChild(a);
+  fireEvent.click(a, init);
+  a.remove();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+test("clicking a link to the current hash re-applies it", async () => {
   mockHealth("ok");
   render(<App />);
 
@@ -302,13 +314,52 @@ test("clicking the same deep link twice re-applies it", async () => {
   await waitFor(() =>
     expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r9"/),
   );
-  expect(window.location.hash).toBe("");
+  expect(window.location.hash).toBe("#review=r9");
 
-  // Navigating to the identical fragment only fires hashchange if the first one was cleared.
+  // Browsers fire no hashchange for the identical fragment; the delegated click handler re-applies.
   useViewLinkStore.getState().setNotice(null);
-  window.location.hash = "#review=r9";
+  await clickLink("#review=r9");
   await waitFor(() =>
     expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r9"/),
+  );
+
+  // Modified clicks open elsewhere (new tab/window) and leave this view alone.
+  useViewLinkStore.getState().setNotice(null);
+  await clickLink("#review=r9", { ctrlKey: true });
+  expect(useViewLinkStore.getState().notice).toBeNull();
+});
+
+test("a link to a different hash is applied once (by hashchange only)", async () => {
+  mockHealth("ok");
+  render(<App />);
+  const request = vi.spyOn(useViewLinkStore.getState(), "request");
+
+  await clickLink("#review=r7");
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r7"/),
+  );
+  expect(request).toHaveBeenCalledTimes(1);
+  request.mockRestore();
+});
+
+test("Back re-applies the previous deep-link view", async () => {
+  mockHealth("ok");
+  render(<App />);
+
+  window.location.hash = "#review=r1";
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r1"/),
+  );
+  window.location.hash = "#review=r2";
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r2"/),
+  );
+
+  useViewLinkStore.getState().setNotice(null);
+  window.history.back();
+  await waitFor(() => expect(window.location.hash).toBe("#review=r1"));
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r1"/),
   );
 });
 

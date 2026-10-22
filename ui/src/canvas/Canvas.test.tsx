@@ -1021,7 +1021,7 @@ describe("Canvas deep links (issue #168)", () => {
     expect(useViewLinkStore.getState().pendingCanvas).toBeNull();
   });
 
-  test("focus + reach on a node hidden by a collapsed group selects and traces the group", async () => {
+  test("focus + reach on a node hidden by a collapsed group selects the member and traces the group", async () => {
     const a = add(0, 0);
     const b = add(200, 0);
     const c = add(400, 0);
@@ -1038,10 +1038,73 @@ describe("Canvas deep links (issue #168)", () => {
     expect(container.querySelector(`.react-flow__node[data-id="${groupId}"]`)).toHaveClass(
       "ef-trace-traced",
     );
-    expect(useSelectionStore.getState().nodes[groupId]).toBe(true);
-    expect(useSelectionStore.getState().nodes[c]).toBeFalsy();
+    // The selection keeps the linked (hidden) member; only the trace root maps to its group.
+    expect(useSelectionStore.getState().nodes[c]).toBe(true);
+    expect(useSelectionStore.getState().nodes[groupId]).toBeFalsy();
     expect(useViewLinkStore.getState().notice).toBeNull();
     useCollapseStore.getState().setCollapsed(groupId, false);
+  });
+
+  test("after a hidden-member link, expanding the group traces the member and Copy link keeps its id", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    const c = add(400, 0);
+    link(a, b);
+    link(b, c);
+    const groupId = useGraphStore.getState().groupSelection([b, c]);
+    if (!groupId) throw new Error("expected groupSelection to create a group");
+    useCollapseStore.getState().setCollapsed(groupId, true);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    const { container } = render(<Canvas />);
+
+    act(() => useViewLinkStore.getState().request(parseViewHash(`#focus=${c}&reach=up`)));
+    await waitFor(() => expect(traceOf(container, a)).toBe("traced"));
+
+    // A re-shared banner link names the member, not this viewer's collapsed group.
+    fireEvent.click(await screen.findByTestId("trace-banner-copy-link"));
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    expect(writeText.mock.calls[0][0]).toMatch(new RegExp(`#focus=${c}&reach=up$`));
+    expect(writeText.mock.calls[0][0]).not.toContain(groupId);
+
+    // Expanding the group traces the member's real ancestors instead of dimming everything.
+    act(() => useCollapseStore.getState().setCollapsed(groupId, false));
+    await waitFor(() =>
+      expect(container.querySelector(`.react-flow__node[data-id="${c}"]`)).not.toBeNull(),
+    );
+    await waitFor(() => expect(traceOf(container, c)).toBe("traced"));
+    expect(traceOf(container, b)).toBe("traced");
+    expect(traceOf(container, a)).toBe("traced");
+  });
+
+  test("a hidden-member link survives React Flow's echo when a visible node was selected", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    const c = add(400, 0);
+    link(a, b);
+    link(b, c);
+    const groupId = useGraphStore.getState().groupSelection([b, c]);
+    if (!groupId) throw new Error("expected groupSelection to create a group");
+    useCollapseStore.getState().setCollapsed(groupId, true);
+    const { container } = render(<Canvas />);
+    act(() => useSelectionStore.getState().replaceSelection([a]));
+    await waitFor(() =>
+      expect(container.querySelector(`.react-flow__node[data-id="${a}"]`)).toHaveClass("selected"),
+    );
+
+    // Deselecting `a` makes React Flow report an empty selection (it can't see hidden `c`).
+    act(() => useViewLinkStore.getState().request(parseViewHash(`#focus=${c}&reach=up`)));
+    await waitFor(() => expect(traceOf(container, a)).toBe("traced"));
+    expect(useSelectionStore.getState().nodes).toEqual({ [c]: true });
+    expect(useTraceStore.getState().mode).toBe("reach");
+
+    // Once expanded, React Flow renders the member selected.
+    act(() => useCollapseStore.getState().setCollapsed(groupId, false));
+    await waitFor(() =>
+      expect(container.querySelector(`.react-flow__node[data-id="${c}"]`)).toHaveClass("selected"),
+    );
+    expect(useSelectionStore.getState().nodes).toEqual({ [c]: true });
+    expect(traceOf(container, c)).toBe("traced");
   });
 
   test("no Copy link (context menu or trace banner) inside a composite subgraph", async () => {

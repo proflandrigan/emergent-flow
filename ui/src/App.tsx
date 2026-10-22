@@ -25,7 +25,7 @@ import {
   useSessionAutoSave,
 } from "./io/sessionRecovery";
 import { Palette } from "./palette/Palette";
-import { parseViewHash } from "./io/viewLink";
+import { isEmptyViewState, parseViewHash } from "./io/viewLink";
 import { useGraphStore } from "./store/graphStore";
 import { useViewLinkStore } from "./store/viewLinkStore";
 import { ProposalPanel } from "./session/ProposalPanel";
@@ -74,19 +74,6 @@ function clampInspectorWidth(width: number): number {
   return Math.min(
     MAX_INSPECTOR_WIDTH,
     Math.max(MIN_INSPECTOR_WIDTH, Math.round(width)),
-  );
-}
-
-/**
- * Drop a consumed #view hash from the address bar (keeping path + ?session=) so re-clicking the
- * same deep link fires hashchange again. replaceState never fires hashchange, so no re-apply loop.
- */
-function clearViewHash(): void {
-  if (!window.location.hash) return;
-  window.history.replaceState(
-    window.history.state,
-    "",
-    window.location.pathname + window.location.search,
   );
 }
 
@@ -247,7 +234,6 @@ export function App(): JSX.Element {
     startDirtyTracking();
     useFlowStore.getState().fetchExamples();
     const view = parseViewHash(window.location.hash);
-    clearViewHash();
     const urlSession = new URLSearchParams(window.location.search).get("session");
     if (urlSession) {
       // Apply the #view only once join() has loaded the session graph (issue #168).
@@ -272,15 +258,37 @@ export function App(): JSX.Element {
   }, []);
 
   // Deep links clicked inside the app (chat, reviews) change only the hash -- re-apply it (issue #168).
-  // The hash is cleared once read so clicking the same link again changes the URL and re-fires.
+  // The hash stays in the URL so Back/Forward re-fire hashchange between views. Browsers don't fire
+  // hashchange for a link to the CURRENT hash, so a delegated click listener re-applies that case.
   useEffect(() => {
     function onHashChange() {
-      const view = parseViewHash(window.location.hash);
-      clearViewHash();
-      useViewLinkStore.getState().request(view);
+      useViewLinkStore.getState().request(parseViewHash(window.location.hash));
+    }
+    function onClick(e: MouseEvent) {
+      if (e.defaultPrevented || e.button !== 0) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const anchor = e.target instanceof Element ? e.target.closest("a[href]") : null;
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (anchor.target && anchor.target !== "_self") return; // opens elsewhere, not this view
+      const here = window.location;
+      // A different hash navigates and fires hashchange -- leave it to onHashChange (no double apply).
+      if (!anchor.hash || anchor.hash !== here.hash) return;
+      if (
+        anchor.origin !== here.origin ||
+        anchor.pathname !== here.pathname ||
+        anchor.search !== here.search
+      ) {
+        return;
+      }
+      const view = parseViewHash(anchor.hash);
+      if (!isEmptyViewState(view)) useViewLinkStore.getState().request(view);
     }
     window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
+    document.addEventListener("click", onClick);
+    return () => {
+      window.removeEventListener("hashchange", onHashChange);
+      document.removeEventListener("click", onClick);
+    };
   }, []);
 
   useEffect(() => {
