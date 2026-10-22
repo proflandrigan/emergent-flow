@@ -9,6 +9,8 @@ import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
 import { useSubgraphStore } from "../store/subgraphStore";
 import { useTraceStore } from "../store/traceStore";
+import { useViewLinkStore } from "../store/viewLinkStore";
+import { parseViewHash } from "../io/viewLink";
 import { Canvas } from "./Canvas";
 
 const catalogNodes = (catalog as unknown as { nodes: CatalogNode[] }).nodes;
@@ -28,6 +30,13 @@ beforeEach(() => {
   useExecutionStore.getState().clear();
   useTraceStore.getState().reset();
   useSelectionStore.getState().clear();
+  useViewLinkStore.setState({
+    pendingCanvas: null,
+    pendingProposal: null,
+    pendingReview: null,
+    notice: null,
+    fallbackUrl: null,
+  });
 });
 
 afterEach(() => {
@@ -898,5 +907,113 @@ describe("Canvas trace modes (issue #167)", () => {
       expect(screen.queryByTestId("trace-banner")).toBeNull();
     });
     expect(screen.queryByTestId("lens-chip-ml")).toBeNull();
+  });
+});
+
+describe("Canvas deep links (issue #168)", () => {
+  const add = (x = 0, y = 0): string =>
+    useGraphStore.getState().addNodeFromSpec(loadCsv, { x, y });
+
+  const link = (a: string, b: string): void => {
+    const nodes = useGraphStore.getState().nodes;
+    useGraphStore.getState().connect(
+      { node_id: a, port_id: nodes[a].ports[0].id },
+      { node_id: b, port_id: nodes[b].ports[0].id },
+    );
+  };
+
+  const traceOf = (container: HTMLElement, id: string): string | null | undefined =>
+    container
+      .querySelector(`.react-flow__node[data-id="${id}"] [data-trace]`)
+      ?.getAttribute("data-trace");
+
+  test("focus selects the node", async () => {
+    const a = add(0, 0);
+    add(200, 0);
+    render(<Canvas />);
+
+    act(() => useViewLinkStore.getState().request(parseViewHash(`#focus=${a}`)));
+
+    await waitFor(() => expect(useSelectionStore.getState().nodes[a]).toBe(true));
+    expect(useViewLinkStore.getState().pendingCanvas).toBeNull();
+  });
+
+  test("focus + reach=up highlights ancestors", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    const c = add(400, 0);
+    const x = add(0, 300);
+    link(a, b);
+    link(b, c);
+    const { container } = render(<Canvas />);
+
+    act(() => useViewLinkStore.getState().request(parseViewHash(`#focus=${c}&reach=up`)));
+
+    await waitFor(() => expect(traceOf(container, a)).toBe("traced"));
+    expect(traceOf(container, x)).toBe("dimmed");
+    expect(useTraceStore.getState().mode).toBe("reach");
+  });
+
+  test("route shows the route banner", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    const c = add(400, 0);
+    link(a, b);
+    link(b, c);
+    render(<Canvas />);
+
+    act(() => useViewLinkStore.getState().request(parseViewHash(`#route=${a}~${c}`)));
+
+    await waitFor(() => expect(screen.getByTestId("trace-banner")).toHaveTextContent(/Route between/));
+  });
+
+  test("unreachable route shows No path", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    render(<Canvas />);
+
+    act(() => useViewLinkStore.getState().request(parseViewHash(`#route=${a}~${b}`)));
+
+    await waitFor(() => expect(screen.getByTestId("trace-banner")).toHaveTextContent(/No path/));
+  });
+
+  test("unknown ids produce one notice and no selection", async () => {
+    add(0, 0);
+    render(<Canvas />);
+
+    act(() => useViewLinkStore.getState().request(parseViewHash("#focus=nope&edge=bad")));
+
+    await waitFor(() => {
+      const notice = useViewLinkStore.getState().notice;
+      expect(notice).toContain('node "nope"');
+      expect(notice).toContain('edge "bad"');
+    });
+    expect(Object.values(useSelectionStore.getState().nodes).some(Boolean)).toBe(false);
+  });
+
+  test("a view requested before mount is applied once mounted", async () => {
+    const a = add(0, 0);
+    useViewLinkStore.getState().request(parseViewHash(`#focus=${a}`));
+    render(<Canvas />);
+
+    await waitFor(() => expect(useSelectionStore.getState().nodes[a]).toBe(true));
+    expect(useViewLinkStore.getState().pendingCanvas).toBeNull();
+  });
+
+  test("Copy link in the trace banner copies the reach view", async () => {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    link(a, b);
+    useSelectionStore.getState().replaceSelection([b]);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render(<Canvas />);
+    // Set reach after mount: Canvas resets the trace on mount (subgraph-navigation effect).
+    act(() => useTraceStore.getState().setReach("upstream"));
+
+    fireEvent.click(await screen.findByTestId("trace-banner-copy-link"));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    expect(writeText.mock.calls[0][0]).toMatch(new RegExp(`#focus=${b}&reach=up$`));
   });
 });

@@ -25,8 +25,11 @@ import {
   useSessionAutoSave,
 } from "./io/sessionRecovery";
 import { Palette } from "./palette/Palette";
+import { parseViewHash } from "./io/viewLink";
 import { useGraphStore } from "./store/graphStore";
+import { useViewLinkStore } from "./store/viewLinkStore";
 import { ProposalPanel } from "./session/ProposalPanel";
+import { ReviewPanel } from "./session/ReviewPanel";
 import { useSessionStore } from "./session/sessionStore";
 import { useTheme } from "./theme/useTheme";
 import { IconButton } from "./ui/IconButton";
@@ -94,8 +97,15 @@ export function App(): JSX.Element {
   const [runsOpen, setRunsOpen] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [proposalsOpen, setProposalsOpen] = useState(false);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [highlightProposal, setHighlightProposal] = useState<string | null>(null);
+  const [highlightReview, setHighlightReview] = useState<string | null>(null);
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [recoveryToast, setRecoveryToast] = useState<string | null>(null);
+  const pendingProposal = useViewLinkStore((s) => s.pendingProposal);
+  const pendingReview = useViewLinkStore((s) => s.pendingReview);
+  const viewNotice = useViewLinkStore((s) => s.notice);
+  const fallbackUrl = useViewLinkStore((s) => s.fallbackUrl);
   const past = useGraphStore((s) => s.past);
   const future = useGraphStore((s) => s.future);
   const sessionId = useSessionStore((s) => s.sessionId);
@@ -218,13 +228,18 @@ export function App(): JSX.Element {
   // Runs once on mount: start tracking canvas-dirty state, warm the examples list, and
   // recover any localStorage-persisted session left behind by a refresh/crash -- or, if the
   // URL carries a ?session=<id>, join that collaboration session instead (the agent-driven
-  // MCP workflow) so the human lands directly on the shared graph.
+  // MCP workflow) so the human lands directly on the shared graph. A #view hash (focus /
+  // proposal / review deep link) is applied after the graph is in place.
   useEffect(() => {
     startDirtyTracking();
     useFlowStore.getState().fetchExamples();
+    const view = parseViewHash(window.location.hash);
     const urlSession = new URLSearchParams(window.location.search).get("session");
     if (urlSession) {
-      void useSessionStore.getState().join(urlSession);
+      // Apply the #view only once join() has loaded the session graph (issue #168).
+      void useSessionStore.getState().join(urlSession).then(() => {
+        useViewLinkStore.getState().request(view);
+      });
       return;
     }
     const recovered = recoverSession();
@@ -233,7 +248,48 @@ export function App(): JSX.Element {
       setRecoveryToast("Recovered unsaved flow");
       clearSession();
     }
+    useViewLinkStore.getState().request(view);
   }, []);
+
+  // Deep links clicked inside the app (chat, reviews) change only the hash -- re-apply it (issue #168).
+  useEffect(() => {
+    function onHashChange() {
+      useViewLinkStore.getState().request(parseViewHash(window.location.hash));
+    }
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (!pendingProposal) return;
+    const id = pendingProposal;
+    if (!(id in useSessionStore.getState().proposals)) {
+      useViewLinkStore.getState().setNotice(`Not in this session: proposal "${id}"`);
+    }
+    setHighlightProposal(id);
+    setProposalsOpen(true);
+    useViewLinkStore.getState().consumeProposal();
+  }, [pendingProposal]);
+
+  useEffect(() => {
+    if (!pendingReview) return;
+    const id = pendingReview;
+    if (!(id in useSessionStore.getState().reviews)) {
+      useViewLinkStore.getState().setNotice(`Not in this session: review "${id}"`);
+    }
+    setHighlightReview(id);
+    setReviewsOpen(true);
+    useViewLinkStore.getState().consumeReview();
+  }, [pendingReview]);
+
+  // Auto-dismiss the view-link notice toast after 4s.
+  useEffect(() => {
+    if (!viewNotice) return undefined;
+    const timer = window.setTimeout(() => {
+      useViewLinkStore.getState().setNotice(null);
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, [viewNotice]);
 
   // Warn on tab close / refresh while there are unsaved changes.
   useEffect(() => {
@@ -338,6 +394,13 @@ export function App(): JSX.Element {
       label: "Review proposals",
       onSelect: () => {
         setProposalsOpen(true);
+        setMenuOpen(false);
+      },
+    },
+    {
+      label: "Reviews",
+      onSelect: () => {
+        setReviewsOpen(true);
         setMenuOpen(false);
       },
     },
@@ -602,14 +665,65 @@ export function App(): JSX.Element {
         </OverlayModal>
       )}
       {proposalsOpen && (
-        <OverlayModal width={600} onClose={() => setProposalsOpen(false)}>
-          <ProposalPanel />
+        <OverlayModal
+          width={600}
+          onClose={() => {
+            setProposalsOpen(false);
+            setHighlightProposal(null);
+          }}
+        >
+          <ProposalPanel highlightId={highlightProposal} />
+        </OverlayModal>
+      )}
+      {reviewsOpen && (
+        <OverlayModal
+          width={600}
+          onClose={() => {
+            setReviewsOpen(false);
+            setHighlightReview(null);
+          }}
+        >
+          <ReviewPanel highlightId={highlightReview} />
+        </OverlayModal>
+      )}
+      {fallbackUrl && (
+        <OverlayModal width={480} onClose={() => useViewLinkStore.getState().setFallbackUrl(null)}>
+          <div data-testid="copy-link-fallback">
+            <div style={{ marginBottom: "var(--space-2)" }}>Copy this link:</div>
+            <input
+              readOnly
+              value={fallbackUrl}
+              autoFocus
+              onFocus={(e) => e.currentTarget.select()}
+              data-testid="copy-link-fallback-input"
+              style={{ width: "100%" }}
+              aria-label="Link to this view"
+            />
+          </div>
         </OverlayModal>
       )}
       {chatModalOpen && (
         <Suspense fallback={<div>Loading…</div>}>
           <ChatModal onClose={() => setChatModalOpen(false)} />
         </Suspense>
+      )}
+
+      {viewNotice && (
+        <div
+          data-testid="view-link-toast"
+          style={{
+            position: "fixed",
+            bottom: "calc(var(--space-4) + 48px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 100,
+          }}
+        >
+          <Toast
+            message={viewNotice}
+            onDismiss={() => useViewLinkStore.getState().setNotice(null)}
+          />
+        </div>
       )}
 
       {recoveryToast && (

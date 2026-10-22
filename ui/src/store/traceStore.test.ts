@@ -69,6 +69,28 @@ describe("toggleFamily", () => {
   });
 });
 
+describe("setLens", () => {
+  test("sets lens mode with the given families", () => {
+    useTraceStore.getState().setLens(["ml", "clean"]);
+    const s = useTraceStore.getState();
+    expect(s.mode).toBe("lens");
+    expect(s.families).toEqual(["ml", "clean"]);
+  });
+
+  test("de-duplicates preserving order", () => {
+    useTraceStore.getState().setLens(["ml", "clean", "ml"]);
+    expect(useTraceStore.getState().families).toEqual(["ml", "clean"]);
+  });
+
+  test("an empty list resets to selection-downstream", () => {
+    useTraceStore.getState().setLens(["ml"]);
+    useTraceStore.getState().setLens([]);
+    const s = useTraceStore.getState();
+    expect(s.mode).toBe("selection-downstream");
+    expect(s.families).toEqual([]);
+  });
+});
+
 describe("reset", () => {
   test("reset after setRoute clears everything", () => {
     useTraceStore.getState().setRoute("a", "b");

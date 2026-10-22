@@ -1,5 +1,5 @@
 import { beforeEach, expect, test, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { useGraphStore } from "../store/graphStore";
 import * as sessionClient from "./sessionClient";
@@ -109,6 +109,38 @@ test("does not show Apply fix when there is no fix", () => {
   render(<ReviewPanel />);
 
   expect(screen.queryByTestId("review-apply-fix")).not.toBeInTheDocument();
+});
+
+test("highlightId marks only the matching thread", () => {
+  useSessionStore.setState({
+    sessionId: "abc",
+    reviews: { r1: reviewThread(), r2: reviewThread({ id: "r2" }) },
+  });
+
+  render(<ReviewPanel highlightId="r2" />);
+
+  const threads = screen.getAllByTestId("review-thread");
+  expect(threads[0]).not.toHaveAttribute("data-highlighted");
+  expect(threads[1]).toHaveAttribute("data-highlighted", "true");
+});
+
+test("Copy link writes a URL ending with the review fragment", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText },
+    configurable: true,
+  });
+  useSessionStore.setState({
+    sessionId: "abc",
+    reviews: { r1: reviewThread() },
+  });
+
+  render(<ReviewPanel />);
+  fireEvent.click(screen.getByTestId("review-copy-link"));
+
+  await waitFor(() =>
+    expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/#review=r1$/)),
+  );
 });
 
 test("Reply posts a comment authored by human and clears the input", async () => {

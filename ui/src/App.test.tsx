@@ -2,7 +2,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import { App } from "./App";
+import { getSession } from "./session/sessionClient";
 import { useSessionStore } from "./session/sessionStore";
+import { useViewLinkStore } from "./store/viewLinkStore";
 
 vi.mock("./session/sessionClient", () => ({
   createSession: vi.fn().mockResolvedValue({
@@ -45,6 +47,14 @@ afterEach(() => {
     rebaseNeeded: false,
     rebaseMessage: null,
   });
+  useViewLinkStore.setState({
+    pendingCanvas: null,
+    pendingProposal: null,
+    pendingReview: null,
+    notice: null,
+    fallbackUrl: null,
+  });
+  window.history.replaceState(null, "", "/");
 });
 
 // App fires two fetches on mount (/healthz and the palette's /catalog). A `Response` body is
@@ -226,6 +236,68 @@ test("Start chat overflow item opens the chat modal", async () => {
   await waitFor(() => {
     expect(screen.getByTestId("chat-backend-picker")).toBeInTheDocument();
   });
+});
+
+test("applies #focus after joining ?session=", async () => {
+  mockHealth("ok");
+  window.history.replaceState(null, "", "/?session=s1#focus=n1");
+  vi.mocked(getSession).mockResolvedValue({
+    id: "s1",
+    graph: { paradigm: "functional", nodes: {}, edges: {} },
+    version: 0,
+    proposals: {},
+  } as never);
+  render(<App />);
+
+  await waitFor(() => expect(getSession).toHaveBeenCalledWith("s1"));
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/node "n1"/),
+  );
+});
+
+test("#proposal opens the proposals panel highlighted", async () => {
+  mockHealth("ok");
+  window.history.replaceState(null, "", "/?session=s1#proposal=p1");
+  vi.mocked(getSession).mockResolvedValue({
+    id: "s1",
+    graph: { paradigm: "functional", nodes: {}, edges: {} },
+    version: 0,
+    proposals: {
+      p1: {
+        id: "p1",
+        mutation: { base_version: 0, author: "ml_engineer", description: "add a describe node" },
+        diagnostics: { diagnostics: [], edge_compatibility: {} },
+        status: "pending",
+      },
+    },
+  } as never);
+  render(<App />);
+
+  const panel = await screen.findByTestId("proposal-panel");
+  await waitFor(() =>
+    expect(panel.querySelector('[data-highlighted="true"]')).not.toBeNull(),
+  );
+});
+
+test("hashchange re-applies the view", async () => {
+  mockHealth("ok");
+  render(<App />);
+
+  window.history.replaceState(null, "", "/#review=r9");
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
+
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r9"/),
+  );
+});
+
+test("bad keys never throw", () => {
+  mockHealth("ok");
+  window.history.replaceState(null, "", "/#nonsense=1&focus=%E0%A4%A");
+  expect(() => render(<App />)).not.toThrow();
+  expect(
+    screen.getByRole("heading", { name: /Emergent Flow/ }),
+  ).toBeInTheDocument();
 });
 
 test("Get started overflow item opens the gallery and close dismisses it", async () => {

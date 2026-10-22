@@ -195,6 +195,52 @@ Once accepted, `GET /sessions/{id}` again to see the merged graph — it's now a
 compilable/executable through the exact same `/compile`/`/execute` routes as anything the human
 built by hand.
 
+## 7. Point the human at the change
+
+End each turn with a focused link rather than a prose recap. The human clicks once and lands on
+exactly what changed: the node selected and centred, its reach highlighted, the proposal open, or
+the path between two nodes lit up. Links are built from the session URL plus a hash of view state:
+
+```
+http://127.0.0.1:8765/?session=<id>#<key>=<value>[&<key>=<value>]
+```
+
+| key        | example                              | what the canvas does                                           |
+|------------|--------------------------------------|----------------------------------------------------------------|
+| `focus`    | `#focus=n-scale,n-split`             | selects the nodes and centres the view on them                 |
+| `reach`    | `#focus=n-scale&reach=down`          | with `focus`: highlights upstream (`up`), downstream (`down`), or both |
+| `route`    | `#route=n-load~n-model`              | highlights the path between two nodes; says "No path" if none |
+| `lens`     | `#lens=stats~ml`                     | highlights nodes of those families and dims the rest           |
+| `edge`     | `#edge=e-load-to-scale`              | selects one edge                                               |
+| `proposal` | `#proposal=p1`                       | opens the Proposals panel on that proposal                     |
+| `review`   | `#review=rev-1`                      | opens the Reviews panel on that thread                         |
+
+Ids are percent-encoded when they contain reserved characters. The hash is view state only: it
+never changes the graph. An unknown id shows one toast, never an error.
+
+Example reply line:
+
+```
+Rewired the feature step so scaling happens after the split. [See the change](http://127.0.0.1:8765/?session=sess-abc123#focus=n-scale&reach=down)
+```
+
+Proposal and route examples:
+
+```
+I've proposed a fix for the leakage warning. [Review proposal p1](http://127.0.0.1:8765/?session=sess-abc123#proposal=p1)
+The model now trains on the scaled features. [Trace the path](http://127.0.0.1:8765/?session=sess-abc123#route=n-load~n-model)
+```
+
+**MCP clients.** The mutating tools `add_node`, `connect_ports`, `set_param`, `propose_mutation`,
+and `add_result_card` return a `view_url` field focused on what they touched. Paste that URL as
+the link. You can also call `view_link(session_id, focus=None, reach=None, route=None, lens=None,
+edge=None, proposal=None, review=None)` to build a link for any explanation; it returns
+`{"view_url", "canvas_reachable", "note"}`. `view_url` is only present when the tool runs inside a
+live `emergentflow serve` process (the HTTP bridge, the stdio bridge `emergentflow.collab.mcp_bridge`,
+or the in-app chat). If `view_url` is absent, or `canvas_reachable` is false, you are on the
+standalone stdio server (`create_mcp_server().run()`), which has its own session store, so the link
+would not resolve. Say so instead of pasting it.
+
 ## Review workflow
 
 The other direction: instead of proposing changes, you review a HUMAN-built graph and post

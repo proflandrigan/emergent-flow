@@ -11,6 +11,7 @@ const defaultProps = () => ({
   onTraceDownstream: vi.fn(),
   onTraceBoth: vi.fn(),
   onRouteFromHere: vi.fn(),
+  onCopyLink: vi.fn(),
   onNodeInfo: vi.fn(),
   onClose: vi.fn(),
 });
@@ -109,6 +110,17 @@ describe("NodeContextMenu", () => {
     fireEvent.click(screen.getByTestId("node-context-menu-run-from-here"));
 
     expect(props.onRunFromHere).toHaveBeenCalledTimes(1);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test("clicking Copy link to node calls onCopyLink once and onClose once", () => {
+    const props = defaultProps();
+
+    render(<NodeContextMenu x={0} y={0} {...props} />);
+
+    fireEvent.click(screen.getByTestId("node-context-menu-copy-link"));
+
+    expect(props.onCopyLink).toHaveBeenCalledTimes(1);
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
 

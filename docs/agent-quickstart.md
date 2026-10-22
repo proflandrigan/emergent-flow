@@ -79,6 +79,9 @@ happy path, pick ONE surface and stay on it:
 
 The `open_in_ui` link from `create_session` is for when the MCP bridge and the server share a session
 store (currently not wired per ADR 0019 "one behavior, two doors"), so treat it as informational here.
+The same caveat applies to the focused `view_url` links (issue #168): mutating tools only return
+`view_url` when they run inside `emergentflow serve` (the HTTP bridge or in-app chat), and
+`view_link` reports `canvas_reachable: false` otherwise.
 
 ## 2. Create a session
 
@@ -159,6 +162,21 @@ add_result_card(session_id, "Churn drivers", [
 
 Recommended: put the conclusion in the first markdown block, then the supporting result blocks;
 use one card per analysis question.
+
+### Hand the human a focused link
+
+Mutating tools (`add_node`, `connect_ports`, `set_param`, `propose_mutation`, `add_result_card`)
+return a `view_url` focused on what they touched, when running inside `emergentflow serve`. Paste
+that URL in your reply so the human lands on the change. To build a link for any explanation, call
+`view_link`:
+
+```python
+view_link(session_id=sid, focus=[scale_id], reach="down")
+# -> {"view_url": "http://127.0.0.1:8765/?session=<sid>#focus=<scale_id>&reach=down", "canvas_reachable": true, ...}
+```
+
+For the full hash grammar (`focus`, `reach`, `route`, `lens`, `edge`, `proposal`, `review`) and
+reply examples, see `agents/emergent-flow-collaborator.md` §7.
 
 ## 5. Validate and compile (preflight)
 

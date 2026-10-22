@@ -1,6 +1,7 @@
 // A minimal right-click context menu for canvas nodes. Positioned at the mouse coordinates the
 // triggering `contextmenu` event reports (fixed-position, so no pane/viewport coordinate math is
-// needed). Run-mode items, trace items (reach / route, issue #167), and "Node info";
+// needed). Run-mode items, trace items (reach / route, issue #167), "Copy link to node"
+// (deep link, issue #168), and "Node info";
 // deliberately not a generic menu framework -- add items here directly if/when more are needed.
 // See issue #105 for the partial-run modes.
 
@@ -16,6 +17,7 @@ export interface NodeContextMenuProps {
   onTraceDownstream: () => void;
   onTraceBoth: () => void;
   onRouteFromHere: () => void;
+  onCopyLink: () => void;
   onNodeInfo: () => void;
   onClose: () => void;
 }
@@ -30,6 +32,7 @@ export function NodeContextMenu({
   onTraceDownstream,
   onTraceBoth,
   onRouteFromHere,
+  onCopyLink,
   onNodeInfo,
   onClose,
 }: NodeContextMenuProps): JSX.Element {
@@ -93,6 +96,14 @@ export function NodeContextMenu({
             testId: "node-context-menu-route-from-here",
             onSelect: () => {
               onRouteFromHere();
+              onClose();
+            },
+          },
+          {
+            label: "Copy link to node",
+            testId: "node-context-menu-copy-link",
+            onSelect: () => {
+              onCopyLink();
               onClose();
             },
           },

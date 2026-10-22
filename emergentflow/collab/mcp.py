@@ -25,6 +25,7 @@ import json
 import queue
 import time
 from typing import Any
+from urllib.parse import quote
 
 # Shared base URL used to build the ``open_in_ui`` browser links on agent-created
 # sessions. ``emergentflow.server.app`` imports this same value so the HTTP and MCP
@@ -32,6 +33,97 @@ from typing import Any
 # live server starts on a non-default address. The default matches the localhost
 # bind the canvas normally runs on.
 OPEN_IN_UI_BASE = "http://127.0.0.1:8765"
+
+# True only inside a live ``emergentflow serve`` process (set by ``serve()``), i.e. when MCP tools
+# run against the SAME session store the canvas reads. The in-process stdio server
+# (``create_mcp_server().run()``) has its own store, so a focused link from it would open a
+# session the canvas has never heard of; tools omit ``view_url`` in that case (issue #168).
+CANVAS_ATTACHED = False
+
+_REACH_ALIASES = {
+    "up": "up",
+    "upstream": "up",
+    "down": "down",
+    "downstream": "down",
+    "both": "both",
+}
+
+
+def _encode_view_id(value: str) -> str:
+    """Percent-encode one id for the view hash (``~`` and ``,`` are delimiters, so encode them)."""
+    return quote(value, safe="").replace("~", "%7E")
+
+
+def build_view_url(
+    session_id: str,
+    *,
+    focus: str | list[str] | None = None,
+    reach: str | None = None,
+    route: tuple[str, str] | list[str] | None = None,
+    lens: str | list[str] | None = None,
+    edge: str | None = None,
+    proposal: str | None = None,
+    review: str | None = None,
+) -> str:
+    """Return a canvas URL for *session_id*, optionally deep-linked to a view (issue #168).
+
+    The view state lives in the URL hash, keys ``&``-separated in this fixed order:
+    ``focus=<id>[,<id>...]``, ``reach=up|down|both`` (requires ``focus``),
+    ``route=<from>~<to>``, ``lens=<fam>[~<fam>...]``, ``edge=<id>``, ``proposal=<id>``,
+    ``review=<id>``. Each id is percent-encoded individually (``~`` and ``,`` included).
+    The hash is view state only -- it never carries or alters the graph IR.
+
+    With no view arguments the result is byte-identical to the historical ``open_in_ui``
+    (``<base>/?session=<id>``). The base is read at call time.
+    """
+    base = f"{OPEN_IN_UI_BASE}/?session={session_id}"
+    focus_ids = [focus] if isinstance(focus, str) else list(focus or [])
+    focus_ids = [f for f in focus_ids if f]
+    lens_ids = [lens] if isinstance(lens, str) else list(lens or [])
+    lens_ids = [x for x in lens_ids if x]
+
+    reach_norm: str | None = None
+    if reach:
+        reach_norm = _REACH_ALIASES.get(reach.strip().lower())
+        if reach_norm is None:
+            raise ValueError(f"reach must be one of up, down, both; got {reach!r}")
+        if not focus_ids:
+            raise ValueError("reach requires focus")
+
+    route_ids: list[str] = []
+    if route is not None:
+        route_ids = list(route)
+        if len(route_ids) != 2 or not all(route_ids):
+            raise ValueError("route must be a (from_id, to_id) pair")
+
+    parts: list[str] = []
+    if focus_ids:
+        parts.append("focus=" + ",".join(_encode_view_id(f) for f in focus_ids))
+    if reach_norm:
+        parts.append(f"reach={reach_norm}")
+    if route_ids:
+        parts.append("route=" + "~".join(_encode_view_id(r) for r in route_ids))
+    if lens_ids:
+        parts.append("lens=" + "~".join(_encode_view_id(x) for x in lens_ids))
+    if edge:
+        parts.append("edge=" + _encode_view_id(edge))
+    if proposal:
+        parts.append("proposal=" + _encode_view_id(proposal))
+    if review:
+        parts.append("review=" + _encode_view_id(review))
+
+    return base + "#" + "&".join(parts) if parts else base
+
+
+def _with_view_url(result: dict[str, Any], session_id: str, **view: Any) -> dict[str, Any]:
+    """Add a focused ``view_url`` to a mutating tool's *result* when a canvas shares the store.
+
+    Omitted when ``CANVAS_ATTACHED`` is False (the stdio-only MCP server keeps its own session
+    store, so the link would open a session the canvas never saw -- issue #168).
+    """
+    if CANVAS_ATTACHED:
+        result["view_url"] = build_view_url(session_id, **view)
+    return result
 
 
 def _import_fastmcp() -> Any:
@@ -105,8 +197,50 @@ def create_mcp_server() -> Any:
         graph_obj = deserialize_graph(json.dumps(graph)) if graph is not None else None
         session = get_default_session_store().create(graph_obj)
         doc = session.model_dump(mode="json")
-        doc["open_in_ui"] = f"{OPEN_IN_UI_BASE}/?session={session.id}"
+        doc["open_in_ui"] = build_view_url(session.id)
         return doc
+
+    @mcp.tool()
+    def view_link(
+        session_id: str,
+        focus: list[str] | None = None,
+        reach: str | None = None,
+        route: list[str] | None = None,
+        lens: list[str] | None = None,
+        edge: str | None = None,
+        proposal: str | None = None,
+        review: str | None = None,
+    ) -> dict:
+        """Build a canvas deep link that opens *session_id* on a specific view (issue #168).
+
+        *focus* is a list of node ids to select and centre; *reach* is ``up``, ``down`` or
+        ``both`` (requires *focus*); *route* is ``[from_id, to_id]``; *lens* is a list of
+        family names; *edge*, *proposal* and *review* are ids to open. End a turn with this
+        link instead of a prose recap so the human lands on the change.
+
+        Returns ``{"view_url", "canvas_reachable", "note"}``; when ``canvas_reachable`` is
+        False this MCP server is not running inside ``emergentflow serve`` and the link only
+        works if the human's canvas shares this session store.
+        """
+        get_default_session_store().get(session_id)  # raises for an unknown session
+        url = build_view_url(
+            session_id,
+            focus=focus,
+            reach=reach,
+            route=route,
+            lens=lens,
+            edge=edge,
+            proposal=proposal,
+            review=review,
+        )
+        note = (
+            "Open this link in the canvas served by `emergentflow serve`."
+            if CANVAS_ATTACHED
+            else "This MCP server is not attached to a running canvas (stdio mode keeps its own "
+            "session store); the link only resolves if the canvas shares this session. Use the "
+            "HTTP bridge (`emergentflow.collab.mcp_bridge`) for working links."
+        )
+        return {"view_url": url, "canvas_reachable": CANVAS_ATTACHED, "note": note}
 
     @mcp.tool()
     def get_catalog_tool() -> dict:
@@ -415,10 +549,14 @@ def create_mcp_server() -> Any:
 
     @mcp.tool()
     def propose_mutation(session_id: str, mutation: dict) -> dict:
-        """Propose a graph mutation on *session_id* (same as POST /sessions/{id}/proposals)."""
+        """Propose a graph mutation on *session_id* (same as POST /sessions/{id}/proposals).
+
+        Returns the proposal plus ``view_url`` (a canvas link focused on the change) when a
+        live canvas shares the session store.
+        """
         mutation_obj = GraphMutation.model_validate(mutation)
         proposal = get_default_session_store().add_proposal(session_id, mutation_obj)
-        return proposal.model_dump(mode="json")
+        return _with_view_url(proposal.model_dump(mode="json"), session_id, proposal=proposal.id)
 
     @mcp.tool()
     def post_review(session_id: str, review: dict) -> dict:
@@ -605,7 +743,8 @@ def create_mcp_server() -> Any:
         *params* are JSON-native param overrides passed straight to the node
         definition's ``instantiate``. *position* optionally overrides the
         node's canvas coordinates. Returns the common success shape plus the
-        new ``node_id``.
+        new ``node_id``, plus ``view_url`` (a canvas link focused on the change) when a
+        live canvas shares the session store.
         """
         store = get_default_session_store()
         session = store.get(session_id)
@@ -619,7 +758,11 @@ def create_mcp_server() -> Any:
             description=reason,
             author=author,
         )
-        return _apply_mutation(session_id, mutation, extra={"node_id": node.id})
+        return _with_view_url(
+            _apply_mutation(session_id, mutation, extra={"node_id": node.id}),
+            session_id,
+            focus=node.id,
+        )
 
     @mcp.tool()
     def connect_ports(
@@ -635,7 +778,8 @@ def create_mcp_server() -> Any:
         """Connect an OUT port on *source_node_id* to an IN port on *target_node_id*.
 
         Port names are resolved to their IR port ids before the edge is built.
-        Returns the common success shape plus the new ``edge_id``.
+        Returns the common success shape plus the new ``edge_id``, plus ``view_url`` (a
+        canvas link focused on the change) when a live canvas shares the session store.
         """
         store = get_default_session_store()
         session = store.get(session_id)
@@ -655,7 +799,12 @@ def create_mcp_server() -> Any:
             description=reason,
             author=author,
         )
-        return _apply_mutation(session_id, mutation, extra={"edge_id": edge.id})
+        return _with_view_url(
+            _apply_mutation(session_id, mutation, extra={"edge_id": edge.id}),
+            session_id,
+            focus=[source_node_id, target_node_id],
+            edge=edge.id,
+        )
 
     @mcp.tool()
     def set_param(
@@ -669,7 +818,8 @@ def create_mcp_server() -> Any:
     ) -> dict:
         """Set *param_name* to *value* on *node_id* in *session_id*'s graph.
 
-        Returns the common success shape plus the edited ``node_id``.
+        Returns the common success shape plus the edited ``node_id``, plus ``view_url`` (a
+        canvas link focused on the change) when a live canvas shares the session store.
         """
         store = get_default_session_store()
         session = store.get(session_id)
@@ -679,7 +829,11 @@ def create_mcp_server() -> Any:
             description=reason,
             author=author,
         )
-        return _apply_mutation(session_id, mutation, extra={"node_id": node_id})
+        return _with_view_url(
+            _apply_mutation(session_id, mutation, extra={"node_id": node_id}),
+            session_id,
+            focus=node_id,
+        )
 
     @mcp.tool()
     def delete_node(
@@ -796,7 +950,9 @@ def create_mcp_server() -> Any:
         *blocks* is a list of ``{"kind": "markdown", "text": ...}`` or
         ``{"kind": "result", "node_id": ..., "port_name": ..., "caption": ...}`` dicts.
         Each referenced OUT port is wired into the card's ``results`` IN port in the same
-        mutation. Returns the common success shape plus the new ``node_id``.
+        mutation. Returns the common success shape plus the new ``node_id``, plus
+        ``view_url`` (a canvas link focused on the change) when a live canvas shares the
+        session store.
         """
         store = get_default_session_store()
         session = store.get(session_id)
@@ -824,7 +980,11 @@ def create_mcp_server() -> Any:
             description=reason or f"Added result card: {title}",
             author=author,
         )
-        return _apply_mutation(session_id, mutation, extra={"node_id": card.id})
+        return _with_view_url(
+            _apply_mutation(session_id, mutation, extra={"node_id": card.id}),
+            session_id,
+            focus=card.id,
+        )
 
     @mcp.tool()
     def set_result_card(

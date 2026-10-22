@@ -655,7 +655,7 @@ def create_app() -> FastAPI:
             )
             session = get_default_session_store().create(graph)
             doc = session.model_dump(mode="json")
-            doc["open_in_ui"] = f"{_mcp.OPEN_IN_UI_BASE}/?session={session.id}"
+            doc["open_in_ui"] = _mcp.build_view_url(session.id)
             return doc
 
         return await _session_json(_create)
@@ -1405,7 +1405,9 @@ def serve(
     # Point the shared open_in_ui base at the real bind so agent-created sessions get
     # a working browser link even on a non-default host/port. Runs before any session
     # is created (the first tool call / request happens only after uvicorn binds).
+    # CANVAS_ATTACHED marks MCP tools as sharing the canvas's session store.
     _mcp.OPEN_IN_UI_BASE = url
+    _mcp.CANVAS_ATTACHED = True
     print(f"Emergent Flow - serving the local canvas at {url}  (Ctrl-C to stop){token_hint}")
     if open_browser:
         threading.Thread(

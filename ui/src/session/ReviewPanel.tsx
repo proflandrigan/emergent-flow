@@ -5,9 +5,11 @@
 // this is the OTHER direction, an agent critiquing an existing graph. A finding with an
 // attached `fix` offers "Apply fix", which is an ORDINARY proposal accept (sessionStore.propose
 // + sessionStore.accept, both already implemented) -- zero new apply code here.
+// Threads are deep-linkable (#review=<id>): highlightId marks one, "Copy link" shares it (#168).
 
-import { useState, type JSX } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
 
+import { copyViewLink } from "../store/viewLinkStore";
 import type { Diagnostic } from "../store/validation";
 import { severityColor } from "../store/validation";
 import { Button } from "../ui/Button";
@@ -78,7 +80,17 @@ function CommentRow({ comment }: { comment: ReviewComment }): JSX.Element {
   );
 }
 
-function ReviewThreadCard({ thread }: { thread: ReviewThread }): JSX.Element {
+function ReviewThreadCard({
+  thread,
+  highlighted,
+}: {
+  thread: ReviewThread;
+  highlighted: boolean;
+}): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (highlighted) ref.current?.scrollIntoView?.({ block: "nearest" });
+  }, [highlighted]);
   const applyFix = useSessionStore((s) => s.applyFix);
   const postReviewComment = useSessionStore((s) => s.postReviewComment);
   const [replyText, setReplyText] = useState("");
@@ -93,9 +105,13 @@ function ReviewThreadCard({ thread }: { thread: ReviewThread }): JSX.Element {
 
   return (
     <div
+      ref={ref}
       data-testid="review-thread"
+      data-highlighted={highlighted ? "true" : undefined}
       style={{
-        border: "1px solid var(--border-subtle)",
+        border: highlighted
+          ? "2px solid var(--accent)"
+          : "1px solid var(--border-subtle)",
         borderRadius: "var(--radius-md)",
         padding: "0.5rem",
         marginBottom: "0.5rem",
@@ -136,18 +152,30 @@ function ReviewThreadCard({ thread }: { thread: ReviewThread }): JSX.Element {
           Reply
         </Button>
       </div>
+      <div>
+        <Button
+          variant="ghost"
+          data-testid="review-copy-link"
+          onClick={() => void copyViewLink({ review: thread.id })}
+        >
+          Copy link
+        </Button>
+      </div>
     </div>
   );
 }
 
 export interface ReviewPanelProps {
   className?: string;
+  /** Review thread to scroll to and highlight (deep link `#review=<id>`, issue #168). */
+  highlightId?: string | null;
 }
 
 // Renders nothing when there is no active session -- session UI stays strictly opt-in.
 export function ReviewPanel({
   className,
-}: ReviewPanelProps): JSX.Element | null {
+  highlightId,
+}:ReviewPanelProps): JSX.Element | null {
   const sessionId = useSessionStore((s) => s.sessionId);
   const reviews = useSessionStore((s) => s.reviews);
 
@@ -168,7 +196,13 @@ export function ReviewPanel({
           No reviews yet
         </div>
       ) : (
-        list.map((t) => <ReviewThreadCard key={t.id} thread={t} />)
+        list.map((t) => (
+          <ReviewThreadCard
+            key={t.id}
+            thread={t}
+            highlighted={t.id === highlightId}
+          />
+        ))
       )}
     </div>
   );

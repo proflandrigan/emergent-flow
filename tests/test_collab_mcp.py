@@ -1078,3 +1078,121 @@ class TestExecutionTools:
             )
         )
         assert result == {"error": "Run '2026-07-30T14-02-11Z-0000' not found"}
+
+
+class TestViewUrl:
+    """Focused ``view_url`` links on mutating tools and the ``view_link`` tool (issue #168)."""
+
+    BASE = "http://127.0.0.1:8765"
+
+    def _setup(self, monkeypatch, attached: bool):
+        from emergentflow.collab import mcp as mcp_mod
+
+        monkeypatch.setattr(mcp_mod, "OPEN_IN_UI_BASE", self.BASE)
+        monkeypatch.setattr(mcp_mod, "CANVAS_ATTACHED", attached)
+        session = session_mod.get_default_store().create()
+        return mcp_mod.create_mcp_server(), session
+
+    def _add(self, mcp, session_id: str, node_type: str, params: dict[str, Any]) -> dict:
+        return _run_async(
+            _call_tool(
+                mcp,
+                "add_node",
+                {"session_id": session_id, "node_type": node_type, "params": params},
+            )
+        )
+
+    def test_add_node_omits_view_url_without_canvas(self, monkeypatch) -> None:
+        mcp, session = self._setup(monkeypatch, False)
+        result = self._add(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+        assert "view_url" not in result
+
+    def test_add_node_view_url_focuses_new_node(self, monkeypatch) -> None:
+        mcp, session = self._setup(monkeypatch, True)
+        result = self._add(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+        assert result["view_url"] == f"{self.BASE}/?session={session.id}#focus={result['node_id']}"
+
+    def test_propose_mutation_view_url_opens_proposal(self, monkeypatch) -> None:
+        mcp, session = self._setup(monkeypatch, True)
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "propose_mutation",
+                {"session_id": session.id, "mutation": {"base_version": 0}},
+            )
+        )
+        assert result["status"] == "pending"
+        assert result["view_url"].endswith(f"#proposal={result['id']}")
+
+    def test_connect_ports_view_url(self, monkeypatch) -> None:
+        mcp, session = self._setup(monkeypatch, True)
+        source = self._add(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+        target = self._add(
+            mcp,
+            session.id,
+            "script.custom_code",
+            {"code": "def transform(value):\n    return value"},
+        )
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "connect_ports",
+                {
+                    "session_id": session.id,
+                    "source_node_id": source["node_id"],
+                    "source_port_name": "frame",
+                    "target_node_id": target["node_id"],
+                    "target_port_name": "value",
+                },
+            )
+        )
+        src, tgt = source["node_id"], target["node_id"]
+        assert result["view_url"].endswith(f"#focus={src},{tgt}&edge={result['edge_id']}")
+
+    def test_set_param_view_url(self, monkeypatch) -> None:
+        mcp, session = self._setup(monkeypatch, True)
+        node = self._add(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "set_param",
+                {
+                    "session_id": session.id,
+                    "node_id": node["node_id"],
+                    "param_name": "path",
+                    "value": "b.csv",
+                },
+            )
+        )
+        assert result["view_url"].endswith(f"#focus={node['node_id']}")
+
+    def test_view_link_tool(self, monkeypatch) -> None:
+        mcp, session = self._setup(monkeypatch, False)
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "view_link",
+                {"session_id": session.id, "focus": ["n1"], "reach": "up"},
+            )
+        )
+        assert result["view_url"] == f"{self.BASE}/?session={session.id}#focus=n1&reach=up"
+        assert result["canvas_reachable"] is False
+        assert "not attached" in result["note"]
+
+    def test_view_link_tool_attached(self, monkeypatch) -> None:
+        mcp, session = self._setup(monkeypatch, True)
+        result = _run_async(
+            _call_tool(mcp, "view_link", {"session_id": session.id, "route": ["a", "b"]})
+        )
+        assert result["view_url"].endswith("#route=a~b")
+        assert result["canvas_reachable"] is True
+
+    def test_view_link_unknown_session_errors(self, monkeypatch) -> None:
+        mcp, _session = self._setup(monkeypatch, False)
+        with pytest.raises(Exception):  # noqa: B017
+            _run_async(_call_tool(mcp, "view_link", {"session_id": "nope"}))
+
+    def test_create_session_open_in_ui_unchanged_when_attached(self, monkeypatch) -> None:
+        mcp, _session = self._setup(monkeypatch, True)
+        result = _run_async(_call_tool(mcp, "create_session", {}))
+        assert "#" not in result["open_in_ui"]

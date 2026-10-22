@@ -67,6 +67,8 @@ import type { TraceMode } from "./toReactFlow";
 import "./CanvasTrace.css";
 import { fromIR } from "../store/ir";
 import { useSubgraphStore, currentSubgraph } from "../store/subgraphStore";
+import { copyViewLink, useViewLinkStore } from "../store/viewLinkStore";
+import type { ViewState } from "../io/viewLink";
 
 const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode, compositeNode: CompositeNode, snapshotNode: SnapshotNode, calloutNode: CalloutNode, resultCardNode: ResultCardNode };
 const edgeTypes: EdgeTypes = { efEdge: EfEdge };
@@ -120,6 +122,8 @@ export function Canvas(): JSX.Element {
   const setReach = useTraceStore((s) => s.setReach);
   const startRoutePick = useTraceStore((s) => s.startRoutePick);
   const resetTrace = useTraceStore((s) => s.reset);
+  const setLens = useTraceStore((s) => s.setLens);
+  const pendingView = useViewLinkStore((s) => s.pendingCanvas);
 
   const edgeCompatibility = useValidationStore((s) => s.edgeCompatibility);
   const diagnostics = useValidationStore((s) => s.diagnostics);
@@ -424,6 +428,7 @@ export function Canvas(): JSX.Element {
   const [clipboard, setClipboard] = useState<NodeModel[] | null>(null);
   const [findModalOpen, setFindModalOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState<boolean>(false);
+  const [flowReady, setFlowReady] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const reactFlowInstance = useRef<any>(null);
 
@@ -450,6 +455,7 @@ export function Canvas(): JSX.Element {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onInit = useCallback((instance: any) => {
     reactFlowInstance.current = instance;
+    setFlowReady(true);
   }, []);
 
   const navigateToNode = useCallback(
@@ -460,6 +466,25 @@ export function Canvas(): JSX.Element {
         zoom: 1,
         duration: 200,
       });
+    },
+    [nodes],
+  );
+
+  // Fits the viewport to store positions (not measured DOM sizes, which off-screen nodes lack).
+  const fitToNodes = useCallback(
+    (ids: string[]) => {
+      const pts = ids
+        .map((id) => nodes[id]?.position)
+        .filter((p): p is { x: number; y: number } => !!p);
+      if (pts.length === 0 || !reactFlowInstance.current) return;
+      const minX = Math.min(...pts.map((p) => p.x));
+      const minY = Math.min(...pts.map((p) => p.y));
+      const maxX = Math.max(...pts.map((p) => p.x)) + 200; // approx node width
+      const maxY = Math.max(...pts.map((p) => p.y)) + 80; // approx node height
+      reactFlowInstance.current.fitBounds(
+        { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
+        { padding: 0.2, duration: 200 },
+      );
     },
     [nodes],
   );
@@ -533,6 +558,85 @@ export function Canvas(): JSX.Element {
   useEffect(() => {
     resetTrace();
   }, [breadcrumbs, resetTrace]);
+
+  // Deep links (issue #168): apply a pending #focus/#reach/#route/#lens/#edge view once React Flow
+  // is ready. Unknown ids collect into ONE notice.
+  useEffect(() => {
+    if (!pendingView || !flowReady) return;
+    if (isInSubgraph) {
+      useSubgraphStore.getState().clear(); // ids in a link refer to the top-level graph
+      return; // re-runs once breadcrumbs clear
+    }
+    const { consumeCanvas, setNotice } = useViewLinkStore.getState();
+    consumeCanvas();
+    const missing: string[] = [];
+    const knownNode = (id: string): boolean => {
+      if (nodes[id]) return true;
+      missing.push(`node "${id}"`);
+      return false;
+    };
+    const focus = pendingView.focus.filter(knownNode);
+    const edge = pendingView.edge && edges[pendingView.edge] ? edges[pendingView.edge] : null;
+    if (pendingView.edge && !edge) missing.push(`edge "${pendingView.edge}"`);
+    if (focus.length > 0 || edge) replaceSelection(focus, edge ? [edge.id] : undefined);
+    resetTrace();
+    const route = pendingView.route;
+    // Check BOTH ends (no short-circuit) so both missing ids are reported.
+    const routeOk = route ? [route.from, route.to].filter(knownNode).length === 2 : false;
+    let lens: string[] = [];
+    if (pendingView.lens.length > 0) {
+      const knownFamilies = new Set(catalog.nodes.map((n) => n.family));
+      lens = pendingView.lens.filter((f) => {
+        if (knownFamilies.has(f)) return true;
+        missing.push(`family "${f}"`);
+        return false;
+      });
+    }
+    // Apply exactly one trace mode, priority route > reach > lens.
+    if (route && routeOk) {
+      setRoute(route.from, route.to);
+    } else if (pendingView.reach && focus.length > 0) {
+      setReach(pendingView.reach);
+    } else if (lens.length > 0) {
+      setLens(lens);
+    }
+    // Centre on everything the link points at (focus, route endpoints, edge endpoints).
+    const targetIds = [
+      ...new Set([
+        ...focus,
+        ...(route && routeOk ? [route.from, route.to] : []),
+        ...(edge ? [edge.source.node_id, edge.target.node_id] : []),
+      ]),
+    ].filter((id) => nodes[id]);
+    if (targetIds.length === 1) navigateToNode(targetIds[0]);
+    else if (targetIds.length > 1) fitToNodes(targetIds);
+    if (missing.length > 0) setNotice(`Not in this graph: ${missing.join(", ")}`);
+  }, [
+    pendingView,
+    flowReady,
+    isInSubgraph,
+    nodes,
+    edges,
+    catalog,
+    replaceSelection,
+    resetTrace,
+    setReach,
+    setRoute,
+    setLens,
+    navigateToNode,
+    fitToNodes,
+  ]);
+
+  const traceLink = useMemo((): Partial<ViewState> | null => {
+    if (traceMode === "reach" && selectedNodeIds.length > 0) {
+      return { focus: selectedNodeIds, reach: traceDirection };
+    }
+    if (traceMode === "route" && routeFrom && routeTo && !routePicking) {
+      return { route: { from: routeFrom, to: routeTo } };
+    }
+    if (traceMode === "lens" && lensFamilies.length > 0) return { lens: lensFamilies };
+    return null;
+  }, [traceMode, selectedNodeIds, traceDirection, routeFrom, routeTo, routePicking, lensFamilies]);
 
   const traceBanner = useMemo((): string | null => {
     if (traceMode === "reach") {
@@ -677,6 +781,15 @@ export function Canvas(): JSX.Element {
           }}
         >
           <span>{traceBanner}</span>
+          {traceLink && (
+            <Button
+              variant="ghost"
+              data-testid="trace-banner-copy-link"
+              onClick={() => void copyViewLink(traceLink)}
+            >
+              Copy link
+            </Button>
+          )}
           <Button variant="ghost" data-testid="trace-banner-clear" onClick={resetTrace}>Clear (Esc)</Button>
         </div>
       )}
@@ -727,6 +840,7 @@ export function Canvas(): JSX.Element {
             setReach("both");
           }}
           onRouteFromHere={() => startRoutePick(contextMenu.nodeId)}
+          onCopyLink={() => void copyViewLink({ focus: [contextMenu.nodeId] })}
           onNodeInfo={() => setInfoNodeId(contextMenu.nodeId)}
           onClose={closeContextMenu}
         />
