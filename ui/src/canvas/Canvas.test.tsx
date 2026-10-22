@@ -1156,6 +1156,42 @@ describe("Canvas deep links (issue #168)", () => {
     useCollapseStore.getState().setCollapsed(groupId, false);
   });
 
+  test("a link that leaves React Flow's selection unchanged doesn't swallow a later collapse", async () => {
+    const a = add(0, 0);
+    const a2 = add(0, 200);
+    const b = add(400, 0);
+    const c = add(600, 0);
+    const hiddenGroup = useGraphStore.getState().groupSelection([b, c]);
+    const aGroup = useGraphStore.getState().groupSelection([a, a2]);
+    if (!hiddenGroup || !aGroup) throw new Error("expected groupSelection to create groups");
+    useSelectionStore.getState().clear();
+    useCollapseStore.getState().setCollapsed(hiddenGroup, true);
+    const { container } = render(<Canvas />);
+    act(() => useSelectionStore.getState().replaceSelection([a]));
+    await waitFor(() =>
+      expect(container.querySelector(`.react-flow__node[data-id="${a}"]`)).toHaveClass("selected"),
+    );
+
+    // `a` is already selected and `c` is hidden, so React Flow has nothing to echo.
+    act(() => useViewLinkStore.getState().request(parseViewHash(`#focus=${a},${c}`)));
+    await waitFor(() => expect(useSelectionStore.getState().nodes).toEqual({ [a]: true, [c]: true }));
+
+    // Collapsing a's group hides it; React Flow's empty report must clear the selection.
+    fireEvent.click(
+      container.querySelector(
+        `.react-flow__node[data-id="${aGroup}"] [data-testid="group-node-collapse-toggle"]`,
+      ) as HTMLElement,
+    );
+    await waitFor(() =>
+      expect(container.querySelector(`.react-flow__node[data-id="${a}"]`)).toBeNull(),
+    );
+    await waitFor(() =>
+      expect(Object.values(useSelectionStore.getState().nodes).some(Boolean)).toBe(false),
+    );
+    useCollapseStore.getState().setCollapsed(hiddenGroup, false);
+    useCollapseStore.getState().setCollapsed(aGroup, false);
+  });
+
   test("no Copy link (context menu or trace banner) inside a composite subgraph", async () => {
     useGraphStore.getState().loadModel({
       paradigm: "functional",

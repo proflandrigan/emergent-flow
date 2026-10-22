@@ -73,6 +73,11 @@ import type { ViewState } from "../io/viewLink";
 const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode, compositeNode: CompositeNode, snapshotNode: SnapshotNode, calloutNode: CalloutNode, resultCardNode: ResultCardNode };
 const edgeTypes: EdgeTypes = { efEdge: EfEdge };
 
+/** Same ids, ignoring order. */
+function sameIds(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((id) => b.includes(id));
+}
+
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false;
@@ -360,8 +365,19 @@ export function Canvas(): JSX.Element {
   // Read through a ref so onSelectionChange keeps a stable identity (React Flow re-syncs on change).
   const selectionEchoRef = useRef({ visibleId, rawEdges });
   selectionEchoRef.current = { visibleId, rawEdges };
+  // The part of a selection React Flow renders (and so reports): nodes not hidden in a collapsed
+  // group, and edges it draws.
+  const renderedSelection = useCallback((sel: Pick<SelectionStore, "nodes" | "edges">) => {
+    const { visibleId, rawEdges } = selectionEchoRef.current;
+    const renderedEdges = new Set(rawEdges.map((e) => e.id));
+    return {
+      nodes: Object.keys(sel.nodes).filter((id) => sel.nodes[id] && visibleId(id) === id),
+      edges: Object.keys(sel.edges).filter((id) => sel.edges[id] && renderedEdges.has(id)),
+    };
+  }, []);
   // Armed by the deep-link effect with the selection it set when that selection includes a node
-  // hidden in a collapsed group; any other selection change replaces the store objects, disarming it.
+  // hidden in a collapsed group AND React Flow will echo it (its rendered part changed); any other
+  // selection change replaces the store objects, and a collapse/expand clears it, disarming it.
   const deepLinkEchoRef = useRef<Pick<SelectionStore, "nodes" | "edges"> | null>(null);
   const onSelectionChange = useCallback(
     (params: { nodes: Node[]; edges: Edge[] }) => {
@@ -374,18 +390,19 @@ export function Canvas(): JSX.Element {
       deepLinkEchoRef.current = null;
       const sel = useSelectionStore.getState();
       if (armed && armed.nodes === sel.nodes && armed.edges === sel.edges) {
-        const { visibleId, rawEdges } = selectionEchoRef.current;
-        const renderedEdges = new Set(rawEdges.map((e) => e.id));
-        const shownNodes = Object.keys(sel.nodes).filter((id) => sel.nodes[id] && visibleId(id) === id);
-        const shownEdges = Object.keys(sel.edges).filter((id) => sel.edges[id] && renderedEdges.has(id));
-        const same = (a: string[], b: string[]) =>
-          a.length === b.length && a.every((id) => b.includes(id));
-        if (same(nodeIds, shownNodes) && same(edgeIds, shownEdges)) return;
+        const shown = renderedSelection(sel);
+        if (sameIds(nodeIds, shown.nodes) && sameIds(edgeIds, shown.edges)) return;
       }
       replaceSelection(nodeIds, edgeIds.length > 0 ? edgeIds : undefined);
     },
-    [replaceSelection],
+    [replaceSelection, renderedSelection],
   );
+
+  // A collapse/expand changes what React Flow renders without a store selection change; its report
+  // then is authoritative, so never let a stale deep-link arm swallow it.
+  useEffect(() => {
+    deepLinkEchoRef.current = null;
+  }, [collapsedGroupIds]);
 
   // React Flow reports no change when a pane click deselects only nodes it doesn't render (hidden
   // in a collapsed group), so clear such a selection here.
@@ -617,11 +634,16 @@ export function Canvas(): JSX.Element {
     const edge = pendingView.edge && edges[pendingView.edge] ? edges[pendingView.edge] : null;
     if (pendingView.edge && !edge) missing.push(`edge "${pendingView.edge}"`);
     if (focus.length > 0 || edge) {
+      // React Flow only reports when its rendered selection changes, so arm only if it will.
+      const before = renderedSelection(useSelectionStore.getState());
       replaceSelection(focus, edge ? [edge.id] : undefined);
-      const { nodes: selNow, edges: selEdgesNow } = useSelectionStore.getState();
-      deepLinkEchoRef.current = focus.some((id) => visibleId(id) !== id)
-        ? { nodes: selNow, edges: selEdgesNow }
-        : null;
+      const selNow = useSelectionStore.getState();
+      const after = renderedSelection(selNow);
+      const echoes = !sameIds(before.nodes, after.nodes) || !sameIds(before.edges, after.edges);
+      deepLinkEchoRef.current =
+        echoes && focus.some((id) => visibleId(id) !== id)
+          ? { nodes: selNow.nodes, edges: selNow.edges }
+          : null;
     }
     resetTrace();
     const route = pendingView.route;
@@ -663,6 +685,7 @@ export function Canvas(): JSX.Element {
     edges,
     catalog,
     visibleId,
+    renderedSelection,
     replaceSelection,
     resetTrace,
     setReach,
