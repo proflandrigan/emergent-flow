@@ -423,6 +423,69 @@ test("a view_url for a different session keeps normal navigation", async () => {
   request.mockRestore();
 });
 
+// The expanded chat renders inside OverlayModal, whose panel stops click propagation -- App's
+// delegated link listener must still see clicks on agent links there.
+async function openExpandedChatWithViewLink() {
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  fireEvent.click(screen.getByText("Open chat"));
+  useSessionStore.setState({
+    chat: {
+      backend: "claude",
+      backend_thread_id: null,
+      active_persona: null,
+      turns: [
+        {
+          id: "turn-1",
+          backend: "claude",
+          user_message: "add a node",
+          narration: [],
+          agent_message: `Done: [view it](${window.location.origin}/?session=app-test-session#focus=n1)`,
+          status: "completed",
+          error: null,
+        },
+      ],
+    },
+  } as never);
+  await waitFor(() => expect(screen.getByText("view it")).toBeInTheDocument());
+  fireEvent.click(screen.getByTestId("chat-dock-expand"));
+  await waitFor(() => expect(screen.getByTestId("chat-expanded")).toBeInTheDocument());
+  return screen.getByText("view it").closest("a")!;
+}
+
+test("an active-session view_url in the expanded chat overlay is applied in place", async () => {
+  mockHealth("ok");
+  render(<App />);
+  await useSessionStore.getState().createAndJoin();
+  expect(window.location.search).toBe("");
+  const a = await openExpandedChatWithViewLink();
+  const request = vi.spyOn(useViewLinkStore.getState(), "request");
+
+  const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+  a.dispatchEvent(click);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(click.defaultPrevented).toBe(true); // no full-page navigation
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(window.location.search).toBe("?session=app-test-session");
+  expect(window.location.hash).toBe("#focus=n1");
+  request.mockRestore();
+});
+
+test("re-clicking the current view link in the expanded chat overlay re-applies it", async () => {
+  mockHealth("ok");
+  render(<App />);
+  await useSessionStore.getState().createAndJoin();
+  window.history.replaceState(null, "", "/?session=app-test-session#focus=n1");
+  const a = await openExpandedChatWithViewLink();
+  const request = vi.spyOn(useViewLinkStore.getState(), "request");
+
+  a.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(request).toHaveBeenCalledTimes(1);
+  request.mockRestore();
+});
+
 test("bad keys never throw", () => {
   mockHealth("ok");
   window.history.replaceState(null, "", "/#nonsense=1&focus=%E0%A4%A");

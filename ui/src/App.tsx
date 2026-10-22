@@ -276,6 +276,10 @@ export function App(): JSX.Element {
   // An agent's view_url always carries ?session=<id>, but joining in-app (Start chat) leaves the
   // address bar without it -- the browser would treat that link as a full reload, so a link that
   // differs only by the ACTIVE session param is pushed onto history and applied in place.
+  // The click listener runs in the CAPTURE phase: OverlayModal's panel stops click propagation, so
+  // a bubble-phase document listener never sees links in the expanded chat. Capture runs before any
+  // React handler, so defaultPrevented only reflects earlier capture listeners -- no in-app anchor
+  // that handles its own clicks has a #view hash, so nothing here double-handles a link.
   useEffect(() => {
     function onHashChange() {
       useViewLinkStore.getState().request(parseViewHash(window.location.hash));
@@ -309,10 +313,10 @@ export function App(): JSX.Element {
       useViewLinkStore.getState().request(view);
     }
     window.addEventListener("hashchange", onHashChange);
-    document.addEventListener("click", onClick);
+    document.addEventListener("click", onClick, true);
     return () => {
       window.removeEventListener("hashchange", onHashChange);
-      document.removeEventListener("click", onClick);
+      document.removeEventListener("click", onClick, true);
     };
   }, []);
 
