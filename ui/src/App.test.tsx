@@ -486,6 +486,50 @@ test("re-clicking the current view link in the expanded chat overlay re-applies 
   request.mockRestore();
 });
 
+// A click-applied view is deferred to a macrotask so React Flow's node click handler (which
+// re-selects the clicked node) runs first and the linked focus wins.
+test("a click-applied view is requested after the click dispatch, not synchronously", async () => {
+  mockHealth("ok");
+  render(<App />);
+  await useSessionStore.getState().createAndJoin();
+  const request = vi.spyOn(useViewLinkStore.getState(), "request");
+
+  const a = document.createElement("a");
+  a.href = `${window.location.origin}/?session=app-test-session#focus=n1`;
+  document.body.appendChild(a);
+  const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+  a.dispatchEvent(click);
+  a.remove();
+
+  expect(click.defaultPrevented).toBe(true); // preventDefault stays synchronous
+  expect(window.location.hash).toBe("#focus=n1"); // so does pushState
+  await Promise.resolve(); // a microtask is not enough
+  expect(request).not.toHaveBeenCalled();
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(request.mock.calls[0][0].focus).toEqual(["n1"]);
+  request.mockRestore();
+});
+
+test("unmounting before the deferred request fires drops it", async () => {
+  mockHealth("ok");
+  const { unmount } = render(<App />);
+  window.history.replaceState(null, "", "/#focus=n1");
+  const request = vi.spyOn(useViewLinkStore.getState(), "request");
+
+  const a = document.createElement("a");
+  a.href = "#focus=n1";
+  document.body.appendChild(a);
+  a.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+  a.remove();
+  unmount();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(request).not.toHaveBeenCalled();
+  request.mockRestore();
+});
+
 test("bad keys never throw", () => {
   mockHealth("ok");
   window.history.replaceState(null, "", "/#nonsense=1&focus=%E0%A4%A");

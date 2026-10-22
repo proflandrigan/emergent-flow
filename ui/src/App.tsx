@@ -25,7 +25,12 @@ import {
   useSessionAutoSave,
 } from "./io/sessionRecovery";
 import { Palette } from "./palette/Palette";
-import { isEmptyViewState, parseViewHash, withSessionParam } from "./io/viewLink";
+import {
+  isEmptyViewState,
+  parseViewHash,
+  type ViewState,
+  withSessionParam,
+} from "./io/viewLink";
 import { useGraphStore } from "./store/graphStore";
 import { useViewLinkStore } from "./store/viewLinkStore";
 import { ProposalPanel } from "./session/ProposalPanel";
@@ -280,7 +285,20 @@ export function App(): JSX.Element {
   // a bubble-phase document listener never sees links in the expanded chat. Capture runs before any
   // React handler, so defaultPrevented only reflects earlier capture listeners -- no in-app anchor
   // that handles its own clicks has a #view hash, so nothing here double-handles a link.
+  // Because capture runs first, a synchronous request() would let React commit and the Canvas
+  // deep-link effect apply the selection in the microtask checkpoint between listeners -- before
+  // React Flow's node click handler re-selects the clicked note/result-card node and overrides the
+  // linked focus. preventDefault/pushState stay synchronous, but request() is deferred to a
+  // macrotask (setTimeout, not queueMicrotask) so it runs after the whole click dispatch.
   useEffect(() => {
+    const pending = new Set<number>();
+    function requestAfterClick(view: ViewState) {
+      const id = window.setTimeout(() => {
+        pending.delete(id);
+        useViewLinkStore.getState().request(view);
+      }, 0);
+      pending.add(id);
+    }
     function onHashChange() {
       useViewLinkStore.getState().request(parseViewHash(window.location.hash));
     }
@@ -297,26 +315,28 @@ export function App(): JSX.Element {
       if (isEmptyViewState(view)) return;
       if (anchor.search === here.search) {
         // A different hash navigates and fires hashchange -- leave it to onHashChange (no double apply).
-        if (anchor.hash === here.hash) useViewLinkStore.getState().request(view);
+        if (anchor.hash === here.hash) requestAfterClick(view);
         return;
       }
       // A link to another session (or any other query change) keeps normal browser navigation.
       if (!differsOnlyByActiveSession(anchor.search, here.search)) return;
       e.preventDefault();
       // The address bar now carries ?session= (refresh rejoins, Back returns); pushState fires no
-      // hashchange, so apply the view directly.
+      // hashchange, so apply the view directly (after the click dispatch, see above).
       window.history.pushState(
         window.history.state,
         "",
         anchor.pathname + anchor.search + anchor.hash,
       );
-      useViewLinkStore.getState().request(view);
+      requestAfterClick(view);
     }
     window.addEventListener("hashchange", onHashChange);
     document.addEventListener("click", onClick, true);
     return () => {
       window.removeEventListener("hashchange", onHashChange);
       document.removeEventListener("click", onClick, true);
+      for (const id of pending) window.clearTimeout(id);
+      pending.clear();
     };
   }, []);
 
