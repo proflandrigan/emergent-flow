@@ -87,3 +87,11 @@ describe("buildViewUrl", () => {
     ).toBe("http://127.0.0.1:8765/?session=s1#focus=n1");
   });
 });
+
+describe("formatViewHash encoding parity with Python quote", () => {
+  test("escapes ! ' ( ) * and ~", () => {
+    expect(formatViewHash({ focus: ["a!b'c(d)e*f~g"] })).toBe(
+      "#focus=a%21b%27c%28d%29e%2Af%7Eg",
+    );
+  });
+});

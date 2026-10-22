@@ -237,9 +237,15 @@ export function App(): JSX.Element {
     const urlSession = new URLSearchParams(window.location.search).get("session");
     if (urlSession) {
       // Apply the #view only once join() has loaded the session graph (issue #168).
-      void useSessionStore.getState().join(urlSession).then(() => {
-        useViewLinkStore.getState().request(view);
-      });
+      void useSessionStore
+        .getState()
+        .join(urlSession)
+        .then(() => {
+          // join() swallows errors into status "error"; don't apply ids to a graph that never loaded.
+          if (useSessionStore.getState().status !== "error") {
+            useViewLinkStore.getState().request(view);
+          }
+        });
       return;
     }
     const recovered = recoverSession();
@@ -264,7 +270,7 @@ export function App(): JSX.Element {
     if (!pendingProposal) return;
     const id = pendingProposal;
     if (!(id in useSessionStore.getState().proposals)) {
-      useViewLinkStore.getState().setNotice(`Not in this session: proposal "${id}"`);
+      useViewLinkStore.getState().addNotice(`Not in this session: proposal "${id}"`);
     }
     setHighlightProposal(id);
     setProposalsOpen(true);
@@ -275,7 +281,7 @@ export function App(): JSX.Element {
     if (!pendingReview) return;
     const id = pendingReview;
     if (!(id in useSessionStore.getState().reviews)) {
-      useViewLinkStore.getState().setNotice(`Not in this session: review "${id}"`);
+      useViewLinkStore.getState().addNotice(`Not in this session: review "${id}"`);
     }
     setHighlightReview(id);
     setReviewsOpen(true);

@@ -567,7 +567,7 @@ export function Canvas(): JSX.Element {
       useSubgraphStore.getState().clear(); // ids in a link refer to the top-level graph
       return; // re-runs once breadcrumbs clear
     }
-    const { consumeCanvas, setNotice } = useViewLinkStore.getState();
+    const { consumeCanvas, addNotice } = useViewLinkStore.getState();
     consumeCanvas();
     const missing: string[] = [];
     const knownNode = (id: string): boolean => {
@@ -610,7 +610,7 @@ export function Canvas(): JSX.Element {
     ].filter((id) => nodes[id]);
     if (targetIds.length === 1) navigateToNode(targetIds[0]);
     else if (targetIds.length > 1) fitToNodes(targetIds);
-    if (missing.length > 0) setNotice(`Not in this graph: ${missing.join(", ")}`);
+    if (missing.length > 0) addNotice(`Not in this graph: ${missing.join(", ")}`);
   }, [
     pendingView,
     flowReady,

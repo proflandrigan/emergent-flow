@@ -85,3 +85,11 @@ describe("copyViewLink", () => {
     expect(useViewLinkStore.getState().fallbackUrl).toBe(url);
   });
 });
+
+describe("addNotice", () => {
+  test("appends to an existing notice instead of overwriting it", () => {
+    useViewLinkStore.getState().addNotice("a");
+    useViewLinkStore.getState().addNotice("b");
+    expect(useViewLinkStore.getState().notice).toBe("a; b");
+  });
+});

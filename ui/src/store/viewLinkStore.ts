@@ -26,6 +26,8 @@ export interface ViewLinkStore {
   consumeProposal: () => void;
   consumeReview: () => void;
   setNotice: (message: string | null) => void;
+  /** Like setNotice but appends to a pending notice so simultaneous unknown-id reports survive. */
+  addNotice: (message: string) => void;
   setFallbackUrl: (url: string | null) => void;
 }
 
@@ -73,6 +75,10 @@ export const useViewLinkStore = create<ViewLinkStore>((set) => ({
 
   setNotice(message) {
     set({ notice: message });
+  },
+
+  addNotice(message) {
+    set((s) => ({ notice: s.notice && s.notice !== message ? `${s.notice}; ${message}` : message }));
   },
 
   setFallbackUrl(url) {

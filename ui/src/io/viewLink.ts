@@ -49,7 +49,11 @@ function safeDecode(s: string): string | null {
 }
 
 function encodeId(id: string): string {
-  return encodeURIComponent(id).replace(/~/g, "%7E");
+  // Match Python's urllib.parse.quote(safe=""): also escape ! ' ( ) * and ~ (a delimiter here).
+  return encodeURIComponent(id).replace(
+    /[!'()*~]/g,
+    (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0"),
+  );
 }
 
 function decodeList(raw: string, sep: string): string[] {
