@@ -341,3 +341,77 @@ def test_group_and_module_titles_with_direction_token() -> None:
 def test_direction_token_left_alone_outside_subgraph_titles() -> None:
     out = to_mermaid(_graph([_node("a", "data.load_csv", "direction TB")]))
     assert '["direction TB' in out
+
+
+# ---------------------------------------------------------------------------
+# Canvas title precedence (the ``label`` param wins for param-titled types)
+# ---------------------------------------------------------------------------
+
+
+def test_canvas_renamed_group_uses_label_param() -> None:
+    # Canvas shape: node.label stays "Group"; renaming only edits the ``label`` param.
+    grp = _node(
+        "grp",
+        "layout.group",
+        "Group",
+        in_name=None,
+        out_name=None,
+        params=[Param(name="label", type_token="str", value="Preprocessing")],
+    )
+    members = [_node(f"m{i}", "clean.impute_missing", f"M{i}", group_id="grp") for i in range(3)]
+    g = _graph([grp, *members])
+    assert '    subgraph g_grp["Preprocessing"]' in to_mermaid(g).splitlines()
+    collapsed = to_mermaid(g, max_nodes=1)
+    assert "Preprocessing" in collapsed
+    assert '"Group' not in collapsed
+
+
+def test_group_without_label_param_falls_back_to_node_label() -> None:
+    grp = _node("grp", "layout.group", "Prep", in_name=None, out_name=None)
+    g = _graph([grp, _node("m", "data.load_csv", "M", group_id="grp")])
+    assert '    subgraph g_grp["Prep"]' in to_mermaid(g).splitlines()
+    blank = _node(
+        "grp",
+        "layout.group",
+        "Prep",
+        in_name=None,
+        out_name=None,
+        params=[Param(name="label", type_token="str", value="  ")],
+    )
+    g = _graph([blank, _node("m", "data.load_csv", "M", group_id="grp")])
+    assert '    subgraph g_grp["Prep"]' in to_mermaid(g).splitlines()
+
+
+def test_canvas_composite_and_callout_use_label_param() -> None:
+    inner = _graph([_node("l1", "clean.impute_missing", "Impute")])
+    comp = _node(
+        "comp",
+        "layout.composite",
+        "Composite",
+        subgraph=inner,
+        params=[Param(name="label", type_token="str", value="Feature prep")],
+    )
+    out = to_mermaid(_graph([comp]))
+    assert '    subgraph n_comp["Feature prep<br/><small>layout.composite</small>"]' in (
+        out.splitlines()
+    )
+    callout = _node(
+        "co",
+        "layout.callout",
+        "Callout",
+        in_name=None,
+        out_name=None,
+        params=[Param(name="label", type_token="str", value="Key finding")],
+    )
+    out = to_mermaid(_graph([callout]), include_notes=True)
+    assert 'n_co["Key finding' in out
+    assert '"Callout' not in out
+
+
+def test_non_param_titled_type_ignores_label_param() -> None:
+    node = _node(
+        "a", "data.load_csv", "Load", params=[Param(name="label", type_token="str", value="Other")]
+    )
+    out = to_mermaid(_graph([node]))
+    assert 'n_a["Load' in out
+    assert "Other" not in out

@@ -256,3 +256,31 @@ def test_validate_json_output_is_valid(tmp_path) -> None:
     assert rc == 0
     data = json_mod.loads(buf.getvalue())
     assert "diagnostics" in data and "edge_compatibility" in data
+
+
+def test_mermaid_writes_utf8_on_narrow_stdout_encoding(tmp_path, monkeypatch) -> None:
+    import io
+    import sys
+
+    from emergentflow.ir import Direction
+
+    graph_file = tmp_path / "ports.json"
+    _write_graph(
+        graph_file,
+        nodes={
+            "a": _simple_node("a", "test.source", ports=[_port("a-out", "out", "out")]),
+            "b": _simple_node("b", "test.sink", ports=[_port("b-in", "df", Direction.IN.value)]),
+        },
+        edges={
+            "e": {
+                "id": "e",
+                "source": {"node_id": "a", "port_id": "a-out"},
+                "target": {"node_id": "b", "port_id": "b-in"},
+            }
+        },
+    )
+    raw = io.BytesIO()
+    # e.g. redirected stdout on Windows: cp1252 cannot encode the "→" in edge labels.
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(raw, encoding="cp1252"))
+    assert main(["mermaid", str(graph_file)]) == 0
+    assert '|"out→df"|' in raw.getvalue().decode("utf-8")

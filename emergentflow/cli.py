@@ -434,7 +434,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         if args.fenced:
             source = f"```mermaid\n{source}```\n"
-        sys.stdout.write(source)
+        # Mermaid files are UTF-8; bypass a narrower stdout encoding (e.g. cp1252 on
+        # redirected Windows stdout), which can't encode the "→" in port edge labels.
+        buffer = getattr(sys.stdout, "buffer", None)
+        if buffer is not None:
+            sys.stdout.flush()
+            buffer.write(source.encode("utf-8"))
+            buffer.flush()
+        else:
+            sys.stdout.write(source)
         return 0
 
     if args.command == "mcp":

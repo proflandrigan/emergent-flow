@@ -50,6 +50,9 @@ FAMILY_COLORS: dict[str, str] = {
 
 _PRESENTATION_TYPES = frozenset({"notes.markdown", "reports.result_card", "layout.callout"})
 _GROUP_TYPE = "layout.group"
+# Node types whose canvas title comes from the ``label`` param, not ``node.label``
+# (mirrors ``ui/src/canvas/toReactFlow.ts``; renaming on the canvas only edits the param).
+_PARAM_TITLED_TYPES = frozenset({_GROUP_TYPE, "layout.composite", "layout.callout"})
 DEFAULT_MAX_NODES = 150
 _HIGHLIGHT_CLASS = "highlight"
 _HIGHLIGHT_STYLE = "stroke:#ef4444,stroke-width:4px"
@@ -129,8 +132,16 @@ def _is_visible(node: Node, include_notes: bool) -> bool:
     return include_notes or node.type not in _PRESENTATION_TYPES
 
 
+def _label_param(node: Node) -> str:
+    for param in node.params:
+        if param.name == "label" and isinstance(param.value, str) and param.value.strip():
+            return param.value.strip()
+    return ""
+
+
 def _title(node: Node) -> str:
-    label = (node.label or "").strip()
+    label = _label_param(node) if node.type in _PARAM_TITLED_TYPES else ""
+    label = label or (node.label or "").strip()
     if label:
         return label
     definition = default_node_registry.try_get(node.type)
@@ -156,13 +167,7 @@ def _family(node: Node) -> str | None:
 
 
 def _group_name(node: Node) -> str:
-    label = (node.label or "").strip()
-    if label:
-        return label
-    for param in node.params:
-        if param.name == "label" and param.value is not None and str(param.value).strip():
-            return str(param.value).strip()
-    return "Group"
+    return _label_param(node) or (node.label or "").strip() or "Group"
 
 
 def _port_name(node: Node, port_id: str) -> str:
