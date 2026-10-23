@@ -70,7 +70,7 @@
           n_load["Load #quot;sales.csv#quot; #lt;raw#gt; #124; v2<br/><small>data.load_csv</small>"]
           n_impute["Impute #123;mean#125; #amp; #96;fill#96;<br/>second line<br/><small>clean.impute_missing</small>"]
       end
-      n_fit["Fit model; 100#37; → done<br/><small>ml.fit_estimator</small>"]
+      n_fit["Fit model; 100#37; → done (direction#32;TB)<br/><small>ml.fit_estimator</small>"]
       n_note["Note: #lt;b#gt;not#lt;/b#gt; html<br/><small>notes.markdown</small>"]
       n_load -->|"frame"| n_impute
       n_impute -->|"frame→data"| n_fit

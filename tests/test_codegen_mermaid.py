@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from emergentflow.api import is_inspectable
-from emergentflow.codegen.mermaid import _mermaid_label, _subgraph_title, to_mermaid
+from emergentflow.codegen.mermaid import _mermaid_label, to_mermaid
 from emergentflow.ir import Direction, Edge, Graph, Node, Port, PortRef
 from emergentflow.ir.params import Param
 
@@ -315,14 +317,15 @@ def test_edge_text_is_quoted(port: str) -> None:
     assert f'    n_a -->|"{_mermaid_label(port + "→df")}"| n_b' in out.splitlines()
 
 
-def test_subgraph_title_neutralises_direction_token() -> None:
-    assert _subgraph_title("Stage: direction LR") == "Stage: direction#32;LR"
-    assert _subgraph_title("direction\tTB") == "direction#9;TB"
-    assert _subgraph_title("direction   TD x") == "direction#32;  TD x"
-    assert _subgraph_title("subdirection BT") == "subdirection#32;BT"
+def test_label_neutralises_direction_token() -> None:
+    assert _mermaid_label("Stage: direction LR") == "Stage: direction#32;LR"
+    assert _mermaid_label("direction\tTB") == "direction#9;TB"
+    assert _mermaid_label("direction   TD x") == "direction#32;  TD x"
+    assert _mermaid_label("subdirection BT") == "subdirection#32;BT"
+    assert _mermaid_label("direction\ufeffRL") == "direction#65279;RL"
     # The lexer rule is case-sensitive and needs whitespace + a direction keyword.
-    for safe in ("Direction TB", "direction tb", "direction", "directions LR", "direction#32;TB"):
-        assert _subgraph_title(safe) == safe
+    for safe in ("Direction TB", "direction tb", "direction", "directions LR"):
+        assert _mermaid_label(safe) == safe
 
 
 def test_group_and_module_titles_with_direction_token() -> None:
@@ -338,9 +341,64 @@ def test_group_and_module_titles_with_direction_token() -> None:
     )
 
 
-def test_direction_token_left_alone_outside_subgraph_titles() -> None:
-    out = to_mermaid(_graph([_node("a", "data.load_csv", "direction TB")]))
-    assert '["direction TB' in out
+# Mermaid's lexer applies ``.*direction\s+(TB|BT|RL|LR|TD)`` to every line, so any emitted
+# line matching it (other than real direction statements) silently loses its content.
+_LEXER_DIRECTION = re.compile(r"direction\s+(TB|BT|RL|LR|TD)")
+_HOSTILE = "direction TB"
+
+
+def _assert_no_stray_direction(out: str) -> None:
+    stray = [line for line in out.splitlines() if _LEXER_DIRECTION.search(line)]
+    assert stray == []
+
+
+def _hostile_cases() -> dict[str, tuple[Graph, int]]:
+    label = _graph([_node("a", "data.load_csv", _HOSTILE)])
+    type_ = _graph([_node("a", _HOSTILE, "A")])
+    port = _graph(
+        [
+            _node("a", "data.load_csv", "A", in_name=None, out_name=_HOSTILE),
+            _node("b", "clean.impute_missing", "B"),
+        ],
+        [_edge("a", "b")],
+    )
+    inner_mod = _graph(
+        [_node("mod", "nn.module", "M", subgraph=_graph([_node("l1", "nn.linear", _HOSTILE)]))]
+    )
+    deep = _graph([_node("x", "nn.linear", "x")])
+    nested = _node("inner", "nn.module", _HOSTILE, subgraph=deep)
+    flat_comment = _graph(
+        [_node("mod", "nn.module", "M", subgraph=_graph([nested, _node("l2", "nn.relu", "r")]))]
+    )
+    grp = _node("g", "layout.group", _HOSTILE, in_name=None, out_name=None)
+    members = [_node(f"m{i}", "clean.impute_missing", f"M{i}", group_id="g") for i in range(3)]
+    collapsed = _graph([grp, *members, _node("o", "data.load_csv", _HOSTILE)])
+    return {
+        "label": (label, 0),
+        "type": (type_, 0),
+        "port": (port, 0),
+        "inner_module": (inner_mod, 0),
+        "flat_comment": (flat_comment, 0),
+        "group": (collapsed, 0),
+        "collapsed": (collapsed, 1),
+    }
+
+
+@pytest.mark.parametrize("case", list(_hostile_cases()))
+def test_no_stray_direction_statement_in_any_line(case: str) -> None:
+    graph, max_nodes = _hostile_cases()[case]
+    kwargs = {"max_nodes": max_nodes} if max_nodes else {}
+    for direction in ("LR", "TB"):
+        out = to_mermaid(graph, direction=direction, **kwargs)  # type: ignore[arg-type]
+        assert out.splitlines()[0] == f"flowchart {direction}"
+        _assert_no_stray_direction(out)
+        assert "direction#32;TB" in out
+
+
+def test_flattened_comment_neutralises_direction_token() -> None:
+    graph, _ = _hostile_cases()["flat_comment"]
+    lines = to_mermaid(graph).splitlines()
+    assert "        %% flattened: nested subgraph of direction#32;TB (1 nodes) not shown" in lines
 
 
 # ---------------------------------------------------------------------------

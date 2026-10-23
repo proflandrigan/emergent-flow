@@ -153,7 +153,8 @@ emergentflow mermaid examples/functional_pipeline.json --fenced
 
 # Options: --direction TB, --no-types, --no-ports, --highlight NODE_ID (repeatable), --include-notes
 
-# Server: same output over HTTP
+# Server: the bare graph JSON as the body; returns unfenced source with default options
+# (no highlight or other flags; wrap it in a ```mermaid fence yourself)
 curl -X POST http://127.0.0.1:8765/export/mermaid \
   -H "Content-Type: application/json" --data @examples/functional_pipeline.json
 # {"mermaid":"flowchart LR\n    ..."}
@@ -167,7 +168,8 @@ print(ef.to_mermaid(load_graph("examples/functional_pipeline.json"), highlight=[
 ```
 
 On the canvas, **File → Copy as Mermaid** copies the same fenced block to the clipboard. Agents
-connected over MCP can call `get_graph_mermaid(session_id, highlight=[...])`.
+connected over MCP can call `get_graph_mermaid(session_id, highlight=[...])`, which returns
+`{"mermaid": ..., "markdown": ...}` (`markdown` is the fenced block).
 `examples/functional_pipeline.json` renders as:
 
 ```mermaid

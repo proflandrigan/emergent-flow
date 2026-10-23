@@ -23,6 +23,32 @@ describe("ef.to_mermaid goldens", () => {
     },
   );
 
+  it("keeps every vertex and edge of hostile_labels (a 'direction TB' label is not swallowed)", async () => {
+    // Mermaid's lexer swallows any line matching `direction\s+(TB|…)` as a direction statement:
+    // parse() still succeeds but the node/edge silently vanishes, so check what was parsed.
+    const source = Object.entries(GOLDENS).find(([p]) =>
+      p.endsWith("/hostile_labels.mmd"),
+    )?.[1];
+    expect(source).toContain("direction#32;TB");
+    const diagram = await mermaid.mermaidAPI.getDiagramFromText(source!);
+    const db = diagram.db as unknown as {
+      getVertices(): Map<string, { text?: string }>;
+      getEdges(): unknown[];
+      getDirection(): string;
+    };
+    const vertices = db.getVertices();
+    expect([...vertices.keys()].sort()).toEqual([
+      "n_fit",
+      "n_impute",
+      "n_load",
+      "n_note",
+    ]);
+    // A swallowed declaration still leaves an id-only vertex behind via its edges/classes.
+    expect(vertices.get("n_fit")?.text).toContain("Fit model");
+    expect(db.getEdges()).toHaveLength(2);
+    expect(db.getDirection()).toBe("LR");
+  });
+
   it("rejects an unescaped quote (sanity check that parse is strict)", async () => {
     await expect(
       mermaid.parse('flowchart LR\n  a["x"y"]'),

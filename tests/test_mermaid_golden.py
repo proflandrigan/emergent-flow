@@ -56,7 +56,7 @@ def _hostile_graph() -> Graph:
         Node(
             id="fit",
             type="ml.fit_estimator",
-            label="Fit model; 100% → done",
+            label="Fit model; 100% → done (direction TB)",
             ports=[
                 _port("fit", "data", Direction.IN),
                 _port("fit", "model", Direction.OUT),
