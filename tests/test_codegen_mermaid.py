@@ -279,3 +279,26 @@ def test_ef_to_mermaid_is_lazy_entry_point() -> None:
 
     assert "to_mermaid" in ef.__all__
     assert ef.to_mermaid is direct
+
+
+def test_percent_in_label_is_escaped() -> None:
+    a = _node("a", "data.load_csv", "Rate %% of 100%")
+    out = to_mermaid(_graph([a], []))
+    assert "%%" not in out
+    assert "Rate #37;#37; of 100#37;" in out
+
+
+def test_highlight_accepts_bare_string_id() -> None:
+    a = _node("abc", "data.load_csv", "A")
+    b = _node("b", "clean.impute_missing", "B")
+    out = to_mermaid(_graph([a, b], [_edge("abc", "b")]), highlight="abc")  # type: ignore[arg-type]
+    assert "class n_abc highlight" in out
+    assert "n_b highlight" not in out and ",n_b" not in out
+
+
+def test_truncation_count_does_not_treat_group_as_one_drawn_node() -> None:
+    grp = _node("grp", "layout.group", "Big", in_name=None, out_name=None)
+    members = [_node(f"m{i}", "clean.impute_missing", f"M{i}", group_id="grp") for i in range(6)]
+    outside = _node("out", "data.load_csv", "Out", in_name=None, out_name="df")
+    out = to_mermaid(_graph([grp, outside, *members], [_edge("out", "m0")]), max_nodes=3)
+    assert "%% truncated: 6 of 7 nodes not drawn individually" in out

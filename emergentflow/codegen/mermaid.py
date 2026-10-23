@@ -58,6 +58,7 @@ _INDENT = "    "
 _ESCAPES: dict[str, str] = {
     '"': "#quot;",
     "#": "#35;",
+    "%": "#37;",
     "&": "#amp;",
     "<": "#lt;",
     ">": "#gt;",
@@ -362,7 +363,9 @@ def _render_collapsed(
     lines += [f"{_INDENT}{kept[a].mid} --> {kept[b].mid}" for a, b in sorted(pairs)]
     drawn = [(it.mid, it.family, it.raw) for it in kept]
     lines += [_INDENT + line for line in _class_lines(drawn, highlight)]
-    omitted = count - len(kept)
+    # Group items stand for several nodes but are not drawn individually.
+    individual = sum(1 for it in kept if not it.mid.startswith("g_"))
+    omitted = count - individual
     note = (
         f"{_INDENT}%% truncated: {omitted} of {count} nodes not drawn individually "
         f"(limit {max_nodes}); GitHub caps Mermaid diagram size"
@@ -432,6 +435,8 @@ def to_mermaid(
     if max_nodes < 1:
         raise ValueError(f"max_nodes must be >= 1, got {max_nodes!r}")
 
+    if isinstance(highlight, str):  # a bare id is a Collection of characters otherwise
+        highlight = (highlight,)
     header = f"flowchart {direction}"
     count = _renderable_count(graph, include_notes)
     if count > max_nodes:
