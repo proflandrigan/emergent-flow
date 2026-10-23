@@ -25,8 +25,16 @@ import {
   useSessionAutoSave,
 } from "./io/sessionRecovery";
 import { Palette } from "./palette/Palette";
+import {
+  isEmptyViewState,
+  parseViewHash,
+  type ViewState,
+  withSessionParam,
+} from "./io/viewLink";
 import { useGraphStore } from "./store/graphStore";
+import { useViewLinkStore } from "./store/viewLinkStore";
 import { ProposalPanel } from "./session/ProposalPanel";
+import { ReviewPanel } from "./session/ReviewPanel";
 import { useSessionStore } from "./session/sessionStore";
 import { useTheme } from "./theme/useTheme";
 import { IconButton } from "./ui/IconButton";
@@ -86,6 +94,19 @@ function Divider(): JSX.Element {
   );
 }
 
+// True when `linkSearch` names the active session and otherwise matches `pageSearch`
+// (order-insensitive), i.e. following it would only add/replace ?session= with the one joined.
+function differsOnlyByActiveSession(linkSearch: string, pageSearch: string): boolean {
+  const active = useSessionStore.getState().sessionId;
+  if (!active || new URLSearchParams(linkSearch).get("session") !== active) return false;
+  const normalize = (search: string) => {
+    const params = new URLSearchParams(withSessionParam(search, null));
+    params.sort();
+    return params.toString();
+  };
+  return normalize(linkSearch) === normalize(pageSearch);
+}
+
 export function App(): JSX.Element {
   const [status, setStatus] = useState<ServerStatus>("connecting");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -94,8 +115,15 @@ export function App(): JSX.Element {
   const [runsOpen, setRunsOpen] = useState(false);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [proposalsOpen, setProposalsOpen] = useState(false);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [highlightProposal, setHighlightProposal] = useState<string | null>(null);
+  const [highlightReview, setHighlightReview] = useState<string | null>(null);
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [recoveryToast, setRecoveryToast] = useState<string | null>(null);
+  const pendingProposal = useViewLinkStore((s) => s.pendingProposal);
+  const pendingReview = useViewLinkStore((s) => s.pendingReview);
+  const viewNotice = useViewLinkStore((s) => s.notice);
+  const fallbackUrl = useViewLinkStore((s) => s.fallbackUrl);
   const past = useGraphStore((s) => s.past);
   const future = useGraphStore((s) => s.future);
   const sessionId = useSessionStore((s) => s.sessionId);
@@ -218,13 +246,24 @@ export function App(): JSX.Element {
   // Runs once on mount: start tracking canvas-dirty state, warm the examples list, and
   // recover any localStorage-persisted session left behind by a refresh/crash -- or, if the
   // URL carries a ?session=<id>, join that collaboration session instead (the agent-driven
-  // MCP workflow) so the human lands directly on the shared graph.
+  // MCP workflow) so the human lands directly on the shared graph. A #view hash (focus /
+  // proposal / review deep link) is applied after the graph is in place.
   useEffect(() => {
     startDirtyTracking();
     useFlowStore.getState().fetchExamples();
+    const view = parseViewHash(window.location.hash);
     const urlSession = new URLSearchParams(window.location.search).get("session");
     if (urlSession) {
-      void useSessionStore.getState().join(urlSession);
+      // Apply the #view only once join() has loaded the session graph (issue #168).
+      void useSessionStore
+        .getState()
+        .join(urlSession)
+        .then(() => {
+          // join() swallows errors into status "error"; don't apply ids to a graph that never loaded.
+          if (useSessionStore.getState().status !== "error") {
+            useViewLinkStore.getState().request(view);
+          }
+        });
       return;
     }
     const recovered = recoverSession();
@@ -233,7 +272,104 @@ export function App(): JSX.Element {
       setRecoveryToast("Recovered unsaved flow");
       clearSession();
     }
+    useViewLinkStore.getState().request(view);
   }, []);
+
+  // Deep links clicked inside the app (chat, reviews) change only the hash -- re-apply it (issue #168).
+  // The hash stays in the URL so Back/Forward re-fire hashchange between views. Browsers don't fire
+  // hashchange for a link to the CURRENT hash, so a delegated click listener re-applies that case.
+  // An agent's view_url always carries ?session=<id>, but joining in-app (Start chat) leaves the
+  // address bar without it -- the browser would treat that link as a full reload, so a link that
+  // differs only by the ACTIVE session param is pushed onto history and applied in place.
+  // The click listener runs in the CAPTURE phase: OverlayModal's panel stops click propagation, so
+  // a bubble-phase document listener never sees links in the expanded chat. Capture runs before any
+  // React handler, so defaultPrevented only reflects earlier capture listeners -- no in-app anchor
+  // that handles its own clicks has a #view hash, so nothing here double-handles a link.
+  // Because capture runs first, a synchronous request() would let React commit and the Canvas
+  // deep-link effect apply the selection in the microtask checkpoint between listeners -- before
+  // React Flow's node click handler re-selects the clicked note/result-card node and overrides the
+  // linked focus. preventDefault/pushState stay synchronous, but request() is deferred to a
+  // macrotask (setTimeout, not queueMicrotask) so it runs after the whole click dispatch.
+  useEffect(() => {
+    const pending = new Set<number>();
+    function requestAfterClick(view: ViewState) {
+      const id = window.setTimeout(() => {
+        pending.delete(id);
+        useViewLinkStore.getState().request(view);
+      }, 0);
+      pending.add(id);
+    }
+    function onHashChange() {
+      useViewLinkStore.getState().request(parseViewHash(window.location.hash));
+    }
+    function onClick(e: MouseEvent) {
+      if (e.defaultPrevented || e.button !== 0) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const anchor = e.target instanceof Element ? e.target.closest("a[href]") : null;
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (anchor.target && anchor.target !== "_self") return; // opens elsewhere, not this view
+      if (anchor.hasAttribute("download")) return; // a download, not a navigation
+      const here = window.location;
+      if (!anchor.hash || anchor.origin !== here.origin || anchor.pathname !== here.pathname) return;
+      const view = parseViewHash(anchor.hash);
+      if (isEmptyViewState(view)) return;
+      if (anchor.search === here.search) {
+        // A different hash navigates and fires hashchange -- leave it to onHashChange (no double apply).
+        if (anchor.hash === here.hash) requestAfterClick(view);
+        return;
+      }
+      // A link to another session (or any other query change) keeps normal browser navigation.
+      if (!differsOnlyByActiveSession(anchor.search, here.search)) return;
+      e.preventDefault();
+      // The address bar now carries ?session= (refresh rejoins, Back returns); pushState fires no
+      // hashchange, so apply the view directly (after the click dispatch, see above).
+      window.history.pushState(
+        window.history.state,
+        "",
+        anchor.pathname + anchor.search + anchor.hash,
+      );
+      requestAfterClick(view);
+    }
+    window.addEventListener("hashchange", onHashChange);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("hashchange", onHashChange);
+      document.removeEventListener("click", onClick, true);
+      for (const id of pending) window.clearTimeout(id);
+      pending.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!pendingProposal) return;
+    const id = pendingProposal;
+    if (!(id in useSessionStore.getState().proposals)) {
+      useViewLinkStore.getState().addNotice(`Not in this session: proposal "${id}"`);
+    }
+    setHighlightProposal(id);
+    setProposalsOpen(true);
+    useViewLinkStore.getState().consumeProposal();
+  }, [pendingProposal]);
+
+  useEffect(() => {
+    if (!pendingReview) return;
+    const id = pendingReview;
+    if (!(id in useSessionStore.getState().reviews)) {
+      useViewLinkStore.getState().addNotice(`Not in this session: review "${id}"`);
+    }
+    setHighlightReview(id);
+    setReviewsOpen(true);
+    useViewLinkStore.getState().consumeReview();
+  }, [pendingReview]);
+
+  // Auto-dismiss the view-link notice toast after 4s.
+  useEffect(() => {
+    if (!viewNotice) return undefined;
+    const timer = window.setTimeout(() => {
+      useViewLinkStore.getState().setNotice(null);
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, [viewNotice]);
 
   // Warn on tab close / refresh while there are unsaved changes.
   useEffect(() => {
@@ -338,6 +474,13 @@ export function App(): JSX.Element {
       label: "Review proposals",
       onSelect: () => {
         setProposalsOpen(true);
+        setMenuOpen(false);
+      },
+    },
+    {
+      label: "Reviews",
+      onSelect: () => {
+        setReviewsOpen(true);
         setMenuOpen(false);
       },
     },
@@ -602,14 +745,65 @@ export function App(): JSX.Element {
         </OverlayModal>
       )}
       {proposalsOpen && (
-        <OverlayModal width={600} onClose={() => setProposalsOpen(false)}>
-          <ProposalPanel />
+        <OverlayModal
+          width={600}
+          onClose={() => {
+            setProposalsOpen(false);
+            setHighlightProposal(null);
+          }}
+        >
+          <ProposalPanel highlightId={highlightProposal} />
+        </OverlayModal>
+      )}
+      {reviewsOpen && (
+        <OverlayModal
+          width={600}
+          onClose={() => {
+            setReviewsOpen(false);
+            setHighlightReview(null);
+          }}
+        >
+          <ReviewPanel highlightId={highlightReview} />
+        </OverlayModal>
+      )}
+      {fallbackUrl && (
+        <OverlayModal width={480} onClose={() => useViewLinkStore.getState().setFallbackUrl(null)}>
+          <div data-testid="copy-link-fallback">
+            <div style={{ marginBottom: "var(--space-2)" }}>Copy this link:</div>
+            <input
+              readOnly
+              value={fallbackUrl}
+              autoFocus
+              onFocus={(e) => e.currentTarget.select()}
+              data-testid="copy-link-fallback-input"
+              style={{ width: "100%" }}
+              aria-label="Link to this view"
+            />
+          </div>
         </OverlayModal>
       )}
       {chatModalOpen && (
         <Suspense fallback={<div>Loading…</div>}>
           <ChatModal onClose={() => setChatModalOpen(false)} />
         </Suspense>
+      )}
+
+      {viewNotice && (
+        <div
+          data-testid="view-link-toast"
+          style={{
+            position: "fixed",
+            bottom: "calc(var(--space-4) + 48px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 100,
+          }}
+        >
+          <Toast
+            message={viewNotice}
+            onDismiss={() => useViewLinkStore.getState().setNotice(null)}
+          />
+        </div>
       )}
 
       {recoveryToast && (

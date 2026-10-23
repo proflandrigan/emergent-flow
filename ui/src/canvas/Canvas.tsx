@@ -27,7 +27,7 @@ import type { NodeModel } from "../store/model";
 import { useCollapseStore } from "../store/collapseStore";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
-import { useSelectionStore } from "../store/selectionStore";
+import { useSelectionStore, type SelectionStore } from "../store/selectionStore";
 import { useTraceStore } from "../store/traceStore";
 import { familyMeta } from "../theme/family";
 import { useLiveValidation } from "../store/useLiveValidation";
@@ -67,9 +67,16 @@ import type { TraceMode } from "./toReactFlow";
 import "./CanvasTrace.css";
 import { fromIR } from "../store/ir";
 import { useSubgraphStore, currentSubgraph } from "../store/subgraphStore";
+import { copyViewLink, useViewLinkStore } from "../store/viewLinkStore";
+import type { ViewState } from "../io/viewLink";
 
 const nodeTypes: NodeTypes = { efNode: EfNode, noteNode: NoteNode, groupNode: GroupNode, compositeNode: CompositeNode, snapshotNode: SnapshotNode, calloutNode: CalloutNode, resultCardNode: ResultCardNode };
 const edgeTypes: EdgeTypes = { efEdge: EfEdge };
+
+/** Same ids, ignoring order. */
+function sameIds(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((id) => b.includes(id));
+}
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
@@ -120,6 +127,8 @@ export function Canvas(): JSX.Element {
   const setReach = useTraceStore((s) => s.setReach);
   const startRoutePick = useTraceStore((s) => s.startRoutePick);
   const resetTrace = useTraceStore((s) => s.reset);
+  const setLens = useTraceStore((s) => s.setLens);
+  const pendingView = useViewLinkStore((s) => s.pendingCanvas);
 
   const edgeCompatibility = useValidationStore((s) => s.edgeCompatibility);
   const diagnostics = useValidationStore((s) => s.diagnostics);
@@ -198,22 +207,28 @@ export function Canvas(): JSX.Element {
     [selNodes],
   );
 
+  // A node hidden inside a collapsed group is represented by the group node, mirroring how its
+  // edges are re-anchored -- otherwise a trace rooted at it would read as "No path" / all-dimmed.
+  const visibleId = useCallback(
+    (id: string): string => {
+      const groupId = activeNodes[id]?.groupId;
+      return groupId && collapsedGroupIds.has(groupId) ? groupId : id;
+    },
+    [activeNodes, collapsedGroupIds],
+  );
+
   const trace = useMemo((): TraceResult & { routeFound: boolean | null } => {
     const nodeIds = rawNodes.map((n) => n.id);
     const traceEdges = rawEdges.map((e) => ({ id: e.id, source: e.source, target: e.target }));
     switch (traceMode) {
-      case "reach":
-        return { ...computeReach(selectedNodeIds, nodeIds, traceEdges, traceDirection), routeFound: null };
+      case "reach": {
+        const roots = [...new Set(selectedNodeIds.map(visibleId))];
+        return { ...computeReach(roots, nodeIds, traceEdges, traceDirection), routeFound: null };
+      }
       case "route": {
         if (!routeFrom) {
           return { ...computeTrace(selectedNodeIds, nodeIds, traceEdges), routeFound: null };
         }
-        // An endpoint hidden inside a collapsed group is represented by the group node, mirroring
-        // how its edges are re-anchored -- otherwise collapsing would read as "No path".
-        const visibleId = (id: string): string => {
-          const groupId = activeNodes[id]?.groupId;
-          return groupId && collapsedGroupIds.has(groupId) ? groupId : id;
-        };
         if (!routeTo) {
           // Picking a target: highlight only the origin so the user sees where the route starts.
           return { ...computeReach([visibleId(routeFrom)], nodeIds, [], "downstream"), routeFound: null };
@@ -236,7 +251,7 @@ export function Canvas(): JSX.Element {
       default:
         return { ...computeTrace(selectedNodeIds, nodeIds, traceEdges), routeFound: null };
     }
-  }, [traceMode, traceDirection, routeFrom, routeTo, lensFamilies, selectedNodeIds, rawNodes, rawEdges, familyByType, activeNodes, collapsedGroupIds]);
+  }, [traceMode, traceDirection, routeFrom, routeTo, lensFamilies, selectedNodeIds, rawNodes, rawEdges, familyByType, activeNodes, visibleId]);
 
   const presentFamilies = useMemo(() => {
     const found = new Set<string>();
@@ -347,15 +362,56 @@ export function Canvas(): JSX.Element {
     [isInSubgraph, removeEdge, setEdgeSelected],
   );
 
+  // Read through a ref so onSelectionChange keeps a stable identity (React Flow re-syncs on change).
+  const selectionEchoRef = useRef({ visibleId, rawEdges });
+  selectionEchoRef.current = { visibleId, rawEdges };
+  // The part of a selection React Flow renders (and so reports): nodes not hidden in a collapsed
+  // group, and edges it draws.
+  const renderedSelection = useCallback((sel: Pick<SelectionStore, "nodes" | "edges">) => {
+    const { visibleId, rawEdges } = selectionEchoRef.current;
+    const renderedEdges = new Set(rawEdges.map((e) => e.id));
+    return {
+      nodes: Object.keys(sel.nodes).filter((id) => sel.nodes[id] && visibleId(id) === id),
+      edges: Object.keys(sel.edges).filter((id) => sel.edges[id] && renderedEdges.has(id)),
+    };
+  }, []);
+  // Armed by the deep-link effect with the selection it set when that selection includes a node
+  // hidden in a collapsed group AND React Flow will echo it (its rendered part changed); any other
+  // selection change replaces the store objects, and a collapse/expand clears it, disarming it.
+  const deepLinkEchoRef = useRef<Pick<SelectionStore, "nodes" | "edges"> | null>(null);
   const onSelectionChange = useCallback(
     (params: { nodes: Node[]; edges: Edge[] }) => {
-      replaceSelection(
-        params.nodes.map((n) => n.id),
-        params.edges.length > 0 ? params.edges.map((e) => e.id) : undefined,
-      );
+      const nodeIds = params.nodes.map((n) => n.id);
+      const edgeIds = params.edges.map((e) => e.id);
+      // A hidden node selected by a deep link isn't a React Flow node, so React Flow echoes that
+      // selection back without it. Ignore that one echo rather than drop the hidden id; every other
+      // report (a real user selection, or collapsing a group around the selection) replaces it.
+      const armed = deepLinkEchoRef.current;
+      deepLinkEchoRef.current = null;
+      const sel = useSelectionStore.getState();
+      if (armed && armed.nodes === sel.nodes && armed.edges === sel.edges) {
+        const shown = renderedSelection(sel);
+        if (sameIds(nodeIds, shown.nodes) && sameIds(edgeIds, shown.edges)) return;
+      }
+      replaceSelection(nodeIds, edgeIds.length > 0 ? edgeIds : undefined);
     },
-    [replaceSelection],
+    [replaceSelection, renderedSelection],
   );
+
+  // A collapse/expand changes what React Flow renders without a store selection change; its report
+  // then is authoritative, so never let a stale deep-link arm swallow it.
+  useEffect(() => {
+    deepLinkEchoRef.current = null;
+  }, [collapsedGroupIds]);
+
+  // React Flow reports no change when a pane click deselects only nodes it doesn't render (hidden
+  // in a collapsed group), so clear such a selection here.
+  const onPaneClick = useCallback(() => {
+    deepLinkEchoRef.current = null;
+    const { visibleId } = selectionEchoRef.current;
+    const { nodes: sel } = useSelectionStore.getState();
+    if (Object.keys(sel).some((id) => sel[id] && visibleId(id) !== id)) clearSelection();
+  }, [clearSelection]);
 
   const onConnect = useCallback(
     (c: Connection) => {
@@ -424,6 +480,7 @@ export function Canvas(): JSX.Element {
   const [clipboard, setClipboard] = useState<NodeModel[] | null>(null);
   const [findModalOpen, setFindModalOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState<boolean>(false);
+  const [flowReady, setFlowReady] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const reactFlowInstance = useRef<any>(null);
 
@@ -450,6 +507,7 @@ export function Canvas(): JSX.Element {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onInit = useCallback((instance: any) => {
     reactFlowInstance.current = instance;
+    setFlowReady(true);
   }, []);
 
   const navigateToNode = useCallback(
@@ -460,6 +518,25 @@ export function Canvas(): JSX.Element {
         zoom: 1,
         duration: 200,
       });
+    },
+    [nodes],
+  );
+
+  // Fits the viewport to store positions (not measured DOM sizes, which off-screen nodes lack).
+  const fitToNodes = useCallback(
+    (ids: string[]) => {
+      const pts = ids
+        .map((id) => nodes[id]?.position)
+        .filter((p): p is { x: number; y: number } => !!p);
+      if (pts.length === 0 || !reactFlowInstance.current) return;
+      const minX = Math.min(...pts.map((p) => p.x));
+      const minY = Math.min(...pts.map((p) => p.y));
+      const maxX = Math.max(...pts.map((p) => p.x)) + 200; // approx node width
+      const maxY = Math.max(...pts.map((p) => p.y)) + 80; // approx node height
+      reactFlowInstance.current.fitBounds(
+        { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
+        { padding: 0.2, duration: 200 },
+      );
     },
     [nodes],
   );
@@ -533,6 +610,104 @@ export function Canvas(): JSX.Element {
   useEffect(() => {
     resetTrace();
   }, [breadcrumbs, resetTrace]);
+
+  // Deep links (issue #168): apply a pending #focus/#reach/#route/#lens/#edge view once React Flow
+  // is ready. Unknown ids collect into ONE notice.
+  useEffect(() => {
+    if (!pendingView || !flowReady) return;
+    if (isInSubgraph) {
+      useSubgraphStore.getState().clear(); // ids in a link refer to the top-level graph
+      return; // re-runs once breadcrumbs clear
+    }
+    const { consumeCanvas, addNotice } = useViewLinkStore.getState();
+    consumeCanvas();
+    const missing: string[] = [];
+    const knownNode = (id: string): boolean => {
+      if (nodes[id]) return true;
+      missing.push(`node "${id}"`);
+      return false;
+    };
+    // Keep the RAW linked ids in the selection: collapse state is per viewer, and the trace memo
+    // already roots a hidden member at its collapsed group. Only centring maps through visibleId,
+    // so expanding the group (or re-sharing the banner link) still points at the linked node.
+    const focus = [...new Set(pendingView.focus.filter(knownNode))];
+    const edge = pendingView.edge && edges[pendingView.edge] ? edges[pendingView.edge] : null;
+    if (pendingView.edge && !edge) missing.push(`edge "${pendingView.edge}"`);
+    if (focus.length > 0 || edge) {
+      // React Flow only reports when its rendered selection changes, so arm only if it will.
+      const before = renderedSelection(useSelectionStore.getState());
+      replaceSelection(focus, edge ? [edge.id] : undefined);
+      const selNow = useSelectionStore.getState();
+      const after = renderedSelection(selNow);
+      const echoes = !sameIds(before.nodes, after.nodes) || !sameIds(before.edges, after.edges);
+      deepLinkEchoRef.current =
+        echoes && focus.some((id) => visibleId(id) !== id)
+          ? { nodes: selNow.nodes, edges: selNow.edges }
+          : null;
+    }
+    resetTrace();
+    const route = pendingView.route;
+    // Check BOTH ends (no short-circuit) so both missing ids are reported.
+    const routeOk = route ? [route.from, route.to].filter(knownNode).length === 2 : false;
+    let lens: string[] = [];
+    if (pendingView.lens.length > 0) {
+      const knownFamilies = new Set(catalog.nodes.map((n) => n.family));
+      lens = pendingView.lens.filter((f) => {
+        if (knownFamilies.has(f)) return true;
+        missing.push(`family "${f}"`);
+        return false;
+      });
+    }
+    // Apply exactly one trace mode, priority route > reach > lens.
+    if (route && routeOk) {
+      setRoute(route.from, route.to);
+    } else if (pendingView.reach && focus.length > 0) {
+      setReach(pendingView.reach);
+    } else if (lens.length > 0) {
+      setLens(lens);
+    }
+    // Centre on everything the link points at (focus, route endpoints, edge endpoints).
+    const targetIds = [
+      ...new Set([
+        ...focus,
+        ...(route && routeOk ? [route.from, route.to] : []),
+        ...(edge ? [edge.source.node_id, edge.target.node_id] : []),
+      ].map(visibleId)),
+    ].filter((id) => nodes[id]);
+    if (targetIds.length === 1) navigateToNode(targetIds[0]);
+    else if (targetIds.length > 1) fitToNodes(targetIds);
+    if (missing.length > 0) addNotice(`Not in this graph: ${missing.join(", ")}`);
+  }, [
+    pendingView,
+    flowReady,
+    isInSubgraph,
+    nodes,
+    edges,
+    catalog,
+    visibleId,
+    renderedSelection,
+    replaceSelection,
+    resetTrace,
+    setReach,
+    setRoute,
+    setLens,
+    navigateToNode,
+    fitToNodes,
+  ]);
+
+  // Link ids resolve against the top-level graph only, so a subgraph-local id would be a dead
+  // link: no "Copy link" (banner or context menu) while browsing a composite.
+  const traceLink = useMemo((): Partial<ViewState> | null => {
+    if (isInSubgraph) return null;
+    if (traceMode === "reach" && selectedNodeIds.length > 0) {
+      return { focus: selectedNodeIds, reach: traceDirection };
+    }
+    if (traceMode === "route" && routeFrom && routeTo && !routePicking) {
+      return { route: { from: routeFrom, to: routeTo } };
+    }
+    if (traceMode === "lens" && lensFamilies.length > 0) return { lens: lensFamilies };
+    return null;
+  }, [isInSubgraph, traceMode, selectedNodeIds, traceDirection, routeFrom, routeTo, routePicking, lensFamilies]);
 
   const traceBanner = useMemo((): string | null => {
     if (traceMode === "reach") {
@@ -628,6 +803,7 @@ export function Canvas(): JSX.Element {
         onNodeDragStop={onNodeDragStop}
         onEdgesChange={onEdgesChange}
         onSelectionChange={onSelectionChange}
+        onPaneClick={onPaneClick}
         onConnect={onConnect}
         onNodeDoubleClick={handleNodeDoubleClick}
         onNodeContextMenu={onNodeContextMenu}
@@ -677,6 +853,15 @@ export function Canvas(): JSX.Element {
           }}
         >
           <span>{traceBanner}</span>
+          {traceLink && (
+            <Button
+              variant="ghost"
+              data-testid="trace-banner-copy-link"
+              onClick={() => void copyViewLink(traceLink)}
+            >
+              Copy link
+            </Button>
+          )}
           <Button variant="ghost" data-testid="trace-banner-clear" onClick={resetTrace}>Clear (Esc)</Button>
         </div>
       )}
@@ -727,6 +912,9 @@ export function Canvas(): JSX.Element {
             setReach("both");
           }}
           onRouteFromHere={() => startRoutePick(contextMenu.nodeId)}
+          onCopyLink={
+            isInSubgraph ? undefined : () => void copyViewLink({ focus: [contextMenu.nodeId] })
+          }
           onNodeInfo={() => setInfoNodeId(contextMenu.nodeId)}
           onClose={closeContextMenu}
         />

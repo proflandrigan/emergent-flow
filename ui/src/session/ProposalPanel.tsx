@@ -1,6 +1,7 @@
-import type { JSX } from "react";
+import { useEffect, useRef, type JSX } from "react";
 
 import { snapshot, useGraphStore } from "../store/graphStore";
+import { copyViewLink } from "../store/viewLinkStore";
 import type { Diagnostic, Diagnostics } from "../store/validation";
 import { severityColor } from "../store/validation";
 import { Button } from "../ui/Button";
@@ -46,7 +47,17 @@ function DiagnosticsVerdict({
   );
 }
 
-function ProposalCard({ proposal }: { proposal: StoredProposal }): JSX.Element {
+function ProposalCard({
+  proposal,
+  highlighted,
+}: {
+  proposal: StoredProposal;
+  highlighted: boolean;
+}): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (highlighted) ref.current?.scrollIntoView?.({ block: "nearest" });
+  }, [highlighted]);
   const accept = useSessionStore((s) => s.accept);
   const reject = useSessionStore((s) => s.reject);
 
@@ -75,9 +86,13 @@ function ProposalCard({ proposal }: { proposal: StoredProposal }): JSX.Element {
 
   return (
     <div
+      ref={ref}
       data-testid="proposal-card"
+      data-highlighted={highlighted ? "true" : undefined}
       style={{
-        border: "1px solid var(--border-subtle)",
+        border: highlighted
+          ? "2px solid var(--accent)"
+          : "1px solid var(--border-subtle)",
         borderRadius: "var(--radius-md)",
         padding: "0.5rem",
         marginBottom: "0.5rem",
@@ -132,16 +147,28 @@ function ProposalCard({ proposal }: { proposal: StoredProposal }): JSX.Element {
           {proposal.status}
         </div>
       )}
+      <div>
+        <Button
+          variant="ghost"
+          data-testid="proposal-copy-link"
+          onClick={() => void copyViewLink({ proposal: proposal.id })}
+        >
+          Copy link
+        </Button>
+      </div>
     </div>
   );
 }
 
 export interface ProposalPanelProps {
   className?: string;
+  /** Proposal to scroll to and highlight (deep link `#proposal=<id>`, issue #168). */
+  highlightId?: string | null;
 }
 
 export function ProposalPanel({
   className,
+  highlightId,
 }: ProposalPanelProps): JSX.Element | null {
   const sessionId = useSessionStore((s) => s.sessionId);
   const proposals = useSessionStore((s) => s.proposals);
@@ -165,7 +192,13 @@ export function ProposalPanel({
           No proposals yet
         </div>
       ) : (
-        list.map((p) => <ProposalCard key={p.id} proposal={p} />)
+        list.map((p) => (
+          <ProposalCard
+            key={p.id}
+            proposal={p}
+            highlighted={p.id === highlightId}
+          />
+        ))
       )}
     </div>
   );

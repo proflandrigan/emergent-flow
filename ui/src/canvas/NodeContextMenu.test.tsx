@@ -11,6 +11,7 @@ const defaultProps = () => ({
   onTraceDownstream: vi.fn(),
   onTraceBoth: vi.fn(),
   onRouteFromHere: vi.fn(),
+  onCopyLink: vi.fn(),
   onNodeInfo: vi.fn(),
   onClose: vi.fn(),
 });
@@ -110,6 +111,26 @@ describe("NodeContextMenu", () => {
 
     expect(props.onRunFromHere).toHaveBeenCalledTimes(1);
     expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test("clicking Copy link to node calls onCopyLink once and onClose once", () => {
+    const props = defaultProps();
+
+    render(<NodeContextMenu x={0} y={0} {...props} />);
+
+    fireEvent.click(screen.getByTestId("node-context-menu-copy-link"));
+
+    expect(props.onCopyLink).toHaveBeenCalledTimes(1);
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test("omits Copy link to node when onCopyLink is not provided", () => {
+    const props = { ...defaultProps(), onCopyLink: undefined };
+
+    render(<NodeContextMenu x={0} y={0} {...props} />);
+
+    expect(screen.queryByTestId("node-context-menu-copy-link")).toBeNull();
+    expect(screen.getByTestId("node-context-menu-node-info")).toBeInTheDocument();
   });
 
   test("renders the Node info item", () => {

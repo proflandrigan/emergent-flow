@@ -2,7 +2,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import { App } from "./App";
+import { getSession } from "./session/sessionClient";
 import { useSessionStore } from "./session/sessionStore";
+import { useViewLinkStore } from "./store/viewLinkStore";
 
 vi.mock("./session/sessionClient", () => ({
   createSession: vi.fn().mockResolvedValue({
@@ -45,6 +47,14 @@ afterEach(() => {
     rebaseNeeded: false,
     rebaseMessage: null,
   });
+  useViewLinkStore.setState({
+    pendingCanvas: null,
+    pendingProposal: null,
+    pendingReview: null,
+    notice: null,
+    fallbackUrl: null,
+  });
+  window.history.replaceState(null, "", "/");
 });
 
 // App fires two fetches on mount (/healthz and the palette's /catalog). A `Response` body is
@@ -226,6 +236,307 @@ test("Start chat overflow item opens the chat modal", async () => {
   await waitFor(() => {
     expect(screen.getByTestId("chat-backend-picker")).toBeInTheDocument();
   });
+});
+
+test("applies #focus after joining ?session=", async () => {
+  mockHealth("ok");
+  window.history.replaceState(null, "", "/?session=s1#focus=n1");
+  vi.mocked(getSession).mockResolvedValue({
+    id: "s1",
+    graph: { paradigm: "functional", nodes: {}, edges: {} },
+    version: 0,
+    proposals: {},
+  } as never);
+  render(<App />);
+
+  await waitFor(() => expect(getSession).toHaveBeenCalledWith("s1"));
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/node "n1"/),
+  );
+  // The hash stays in the URL (Back/Forward and refresh keep the view), as does ?session=.
+  expect(window.location.hash).toBe("#focus=n1");
+  expect(window.location.search).toBe("?session=s1");
+});
+
+test("#proposal opens the proposals panel highlighted", async () => {
+  mockHealth("ok");
+  window.history.replaceState(null, "", "/?session=s1#proposal=p1");
+  vi.mocked(getSession).mockResolvedValue({
+    id: "s1",
+    graph: { paradigm: "functional", nodes: {}, edges: {} },
+    version: 0,
+    proposals: {
+      p1: {
+        id: "p1",
+        mutation: { base_version: 0, author: "ml_engineer", description: "add a describe node" },
+        diagnostics: { diagnostics: [], edge_compatibility: {} },
+        status: "pending",
+      },
+    },
+  } as never);
+  render(<App />);
+
+  const panel = await screen.findByTestId("proposal-panel");
+  await waitFor(() =>
+    expect(panel.querySelector('[data-highlighted="true"]')).not.toBeNull(),
+  );
+});
+
+test("hashchange re-applies the view", async () => {
+  mockHealth("ok");
+  render(<App />);
+
+  window.history.replaceState(null, "", "/#review=r9");
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
+
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r9"/),
+  );
+});
+
+// jsdom queues an anchor's fragment navigation as a task, so let it settle inside the test --
+// otherwise a late hashchange leaks into the next test.
+async function clickLink(href: string, init: MouseEventInit = {}): Promise<void> {
+  const a = document.createElement("a");
+  a.href = href;
+  a.textContent = "link";
+  document.body.appendChild(a);
+  fireEvent.click(a, init);
+  a.remove();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+test("clicking a link to the current hash re-applies it", async () => {
+  mockHealth("ok");
+  render(<App />);
+
+  window.location.hash = "#review=r9";
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r9"/),
+  );
+  expect(window.location.hash).toBe("#review=r9");
+
+  // Browsers fire no hashchange for the identical fragment; the delegated click handler re-applies.
+  useViewLinkStore.getState().setNotice(null);
+  await clickLink("#review=r9");
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r9"/),
+  );
+
+  // Modified clicks open elsewhere (new tab/window) and leave this view alone.
+  useViewLinkStore.getState().setNotice(null);
+  await clickLink("#review=r9", { ctrlKey: true });
+  expect(useViewLinkStore.getState().notice).toBeNull();
+});
+
+test("a link to a different hash is applied once (by hashchange only)", async () => {
+  mockHealth("ok");
+  render(<App />);
+  const request = vi.spyOn(useViewLinkStore.getState(), "request");
+
+  await clickLink("#review=r7");
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r7"/),
+  );
+  expect(request).toHaveBeenCalledTimes(1);
+  request.mockRestore();
+});
+
+test("Back re-applies the previous deep-link view", async () => {
+  mockHealth("ok");
+  render(<App />);
+
+  window.location.hash = "#review=r1";
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r1"/),
+  );
+  window.location.hash = "#review=r2";
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r2"/),
+  );
+
+  useViewLinkStore.getState().setNotice(null);
+  window.history.back();
+  await waitFor(() => expect(window.location.hash).toBe("#review=r1"));
+  await waitFor(() =>
+    expect(useViewLinkStore.getState().notice ?? "").toMatch(/review "r1"/),
+  );
+});
+
+test("a view_url for the active session is applied in place after an in-app join", async () => {
+  mockHealth("ok");
+  render(<App />);
+  // Start chat -> createAndJoin(): the session is joined but the address bar has no ?session=.
+  await useSessionStore.getState().createAndJoin();
+  expect(window.location.search).toBe("");
+  const request = vi.spyOn(useViewLinkStore.getState(), "request");
+
+  // The shape build_view_url emits: <base>/?session=<id>#focus=...
+  const a = document.createElement("a");
+  a.href = `${window.location.origin}/?session=app-test-session#focus=n1`;
+  document.body.appendChild(a);
+  const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+  a.dispatchEvent(click);
+  a.remove();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(click.defaultPrevented).toBe(true); // no full-page navigation
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(request.mock.calls[0][0].focus).toEqual(["n1"]);
+  expect(window.location.search).toBe("?session=app-test-session");
+  expect(window.location.hash).toBe("#focus=n1");
+
+  // Back returns to the pre-push entry (no hash): an empty view, which request() ignores.
+  window.history.back();
+  await waitFor(() => expect(window.location.search).toBe(""));
+  expect(useSessionStore.getState().sessionId).toBe("app-test-session");
+  request.mockRestore();
+});
+
+test("a view_url for a different session keeps normal navigation", async () => {
+  mockHealth("ok");
+  render(<App />);
+  await useSessionStore.getState().createAndJoin();
+  const request = vi.spyOn(useViewLinkStore.getState(), "request");
+
+  const a = document.createElement("a");
+  a.href = `${window.location.origin}/?session=other-session#focus=n1`;
+  document.body.appendChild(a);
+  const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+  // Runs after App's listener: record whether App cancelled it, then cancel so jsdom doesn't
+  // attempt (and log) the cross-document navigation a browser would perform.
+  let preventedByApp: boolean | null = null;
+  document.addEventListener(
+    "click",
+    (e) => {
+      preventedByApp = e.defaultPrevented;
+      e.preventDefault();
+    },
+    { once: true },
+  );
+  a.dispatchEvent(click);
+  a.remove();
+
+  expect(preventedByApp).toBe(false);
+  expect(request).not.toHaveBeenCalled();
+  expect(window.location.search).toBe("");
+  request.mockRestore();
+});
+
+// The expanded chat renders inside OverlayModal, whose panel stops click propagation -- App's
+// delegated link listener must still see clicks on agent links there.
+async function openExpandedChatWithViewLink() {
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  fireEvent.click(screen.getByText("Open chat"));
+  useSessionStore.setState({
+    chat: {
+      backend: "claude",
+      backend_thread_id: null,
+      active_persona: null,
+      turns: [
+        {
+          id: "turn-1",
+          backend: "claude",
+          user_message: "add a node",
+          narration: [],
+          agent_message: `Done: [view it](${window.location.origin}/?session=app-test-session#focus=n1)`,
+          status: "completed",
+          error: null,
+        },
+      ],
+    },
+  } as never);
+  await waitFor(() => expect(screen.getByText("view it")).toBeInTheDocument());
+  fireEvent.click(screen.getByTestId("chat-dock-expand"));
+  await waitFor(() => expect(screen.getByTestId("chat-expanded")).toBeInTheDocument());
+  return screen.getByText("view it").closest("a")!;
+}
+
+test("an active-session view_url in the expanded chat overlay is applied in place", async () => {
+  mockHealth("ok");
+  render(<App />);
+  await useSessionStore.getState().createAndJoin();
+  expect(window.location.search).toBe("");
+  const a = await openExpandedChatWithViewLink();
+  const request = vi.spyOn(useViewLinkStore.getState(), "request");
+
+  const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+  a.dispatchEvent(click);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(click.defaultPrevented).toBe(true); // no full-page navigation
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(window.location.search).toBe("?session=app-test-session");
+  expect(window.location.hash).toBe("#focus=n1");
+  request.mockRestore();
+});
+
+test("re-clicking the current view link in the expanded chat overlay re-applies it", async () => {
+  mockHealth("ok");
+  render(<App />);
+  await useSessionStore.getState().createAndJoin();
+  window.history.replaceState(null, "", "/?session=app-test-session#focus=n1");
+  const a = await openExpandedChatWithViewLink();
+  const request = vi.spyOn(useViewLinkStore.getState(), "request");
+
+  a.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(request).toHaveBeenCalledTimes(1);
+  request.mockRestore();
+});
+
+// A click-applied view is deferred to a macrotask so React Flow's node click handler (which
+// re-selects the clicked node) runs first and the linked focus wins.
+test("a click-applied view is requested after the click dispatch, not synchronously", async () => {
+  mockHealth("ok");
+  render(<App />);
+  await useSessionStore.getState().createAndJoin();
+  const request = vi.spyOn(useViewLinkStore.getState(), "request");
+
+  const a = document.createElement("a");
+  a.href = `${window.location.origin}/?session=app-test-session#focus=n1`;
+  document.body.appendChild(a);
+  const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+  a.dispatchEvent(click);
+  a.remove();
+
+  expect(click.defaultPrevented).toBe(true); // preventDefault stays synchronous
+  expect(window.location.hash).toBe("#focus=n1"); // so does pushState
+  await Promise.resolve(); // a microtask is not enough
+  expect(request).not.toHaveBeenCalled();
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(request.mock.calls[0][0].focus).toEqual(["n1"]);
+  request.mockRestore();
+});
+
+test("unmounting before the deferred request fires drops it", async () => {
+  mockHealth("ok");
+  const { unmount } = render(<App />);
+  window.history.replaceState(null, "", "/#focus=n1");
+  const request = vi.spyOn(useViewLinkStore.getState(), "request");
+
+  const a = document.createElement("a");
+  a.href = "#focus=n1";
+  document.body.appendChild(a);
+  a.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+  a.remove();
+  unmount();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(request).not.toHaveBeenCalled();
+  request.mockRestore();
+});
+
+test("bad keys never throw", () => {
+  mockHealth("ok");
+  window.history.replaceState(null, "", "/#nonsense=1&focus=%E0%A4%A");
+  expect(() => render(<App />)).not.toThrow();
+  expect(
+    screen.getByRole("heading", { name: /Emergent Flow/ }),
+  ).toBeInTheDocument();
 });
 
 test("Get started overflow item opens the gallery and close dismisses it", async () => {

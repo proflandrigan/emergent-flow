@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
 import { useGraphStore } from "../store/graphStore";
@@ -211,6 +211,43 @@ test("edit-into-own re-flows the merged graph via loadModel reflow", async () =>
   );
 
   getStateSpy.mockRestore();
+});
+
+test("highlightId marks only the matching card", () => {
+  useSessionStore.setState({
+    sessionId: "abc",
+    proposals: {
+      p1: pendingProposal(),
+      p2: pendingProposal({ id: "p2" }),
+    },
+  });
+
+  render(<ProposalPanel highlightId="p2" />);
+
+  const cards = screen.getAllByTestId("proposal-card");
+  expect(cards[0]).not.toHaveAttribute("data-highlighted");
+  expect(cards[1]).toHaveAttribute("data-highlighted", "true");
+});
+
+test("Copy link writes a URL ending with the proposal fragment", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText },
+    configurable: true,
+  });
+  useSessionStore.setState({
+    sessionId: "abc",
+    proposals: { p1: pendingProposal() },
+  });
+
+  render(<ProposalPanel />);
+  fireEvent.click(screen.getByTestId("proposal-copy-link"));
+
+  await waitFor(() =>
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringMatching(/#proposal=p1$/),
+    ),
+  );
 });
 
 test("a decided proposal shows its status instead of action buttons", () => {

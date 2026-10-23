@@ -67,6 +67,16 @@ class TestServeBanner:
 
         assert mcp_mod.OPEN_IN_UI_BASE == "http://127.0.0.1:9000"
 
+    def test_serve_marks_canvas_attached(self, monkeypatch) -> None:
+        """serve() flags MCP tools as sharing the canvas's session store (issue #168)."""
+        self._neutralize_setup(monkeypatch)
+        monkeypatch.setattr(mcp_mod, "OPEN_IN_UI_BASE", "http://127.0.0.1:8765")
+        monkeypatch.setattr(mcp_mod, "CANVAS_ATTACHED", False)
+
+        app_module.serve(host="127.0.0.1", port=9000, open_browser=False)
+
+        assert mcp_mod.CANVAS_ATTACHED is True
+
     def test_serve_non_loopback_sets_shared_base_to_browse_host(self, monkeypatch) -> None:
         """A wildcard bind (0.0.0.0) still yields a browsable 127.0.0.1 open_in_ui base."""
         self._neutralize_setup(monkeypatch)

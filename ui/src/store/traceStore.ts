@@ -24,6 +24,8 @@ export interface TraceStore {
   startRoutePick: (fromId: string) => void;
   setRoute: (fromId: string, toId: string) => void;
   toggleFamily: (family: string) => void;
+  /** Replace the lens wholesale (deep links, issue #168); an empty list resets to the default trace. */
+  setLens: (families: string[]) => void;
   reset: () => void;
 }
 
@@ -77,6 +79,24 @@ export const useTraceStore = create<TraceStore>((set, get) => ({
     const families = current.includes(family)
       ? current.filter((f) => f !== family)
       : [...current, family];
+
+    if (families.length === 0) {
+      set({ ...INITIAL });
+      return;
+    }
+
+    set({
+      mode: "lens",
+      direction: "downstream",
+      routeFrom: null,
+      routeTo: null,
+      routePicking: false,
+      families,
+    });
+  },
+
+  setLens(input) {
+    const families = Array.from(new Set(input));
 
     if (families.length === 0) {
       set({ ...INITIAL });
