@@ -290,6 +290,25 @@ def test_percent_in_label_is_escaped() -> None:
     assert "Rate #37;#37; of 100#37;" in out
 
 
+def test_colon_in_user_text_is_escaped() -> None:
+    # Mermaid's pre-parse ``encodeEntities`` strips the last ``;`` of any line matching
+    # ``style.*:\S*#.*;`` (``Lifestyle:<30`` rendered as ``Lifestyle:#lt30``), so no literal
+    # ``:`` from user text may reach a node, edge or subgraph line.
+    a = _node("lifestyle", "data.load_csv", "Lifestyle:<30", in_name=None, out_name="style:x")
+    b = _node("b", "clean.impute_missing", "Age:<30", in_name="in")
+    grp = _node("g", "layout.group", "style:50%", in_name=None, out_name=None)
+    m = _node("m", "clean.impute_missing", "M", group_id="g")
+    out = to_mermaid(_graph([a, b, grp, m], [_edge("lifestyle", "b")]))
+    lines = out.splitlines()
+    assert '    n_lifestyle["Lifestyle#58;#lt;30<br/><small>data.load_csv</small>"]' in lines
+    assert '    n_b["Age#58;#lt;30<br/><small>clean.impute_missing</small>"]' in lines
+    assert '    n_lifestyle -->|"style#58;x→in"| n_b' in lines
+    assert '    subgraph g_g["style#58;50#37;"]' in lines
+    for line in lines:
+        if not line.strip().startswith(("classDef ", "%%")):
+            assert ":" not in line, line
+
+
 def test_highlight_accepts_bare_string_id() -> None:
     a = _node("abc", "data.load_csv", "A")
     b = _node("b", "clean.impute_missing", "B")
@@ -318,7 +337,7 @@ def test_edge_text_is_quoted(port: str) -> None:
 
 
 def test_label_neutralises_direction_token() -> None:
-    assert _mermaid_label("Stage: direction LR") == "Stage: direction#32;LR"
+    assert _mermaid_label("Stage: direction LR") == "Stage#58; direction#32;LR"
     assert _mermaid_label("direction\tTB") == "direction#9;TB"
     assert _mermaid_label("direction   TD x") == "direction#32;  TD x"
     assert _mermaid_label("subdirection BT") == "subdirection#32;BT"
@@ -331,7 +350,7 @@ def test_label_neutralises_direction_token() -> None:
 def test_group_and_module_titles_with_direction_token() -> None:
     grp = _node("g", "layout.group", "Stage: direction LR", in_name=None, out_name=None)
     out = to_mermaid(_graph([grp, _node("m", "data.load_csv", "M", group_id="g")]))
-    assert '    subgraph g_g["Stage: direction#32;LR"]' in out.splitlines()
+    assert '    subgraph g_g["Stage#58; direction#32;LR"]' in out.splitlines()
 
     inner = _graph([_node("l1", "nn.linear", "lin")])
     mod = _node("mod", "nn.module", "Encoder (direction TB)", subgraph=inner)
@@ -473,3 +492,70 @@ def test_non_param_titled_type_ignores_label_param() -> None:
     out = to_mermaid(_graph([node]))
     assert 'n_a["Load' in out
     assert "Other" not in out
+
+
+# ---------------------------------------------------------------------------
+# Highlight of nodes not drawn individually
+# ---------------------------------------------------------------------------
+
+
+def _module_graph(*, group: bool = False) -> Graph:
+    inner = _graph(
+        [
+            _node("l1", "nn.linear", "Lin"),
+            _node("l2", "nn.relu", "R"),
+            _node("hidden", "notes.markdown", "N", in_name=None, out_name=None),
+        ],
+        [_edge("l1", "l2")],
+    )
+    mod = _node("mod", "nn.module", "M", subgraph=inner, group_id="g" if group else None)
+    src = _node("a", "data.load_csv", "Load", in_name=None)
+    nodes = [src, mod]
+    if group:
+        nodes.append(_node("g", "layout.group", "Grp", in_name=None, out_name=None))
+    return _graph(nodes, [_edge("a", "mod")])
+
+
+def test_highlight_inner_node_of_collapsed_module_highlights_module() -> None:
+    out = to_mermaid(_module_graph(), highlight=["l2"], max_nodes=2)
+    assert "%% truncated:" in out
+    assert "    class n_mod highlight" in out.splitlines()
+    # A node that is not drawn at all (hidden note) has no stand-in.
+    assert "highlight" not in to_mermaid(_module_graph(), highlight=["hidden"], max_nodes=2)
+
+
+def test_highlight_inner_node_of_collapsed_composite_highlights_composite() -> None:
+    inner = _graph([_node("c1", "t.a", "C1"), _node("c2", "t.b", "C2")], [_edge("c1", "c2")])
+    comp = _node(
+        "comp",
+        "layout.composite",
+        None,
+        subgraph=inner,
+        params=[Param(name="label", type_token="str", value="MyComp")],
+    )
+    src = _node("a", "data.load_csv", "Load", in_name=None)
+    out = to_mermaid(_graph([src, comp], [_edge("a", "comp")]), highlight=["c2"], max_nodes=2)
+    assert "    class n_comp highlight" in out.splitlines()
+
+
+def test_highlight_inside_depth2_flattened_container_highlights_stand_in() -> None:
+    deep = _graph([_node("d1", "t.d", "D")])
+    inner = _graph(
+        [_node("m2", "nn.module", "Inner", subgraph=deep), _node("x", "t.x", "X")],
+        [_edge("m2", "x")],
+    )
+    outer = _node("mod", "nn.module", "Outer", subgraph=inner)
+    out = to_mermaid(_graph([outer]), highlight=["d1"])
+    lines = out.splitlines()
+    assert "        %% flattened: nested subgraph of Inner (1 nodes) not shown" in lines
+    assert "    class n_m2 highlight" in lines
+    # In collapsed mode the top-level container stands for the whole nested tree.
+    collapsed = to_mermaid(_graph([outer, _node("z", "t.z", "Z")]), highlight=["d1"], max_nodes=1)
+    assert "    class n_mod highlight" in collapsed.splitlines()
+
+
+def test_highlight_inner_node_of_module_in_collapsed_group() -> None:
+    out = to_mermaid(_module_graph(group=True), highlight=["l2"], max_nodes=3)
+    assert "    class g_g highlight" in out.splitlines()
+    no_groups = to_mermaid(_module_graph(group=True), highlight=["l2"], groups=False, max_nodes=2)
+    assert "    class n_mod highlight" in no_groups.splitlines()

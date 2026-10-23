@@ -4,11 +4,13 @@ flowchart LR
         n_impute["Impute #123;mean#125; #amp; #96;fill#96;<br/>second line<br/><small>clean.impute_missing</small>"]
     end
     n_fit["Fit model; 100#37; → done (direction#32;TB)<br/><small>ml.fit_estimator</small>"]
-    n_note["Note: #lt;b#gt;not#lt;/b#gt; html<br/><small>notes.markdown</small>"]
+    n_lifestyle["Lifestyle#58;#lt;30 #amp; style#58;50#37;<br/><small>clean.filter_rows</small>"]
+    n_note["Note#58; #lt;b#gt;not#lt;/b#gt; html<br/><small>notes.markdown</small>"]
     n_load -->|"frame"| n_impute
     n_impute -->|"frame→data"| n_fit
+    n_impute -->|"frame"| n_lifestyle
     classDef fam_clean stroke:#14b8a6,stroke-width:2px
-    class n_impute fam_clean
+    class n_impute,n_lifestyle fam_clean
     classDef fam_data stroke:#3b82f6,stroke-width:2px
     class n_load fam_data
     classDef fam_ml stroke:#f59e0b,stroke-width:2px

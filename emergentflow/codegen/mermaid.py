@@ -59,11 +59,15 @@ _HIGHLIGHT_STYLE = "stroke:#ef4444,stroke-width:4px"
 _INDENT = "    "
 
 # Mermaid decodes ``#name;`` / ``#NNN;`` entities inside quoted labels.
+# ``:`` is escaped because Mermaid's pre-parse ``encodeEntities`` pass strips the trailing
+# ``;`` from any line matching ``style.*:\S*#.*;`` (or ``classDef...``) -- e.g. a label
+# ``Lifestyle:<30`` would otherwise render as ``Lifestyle:#lt30``.
 _ESCAPES: dict[str, str] = {
     '"': "#quot;",
     "#": "#35;",
     "%": "#37;",
     "&": "#amp;",
+    ":": "#58;",
     "<": "#lt;",
     ">": "#gt;",
     "[": "#91;",
@@ -194,6 +198,20 @@ def _visible_inner(node: Node, include_notes: bool) -> list[IRId]:
     ]
 
 
+def _nested_ids(node: Node, include_notes: bool) -> set[str]:
+    """``node.id`` plus every drawable node id nested (recursively) in its subgraph.
+
+    The raw ids a node stands for when it is drawn as a single Mermaid node, so a
+    highlighted inner node lights up its visible container.
+    """
+    ids = {node.id}
+    if node.subgraph is not None:
+        for inner in node.subgraph.nodes.values():
+            if _is_visible(inner, include_notes):
+                ids |= _nested_ids(inner, include_notes)
+    return ids
+
+
 def _edge_line(a: str, b: str, label: str) -> str:
     if label:
         return f'{a} -->|"{_mermaid_label(label)}"| {b}'
@@ -242,8 +260,10 @@ class _FullRenderer:
         mid = self.ids.alloc("n", node.id, scope)
         text = _node_text(node, self.show_types)
         self.drawn[(scope, node.id)] = mid
-        self.draw_order.append((mid, _family(node), {node.id}))
         inner = [] if nested else _visible_inner(node, self.include_notes)
+        # Drawn as a subgraph, inner nodes register themselves; flattened, it stands for them.
+        raw = {node.id} if inner else _nested_ids(node, self.include_notes)
+        self.draw_order.append((mid, _family(node), raw))
         if not inner:
             if nested and node.subgraph is not None and node.subgraph.nodes:
                 count = len(node.subgraph.nodes)
@@ -357,7 +377,7 @@ def _render_collapsed(
                     ids.alloc("n", nid),
                     _node_text(node, show_types),
                     _family(node),
-                    {nid},
+                    _nested_ids(node, include_notes),
                 )
             )
         elif gid not in group_item:
@@ -366,7 +386,8 @@ def _render_collapsed(
             name = _mermaid_label(_group_name(graph.nodes[gid]))
             text = f"{name}<br/><small>{n} {'node' if n == 1 else 'nodes'}</small>"
             group_item[gid] = len(items)
-            items.append(_Item(ids.alloc("g", gid), text, None, set(members)))
+            raw = set().union(*(_nested_ids(graph.nodes[m], include_notes) for m in members))
+            items.append(_Item(ids.alloc("g", gid), text, None, raw))
             for m in members:
                 item_of[m] = group_item[gid]
         else:
@@ -431,7 +452,10 @@ def to_mermaid(
     show_ports:
         Label edges with port names (``src→tgt`` when they differ).
     highlight:
-        Node ids to emphasise; unknown ids are ignored.
+        Node ids to emphasise; unknown ids are ignored. A node that is not drawn
+        individually (inside a flattened or collapsed container, or a collapsed
+        group) highlights the visible node standing in for it; ids of nodes that
+        are not drawn at all (e.g. hidden notes) are ignored.
     groups:
         Draw ``layout.group`` containers as Mermaid subgraphs.
     include_notes:

@@ -62,9 +62,17 @@ def _hostile_graph() -> Graph:
                 _port("fit", "model", Direction.OUT),
             ],
         ),
+        # Mermaid's pre-parse strips the last ``;`` of any line matching ``style.*:\S*#.*;``
+        # (here via the label *and* the ``n_lifestyle`` id), so ``:`` must be entity-escaped.
+        Node(
+            id="lifestyle",
+            type="clean.filter_rows",
+            label="Lifestyle:<30 & style:50%",
+            ports=[_port("lifestyle", "frame", Direction.IN)],
+        ),
         Node(id="note", type="notes.markdown", label="Note: <b>not</b> html", ports=[]),
     ]
-    edges = [_edge("load", "impute"), _edge("impute", "fit")]
+    edges = [_edge("load", "impute"), _edge("impute", "fit"), _edge("impute", "lifestyle")]
     return Graph(nodes={n.id: n for n in nodes}, edges={e.id: e for e in edges})
 
 

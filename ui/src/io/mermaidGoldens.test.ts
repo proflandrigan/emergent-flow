@@ -11,6 +11,19 @@ const GOLDENS = import.meta.glob("../../../tests/golden/mermaid/*.mmd", {
   eager: true,
 }) as Record<string, string>;
 
+// Undo Mermaid's entity placeholders (its own `decodeEntities`) and HTML entities, then drop
+// the `<br/><small>type</small>` suffix, yielding the text a reader actually sees.
+function decodeMermaidText(text: string): string {
+  const html = text
+    .replace(/ﬂ°°/g, "&#")
+    .replace(/ﬂ°/g, "&")
+    .replace(/¶ß/g, ";")
+    .replace(/<br\s*\/?>\s*<small>.*<\/small>$/, "");
+  const el = document.createElement("textarea");
+  el.innerHTML = html;
+  return el.value;
+}
+
 describe("ef.to_mermaid goldens", () => {
   it("finds the golden files", () => {
     expect(Object.keys(GOLDENS).length).toBeGreaterThanOrEqual(4);
@@ -40,12 +53,18 @@ describe("ef.to_mermaid goldens", () => {
     expect([...vertices.keys()].sort()).toEqual([
       "n_fit",
       "n_impute",
+      "n_lifestyle",
       "n_load",
       "n_note",
     ]);
     // A swallowed declaration still leaves an id-only vertex behind via its edges/classes.
     expect(vertices.get("n_fit")?.text).toContain("Fit model");
-    expect(db.getEdges()).toHaveLength(2);
+    // getDiagramFromText runs Mermaid's pre-parse `encodeEntities`, which drops the last `;` of
+    // any line matching `style.*:\S*#.*;` -- a literal `:` would corrupt `#lt;30` here.
+    expect(decodeMermaidText(vertices.get("n_lifestyle")?.text ?? "")).toBe(
+      "Lifestyle:<30 & style:50%",
+    );
+    expect(db.getEdges()).toHaveLength(3);
     expect(db.getDirection()).toBe("LR");
   });
 
