@@ -149,6 +149,7 @@ def create_mcp_server() -> Any:
     fastmcp = _import_fastmcp()
     mcp = fastmcp.FastMCP("emergent-flow-collaboration")
 
+    from emergentflow.codegen.mermaid import to_mermaid
     from emergentflow.collab.review import ReviewThread
     from emergentflow.collab.session import OpenGatesError, UnknownProposalError
     from emergentflow.collab.session import get_default_store as get_default_session_store
@@ -174,6 +175,18 @@ def create_mcp_server() -> Any:
         """Return the full session document for *session_id* (same as GET /sessions/{id})."""
         session = get_default_session_store().get(session_id)
         return session.model_dump(mode="json")
+
+    @mcp.tool()
+    def get_graph_mermaid(session_id: str, highlight: list[str] | None = None) -> dict:
+        """Render the session's current graph as a Mermaid flowchart (ef.to_mermaid, issue #169).
+
+        Returns {"mermaid": "<flowchart source>", "markdown": "```mermaid ...```"}. Paste
+        ``markdown`` into a PR description, issue, or chat reply so reviewers see the pipeline
+        as a diagram. ``highlight`` lists node ids to emphasise (e.g. the nodes you changed).
+        """
+        session = get_default_session_store().get(session_id)
+        source = to_mermaid(session.graph, highlight=highlight or ())
+        return {"mermaid": source, "markdown": f"```mermaid\n{source}```\n"}
 
     @mcp.tool()
     def list_sessions() -> dict:

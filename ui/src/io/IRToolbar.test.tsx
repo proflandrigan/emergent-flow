@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { useGraphStore } from "../store/graphStore";
+import { useViewLinkStore } from "../store/viewLinkStore";
 import { startDirtyTracking, stopDirtyTracking, useFlowStore } from "./flowStore";
 import { IRToolbar } from "./IRToolbar";
 
@@ -324,5 +325,52 @@ describe("Rename flow", () => {
     await waitFor(() => expect(useFlowStore.getState().error).toBe("slug taken"));
     expect(useGraphStore.getState().name).toBe("Old Name");
     expect(useFlowStore.getState().currentSlug).toBe("old-slug");
+  });
+});
+
+describe("Copy as Mermaid", () => {
+  afterEach(() => {
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+    useViewLinkStore.getState().setNotice(null);
+  });
+
+  test("posts the graph and copies the fenced mermaid source", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ mermaid: "flowchart LR\n" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+
+    render(<IRToolbar />);
+    fireEvent.click(screen.getByTestId("file-menu-toggle"));
+    fireEvent.click(screen.getByTestId("file-menu-copy-mermaid"));
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith("```mermaid\nflowchart LR\n```\n"),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/export/mermaid",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(useViewLinkStore.getState().notice).toBe("Mermaid diagram copied");
+  });
+
+  test("shows the server error message on a 422", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 422,
+        json: () => Promise.resolve({ error: "bad graph" }),
+      }),
+    );
+
+    render(<IRToolbar />);
+    fireEvent.click(screen.getByTestId("file-menu-toggle"));
+    fireEvent.click(screen.getByTestId("file-menu-copy-mermaid"));
+
+    expect(await screen.findByText(/Copy as Mermaid failed: bad graph/)).toBeInTheDocument();
   });
 });

@@ -55,6 +55,7 @@ _LAZY_ENTRY_POINTS = {
     "export_report": ("emergentflow.codegen.export", "export_report"),
     "export_script": ("emergentflow.codegen.export", "export_script"),
     "validate": ("emergentflow.codegen.validation", "validate"),
+    "to_mermaid": ("emergentflow.codegen.mermaid", "to_mermaid"),
     "apply_suppressions": ("emergentflow.codegen.validation", "apply_suppressions"),
     "apply_type_compatibility": ("emergentflow.codegen.validation", "apply_type_compatibility"),
     "build_rules_artifact": ("emergentflow.types.rules_artifact", "build_rules_artifact"),
@@ -93,6 +94,7 @@ if TYPE_CHECKING:  # let type-checkers resolve ef.data, ef.codegen, ... statical
     from emergentflow.codegen.diagnostics_schema import diagnostics_json_schema
     from emergentflow.codegen.executor import execute
     from emergentflow.codegen.export import export_report, export_script
+    from emergentflow.codegen.mermaid import to_mermaid
     from emergentflow.codegen.validation import (
         apply_suppressions,
         apply_type_compatibility,
@@ -131,6 +133,7 @@ __all__ = [
     "export_report",
     "export_script",
     "validate",
+    "to_mermaid",
     "apply_suppressions",
     "apply_type_compatibility",
     "build_rules_artifact",

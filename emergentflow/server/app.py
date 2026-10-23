@@ -24,6 +24,7 @@ Routes:
 - ``POST /execute_node``     -- ``{"graph", "run_node", "inputs"}`` -> single-node run
 - ``POST /export/eval_set``  -- ``{"rows": [...]}`` -> eval-set JSONL file download (Epic 9 Story 7)
 - ``POST /export/finetune``  -- ``{"rows": [...]}`` -> fine-tune JSONL download (Epic 9 Story 7)
+- ``POST /export/mermaid``   -- IR JSON -> ``{"mermaid": ...}`` Mermaid flowchart (issue #169)
 - ``POST /validate``         -- IR JSON -> ``{"diagnostics": ...}``
 - ``GET  /connections``      -- list local connection profiles (Epic 13 Story 10)
 - ``POST /connections/{name}/test`` -- probe one connection profile
@@ -144,6 +145,7 @@ from emergentflow.server.service import (
     lineage_for_node,
     list_connections,
     list_knowledge,
+    mermaid_graph,
     save_knowledge,
     test_connection_route,
     update_connection,
@@ -230,6 +232,7 @@ _POST_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "/eval/label": label_eval,
     "/execute": execute_graph,
     "/execute_node": execute_node,
+    "/export/mermaid": mermaid_graph,
     "/inspect": inspect_graph,
     "/knowledge": save_knowledge,
     "/lineage": lineage_for_node,

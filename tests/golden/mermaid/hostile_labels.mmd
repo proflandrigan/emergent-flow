@@ -1,0 +1,19 @@
+flowchart LR
+    subgraph g_grp["Prep #91;stage #35;1#93;"]
+        n_load["Load #quot;sales.csv#quot; #lt;raw#gt; #124; v2<br/><small>data.load_csv</small>"]
+        n_impute["Impute #123;mean#125; #amp; #96;fill#96;<br/>second line<br/><small>clean.impute_missing</small>"]
+    end
+    n_fit["Fit model; 100% → done<br/><small>ml.fit_estimator</small>"]
+    n_note["Note: #lt;b#gt;not#lt;/b#gt; html<br/><small>notes.markdown</small>"]
+    n_load -->|frame| n_impute
+    n_impute -->|frame→data| n_fit
+    classDef fam_clean stroke:#14b8a6,stroke-width:2px
+    class n_impute fam_clean
+    classDef fam_data stroke:#3b82f6,stroke-width:2px
+    class n_load fam_data
+    classDef fam_ml stroke:#f59e0b,stroke-width:2px
+    class n_fit fam_ml
+    classDef fam_notes stroke:#eab308,stroke-width:2px
+    class n_note fam_notes
+    classDef highlight stroke:#ef4444,stroke-width:4px
+    class n_fit highlight

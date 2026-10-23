@@ -1,0 +1,27 @@
+flowchart LR
+    n_n_load["Load Sample<br/><small>data.load_sample</small>"]
+    n_n_drop["Drop Missing<br/><small>clean.drop_missing</small>"]
+    n_n_select["Select Columns<br/><small>clean.select_columns</small>"]
+    n_n_describe["Describe<br/><small>stats.describe</small>"]
+    n_n_report["HTML Summary<br/><small>reports.generate_html_summary</small>"]
+    n_n_split["Train/Test Split<br/><small>ml.train_test_split</small>"]
+    n_n_train["Train Regressor<br/><small>ml.train_regressor</small>"]
+    n_n_eval["Evaluate<br/><small>ml.evaluate</small>"]
+    n_n_load -->|frame| n_n_drop
+    n_n_drop -->|frame| n_n_select
+    n_n_select -->|frame| n_n_describe
+    n_n_select -->|frame| n_n_report
+    n_n_select -->|frame| n_n_split
+    n_n_split -->|train→frame| n_n_train
+    n_n_split -->|test→frame| n_n_eval
+    n_n_train -->|model| n_n_eval
+    classDef fam_clean stroke:#14b8a6,stroke-width:2px
+    class n_n_drop,n_n_select fam_clean
+    classDef fam_data stroke:#3b82f6,stroke-width:2px
+    class n_n_load fam_data
+    classDef fam_ml stroke:#f59e0b,stroke-width:2px
+    class n_n_split,n_n_train,n_n_eval fam_ml
+    classDef fam_reports stroke:#10b981,stroke-width:2px
+    class n_n_report fam_reports
+    classDef fam_stats stroke:#a78bfa,stroke-width:2px
+    class n_n_describe fam_stats

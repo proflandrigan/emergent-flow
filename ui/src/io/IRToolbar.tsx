@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Graph } from "../generated/ir";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
+import { useViewLinkStore } from "../store/viewLinkStore";
 import { collectReportCards, buildReportHtml } from "./reportHtml";
 import { parseImport, serializeIR } from "./irFile";
 import { useFlowStore } from "./flowStore";
@@ -125,6 +126,44 @@ export function IRToolbar(): JSX.Element {
     anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
     setFileMenuOpen(false);
+  }
+
+  // POST the current graph to the server's ef.to_mermaid route (issue #169) and copy the result,
+  // wrapped in a ```mermaid fence so it renders when pasted into a PR, issue, or chat. If the
+  // Clipboard API is missing or denied, fall back to downloading a .mmd file.
+  async function handleCopyMermaid() {
+    setFileMenuOpen(false);
+    const graph = useGraphStore.getState().toIR();
+    let source: string;
+    try {
+      const res = await fetch("/export/mermaid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: serializeIR(graph),
+      });
+      const body = (await res.json()) as { mermaid?: string; error?: string };
+      if (!res.ok || typeof body.mermaid !== "string") {
+        throw new Error(body.error || `Mermaid export failed: ${res.status}`);
+      }
+      source = body.mermaid;
+    } catch (e) {
+      setError(`Copy as Mermaid failed: ${(e as Error).message}`);
+      return;
+    }
+    const fenced = "```mermaid\n" + source + "```\n";
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(fenced);
+      useViewLinkStore.getState().setNotice("Mermaid diagram copied");
+    } catch {
+      const blob = new Blob([source], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${slugify(useGraphStore.getState().name || "graph")}.mmd`;
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
   }
 
   function handleImportClick() {
@@ -298,6 +337,7 @@ export function IRToolbar(): JSX.Element {
       testId: "file-menu-rename",
     },
     { label: "Export JSON", onSelect: handleExport, testId: "file-menu-export" },
+    { label: "Copy as Mermaid", onSelect: handleCopyMermaid, testId: "file-menu-copy-mermaid" },
     {
       label: "Export report (HTML)",
       onSelect: handleExportReport,

@@ -183,6 +183,41 @@ class TestTools:
         with pytest.raises(ToolError):
             _run_async(_call_tool(mcp, "get_graph", {"session_id": "does-not-exist"}))
 
+    def test_get_graph_mermaid(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+        added = _run_async(
+            _call_tool(
+                mcp,
+                "add_node",
+                {
+                    "session_id": session.id,
+                    "node_type": "data.load_csv",
+                    "params": {"path": "a.csv"},
+                },
+            )
+        )
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "get_graph_mermaid",
+                {"session_id": session.id, "highlight": [added["node_id"]]},
+            )
+        )
+        assert result["mermaid"].startswith("flowchart LR\n")
+        assert "classDef highlight" in result["mermaid"]
+        assert result["markdown"].startswith("```mermaid\n")
+
+    def test_get_graph_mermaid_empty_session(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+        result = _run_async(_call_tool(mcp, "get_graph_mermaid", {"session_id": session.id}))
+        assert result["mermaid"] == "flowchart LR\n"
+
     def test_validate_graph(self) -> None:
         from emergentflow.collab.mcp import create_mcp_server
 
