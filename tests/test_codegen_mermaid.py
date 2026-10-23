@@ -559,3 +559,22 @@ def test_highlight_inner_node_of_module_in_collapsed_group() -> None:
     assert "    class g_g highlight" in out.splitlines()
     no_groups = to_mermaid(_module_graph(group=True), highlight=["l2"], groups=False, max_nodes=2)
     assert "    class n_mod highlight" in no_groups.splitlines()
+
+
+def test_highlight_group_id_highlights_group_subgraph() -> None:
+    lines = to_mermaid(_grouped(), highlight=["grp"]).splitlines()
+    assert "    class g_grp highlight" in lines
+    # Only the group itself, not its members.
+    assert not any(line.startswith("    class n_") and "highlight" in line for line in lines)
+
+
+def test_highlight_group_id_highlights_collapsed_group() -> None:
+    out = to_mermaid(_grouped(), highlight=["grp"], max_nodes=2)
+    assert '    g_grp["Prep<br/><small>2 nodes</small>"]' in out.splitlines()
+    assert "    class g_grp highlight" in out.splitlines()
+
+
+def test_highlight_group_id_ignored_when_groups_false() -> None:
+    assert "highlight" not in to_mermaid(_grouped(), highlight=["grp"], groups=False)
+    collapsed = to_mermaid(_grouped(), highlight=["grp"], groups=False, max_nodes=2)
+    assert "highlight" not in collapsed

@@ -285,6 +285,7 @@ class _FullRenderer:
         gnode = graph.nodes[gid]
         pad = _INDENT
         gmid = self.ids.alloc("g", gid)
+        self.draw_order.append((gmid, None, {gid}))
         title = _mermaid_label(_group_name(gnode))
         self.lines.append(f'{pad}subgraph {gmid}["{title}"]')
         for nid in members:
@@ -386,7 +387,7 @@ def _render_collapsed(
             name = _mermaid_label(_group_name(graph.nodes[gid]))
             text = f"{name}<br/><small>{n} {'node' if n == 1 else 'nodes'}</small>"
             group_item[gid] = len(items)
-            raw = set().union(*(_nested_ids(graph.nodes[m], include_notes) for m in members))
+            raw = {gid}.union(*(_nested_ids(graph.nodes[m], include_notes) for m in members))
             items.append(_Item(ids.alloc("g", gid), text, None, raw))
             for m in members:
                 item_of[m] = group_item[gid]
