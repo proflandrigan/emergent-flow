@@ -20,6 +20,7 @@ from emergentflow.server.service import (
     get_schema,
     label_eval,
     lineage_for_node,
+    mermaid_graph,
     validate_graph,
 )
 
@@ -37,5 +38,6 @@ __all__ = [
     "label_eval",
     "column_lineage_for",
     "lineage_for_node",
+    "mermaid_graph",
     "validate_graph",
 ]

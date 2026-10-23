@@ -6,6 +6,7 @@ Subcommands:
 - ``emergentflow run``   -- execute a graph from a file and record the run.
 - ``emergentflow validate`` -- validate a graph from a file and print findings
   (``--strict`` exits non-zero on error-severity diagnostics).
+- ``emergentflow mermaid`` -- print a graph file as a Mermaid flowchart (issue #169).
 
 Kept dependency-light: the server (and stdlib ``http.server``) is imported lazily
 inside ``main`` so ``import emergentflow.cli`` stays cheap.
@@ -102,6 +103,34 @@ def _build_parser() -> argparse.ArgumentParser:
         "--json",
         action="store_true",
         help="Emit the full Diagnostics result as JSON (machine-readable).",
+    )
+
+    p = sub.add_parser("mermaid", help="Print a graph file as a Mermaid flowchart.")
+    p.add_argument("graph_file", help="Path to a .json graph file.")
+    p.add_argument(
+        "--direction",
+        choices=("LR", "TB"),
+        default="LR",
+        help="Flowchart direction (default: LR).",
+    )
+    p.add_argument("--no-types", action="store_true", help="Omit node types under titles.")
+    p.add_argument("--no-ports", action="store_true", help="Omit port names on edges.")
+    p.add_argument(
+        "--highlight",
+        action="append",
+        default=None,
+        metavar="NODE_ID",
+        help="Emphasise a node (repeatable).",
+    )
+    p.add_argument(
+        "--include-notes",
+        action="store_true",
+        help="Also draw presentation-only nodes (notes, result cards, callouts).",
+    )
+    p.add_argument(
+        "--fenced",
+        action="store_true",
+        help="Wrap the output in a ```mermaid fenced block, ready to paste into Markdown.",
     )
 
     p = sub.add_parser(
@@ -381,6 +410,39 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.strict:
             errors = [d for d in filtered.diagnostics if d.severity.value == "error"]
             return 1 if errors else 0
+        return 0
+
+    if args.command == "mermaid":
+        import pathlib
+
+        graph_path = pathlib.Path(args.graph_file)
+        if not graph_path.is_file():
+            print(f"Error: graph file not found: {graph_path}", file=sys.stderr)
+            return 1
+
+        from emergentflow.codegen.mermaid import to_mermaid
+        from emergentflow.ir.serialize import deserialize_graph
+
+        graph = deserialize_graph(graph_path.read_text(encoding="utf-8"))
+        source = to_mermaid(
+            graph,
+            direction=args.direction,
+            show_types=not args.no_types,
+            show_ports=not args.no_ports,
+            highlight=args.highlight or (),
+            include_notes=args.include_notes,
+        )
+        if args.fenced:
+            source = f"```mermaid\n{source}```\n"
+        # Mermaid files are UTF-8; bypass a narrower stdout encoding (e.g. cp1252 on
+        # redirected Windows stdout), which can't encode the "→" in port edge labels.
+        buffer = getattr(sys.stdout, "buffer", None)
+        if buffer is not None:
+            sys.stdout.flush()
+            buffer.write(source.encode("utf-8"))
+            buffer.flush()
+        else:
+            sys.stdout.write(source)
         return 0
 
     if args.command == "mcp":

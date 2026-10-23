@@ -137,6 +137,56 @@ HTML report.
 > **Shaping data for recommenders:** see [Recommender data prep](./recommender-data-prep.md) for a
 > packed-lists → two-tower walkthrough.
 
+### Mermaid diagrams for PRs, issues and chat
+
+`ef.to_mermaid(graph)` renders a flow as a Mermaid `flowchart`. GitHub, GitLab, Notion, Obsidian
+and most chat UIs draw a fenced `mermaid` block inline, so a reviewer sees the pipeline without
+running `emergentflow serve`. It is pure and deterministic (topological order), colours nodes by
+family to match the canvas, draws `layout.group` containers and `nn.module`/composite subgraphs as
+Mermaid subgraphs, omits presentation-only nodes (notes, result cards, callouts) unless
+`include_notes=True`, and above 150 nodes collapses groups and says so in a `%% truncated:`
+comment instead of silently dropping nodes (GitHub caps diagram size).
+
+```bash
+# CLI: print a fenced block ready to paste into a PR description
+emergentflow mermaid examples/functional_pipeline.json --fenced
+
+# Options: --direction TB, --no-types, --no-ports, --highlight NODE_ID (repeatable), --include-notes
+
+# Server: the bare graph JSON as the body; returns unfenced source with default options
+# (no highlight or other flags; wrap it in a ```mermaid fence yourself)
+curl -X POST http://127.0.0.1:8765/export/mermaid \
+  -H "Content-Type: application/json" --data @examples/functional_pipeline.json
+# {"mermaid":"flowchart LR\n    ..."}
+```
+
+```python
+import emergentflow as ef
+from emergentflow.ir import load_graph
+
+print(ef.to_mermaid(load_graph("examples/functional_pipeline.json"), highlight=["n-impute"]))
+```
+
+On the canvas, **File → Copy as Mermaid** copies the same fenced block to the clipboard. Agents
+connected over MCP can call `get_graph_mermaid(session_id, highlight=[...])`, which returns
+`{"mermaid": ..., "markdown": ...}` (`markdown` is the fenced block).
+`examples/functional_pipeline.json` renders as:
+
+```mermaid
+flowchart LR
+    n_n_load["Load CSV<br/><small>data.load_csv</small>"]
+    n_n_impute["Impute Missing<br/><small>clean.impute_missing</small>"]
+    n_n_anova["ANOVA<br/><small>stats.anova</small>"]
+    n_n_load -->|"frame"| n_n_impute
+    n_n_impute -->|"frame"| n_n_anova
+    classDef fam_clean stroke:#14b8a6,stroke-width:2px
+    class n_n_impute fam_clean
+    classDef fam_data stroke:#3b82f6,stroke-width:2px
+    class n_n_load fam_data
+    classDef fam_stats stroke:#a78bfa,stroke-width:2px
+    class n_n_anova fam_stats
+```
+
 ## 5. Developing the UI directly (optional)
 
 Only needed if you're editing `ui/` source rather than just using the app:

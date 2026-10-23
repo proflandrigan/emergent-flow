@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pandas as pd
 
-from emergentflow import __version__, compile_to_code, execute, export_catalog, validate
+from emergentflow import __version__, compile_to_code, execute, export_catalog, to_mermaid, validate
 from emergentflow.clients import ClientKind, Clients
 from emergentflow.codegen.errors import CodegenError, UnboundInputError
 from emergentflow.codegen.inspect import build_step_traces
@@ -119,6 +119,11 @@ def _to_graph(payload: dict[str, Any]) -> Graph:
 def compile_graph(payload: dict[str, Any]) -> dict[str, Any]:
     """IR graph (as a dict) -> ``{"code": <generated Python>}``."""
     return {"code": compile_to_code(_to_graph(payload))}
+
+
+def mermaid_graph(payload: dict[str, Any]) -> dict[str, Any]:
+    """IR graph (as a dict) -> ``{"mermaid": <Mermaid flowchart source>}`` (issue #169)."""
+    return {"mermaid": to_mermaid(_to_graph(payload))}
 
 
 def validate_graph(payload: dict[str, Any]) -> dict[str, Any]:

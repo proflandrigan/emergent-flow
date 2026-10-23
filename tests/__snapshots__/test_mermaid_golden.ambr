@@ -1,0 +1,91 @@
+# serializer version: 1
+# name: test_mermaid_golden[acceptance_demo]
+  '''
+  flowchart LR
+      n_n_load["Load Sample<br/><small>data.load_sample</small>"]
+      n_n_drop["Drop Missing<br/><small>clean.drop_missing</small>"]
+      n_n_select["Select Columns<br/><small>clean.select_columns</small>"]
+      n_n_describe["Describe<br/><small>stats.describe</small>"]
+      n_n_report["HTML Summary<br/><small>reports.generate_html_summary</small>"]
+      n_n_split["Train/Test Split<br/><small>ml.train_test_split</small>"]
+      n_n_train["Train Regressor<br/><small>ml.train_regressor</small>"]
+      n_n_eval["Evaluate<br/><small>ml.evaluate</small>"]
+      n_n_load -->|"frame"| n_n_drop
+      n_n_drop -->|"frame"| n_n_select
+      n_n_select -->|"frame"| n_n_describe
+      n_n_select -->|"frame"| n_n_report
+      n_n_select -->|"frame"| n_n_split
+      n_n_split -->|"train→frame"| n_n_train
+      n_n_split -->|"test→frame"| n_n_eval
+      n_n_train -->|"model"| n_n_eval
+      classDef fam_clean stroke:#14b8a6,stroke-width:2px
+      class n_n_drop,n_n_select fam_clean
+      classDef fam_data stroke:#3b82f6,stroke-width:2px
+      class n_n_load fam_data
+      classDef fam_ml stroke:#f59e0b,stroke-width:2px
+      class n_n_split,n_n_train,n_n_eval fam_ml
+      classDef fam_reports stroke:#10b981,stroke-width:2px
+      class n_n_report fam_reports
+      classDef fam_stats stroke:#a78bfa,stroke-width:2px
+      class n_n_describe fam_stats
+  
+  '''
+# ---
+# name: test_mermaid_golden[declarative_module]
+  '''
+  flowchart LR
+      subgraph n_n_module["SimpleClassifier<br/><small>nn.module</small>"]
+          n_n_linear1["Linear 128→64<br/><small>nn.linear</small>"]
+          n_n_relu["ReLU<br/><small>nn.relu</small>"]
+          n_n_linear2["Linear 64→10<br/><small>nn.linear</small>"]
+      end
+      n_n_linear1 -->|"out→x"| n_n_relu
+      n_n_relu -->|"out→x"| n_n_linear2
+      classDef fam_nn stroke:#ec4899,stroke-width:2px
+      class n_n_module,n_n_linear1,n_n_relu,n_n_linear2 fam_nn
+  
+  '''
+# ---
+# name: test_mermaid_golden[functional_pipeline]
+  '''
+  flowchart LR
+      n_n_load["Load CSV<br/><small>data.load_csv</small>"]
+      n_n_impute["Impute Missing<br/><small>clean.impute_missing</small>"]
+      n_n_anova["ANOVA<br/><small>stats.anova</small>"]
+      n_n_load -->|"frame"| n_n_impute
+      n_n_impute -->|"frame"| n_n_anova
+      classDef fam_clean stroke:#14b8a6,stroke-width:2px
+      class n_n_impute fam_clean
+      classDef fam_data stroke:#3b82f6,stroke-width:2px
+      class n_n_load fam_data
+      classDef fam_stats stroke:#a78bfa,stroke-width:2px
+      class n_n_anova fam_stats
+  
+  '''
+# ---
+# name: test_mermaid_golden[hostile_labels]
+  '''
+  flowchart LR
+      subgraph g_grp["Prep #91;stage #35;1#93;"]
+          n_load["Load #quot;sales.csv#quot; #lt;raw#gt; #124; v2<br/><small>data.load_csv</small>"]
+          n_impute["Impute #123;mean#125; #amp; #96;fill#96;<br/>second line<br/><small>clean.impute_missing</small>"]
+      end
+      n_fit["Fit model; 100#37; → done (direction#32;TB)<br/><small>ml.fit_estimator</small>"]
+      n_lifestyle["Lifestyle#58;#lt;30 #amp; style#58;50#37;<br/><small>clean.filter_rows</small>"]
+      n_note["Note#58; #lt;b#gt;not#lt;/b#gt; html<br/><small>notes.markdown</small>"]
+      n_load -->|"frame"| n_impute
+      n_impute -->|"frame→data"| n_fit
+      n_impute -->|"frame"| n_lifestyle
+      classDef fam_clean stroke:#14b8a6,stroke-width:2px
+      class n_impute,n_lifestyle fam_clean
+      classDef fam_data stroke:#3b82f6,stroke-width:2px
+      class n_load fam_data
+      classDef fam_ml stroke:#f59e0b,stroke-width:2px
+      class n_fit fam_ml
+      classDef fam_notes stroke:#eab308,stroke-width:2px
+      class n_note fam_notes
+      classDef highlight stroke:#ef4444,stroke-width:4px
+      class n_fit highlight
+  
+  '''
+# ---

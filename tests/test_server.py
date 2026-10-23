@@ -39,6 +39,7 @@ from emergentflow.server import (
     get_catalog,
     get_schema,
     lineage_for_node,
+    mermaid_graph,
     validate_graph,
 )
 from emergentflow.server import cache as cache_mod
@@ -292,6 +293,12 @@ def test_validate_graph_returns_json_native_diagnostics() -> None:
     out = validate_graph(_load_csv_graph())
     assert "diagnostics" in out
     json.dumps(out)  # JSON-native: encodes without a custom encoder
+
+
+def test_mermaid_graph_returns_flowchart() -> None:
+    out = mermaid_graph(_load_csv_graph())
+    assert out["mermaid"].startswith("flowchart LR\n")
+    assert "Load CSV" in out["mermaid"]
 
 
 def test_lineage_for_node_returns_json_native_lineage() -> None:
@@ -809,6 +816,15 @@ def test_http_compile_and_execute(client: TestClient) -> None:
     assert "n-load" in body["results"]
     assert body["payload_version"] == 2
     assert body["results"]["n-load"]["frame"]["kind"] == "table"
+
+
+def test_http_export_mermaid(client: TestClient) -> None:
+    resp = client.post("/export/mermaid", json=_load_csv_graph())
+    assert resp.status_code == 200
+    assert resp.json()["mermaid"].startswith("flowchart LR\n")
+
+    bad = client.post("/export/mermaid", json={"nodes": "not-a-dict"})
+    assert bad.status_code == 422
 
 
 def _recommend_graph() -> dict:

@@ -241,6 +241,16 @@ or the in-app chat). If `view_url` is absent, or `canvas_reachable` is false, yo
 standalone stdio server (`create_mcp_server().run()`), which has its own session store, so the link
 would not resolve. Say so instead of pasting it.
 
+**Opening a PR or issue? Paste a diagram.** A reviewer reading a pull request sees only a JSON diff
+of the flow. Call `get_graph_mermaid(session_id, highlight=[<ids of the nodes you changed>])` over
+MCP and paste its `markdown` field (a ready-made fenced `mermaid` block) into the PR description.
+GitHub renders it as a picture of the pipeline, with your changed nodes outlined in red. Without
+MCP: from a shell, `emergentflow mermaid flow.json --fenced --highlight <node_id>` (repeat
+`--highlight` per node) prints the same fenced block; over HTTP, `POST /export/mermaid` takes the
+bare graph JSON as the body and returns only `{"mermaid": "<flowchart source>"}`, with no
+`markdown` field and no highlight option, so wrap the source in a ```` ```mermaid ```` fence
+yourself.
+
 ## Review workflow
 
 The other direction: instead of proposing changes, you review a HUMAN-built graph and post

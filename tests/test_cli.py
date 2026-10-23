@@ -197,6 +197,41 @@ def test_validate_missing_file_returns_1(tmp_path) -> None:
     assert main(["validate", str(tmp_path / "nope.json")]) == 1
 
 
+def _one_node_graph(tmp_path):
+    from emergentflow.ir import Direction
+
+    graph_file = tmp_path / "one.json"
+    _write_graph(
+        graph_file,
+        nodes={
+            "n-src": _simple_node(
+                "n-src",
+                "test.source",
+                ports=[_port("p-out", "out", Direction.OUT.value)],
+            ),
+        },
+    )
+    return graph_file
+
+
+def test_mermaid_prints_flowchart(tmp_path, capsys) -> None:
+    graph_file = _one_node_graph(tmp_path)
+    assert main(["mermaid", str(graph_file)]) == 0
+    assert capsys.readouterr().out.startswith("flowchart LR\n")
+
+
+def test_mermaid_options(tmp_path, capsys) -> None:
+    graph_file = _one_node_graph(tmp_path)
+    assert main(["mermaid", str(graph_file), "--direction", "TB", "--fenced"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("```mermaid\nflowchart TB\n")
+    assert out.endswith("```\n")
+
+
+def test_mermaid_missing_file_exits_one(tmp_path) -> None:
+    assert main(["mermaid", str(tmp_path / "nope.json")]) == 1
+
+
 def test_validate_json_output_is_valid(tmp_path) -> None:
     import io
     import json as json_mod
@@ -221,3 +256,31 @@ def test_validate_json_output_is_valid(tmp_path) -> None:
     assert rc == 0
     data = json_mod.loads(buf.getvalue())
     assert "diagnostics" in data and "edge_compatibility" in data
+
+
+def test_mermaid_writes_utf8_on_narrow_stdout_encoding(tmp_path, monkeypatch) -> None:
+    import io
+    import sys
+
+    from emergentflow.ir import Direction
+
+    graph_file = tmp_path / "ports.json"
+    _write_graph(
+        graph_file,
+        nodes={
+            "a": _simple_node("a", "test.source", ports=[_port("a-out", "out", "out")]),
+            "b": _simple_node("b", "test.sink", ports=[_port("b-in", "df", Direction.IN.value)]),
+        },
+        edges={
+            "e": {
+                "id": "e",
+                "source": {"node_id": "a", "port_id": "a-out"},
+                "target": {"node_id": "b", "port_id": "b-in"},
+            }
+        },
+    )
+    raw = io.BytesIO()
+    # e.g. redirected stdout on Windows: cp1252 cannot encode the "→" in edge labels.
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(raw, encoding="cp1252"))
+    assert main(["mermaid", str(graph_file)]) == 0
+    assert '|"out→df"|' in raw.getvalue().decode("utf-8")
