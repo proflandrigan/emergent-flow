@@ -175,8 +175,8 @@ flowchart LR
     n_n_load["Load CSV<br/><small>data.load_csv</small>"]
     n_n_impute["Impute Missing<br/><small>clean.impute_missing</small>"]
     n_n_anova["ANOVA<br/><small>stats.anova</small>"]
-    n_n_load -->|frame| n_n_impute
-    n_n_impute -->|frame| n_n_anova
+    n_n_load -->|"frame"| n_n_impute
+    n_n_impute -->|"frame"| n_n_anova
     classDef fam_clean stroke:#14b8a6,stroke-width:2px
     class n_n_impute fam_clean
     classDef fam_data stroke:#3b82f6,stroke-width:2px

@@ -11,6 +11,7 @@ golden-tested and pasted into GitHub Markdown, which renders Mermaid natively.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Collection
 from typing import Literal
 
@@ -76,6 +77,20 @@ _ESCAPES: dict[str, str] = {
 def _mermaid_label(text: str) -> str:
     """Escape *text* for use inside a quoted Mermaid label (single pass, no double-escape)."""
     return "".join(_ESCAPES.get(ch, ch) for ch in text)
+
+
+# Mermaid's flowchart lexer matches ``.*direction\s+(TB|BT|RL|LR|TD)`` (case-sensitive) even
+# inside a quoted subgraph title, which swallows the line and breaks the following ``end``.
+_DIRECTION_TOKEN = re.compile(r"direction([\s\ufeff])(?=[\s\ufeff]*(?:TB|BT|RL|LR|TD))")
+
+
+def _subgraph_title(text: str) -> str:
+    """Neutralise ``direction <DIR>`` in already-escaped subgraph title *text*.
+
+    Entity-encoding the first whitespace character after ``direction`` breaks the
+    lexer's ``direction\\s+`` match; the title still renders identically.
+    """
+    return _DIRECTION_TOKEN.sub(lambda m: f"direction#{ord(m.group(1))};", text)
 
 
 class _IdAllocator:
@@ -177,7 +192,7 @@ def _visible_inner(node: Node, include_notes: bool) -> list[IRId]:
 
 def _edge_line(a: str, b: str, label: str) -> str:
     if label:
-        return f"{a} -->|{_mermaid_label(label)}| {b}"
+        return f'{a} -->|"{_mermaid_label(label)}"| {b}'
     return f"{a} --> {b}"
 
 
@@ -236,7 +251,7 @@ class _FullRenderer:
             return
         assert node.subgraph is not None
         inner_scope = self.add_scope(node.subgraph)
-        self.lines.append(f'{pad}subgraph {mid}["{text}"]')
+        self.lines.append(f'{pad}subgraph {mid}["{_subgraph_title(text)}"]')
         for nid in inner:
             self.emit_node(inner_scope, node.subgraph.nodes[nid], level + 1, True)
         self.lines.append(f"{pad}end")
@@ -246,7 +261,8 @@ class _FullRenderer:
         gnode = graph.nodes[gid]
         pad = _INDENT
         gmid = self.ids.alloc("g", gid)
-        self.lines.append(f'{pad}subgraph {gmid}["{_mermaid_label(_group_name(gnode))}"]')
+        title = _subgraph_title(_mermaid_label(_group_name(gnode)))
+        self.lines.append(f'{pad}subgraph {gmid}["{title}"]')
         for nid in members:
             self.emit_node(0, graph.nodes[nid], 2, False)
         self.lines.append(f"{pad}end")

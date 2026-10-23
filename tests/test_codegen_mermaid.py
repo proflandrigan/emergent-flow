@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from emergentflow.api import is_inspectable
-from emergentflow.codegen.mermaid import _mermaid_label, to_mermaid
+from emergentflow.codegen.mermaid import _mermaid_label, _subgraph_title, to_mermaid
 from emergentflow.ir import Direction, Edge, Graph, Node, Port, PortRef
 from emergentflow.ir.params import Param
 
@@ -94,8 +94,8 @@ def test_linear_chain_output_exact() -> None:
         '    n_a["Load<br/><small>data.load_csv</small>"]\n'
         '    n_b["Impute<br/><small>clean.impute_missing</small>"]\n'
         '    n_c["Test<br/><small>stats.anova</small>"]\n'
-        "    n_a -->|frame→df| n_b\n"
-        "    n_b -->|df→x| n_c\n"
+        '    n_a -->|"frame→df"| n_b\n'
+        '    n_b -->|"df→x"| n_c\n'
         "    classDef fam_clean stroke:#14b8a6,stroke-width:2px\n"
         "    class n_b fam_clean\n"
         "    classDef fam_data stroke:#3b82f6,stroke-width:2px\n"
@@ -120,8 +120,8 @@ def test_port_label_same_name_vs_different() -> None:
     b = _node("b", "clean.impute_missing", "B", in_name="df", out_name="out")
     c = _node("c", "stats.anova", "C", in_name="x", out_name=None)
     out = to_mermaid(_graph([a, b, c], [_edge("a", "b"), _edge("b", "c")]))
-    assert "n_a -->|df| n_b" in out
-    assert "n_b -->|out→x| n_c" in out
+    assert 'n_a -->|"df"| n_b' in out
+    assert 'n_b -->|"out→x"| n_c' in out
 
 
 def test_show_ports_false_and_show_types_false() -> None:
@@ -196,7 +196,7 @@ def test_container_subgraph_nested_and_deeper_flattened() -> None:
     assert "        %% flattened: nested subgraph of Deeper (1 nodes) not shown" in lines
     assert '        n_deeper["Deeper' in out
     assert "n_z" not in out
-    assert "    n_src -->|df| n_mod" in lines
+    assert '    n_src -->|"df"| n_mod' in lines
     assert any(line.startswith("    n_lin -->") or "n_lin -->" in line for line in lines)
 
 
@@ -302,3 +302,42 @@ def test_truncation_count_does_not_treat_group_as_one_drawn_node() -> None:
     outside = _node("out", "data.load_csv", "Out", in_name=None, out_name="df")
     out = to_mermaid(_graph([grp, outside, *members], [_edge("out", "m0")]), max_nodes=3)
     assert "%% truncated: 6 of 7 nodes not drawn individually" in out
+
+
+@pytest.mark.parametrize(
+    "port", ["count(*)", "f(x)", "~~~", "click a call foo()", "@{ shape: rect }"]
+)
+def test_edge_text_is_quoted(port: str) -> None:
+    # Unquoted |...| edge text breaks the Mermaid parser on (, ), ~~~, @ (PR #177 review).
+    a = _node("a", "data.load_csv", "Load", in_name=None, out_name=port)
+    b = _node("b", "clean.impute_missing", "Impute", in_name="df")
+    out = to_mermaid(_graph([a, b], [_edge("a", "b")]))
+    assert f'    n_a -->|"{_mermaid_label(port + "→df")}"| n_b' in out.splitlines()
+
+
+def test_subgraph_title_neutralises_direction_token() -> None:
+    assert _subgraph_title("Stage: direction LR") == "Stage: direction#32;LR"
+    assert _subgraph_title("direction\tTB") == "direction#9;TB"
+    assert _subgraph_title("direction   TD x") == "direction#32;  TD x"
+    assert _subgraph_title("subdirection BT") == "subdirection#32;BT"
+    # The lexer rule is case-sensitive and needs whitespace + a direction keyword.
+    for safe in ("Direction TB", "direction tb", "direction", "directions LR", "direction#32;TB"):
+        assert _subgraph_title(safe) == safe
+
+
+def test_group_and_module_titles_with_direction_token() -> None:
+    grp = _node("g", "layout.group", "Stage: direction LR", in_name=None, out_name=None)
+    out = to_mermaid(_graph([grp, _node("m", "data.load_csv", "M", group_id="g")]))
+    assert '    subgraph g_g["Stage: direction#32;LR"]' in out.splitlines()
+
+    inner = _graph([_node("l1", "nn.linear", "lin")])
+    mod = _node("mod", "nn.module", "Encoder (direction TB)", subgraph=inner)
+    out = to_mermaid(_graph([mod]))
+    assert '    subgraph n_mod["Encoder (direction#32;TB)<br/><small>nn.module</small>"]' in (
+        out.splitlines()
+    )
+
+
+def test_direction_token_left_alone_outside_subgraph_titles() -> None:
+    out = to_mermaid(_graph([_node("a", "data.load_csv", "direction TB")]))
+    assert '["direction TB' in out
