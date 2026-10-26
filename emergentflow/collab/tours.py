@@ -21,6 +21,7 @@ from emergentflow.ir.common import IRId, new_id
 from emergentflow.ir.graph import Graph
 
 MAX_TITLE = 200
+MAX_ID = 200
 MAX_CONCLUSION = 4_000
 MAX_NOTE = 16_000
 MAX_AUTHOR = 200
@@ -100,7 +101,7 @@ class Tour(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: IRId = Field(default_factory=new_id)
+    id: IRId = Field(default_factory=new_id, max_length=MAX_ID)
     title: str = Field(min_length=1, max_length=MAX_TITLE)
     conclusion: str = Field(min_length=1, max_length=MAX_CONCLUSION)
     steps: list[TourStep] = Field(min_length=1, max_length=MAX_STEPS)
@@ -109,7 +110,12 @@ class Tour(BaseModel):
     @field_validator("id")
     @classmethod
     def _id_not_blank(cls, v: str) -> str:
-        return _reject_blank(v, "id")
+        v = _reject_blank(v, "id")
+        # The id is a single REST path segment (PUT/DELETE /sessions/{id}/tours/{tour_id}): a "/"
+        # or a dot segment is split/normalised before routing, leaving the tour unreachable.
+        if "/" in v or v in {".", ".."}:
+            raise ValueError("id must not contain '/' or be '.' or '..'")
+        return v
 
     @field_validator("title")
     @classmethod

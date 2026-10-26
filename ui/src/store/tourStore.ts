@@ -180,6 +180,11 @@ export const useTourStore = create<TourStore>((set, get) => {
 
       if (!restore || !snapshot) {
         if (useTraceStore.getState().mode === "tour") useTraceStore.getState().reset();
+        // Drop the step hash playback wrote, or a reload would replay the tour. Only when the URL
+        // still holds exactly that hash: a newly clicked link (tour or not) must survive.
+        if (window.location.hash === formatViewHash({ tour: playing.tour.id, step: playing.index })) {
+          replaceHash("");
+        }
         return;
       }
 

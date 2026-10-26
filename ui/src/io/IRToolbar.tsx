@@ -399,6 +399,7 @@ export function IRToolbar(): JSX.Element {
             <div
               className="glass"
               data-testid="open-flow-panel"
+              data-esc-dismiss
               style={{
                 position: "absolute",
                 top: "100%",

@@ -5,6 +5,7 @@ import { App } from "./App";
 import { getSession, type Tour } from "./session/sessionClient";
 import { useSessionStore } from "./session/sessionStore";
 import { useTourStore } from "./store/tourStore";
+import { useTraceStore } from "./store/traceStore";
 import { useViewLinkStore } from "./store/viewLinkStore";
 
 vi.mock("./session/sessionClient", () => ({
@@ -695,4 +696,59 @@ test("Escape closes a modal opened over a playing tour without exiting the tour"
 
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   expect(useTourStore.getState().playing?.tour.id).toBe("t1");
+});
+
+test("tour keys are ignored while a native <select> has focus", async () => {
+  await playTourViaStore();
+  const select = document.createElement("select");
+  select.innerHTML = "<option>a</option><option>b</option>";
+  document.body.appendChild(select);
+  select.focus();
+
+  const right = new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true });
+  select.dispatchEvent(right);
+  select.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  select.remove();
+
+  expect(right.defaultPrevented).toBe(false);
+  expect(useTourStore.getState().playing?.index).toBe(0);
+});
+
+test("Escape closes an open menu first and leaves the tour playing", async () => {
+  await playTourViaStore();
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  expect(screen.getByRole("menu")).toBeInTheDocument();
+
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  expect(useTourStore.getState().playing?.tour.id).toBe("t1");
+
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  expect(useTourStore.getState().playing).toBeNull();
+});
+
+test("a trace takeover ends the tour and drops its #tour hash so a reload doesn't replay it", async () => {
+  mockHealth("ok");
+  mockTourSession();
+  window.history.replaceState(null, "", "/?session=s1#tour=t1&step=1");
+  render(<App />);
+  await waitFor(() => expect(useTourStore.getState().playing?.index).toBe(1));
+
+  act(() => useTraceStore.getState().setReach("upstream"));
+
+  expect(useTourStore.getState().playing).toBeNull();
+  expect(window.location.hash).toBe("");
+});
+
+test("leaving the session while a tour plays drops its #tour hash", async () => {
+  mockHealth("ok");
+  mockTourSession();
+  window.history.replaceState(null, "", "/?session=s1#tour=t1&step=2");
+  render(<App />);
+  await waitFor(() => expect(useTourStore.getState().playing?.index).toBe(2));
+
+  act(() => useSessionStore.setState({ sessionId: null, status: "idle", tours: {} }));
+
+  await waitFor(() => expect(useTourStore.getState().playing).toBeNull());
+  expect(window.location.hash).toBe("");
 });

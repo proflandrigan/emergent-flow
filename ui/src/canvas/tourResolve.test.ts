@@ -140,6 +140,48 @@ describe("resolveTourStep collapsed groups", () => {
   });
 });
 
+describe("resolveTourStep routes decided on the un-collapsed graph", () => {
+  // g (collapsed) holds a and c. The only real edges are c -> b and c -> a; a has no out-edges.
+  // Re-anchoring turns c -> b into g -> b, which must not let a route a -> b "find" a path.
+  const view: TourGraphView = {
+    nodeIds: ["g", "b"],
+    edges: [edge("cb", "g", "b")],
+    hasNode: (id) => ["a", "b", "c", "g"].includes(id),
+    visibleId: (id) => (id === "a" || id === "c" ? "g" : id),
+    graph: {
+      nodeIds: ["a", "b", "c", "g"],
+      edges: [edge("cb", "c", "b"), edge("ca", "c", "a")],
+    },
+  };
+
+  test("route a -> b through a sibling's edge is no-path", () => {
+    const result = resolveTourStep({ note: "n", route: ["a", "b"] }, view);
+    expect(result.routeStatus).toBe("no-path");
+    expect(result.highlight.highlightedEdgeIds.size).toBe(0);
+    expect(result.highlight.highlightedNodeIds).toEqual(new Set(["g", "b"]));
+  });
+
+  test("route a -> c with both hidden in one group and no a -> c path is no-path", () => {
+    const result = resolveTourStep({ note: "n", route: ["a", "c"] }, view);
+    expect(result.routeStatus).toBe("no-path");
+    expect(result.highlight.highlightedNodeIds).toEqual(new Set(["g"]));
+  });
+
+  test("a real path is projected onto the rendered graph", () => {
+    const result = resolveTourStep({ note: "n", route: ["c", "b"] }, view);
+    expect(result.routeStatus).toBe("found");
+    expect(result.highlight.highlightedNodeIds).toEqual(new Set(["g", "b"]));
+    expect(result.highlight.highlightedEdgeIds).toEqual(new Set(["cb"]));
+  });
+
+  test("a path internal to one collapsed group highlights just the group", () => {
+    const result = resolveTourStep({ note: "n", route: ["c", "a"] }, view);
+    expect(result.routeStatus).toBe("found");
+    expect(result.highlight.highlightedNodeIds).toEqual(new Set(["g"]));
+    expect(result.highlight.highlightedEdgeIds.size).toBe(0);
+  });
+});
+
 describe("resolveTourStep odd input", () => {
   test("a step with neither focus nor route is inactive and does not throw", () => {
     const step: TourStep = { note: "n" };

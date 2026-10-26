@@ -35,6 +35,7 @@ export function ExampleGallery({
 
   return (
     <div
+      data-esc-dismiss
       style={{
         position: "absolute",
         top: "50%",

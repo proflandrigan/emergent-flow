@@ -16,6 +16,12 @@ export interface TourGraphView {
   hasNode: (id: string) => boolean;
   /** Map an id to the node that represents it on screen (its collapsed group, else itself). */
   visibleId: (id: string) => string;
+  /**
+   * The top-level graph before re-anchoring to collapsed groups. Route steps decide found/no-path
+   * on this so a collapsed group can't fake a path through a sibling member; the result is then
+   * projected onto the rendered graph. Omitted => the rendered graph is used as-is.
+   */
+  graph?: { nodeIds: string[]; edges: TraceEdge[] };
 }
 
 export type TourRouteStatus = "found" | "no-path" | "endpoint-removed";
@@ -111,16 +117,24 @@ export function resolveTourStep(step: TourStep, view: TourGraphView): ResolvedTo
       };
     }
 
-    const route = computeRoute(view.visibleId(from), view.visibleId(to), view.nodeIds, view.edges);
+    const graph = view.graph ?? { nodeIds: view.nodeIds, edges: view.edges };
+    const route = view.graph
+      ? computeRoute(from, to, graph.nodeIds, graph.edges)
+      : computeRoute(view.visibleId(from), view.visibleId(to), view.nodeIds, view.edges);
     if (route.found) {
+      // Project the path onto the rendered graph: hidden members show as their collapsed group,
+      // and edges dropped by re-anchoring (internal to one collapsed group) are not highlighted.
+      const renderedEdgeIds = new Set(view.edges.map((e) => e.id));
       return {
         kind: "route",
         authoredIds,
         removedIds,
         highlight: {
           active: route.active,
-          highlightedNodeIds: route.highlightedNodeIds,
-          highlightedEdgeIds: route.highlightedEdgeIds,
+          highlightedNodeIds: new Set(survivingVisible([...route.highlightedNodeIds])),
+          highlightedEdgeIds: new Set(
+            [...route.highlightedEdgeIds].filter((id) => renderedEdgeIds.has(id)),
+          ),
         },
         routeStatus: "found",
         fitIds: endpoints,

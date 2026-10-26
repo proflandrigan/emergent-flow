@@ -179,3 +179,11 @@ class TestTourRoutes:
         after = client.get(f"/sessions/{sid}").json()
         assert after["graph"] == before["graph"]
         assert after["version"] == before["version"]
+
+
+def test_slash_id_rejected_so_every_stored_tour_stays_deletable(client: TestClient) -> None:
+    # A "/" id would be stored but unreachable by PUT/DELETE (405) once Starlette decodes %2F.
+    sid = _new_session(client)
+    r = client.post(f"/sessions/{sid}/tours", json=_tour(id="a/b"))
+    assert r.status_code == 422, r.text
+    assert client.get(f"/sessions/{sid}/tours").json()["tours"] == []

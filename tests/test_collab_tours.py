@@ -90,6 +90,18 @@ def test_blank_id_rejected() -> None:
         Tour.model_validate(_tour(id="  "))
 
 
+@pytest.mark.parametrize("bad", ["a/b", "/", ".", "..", "x" * 201])
+def test_unroutable_or_oversized_id_rejected(bad: str) -> None:
+    # The id is one REST path segment; "/" and dot segments would make PUT/DELETE unreachable.
+    with pytest.raises(ValidationError):
+        Tour.model_validate(_tour(id=bad))
+
+
+@pytest.mark.parametrize("ok", ["a.b", "...", "a b", "a?b#c", "x" * 200])
+def test_unusual_but_routable_id_accepted(ok: str) -> None:
+    assert Tour.model_validate(_tour(id=ok)).id == ok
+
+
 @pytest.mark.parametrize("field", ["title", "conclusion", "author"])
 @pytest.mark.parametrize("value", ["", "   "])
 def test_blank_tour_text_rejected(field: str, value: str) -> None:

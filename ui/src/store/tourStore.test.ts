@@ -210,6 +210,19 @@ describe("exit", () => {
     useTourStore.getState().exit({ restore: false });
     expect(useTraceStore.getState().mode).toBe("reach");
   });
+
+  test("restore:false clears only the step hash the tour itself wrote", () => {
+    useTourStore.getState().start(makeTour("t1"), 1);
+    expect(window.location.hash).toBe("#tour=t1&step=1");
+    useTourStore.getState().exit({ restore: false });
+    expect(window.location.hash).toBe("");
+
+    // A newly clicked link already in the URL survives the exit it triggers.
+    useTourStore.getState().start(makeTour("t1"), 1);
+    window.history.replaceState(null, "", "/#focus=n2");
+    useTourStore.getState().exit({ restore: false });
+    expect(window.location.hash).toBe("#focus=n2");
+  });
 });
 
 describe("updateTour", () => {

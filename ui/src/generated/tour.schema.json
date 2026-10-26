@@ -89,6 +89,7 @@
       "type": "string"
     },
     "id": {
+      "maxLength": 200,
       "title": "Id",
       "type": "string"
     },

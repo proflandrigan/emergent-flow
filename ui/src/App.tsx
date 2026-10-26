@@ -435,9 +435,15 @@ export function App(): JSX.Element {
     if (!tourPlaying) return undefined;
     function onTourKeyDown(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (isTextEntryTarget(e.target)) return;
+      // A native <select> uses arrows to change its value and Esc to close its list.
+      if (isTextEntryTarget(e.target) || (e.target instanceof HTMLElement && e.target.tagName === "SELECT")) {
+        return;
+      }
       // A modal opened over a playing tour owns the keyboard (its Esc closes it, not the tour).
       if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      // An open menu/popover closes itself on Esc (a document listener this capture handler would
+      // otherwise pre-empt); the tour needs a second Esc.
+      if (e.key === "Escape" && document.querySelector('[role="menu"], [data-esc-dismiss]')) return;
       const tourStore = useTourStore.getState();
       if (e.key === "ArrowRight") tourStore.next();
       else if (e.key === "ArrowLeft") tourStore.prev();

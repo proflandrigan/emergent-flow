@@ -231,8 +231,16 @@ export function Canvas(): JSX.Element {
       edges: rawEdges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
       hasNode: (id) => !!activeNodes[id],
       visibleId,
+      graph: {
+        nodeIds: Object.keys(activeNodes),
+        edges: Object.values(activeEdges).map((e) => ({
+          id: e.id,
+          source: e.source.node_id,
+          target: e.target.node_id,
+        })),
+      },
     });
-  }, [traceMode, tourStep, rawNodes, rawEdges, activeNodes, visibleId]);
+  }, [traceMode, tourStep, rawNodes, rawEdges, activeNodes, activeEdges, visibleId]);
 
   const trace = useMemo((): TraceResult & { routeFound: boolean | null } => {
     const nodeIds = rawNodes.map((n) => n.id);
