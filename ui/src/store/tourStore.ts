@@ -234,3 +234,12 @@ export const useTourStore = create<TourStore>((set, get) => {
     },
   };
 });
+
+// Anything else that takes over the trace while a tour plays (e.g. a context-menu "Trace upstream")
+// ends the tour: the player would otherwise vanish while playback stayed armed. Not restored --
+// the user's new trace is the view they want.
+useTraceStore.subscribe((trace) => {
+  if (trace.mode !== "tour" && useTourStore.getState().playing !== null) {
+    useTourStore.getState().exit({ restore: false });
+  }
+});

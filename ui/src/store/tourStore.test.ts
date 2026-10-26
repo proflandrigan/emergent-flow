@@ -270,3 +270,23 @@ describe("integration", () => {
     expect(JSON.stringify(useGraphStore.getState().toIR())).toBe(before);
   });
 });
+
+describe("trace takeover", () => {
+  test("another trace mode taking over ends playback without restoring", () => {
+    useSelectionStore.getState().replaceSelection(["n1"]);
+    useTourStore.getState().start(makeTour("t1"));
+    useSelectionStore.getState().replaceSelection(["n2"]);
+
+    useTraceStore.getState().setReach("upstream");
+
+    expect(useTourStore.getState().playing).toBeNull();
+    expect(useTraceStore.getState().mode).toBe("reach");
+    expect(useSelectionStore.getState().nodes).toEqual({ n2: true });
+  });
+
+  test("stepping through a tour does not end it", () => {
+    useTourStore.getState().start(makeTour("t1"));
+    useTourStore.getState().next();
+    expect(useTourStore.getState().playing?.index).toBe(1);
+  });
+});

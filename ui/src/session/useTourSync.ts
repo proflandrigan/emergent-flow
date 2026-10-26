@@ -25,6 +25,8 @@ export function useTourSync(): void {
     if (!playing) return;
     const live = tours[playing.tour.id];
     if (!live) {
+      // The session effect above may already have exited playback (session switch/leave).
+      if (useTourStore.getState().playing === null) return;
       useTourStore.getState().exit();
       useViewLinkStore.getState().addNotice("Tour deleted");
       return;

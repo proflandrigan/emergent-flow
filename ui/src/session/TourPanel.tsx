@@ -44,7 +44,7 @@ export function TourPanel({ onPlay }: { onPlay?: () => void }): JSX.Element {
         >
           <div style={{ fontWeight: 600 }}>{tour.title}</div>
           <div style={{ color: "var(--text-secondary)" }}>
-            by {tour.author} · {tour.steps.length} steps
+            by {tour.author} · {tour.steps.length} {tour.steps.length === 1 ? "step" : "steps"}
           </div>
           <div>
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{tour.conclusion}</ReactMarkdown>
