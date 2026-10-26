@@ -2,10 +2,11 @@
 emergentflow.collab.contracts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Typed JSON-Schema-exportable mirror of the SSE event shapes `SessionStore` publishes
-(Epic 14 Story 4). This module exists purely so the canvas has a committed JSON Schema
-to ajv-validate session events against, the same role `emergentflow.ir.schema` plays for
-the `Graph` IR model. It does not construct or validate the dicts `SessionStore._publish`
-actually emits at runtime -- `tests/test_collab_contracts.py` asserts the two stay in sync.
+(Epic 14 Story 4), plus the guided-tour `Tour` model (issue #171). This module exists purely
+so the canvas has committed JSON Schemas to ajv-validate session events and tours against, the
+same role `emergentflow.ir.schema` plays for the `Graph` IR model. It does not construct or
+validate the dicts `SessionStore._publish` actually emits at runtime --
+`tests/test_collab_contracts.py` asserts the two stay in sync.
 
 Never imported by `emergentflow/__init__.py`, `emergentflow/ir/graph.py`, or
 `emergentflow/ir/mutation.py` (works-without-agents invariant, ADR 0019).
@@ -17,6 +18,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from emergentflow.collab.tours import Tour
 from emergentflow.ir.mutation import GraphMutation
 
 
@@ -46,6 +48,9 @@ class SessionEvent(BaseModel):
         "chat_ended",
         "persona_changed",
         "run_completed",
+        "tour_added",
+        "tour_updated",
+        "tour_deleted",
     ]
     session_id: str
     proposal_id: str | None = None
@@ -61,6 +66,7 @@ class SessionEvent(BaseModel):
     author: str | None = None
     description: str | None = None
     run_id: str | None = None
+    tour_id: str | None = None
 
 
 def mutation_json_schema() -> dict[str, Any]:
@@ -71,3 +77,8 @@ def mutation_json_schema() -> dict[str, Any]:
 def session_event_json_schema() -> dict[str, Any]:
     """Return the JSON Schema for `SessionEvent`."""
     return SessionEvent.model_json_schema()
+
+
+def tour_json_schema() -> dict[str, Any]:
+    """Return the JSON Schema for `Tour` (issue #171)."""
+    return Tour.model_json_schema()

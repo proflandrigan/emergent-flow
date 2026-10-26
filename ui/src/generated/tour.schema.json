@@ -1,0 +1,120 @@
+{
+  "$defs": {
+    "TourStep": {
+      "additionalProperties": false,
+      "description": "One step of a tour: a focus set (with optional reach) or a route, plus a note.",
+      "properties": {
+        "focus": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Focus",
+          "type": "array"
+        },
+        "note": {
+          "maxLength": 16000,
+          "minLength": 1,
+          "title": "Note",
+          "type": "string"
+        },
+        "reach": {
+          "anyOf": [
+            {
+              "enum": [
+                "up",
+                "down",
+                "both"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reach"
+        },
+        "route": {
+          "anyOf": [
+            {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Route"
+        },
+        "unknowns": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Unknowns",
+          "type": "array"
+        }
+      },
+      "required": [
+        "note"
+      ],
+      "title": "TourStep",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "An ordered guided walkthrough of the session graph.",
+  "properties": {
+    "author": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Author",
+      "type": "string"
+    },
+    "conclusion": {
+      "maxLength": 4000,
+      "minLength": 1,
+      "title": "Conclusion",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 200,
+      "title": "Id",
+      "type": "string"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/TourStep"
+      },
+      "maxItems": 100,
+      "minItems": 1,
+      "title": "Steps",
+      "type": "array"
+    },
+    "title": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "conclusion",
+    "steps",
+    "author"
+  ],
+  "title": "Tour",
+  "type": "object"
+}

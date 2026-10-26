@@ -1,0 +1,11 @@
+{
+  "id": "tour-1",
+  "title": "How the churn model is built",
+  "conclusion": "Gradient boosting on 14 features; AUC 0.81 on a temporal holdout.",
+  "steps": [
+    {"focus": ["n-load", "n-clean"], "note": "Raw events are de-duplicated and nulls imputed."},
+    {"focus": ["n-split"], "reach": "down", "note": "Temporal split at 2026-06-01, so no leakage."},
+    {"route": ["n-feat", "n-fit"], "note": "Scaling is fitted **after** the split.", "unknowns": ["Is `days_active` computed before or after the cutoff?"]}
+  ],
+  "author": "data_scientist"
+}

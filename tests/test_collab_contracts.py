@@ -8,11 +8,19 @@ publishes and what the export script actually writes.
 
 from __future__ import annotations
 
+import queue
+
 from emergentflow.collab.contracts import (
     SessionEvent,
     mutation_json_schema,
     session_event_json_schema,
 )
+from emergentflow.collab.session import SessionStore
+from emergentflow.collab.tours import Tour, TourStep
+from emergentflow.ir.common import Direction
+from emergentflow.ir.graph import Graph
+from emergentflow.ir.node import Node
+from emergentflow.ir.port import Port
 from emergentflow.server.service import get_mutation_schema, get_session_event_schema
 
 
@@ -85,6 +93,39 @@ def test_session_event_matches_every_publish_call_shape() -> None:
         {"type": "persona_changed", "session_id": "s1", "persona": "data_scientist"}
     )
     SessionEvent.model_validate({"type": "run_completed", "session_id": "s1", "run_id": "r1"})
+    SessionEvent.model_validate({"type": "tour_added", "session_id": "s1", "tour_id": "t1"})
+    SessionEvent.model_validate({"type": "tour_updated", "session_id": "s1", "tour_id": "t1"})
+    SessionEvent.model_validate({"type": "tour_deleted", "session_id": "s1", "tour_id": "t1"})
+
+
+def test_published_tour_events_validate() -> None:
+    node = Node(
+        id="n1",
+        type="data.load_csv",
+        ports=[Port(id="p1", name="frame", direction=Direction.OUT, data_type="DataFrame")],
+    )
+    store = SessionStore()
+    session = store.create(Graph(nodes={"n1": node}, edges={}))
+    q = store.subscribe(session.id)
+    tour = Tour(
+        id="t1",
+        title="T",
+        conclusion="C",
+        author="a",
+        steps=[TourStep(focus=["n1"], note="look")],
+    )
+    store.create_tour(session.id, tour)
+    store.upsert_tour(session.id, tour)
+    store.delete_tour(session.id, "t1")
+    events = []
+    while True:
+        try:
+            events.append(q.get_nowait())
+        except queue.Empty:
+            break
+    for event in events:
+        SessionEvent.model_validate(event)
+    assert [e["type"] for e in events] == ["tour_added", "tour_updated", "tour_deleted"]
 
 
 def test_mutation_json_schema_has_expected_top_level_shape() -> None:

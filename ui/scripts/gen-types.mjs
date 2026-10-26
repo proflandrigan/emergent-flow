@@ -25,6 +25,16 @@ const GENERATED_DIR = resolve(here, "../src/generated");
 function adaptSchema(schema) {
   const rewritten = JSON.parse(
     JSON.stringify(schema).replaceAll("#/$defs/", "#/definitions/"),
+    // Pydantic emits fixed-length tuples (e.g. Tour route: tuple[str, str]) as draft 2020-12
+    // `prefixItems`, which json-schema-to-typescript ignores (yielding `[unknown, unknown]`);
+    // rewrite them to the draft-07 tuple form it understands.
+    (_key, value) => {
+      if (value && typeof value === "object" && Array.isArray(value.prefixItems)) {
+        const { prefixItems, ...others } = value;
+        return { ...others, items: prefixItems, additionalItems: false };
+      }
+      return value;
+    },
   );
   const { $defs, ...rest } = rewritten;
   const definitions = $defs ?? {};
@@ -44,6 +54,7 @@ const TARGETS = [
   { schema: "ir", rootName: "Graph", out: "ir" },
   { schema: "mutation", rootName: "GraphMutation", out: "mutation" },
   { schema: "session_event", rootName: "SessionEvent", out: "session_event" },
+  { schema: "tour", rootName: "Tour", out: "tour" },
 ];
 
 for (const { schema, rootName, out } of TARGETS) {
@@ -55,6 +66,9 @@ for (const { schema, rootName, out } of TARGETS) {
   const ts = await compile(adapted, rootName, {
     bannerComment: banner,
     additionalProperties: false,
+    // Length bounds (Tour's maxItems caps) are enforced server-side and by ajv; emitting them
+    // would expand e.g. maxItems: 20 into a 21-way tuple union.
+    ignoreMinAndMaxItems: true,
   });
   writeFileSync(outPath, ts);
   console.log(`wrote ${outPath}`);

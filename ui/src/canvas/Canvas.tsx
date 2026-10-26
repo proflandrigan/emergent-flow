@@ -28,6 +28,7 @@ import { useCollapseStore } from "../store/collapseStore";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore, type SelectionStore } from "../store/selectionStore";
+import { useTourStore } from "../store/tourStore";
 import { useTraceStore } from "../store/traceStore";
 import { familyMeta } from "../theme/family";
 import { useLiveValidation } from "../store/useLiveValidation";
@@ -44,6 +45,7 @@ import { NoteNode } from "./nodes/NoteNode";
 import { CalloutNode } from "./nodes/CalloutNode";
 import { SnapshotNode } from "./nodes/SnapshotNode";
 import { ResultCardNode } from "./nodes/ResultCardNode";
+import { TourPlayer } from "../session/TourPlayer";
 import { FindNodeModal } from "./FindNodeModal";
 import { ProblemsPanel } from "./ProblemsPanel";
 import { LensBar } from "./LensBar";
@@ -63,6 +65,7 @@ import {
   toRFNode,
 } from "./toReactFlow";
 import { computeLens, computeReach, computeRoute, computeTrace, type TraceResult } from "./trace";
+import { resolveTourStep } from "./tourResolve";
 import type { TraceMode } from "./toReactFlow";
 import "./CanvasTrace.css";
 import { fromIR } from "../store/ir";
@@ -129,6 +132,10 @@ export function Canvas(): JSX.Element {
   const resetTrace = useTraceStore((s) => s.reset);
   const setLens = useTraceStore((s) => s.setLens);
   const pendingView = useViewLinkStore((s) => s.pendingCanvas);
+  const tourStep = useTraceStore((s) => s.tourStep);
+  const tourPlaying = useTourStore((s) => s.playing);
+  const tourAnnouncement = useTourStore((s) => s.announcement);
+  const pendingViewportRestore = useTourStore((s) => s.pendingViewportRestore);
 
   const edgeCompatibility = useValidationStore((s) => s.edgeCompatibility);
   const diagnostics = useValidationStore((s) => s.diagnostics);
@@ -217,6 +224,24 @@ export function Canvas(): JSX.Element {
     [activeNodes, collapsedGroupIds],
   );
 
+  const tourResolution = useMemo(() => {
+    if (traceMode !== "tour" || !tourStep) return null;
+    return resolveTourStep(tourStep, {
+      nodeIds: rawNodes.map((n) => n.id),
+      edges: rawEdges.map((e) => ({ id: e.id, source: e.source, target: e.target })),
+      hasNode: (id) => !!activeNodes[id],
+      visibleId,
+      graph: {
+        nodeIds: Object.keys(activeNodes),
+        edges: Object.values(activeEdges).map((e) => ({
+          id: e.id,
+          source: e.source.node_id,
+          target: e.target.node_id,
+        })),
+      },
+    });
+  }, [traceMode, tourStep, rawNodes, rawEdges, activeNodes, activeEdges, visibleId]);
+
   const trace = useMemo((): TraceResult & { routeFound: boolean | null } => {
     const nodeIds = rawNodes.map((n) => n.id);
     const traceEdges = rawEdges.map((e) => ({ id: e.id, source: e.source, target: e.target }));
@@ -248,10 +273,21 @@ export function Canvas(): JSX.Element {
         }));
         return { ...computeLens(new Set(lensFamilies), lensNodes, traceEdges), routeFound: null };
       }
+      case "tour": {
+        // Deliberate exception: exact focus (no downstream expansion) and forward-only routes.
+        return tourResolution
+          ? { ...tourResolution.highlight, routeFound: null }
+          : {
+              active: false,
+              highlightedNodeIds: new Set<string>(),
+              highlightedEdgeIds: new Set<string>(),
+              routeFound: null,
+            };
+      }
       default:
         return { ...computeTrace(selectedNodeIds, nodeIds, traceEdges), routeFound: null };
     }
-  }, [traceMode, traceDirection, routeFrom, routeTo, lensFamilies, selectedNodeIds, rawNodes, rawEdges, familyByType, activeNodes, visibleId]);
+  }, [tourResolution, traceMode, traceDirection, routeFrom, routeTo, lensFamilies, selectedNodeIds, rawNodes, rawEdges, familyByType, activeNodes, visibleId]);
 
   const presentFamilies = useMemo(() => {
     const found = new Set<string>();
@@ -524,7 +560,8 @@ export function Canvas(): JSX.Element {
 
   // Fits the viewport to store positions (not measured DOM sizes, which off-screen nodes lack).
   const fitToNodes = useCallback(
-    (ids: string[]) => {
+    (ids: string[], opts?: { padding?: number }) => {
+      // Store positions are already ABSOLUTE (onNodesChange converts group-relative ones back).
       const pts = ids
         .map((id) => nodes[id]?.position)
         .filter((p): p is { x: number; y: number } => !!p);
@@ -535,7 +572,7 @@ export function Canvas(): JSX.Element {
       const maxY = Math.max(...pts.map((p) => p.y)) + 80; // approx node height
       reactFlowInstance.current.fitBounds(
         { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
-        { padding: 0.2, duration: 200 },
+        { padding: opts?.padding ?? 0.2, duration: 200 },
       );
     },
     [nodes],
@@ -563,7 +600,8 @@ export function Canvas(): JSX.Element {
   }, [contextMenu, closeContextMenu]);
 
   useEffect(() => {
-    if (traceMode === "selection-downstream") return undefined;
+    // While a tour owns highlighting, its own Esc handler (App) exits and restores.
+    if (traceMode === "selection-downstream" || traceMode === "tour") return undefined;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
       if (isEditableTarget(e.target)) return;
@@ -579,6 +617,7 @@ export function Canvas(): JSX.Element {
     function onKeyDown(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (isEditableTarget(e.target)) return;
+      if (useTraceStore.getState().mode === "tour") return;
       const key = e.key.toLowerCase();
       if (key === "u" && selectedNodeIds.length > 0) {
         setReach("upstream");
@@ -608,8 +647,35 @@ export function Canvas(): JSX.Element {
 
   // Node ids from the previous view must not keep highlighting after subgraph navigation.
   useEffect(() => {
+    // The tour clears breadcrumbs itself on start and restores them on exit.
+    if (useTraceStore.getState().mode === "tour") return;
     resetTrace();
   }, [breadcrumbs, resetTrace]);
+
+  // Capture the pre-tour viewport BEFORE the fit effect below moves it (effects run in order).
+  useEffect(() => {
+    if (!tourPlaying || !flowReady || !reactFlowInstance.current) return;
+    const snap = useTourStore.getState().snapshot;
+    if (snap && snap.viewport === null) {
+      useTourStore.getState().captureViewport(reactFlowInstance.current.getViewport());
+    }
+  }, [tourPlaying, flowReady]);
+
+  // Fit the viewport to each tour step (never on an empty set; no layout, no position writes).
+  const tourFitKey = tourPlaying ? `${tourPlaying.tour.id}:${tourPlaying.index}` : null;
+  useEffect(() => {
+    if (!tourFitKey || !flowReady || !tourResolution) return;
+    const ids = tourResolution.fitIds.filter((id) => nodes[id] || activeNodes[id]);
+    if (ids.length === 1) navigateToNode(ids[0]);
+    else if (ids.length > 1) fitToNodes(ids, { padding: 0.35 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refit only when the step changes
+  }, [tourFitKey, flowReady]);
+
+  useEffect(() => {
+    if (!pendingViewportRestore || !reactFlowInstance.current) return;
+    reactFlowInstance.current.setViewport(pendingViewportRestore, { duration: 200 });
+    useTourStore.getState().consumeViewportRestore();
+  }, [pendingViewportRestore]);
 
   // Deep links (issue #168): apply a pending #focus/#reach/#route/#lens/#edge view once React Flow
   // is ready. Unknown ids collect into ONE notice.
@@ -698,7 +764,7 @@ export function Canvas(): JSX.Element {
   // Link ids resolve against the top-level graph only, so a subgraph-local id would be a dead
   // link: no "Copy link" (banner or context menu) while browsing a composite.
   const traceLink = useMemo((): Partial<ViewState> | null => {
-    if (isInSubgraph) return null;
+    if (isInSubgraph || traceMode === "tour") return null;
     if (traceMode === "reach" && selectedNodeIds.length > 0) {
       return { focus: selectedNodeIds, reach: traceDirection };
     }
@@ -710,6 +776,7 @@ export function Canvas(): JSX.Element {
   }, [isInSubgraph, traceMode, selectedNodeIds, traceDirection, routeFrom, routeTo, routePicking, lensFamilies]);
 
   const traceBanner = useMemo((): string | null => {
+    if (traceMode === "tour") return null; // the player shows status instead
     if (traceMode === "reach") {
       return trace.active
         ? `Tracing ${traceDirection === "both" ? "upstream + downstream" : traceDirection} reach`
@@ -814,6 +881,7 @@ export function Canvas(): JSX.Element {
         deleteKeyCode={isInSubgraph ? [] : ["Backspace", "Delete"]}
         fitView
         onlyRenderVisibleElements
+        disableKeyboardA11y={traceMode === "tour"}
         nodesDraggable={!isInSubgraph}
         nodesConnectable={!isInSubgraph}
         elementsSelectable
@@ -864,6 +932,18 @@ export function Canvas(): JSX.Element {
           )}
           <Button variant="ghost" data-testid="trace-banner-clear" onClick={resetTrace}>Clear (Esc)</Button>
         </div>
+      )}
+      {tourPlaying && traceMode === "tour" && (
+        <TourPlayer
+          tour={tourPlaying.tour}
+          index={tourPlaying.index}
+          resolved={tourResolution}
+          nodeName={(id) => nodeName(id) || id}
+          onPrev={() => useTourStore.getState().prev()}
+          onNext={() => useTourStore.getState().next()}
+          onExit={() => useTourStore.getState().exit()}
+          announcement={tourAnnouncement}
+        />
       )}
       {!isInSubgraph && (selectedNodeIds.length > 1 || canUngroup) && (
         <SelectionToolbar

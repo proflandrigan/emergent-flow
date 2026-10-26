@@ -64,13 +64,16 @@ def build_view_url(
     edge: str | None = None,
     proposal: str | None = None,
     review: str | None = None,
+    tour: str | None = None,
+    step: int | None = None,
 ) -> str:
     """Return a canvas URL for *session_id*, optionally deep-linked to a view (issue #168).
 
     The view state lives in the URL hash, keys ``&``-separated in this fixed order:
     ``focus=<id>[,<id>...]``, ``reach=up|down|both`` (requires ``focus``),
     ``route=<from>~<to>``, ``lens=<fam>[~<fam>...]``, ``edge=<id>``, ``proposal=<id>``,
-    ``review=<id>``. Each id is percent-encoded individually (``~`` and ``,`` included).
+    ``review=<id>``, ``tour=<id>``, ``step=<n>`` (``step`` requires ``tour``; defaults to 0).
+    Each id is percent-encoded individually (``~`` and ``,`` included).
     The hash is view state only -- it never carries or alters the graph IR.
 
     With no view arguments the result is byte-identical to the historical ``open_in_ui``
@@ -96,6 +99,12 @@ def build_view_url(
         if len(route_ids) != 2 or not all(route_ids):
             raise ValueError("route must be a (from_id, to_id) pair")
 
+    if step is not None:
+        if not tour:
+            raise ValueError("step requires tour")
+        if isinstance(step, bool) or not isinstance(step, int) or step < 0:
+            raise ValueError("step must be a non-negative integer")
+
     parts: list[str] = []
     if focus_ids:
         parts.append("focus=" + ",".join(_encode_view_id(f) for f in focus_ids))
@@ -111,6 +120,9 @@ def build_view_url(
         parts.append("proposal=" + _encode_view_id(proposal))
     if review:
         parts.append("review=" + _encode_view_id(review))
+    if tour:
+        parts.append("tour=" + _encode_view_id(tour))
+        parts.append(f"step={0 if step is None else step}")
 
     return base + "#" + "&".join(parts) if parts else base
 
@@ -153,6 +165,7 @@ def create_mcp_server() -> Any:
     from emergentflow.collab.review import ReviewThread
     from emergentflow.collab.session import OpenGatesError, UnknownProposalError
     from emergentflow.collab.session import get_default_store as get_default_session_store
+    from emergentflow.collab.tours import Tour
     from emergentflow.ir.common import Direction, new_id
     from emergentflow.ir.edge import Edge, PortRef
     from emergentflow.ir.mutation import GraphMutation
@@ -223,13 +236,16 @@ def create_mcp_server() -> Any:
         edge: str | None = None,
         proposal: str | None = None,
         review: str | None = None,
+        tour: str | None = None,
+        step: int | None = None,
     ) -> dict:
         """Build a canvas deep link that opens *session_id* on a specific view (issue #168).
 
         *focus* is a list of node ids to select and centre; *reach* is ``up``, ``down`` or
         ``both`` (requires *focus*); *route* is ``[from_id, to_id]``; *lens* is a list of
-        family names; *edge*, *proposal* and *review* are ids to open. End a turn with this
-        link instead of a prose recap so the human lands on the change.
+        family names; *edge*, *proposal* and *review* are ids to open; *tour* is a guided-tour
+        id and *step* the zero-based step to open (requires *tour*; defaults to 0). End a
+        turn with this link instead of a prose recap so the human lands on the change.
 
         Returns ``{"view_url", "canvas_reachable", "note"}``; when ``canvas_reachable`` is
         False this MCP server is not running inside ``emergentflow serve`` and the link only
@@ -245,6 +261,8 @@ def create_mcp_server() -> Any:
             edge=edge,
             proposal=proposal,
             review=review,
+            tour=tour,
+            step=step,
         )
         note = (
             "Open this link in the canvas served by `emergentflow serve`."
@@ -577,6 +595,34 @@ def create_mcp_server() -> Any:
         thread = ReviewThread.model_validate(review)
         result = get_default_session_store().add_review(session_id, thread)
         return result.model_dump(mode="json")
+
+    @mcp.tool()
+    def set_tour(session_id: str, tour: dict) -> dict:
+        """Create or replace a guided tour on *session_id* (issue #171).
+
+        Payload: ``title``, ``conclusion`` (markdown, shown first), ``author`` and ``steps``,
+        each step ``{focus: [node ids], reach?: up|down|both, route?: [from, to], note:
+        markdown, unknowns: [str]}``. The same tour ``id`` replaces the existing tour, never
+        duplicates it. Every focus/route id must be a top-level node of the current graph or
+        the call fails naming all missing ids. Returns the stored tour, plus ``view_url``
+        (``#tour=<id>&step=0``) when a canvas is attached.
+        """
+        stored = get_default_session_store().upsert_tour(session_id, Tour.model_validate(tour))
+        return _with_view_url(stored.model_dump(mode="json"), session_id, tour=stored.id, step=0)
+
+    @mcp.tool()
+    def list_tours(session_id: str) -> dict:
+        """List the guided tours on *session_id*, ordered by id.
+
+        Each tour carries a ``view_url`` when a canvas is attached.
+        """
+        tours = get_default_session_store().list_tours(session_id)
+        return {
+            "tours": [
+                _with_view_url(t.model_dump(mode="json"), session_id, tour=t.id, step=0)
+                for t in tours
+            ]
+        }
 
     @mcp.tool()
     def await_verdict(session_id: str, proposal_id: str, timeout_seconds: float = 30.0) -> dict:

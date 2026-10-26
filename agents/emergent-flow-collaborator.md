@@ -214,6 +214,7 @@ http://127.0.0.1:8765/?session=<id>#<key>=<value>[&<key>=<value>]
 | `edge`     | `#edge=e-load-to-scale`              | selects one edge                                               |
 | `proposal` | `#proposal=p1`                       | opens the Proposals panel on that proposal                     |
 | `review`   | `#review=rev-1`                      | opens the Reviews panel on that thread                         |
+| `tour`     | `#tour=tour-1&step=0`                | plays a guided tour from that step                             |
 
 Ids are percent-encoded when they contain reserved characters. The hash is view state only: it
 never changes the graph. An unknown id shows one toast, never an error.
@@ -232,9 +233,9 @@ The model now trains on the scaled features. [Trace the path](http://127.0.0.1:8
 ```
 
 **MCP clients.** The mutating tools `add_node`, `connect_ports`, `set_param`, `propose_mutation`,
-and `add_result_card` return a `view_url` field focused on what they touched. Paste that URL as
+`add_result_card`, and `set_tour` return a `view_url` field focused on what they touched. Paste that URL as
 the link. You can also call `view_link(session_id, focus=None, reach=None, route=None, lens=None,
-edge=None, proposal=None, review=None)` to build a link for any explanation; it returns
+edge=None, proposal=None, review=None, tour=None, step=None)` to build a link for any explanation; it returns
 `{"view_url", "canvas_reachable", "note"}`. `view_url` is only present when the tool runs inside a
 live `emergentflow serve` process (the HTTP bridge, the stdio bridge `emergentflow.collab.mcp_bridge`,
 or the in-app chat). If `view_url` is absent, or `canvas_reachable` is false, you are on the
@@ -250,6 +251,75 @@ MCP: from a shell, `emergentflow mermaid flow.json --fenced --highlight <node_id
 bare graph JSON as the body and returns only `{"mermaid": "<flowchart source>"}`, with no
 `markdown` field and no highlight option, so wrap the source in a ```` ```mermaid ```` fence
 yourself.
+
+## 8. Walk the human through it
+
+Use a guided tour for any change touching more than ~3 nodes, and for any "explain this pipeline"
+or "walk me through it" request. A tour is an ordered walkthrough the human plays on the canvas.
+Write it conclusion-first (the answer in one or two sentences), then one step per question the
+reader would ask, in data-flow order, with short notes. State uncertainty in `unknowns` instead of
+guessing.
+
+```json
+{
+  "id": "tour-1",
+  "title": "How the churn model is built",
+  "conclusion": "Gradient boosting on 14 features; AUC 0.81 on a temporal holdout.",
+  "steps": [
+    {"focus": ["n-load", "n-clean"], "note": "Raw events are de-duplicated and nulls imputed."},
+    {"focus": ["n-split"], "reach": "down", "note": "Temporal split at 2026-06-01, so no leakage."},
+    {"route": ["n-feat", "n-fit"], "note": "Scaling is fitted **after** the split.", "unknowns": ["Is `days_active` computed before or after the cutoff?"]}
+  ],
+  "author": "data_scientist"
+}
+```
+
+Step rules:
+
+- A step has either a non-empty `focus` (optional `reach`: `up`, `down`, or `both`) or a `route`
+  `[from, to]`, never both.
+- Plain `focus` highlights exactly those nodes (no expansion). `reach` highlights the closure in
+  that direction. `route` highlights directed paths from the first node to the second only; a pair
+  with no directed path plays as "No directed path".
+- `note` is markdown (at most 16,000 chars). `unknowns` (at most 20 entries, 1,000 chars each)
+  render as an "Open questions" callout.
+- Limits: `title` at most 200 chars, `conclusion` at most 4,000, at most 100 steps, at most 50
+  `focus` ids per step. No blank strings.
+
+Anchors: every `focus`/`route` id must be a TOP-LEVEL node of the session's current graph at write
+time (ids inside a composite's subgraph are not accepted). A write with missing ids fails naming
+every missing `(step, node_id)` pair: HTTP 422
+`{"error": "anchor_error: ...", "missing": [{"step": 0, "node_id": "n-x"}]}`. If a node is deleted
+later, the stored tour keeps it and the step shows a "Node removed" badge; to update such a tour,
+repair its anchors.
+
+Lifetime: tours are stored on the SESSION, never in the graph. They survive a browser rejoin while
+the server session exists, but NOT a server restart, session deletion, or an ordinary "Save Flow"
+(saved flows contain only the graph). "Export report (HTML)" includes them.
+
+Create one with the MCP tools `set_tour(session_id, tour)` (creates or replaces by `id`, so a retry
+with the same id never duplicates; returns the stored tour plus a `view_url` ending
+`#tour=<id>&step=0` when attached to a canvas) and `list_tours(session_id)` (returns
+`{"tours": [...]}`, each with a `view_url`). Over HTTP:
+
+```bash
+curl -X POST http://127.0.0.1:8765/sessions/<id>/tours -H 'Content-Type: application/json' -d @tour.json
+```
+
+`GET /sessions/{id}/tours` lists them; `PUT`/`DELETE /sessions/{id}/tours/{tour_id}` replace or
+remove one. Auth is the same as the other `/sessions/*` routes. A duplicate `POST` id returns 409;
+`PUT`/`DELETE` on an unknown id returns 404.
+
+End the turn with the returned `view_url`:
+
+```
+Walked the pipeline end to end, conclusion first. [Play the tour](http://127.0.0.1:8765/?session=sess-abc123#tour=tour-1&step=0)
+```
+
+`#tour=<id>&step=<n>` is zero-based; an omitted step means 0, and an out-of-range step falls back
+to 0 with a notice. A tour link takes precedence over other keys in the same hash. As with the
+other links, `view_url` only appears when the MCP tools run inside `emergentflow serve`; the
+standalone stdio server has its own session store.
 
 ## Review workflow
 

@@ -1,9 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import { App } from "./App";
-import { getSession } from "./session/sessionClient";
+import { getSession, type Tour } from "./session/sessionClient";
 import { useSessionStore } from "./session/sessionStore";
+import { useTourStore } from "./store/tourStore";
+import { useTraceStore } from "./store/traceStore";
 import { useViewLinkStore } from "./store/viewLinkStore";
 
 vi.mock("./session/sessionClient", () => ({
@@ -35,12 +37,20 @@ vi.mock("./session/sessionClient", () => ({
 
 afterEach(() => {
   vi.clearAllMocks();
+  useTourStore.getState().exit({ restore: false });
+  useTourStore.setState({
+    playing: null,
+    snapshot: null,
+    pendingViewportRestore: null,
+    announcement: null,
+  });
   useSessionStore.setState({
     sessionId: null,
     version: null,
     proposals: {},
     reviews: {},
     gates: {},
+    tours: {},
     chat: { backend: null, backend_thread_id: null, active_persona: null, turns: [] },
     status: "idle",
     error: null,
@@ -51,6 +61,7 @@ afterEach(() => {
     pendingCanvas: null,
     pendingProposal: null,
     pendingReview: null,
+    pendingTour: null,
     notice: null,
     fallbackUrl: null,
   });
@@ -556,4 +567,188 @@ test("Get started overflow item opens the gallery and close dismisses it", async
   await waitFor(() => {
     expect(screen.queryByTestId("example-iris")).not.toBeInTheDocument();
   });
+});
+
+const TOUR: Tour = {
+  id: "t1",
+  title: "Walkthrough",
+  conclusion: "All **good**",
+  author: "agent",
+  steps: [
+    { focus: ["n1"], note: "first" },
+    { focus: ["n1"], reach: "both", note: "second" },
+    { focus: ["n1"], note: "third" },
+  ],
+};
+
+function mockTourSession(tours: Record<string, Tour> = { t1: TOUR }) {
+  vi.mocked(getSession).mockResolvedValue({
+    id: "s1",
+    graph: {
+      paradigm: "functional",
+      nodes: {
+        n1: {
+          id: "n1",
+          type: "data.load_csv",
+          label: null,
+          paradigm: "functional",
+          position: { x: 0, y: 0 },
+          params: [],
+          ports: [],
+          group_id: null,
+        },
+      },
+      edges: {},
+    },
+    version: 0,
+    proposals: {},
+    collab: { tours },
+  } as never);
+}
+
+async function playTourViaStore() {
+  mockHealth("ok");
+  useSessionStore.setState({ sessionId: "s1", status: "connected", tours: { t1: TOUR } });
+  render(<App />);
+  act(() => useTourStore.getState().start(TOUR, 0));
+  await screen.findByTestId("tour-player");
+}
+
+test("Tours menu item opens the tour panel", async () => {
+  mockHealth("ok");
+  render(<App />);
+
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  fireEvent.click(screen.getByText("Tours"));
+
+  await waitFor(() => {
+    expect(screen.getByTestId("tour-empty")).toBeInTheDocument();
+  });
+});
+
+test("#tour deep link starts playback after joining ?session=", async () => {
+  mockHealth("ok");
+  mockTourSession();
+  window.history.replaceState(null, "", "/?session=s1#tour=t1&step=0");
+  render(<App />);
+
+  await waitFor(() => expect(useTourStore.getState().playing?.tour.id).toBe("t1"));
+  expect(useTourStore.getState().playing?.index).toBe(0);
+  expect(await screen.findByTestId("tour-player")).toBeInTheDocument();
+});
+
+test("#tour with an out-of-range step starts at 0 with a notice", async () => {
+  mockHealth("ok");
+  mockTourSession();
+  window.history.replaceState(null, "", "/?session=s1#tour=t1&step=9");
+  render(<App />);
+
+  await waitFor(() => expect(useTourStore.getState().playing?.tour.id).toBe("t1"));
+  expect(useTourStore.getState().playing?.index).toBe(0);
+  expect(await screen.findByTestId("view-link-toast")).toHaveTextContent(/no step 9/);
+});
+
+test("unknown #tour shows a notice and does not play", async () => {
+  mockHealth("ok");
+  mockTourSession();
+  window.history.replaceState(null, "", "/?session=s1#tour=nope");
+  render(<App />);
+
+  expect(await screen.findByTestId("view-link-toast")).toHaveTextContent(/tour "nope"/);
+  expect(useTourStore.getState().playing).toBeNull();
+});
+
+test("ArrowRight/ArrowLeft/Escape drive playback", async () => {
+  await playTourViaStore();
+
+  fireEvent.keyDown(window, { key: "ArrowRight" });
+  expect(useTourStore.getState().playing?.index).toBe(1);
+  fireEvent.keyDown(window, { key: "ArrowLeft" });
+  expect(useTourStore.getState().playing?.index).toBe(0);
+
+  const input = document.createElement("input");
+  document.body.appendChild(input);
+  fireEvent.keyDown(input, { key: "ArrowRight" });
+  input.remove();
+  expect(useTourStore.getState().playing?.index).toBe(0);
+
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(useTourStore.getState().playing).toBeNull();
+});
+
+test("a remote tour delete exits playback", async () => {
+  await playTourViaStore();
+
+  act(() => useSessionStore.setState({ tours: {} }));
+
+  await waitFor(() => expect(useTourStore.getState().playing).toBeNull());
+  expect(useViewLinkStore.getState().notice).toBe("Tour deleted");
+});
+
+test("Escape closes a modal opened over a playing tour without exiting the tour", async () => {
+  await playTourViaStore();
+
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  fireEvent.click(screen.getByText("Tours"));
+  const dialog = await screen.findByRole("dialog");
+
+  fireEvent.keyDown(dialog, { key: "Escape" });
+
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  expect(useTourStore.getState().playing?.tour.id).toBe("t1");
+});
+
+test("tour keys are ignored while a native <select> has focus", async () => {
+  await playTourViaStore();
+  const select = document.createElement("select");
+  select.innerHTML = "<option>a</option><option>b</option>";
+  document.body.appendChild(select);
+  select.focus();
+
+  const right = new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true });
+  select.dispatchEvent(right);
+  select.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  select.remove();
+
+  expect(right.defaultPrevented).toBe(false);
+  expect(useTourStore.getState().playing?.index).toBe(0);
+});
+
+test("Escape closes an open menu first and leaves the tour playing", async () => {
+  await playTourViaStore();
+  fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+  expect(screen.getByRole("menu")).toBeInTheDocument();
+
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  expect(useTourStore.getState().playing?.tour.id).toBe("t1");
+
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  expect(useTourStore.getState().playing).toBeNull();
+});
+
+test("a trace takeover ends the tour and drops its #tour hash so a reload doesn't replay it", async () => {
+  mockHealth("ok");
+  mockTourSession();
+  window.history.replaceState(null, "", "/?session=s1#tour=t1&step=1");
+  render(<App />);
+  await waitFor(() => expect(useTourStore.getState().playing?.index).toBe(1));
+
+  act(() => useTraceStore.getState().setReach("upstream"));
+
+  expect(useTourStore.getState().playing).toBeNull();
+  expect(window.location.hash).toBe("");
+});
+
+test("leaving the session while a tour plays drops its #tour hash", async () => {
+  mockHealth("ok");
+  mockTourSession();
+  window.history.replaceState(null, "", "/?session=s1#tour=t1&step=2");
+  render(<App />);
+  await waitFor(() => expect(useTourStore.getState().playing?.index).toBe(2));
+
+  act(() => useSessionStore.setState({ sessionId: null, status: "idle", tours: {} }));
+
+  await waitFor(() => expect(useTourStore.getState().playing).toBeNull());
+  expect(window.location.hash).toBe("");
 });

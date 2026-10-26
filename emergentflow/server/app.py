@@ -15,6 +15,7 @@ Routes:
   "charts": [...]}`` (ADR 0015)
 - ``GET  /mutation-schema``  -- the GraphMutation JSON Schema (Epic 14 Story 4)
 - ``GET  /session-event-schema`` -- the session SSE event JSON Schema (Epic 14 Story 4)
+- ``GET  /tour-schema``       -- the guided-tour JSON Schema (issue #171)
 - ``GET  /reports/{hash}``   -- a stored HTML report blob (Epic 7 Story 3)
 - ``POST /cache/clear``      -- ``{"status": "ok"}``
 - ``POST /compile``          -- IR JSON -> ``{"code": ...}``
@@ -80,6 +81,7 @@ from emergentflow.collab.gates import (
 from emergentflow.collab.knowledge import UnknownKnowledgeEntryError
 from emergentflow.collab.review import AnchorError, ReviewComment, ReviewThread
 from emergentflow.collab.session import (
+    DuplicateTourError,
     OpenGatesError,
     ProposalAlreadyResolvedError,
     StaleVersionError,
@@ -87,8 +89,10 @@ from emergentflow.collab.session import (
     UnknownProposalError,
     UnknownReviewError,
     UnknownSessionError,
+    UnknownTourError,
 )
 from emergentflow.collab.session import get_default_store as get_default_session_store
+from emergentflow.collab.tours import Tour, TourAnchorError
 from emergentflow.ir.graph import Graph
 from emergentflow.ir.mutation import GraphMutation
 from emergentflow.ir.serialize import deserialize_graph
@@ -139,6 +143,7 @@ from emergentflow.server.service import (
     get_personas,
     get_schema,
     get_session_event_schema,
+    get_tour_schema,
     get_validity_rules,
     inspect_graph,
     label_eval,
@@ -276,12 +281,14 @@ async def _session_json(fn: Callable[[], dict[str, Any]]) -> Response:
     """Run *fn* off the event loop; map collab session errors to their HTTP codes.
 
     ``UnknownSessionError`` / ``UnknownProposalError`` / ``UnknownReviewError`` /
-    ``UnknownChatTurnError`` -> 404,
+    ``UnknownChatTurnError`` / ``UnknownTourError`` -> 404,
     ``StaleVersionError`` / ``ProposalAlreadyResolvedError`` / ``ChatAlreadyActiveError`` /
-    ``ChatTurnAlreadyResolvedError`` -> 409
+    ``ChatTurnAlreadyResolvedError`` / ``DuplicateTourError`` -> 409
     (optimistic-concurrency / proposal-lifecycle conflicts -- caller sent a
     stale expected/base version, or tried to re-resolve a decided proposal),
-    ``AnchorError`` -> 422 with an ``anchor_error:`` prefix (a review finding's
+    ``TourAnchorError`` -> 422 ``anchor_error:`` plus a ``missing`` list of
+    ``{"step", "node_id"}`` entries, ``AnchorError`` -> 422 with an ``anchor_error:``
+    prefix (a review finding's
     node_id/edge_id/port_id didn't resolve against the graph -- same status as
     the generic catch-all below, but a stable, parseable prefix like the 409s
     get, rather than relying on the exception class name), any other
@@ -297,6 +304,7 @@ async def _session_json(fn: Callable[[], dict[str, Any]]) -> Response:
         UnknownGateError,
         UnknownChatTurnError,
         UnknownCheckpointError,
+        UnknownTourError,
     ) as exc:
         return _error_json(404, str(exc))
     except StaleVersionError as exc:
@@ -311,6 +319,13 @@ async def _session_json(fn: Callable[[], dict[str, Any]]) -> Response:
         return _error_json(409, f"chat_already_active: {exc}")
     except ChatTurnAlreadyResolvedError as exc:
         return _error_json(409, f"chat_turn_already_resolved: {exc}")
+    except DuplicateTourError as exc:
+        return _error_json(409, f"duplicate_tour: {exc}")
+    except TourAnchorError as exc:
+        return JSONResponse(
+            status_code=422,
+            content={"error": f"anchor_error: {exc}", "missing": exc.details()},
+        )
     except AnchorError as exc:
         return _error_json(422, f"anchor_error: {exc}")
     except Exception as exc:  # noqa: BLE001 - any other failure -> 422, never crash the server
@@ -546,6 +561,10 @@ def create_app() -> FastAPI:
     @application.get("/session-event-schema")
     async def session_event_schema() -> Response:
         return await _safe_json(get_session_event_schema)
+
+    @application.get("/tour-schema")
+    async def tour_schema() -> Response:
+        return await _safe_json(get_tour_schema)
 
     @application.get("/personas")
     async def personas() -> Response:
@@ -816,6 +835,63 @@ def create_app() -> FastAPI:
             return result.model_dump(mode="json")
 
         return await _session_json(_comment)
+
+    @application.get("/sessions/{session_id}/tours", dependencies=[Depends(_require_session_auth)])
+    async def list_tours(session_id: str) -> Response:
+        def _list() -> dict[str, Any]:
+            tours = get_default_session_store().list_tours(session_id)
+            return {"tours": [t.model_dump(mode="json") for t in tours]}
+
+        return await _session_json(_list)
+
+    @application.post("/sessions/{session_id}/tours", dependencies=[Depends(_require_session_auth)])
+    async def create_tour(session_id: str, request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+        if not isinstance(body, dict):
+            return _error_json(400, "invalid JSON body: expected an object")
+
+        def _create() -> dict[str, Any]:
+            tour = Tour.model_validate(body)
+            result = get_default_session_store().create_tour(session_id, tour)
+            return result.model_dump(mode="json")
+
+        return await _session_json(_create)
+
+    @application.put(
+        "/sessions/{session_id}/tours/{tour_id}", dependencies=[Depends(_require_session_auth)]
+    )
+    async def replace_tour(session_id: str, tour_id: str, request: Request) -> Response:
+        try:
+            body = await _read_json_body(request)
+        except (ValueError, json.JSONDecodeError) as exc:
+            return _error_json(400, f"invalid JSON body: {exc}")
+        if not isinstance(body, dict):
+            return _error_json(400, "invalid JSON body: expected an object")
+        if "id" in body and body["id"] != tour_id:
+            return _error_json(
+                422, f"tour id mismatch: body id {body['id']!r} != path id {tour_id!r}"
+            )
+        payload = {**body, "id": tour_id}
+
+        def _replace() -> dict[str, Any]:
+            tour = Tour.model_validate(payload)
+            result = get_default_session_store().replace_tour(session_id, tour)
+            return result.model_dump(mode="json")
+
+        return await _session_json(_replace)
+
+    @application.delete(
+        "/sessions/{session_id}/tours/{tour_id}", dependencies=[Depends(_require_session_auth)]
+    )
+    async def delete_tour(session_id: str, tour_id: str) -> Response:
+        def _delete() -> dict[str, Any]:
+            get_default_session_store().delete_tour(session_id, tour_id)
+            return {"deleted": tour_id}
+
+        return await _session_json(_delete)
 
     @application.post("/sessions/{session_id}/gates", dependencies=[Depends(_require_session_auth)])
     async def create_gate(session_id: str, request: Request) -> Response:

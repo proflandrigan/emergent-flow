@@ -1,22 +1,33 @@
+import Ajv2020 from "ajv/dist/2020";
 import { afterEach, describe, expect, test, vi } from "vitest";
+
+// The shared sample is imported as JSON (resolveJsonModule) rather than read via node:fs,
+// because the UI tsconfig does not include @types/node.
+import tourSample from "../../../tests/fixtures/tour_sample.json";
+import tourSchema from "../generated/tour.schema.json";
 
 import {
   acceptProposal,
   createReview,
   addReviewComment,
   createSession,
+  createTour,
   deleteSession,
+  deleteTour,
   endChat,
   getAvailableAgents,
   getSession,
+  listTours,
   proposeMutation,
   rejectProposal,
   replaceSessionGraph,
+  replaceTour,
   startChat,
   stopChatTurn,
   subscribeToSessionEvents,
   type ChatTurn,
   type GraphSession,
+  type Tour,
 } from "./sessionClient";
 
 afterEach(() => {
@@ -502,5 +513,158 @@ describe("getAvailableAgents", () => {
       expect.objectContaining({ method: "GET" }),
     );
     expect(agents).toEqual(["claude", "opencode"]);
+  });
+});
+
+const sampleTour: Tour = {
+  id: "t1",
+  title: "T",
+  conclusion: "C",
+  author: "human",
+  steps: [{ focus: ["n1"], note: "look here" }],
+};
+
+describe("tour wrappers", () => {
+  test("listTours GETs /sessions/{id}/tours and returns the array", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ tours: [sampleTour] }), { status: 200 }),
+    );
+
+    const tours = await listTours("s1");
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/sessions/s1/tours",
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(tours).toEqual([sampleTour]);
+  });
+
+  test("createTour POSTs the tour body", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(JSON.stringify(sampleTour), { status: 200 }),
+      );
+
+    const input = { ...sampleTour, id: undefined };
+    const created = await createTour("s1", input);
+
+    const [url, opts] = fetchSpy.mock.calls[0];
+    expect(url).toBe("/sessions/s1/tours");
+    expect((opts as RequestInit).method).toBe("POST");
+    expect(JSON.parse((opts as RequestInit).body as string)).not.toHaveProperty("id");
+    expect(created.id).toBe("t1");
+  });
+
+  test("replaceTour PUTs to an encoded path", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ...sampleTour, id: "a/b" }), {
+        status: 200,
+      }),
+    );
+
+    const stored = await replaceTour("s1", { ...sampleTour, id: "a/b" });
+
+    const [url, opts] = fetchSpy.mock.calls[0];
+    expect(url).toBe("/sessions/s1/tours/a%2Fb");
+    expect((opts as RequestInit).method).toBe("PUT");
+    expect(JSON.parse((opts as RequestInit).body as string).id).toBe("a/b");
+    expect(stored.id).toBe("a/b");
+  });
+
+  test("deleteTour DELETEs the encoded path", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(JSON.stringify({ deleted: "a/b" }), { status: 200 }),
+      );
+
+    await deleteTour("s1", "a/b");
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/sessions/s1/tours/a%2Fb",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  test("a 422 anchor error rejects with the server's message", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: "anchor_error: unknown node", missing: ["x"] }),
+        { status: 422 },
+      ),
+    );
+
+    await expect(createTour("s1", sampleTour)).rejects.toThrow(
+      "anchor_error: unknown node",
+    );
+  });
+});
+
+describe("tour polling fallback", () => {
+  test("polling fallback detects a tour-only change", async () => {
+    vi.stubGlobal("EventSource", undefined);
+    vi.useFakeTimers();
+
+    const chat = {
+      backend: null,
+      backend_thread_id: null,
+      active_persona: null,
+      turns: [],
+    };
+    let call = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      call += 1;
+      return new Response(
+        JSON.stringify(
+          fakeSession({
+            version: 0,
+            collab: {
+              reviews: {},
+              gates: {},
+              chat,
+              tours: call === 1 ? {} : { t1: sampleTour },
+            },
+          }),
+        ),
+        { status: 200 },
+      );
+    });
+
+    const received: { type: string }[] = [];
+    const sub = subscribeToSessionEvents(
+      "abc",
+      (event) => received.push(event),
+      { pollIntervalMs: 100 },
+    );
+
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(100);
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({
+      type: "tour_updated",
+      session_id: "abc",
+    });
+    expect(received.some((e) => e.type === "graph_replaced")).toBe(false);
+
+    sub.close();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("tour schema", () => {
+  const validate = new Ajv2020({ allErrors: true, strict: false }).compile(
+    tourSchema as object,
+  );
+
+  test("the shared sample validates against the committed schema", () => {
+    expect(validate(tourSample)).toBe(true);
+  });
+
+  test("a tour with an unknown key is rejected", () => {
+    expect(validate({ ...tourSample, bogus: 1 })).toBe(false);
   });
 });

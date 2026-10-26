@@ -24,6 +24,11 @@ the domain-specific review checklist below.
 - **Encoding** — `data.load_csv` defaults to `utf-8`; a stale non-UTF-8 encoding risks
   silent data corruption.
 
+## Walking the human through it
+
+- After a change touching more than ~3 nodes, or when asked to explain the pipeline, author a
+  guided tour (`set_tour`) and end with its link — see "Walk the human through it" in [`emergent-flow-collaborator.md`](./emergent-flow-collaborator.md).
+
 ## Worked example
 
 A `data.load_csv` node has `encoding` set to `"latin-1"` instead of `"utf-8"`,

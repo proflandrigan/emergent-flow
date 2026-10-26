@@ -35,7 +35,10 @@ import { useGraphStore } from "./store/graphStore";
 import { useViewLinkStore } from "./store/viewLinkStore";
 import { ProposalPanel } from "./session/ProposalPanel";
 import { ReviewPanel } from "./session/ReviewPanel";
+import { TourPanel } from "./session/TourPanel";
 import { useSessionStore } from "./session/sessionStore";
+import { useTourSync } from "./session/useTourSync";
+import { useTourStore } from "./store/tourStore";
 import { useTheme } from "./theme/useTheme";
 import { IconButton } from "./ui/IconButton";
 import { Menu, type MenuItem } from "./ui/Menu";
@@ -79,6 +82,17 @@ function clampInspectorWidth(width: number): number {
   return Math.min(
     MAX_INSPECTOR_WIDTH,
     Math.max(MIN_INSPECTOR_WIDTH, Math.round(width)),
+  );
+}
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  return (
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.isContentEditable
   );
 }
 
@@ -131,7 +145,14 @@ export function App(): JSX.Element {
   const canRedo = future.length > 0;
   const { theme, toggleTheme } = useTheme();
 
+  const pendingTour = useViewLinkStore((s) => s.pendingTour);
+  const sessionStatus = useSessionStore((s) => s.status);
+  const tours = useSessionStore((s) => s.tours);
+  const playing = useTourStore((s) => s.playing);
+  const [toursOpen, setToursOpen] = useState(false);
+
   useSessionAutoSave();
+  useTourSync();
 
   const [paletteCollapsed, setPaletteCollapsed] = useState<boolean>(() => {
     try {
@@ -384,18 +405,60 @@ export function App(): JSX.Element {
     };
   }, []);
 
+  // Tour deep link: wait for the session join to finish (tours aren't loaded until then).
   useEffect(() => {
-    function isTextEntryTarget(target: EventTarget | null): boolean {
-      if (!(target instanceof HTMLElement)) {
-        return false;
-      }
-      return (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      );
+    if (!pendingTour) return;
+    if (sessionStatus === "connecting") return;
+    const { consumeTour, addNotice } = useViewLinkStore.getState();
+    if (sessionStatus !== "connected") {
+      consumeTour();
+      addNotice("Tour links need the agent's session open");
+      return;
     }
+    const tour = tours[pendingTour.tourId];
+    consumeTour();
+    if (!tour) {
+      addNotice(`Not in this session: tour "${pendingTour.tourId}"`);
+      return;
+    }
+    let step = pendingTour.step;
+    if (step >= tour.steps.length) {
+      addNotice(`Tour "${tour.title}" has no step ${step}; starting at step 0`);
+      step = 0;
+    }
+    useTourStore.getState().start(tour, step);
+  }, [pendingTour, sessionStatus, tours]);
 
+  // Tour playback keys (capture phase so React Flow / Canvas handlers don't also run).
+  const tourPlaying = playing !== null;
+  useEffect(() => {
+    if (!tourPlaying) return undefined;
+    function onTourKeyDown(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // A native <select> uses arrows to change its value and Esc to close its list.
+      if (isTextEntryTarget(e.target) || (e.target instanceof HTMLElement && e.target.tagName === "SELECT")) {
+        return;
+      }
+      // A modal opened over a playing tour owns the keyboard (its Esc closes it, not the tour).
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      // An open menu/popover closes itself on Esc (a document listener this capture handler would
+      // otherwise pre-empt); the tour needs a second Esc.
+      if (e.key === "Escape" && document.querySelector('[role="menu"], [data-esc-dismiss]')) return;
+      const tourStore = useTourStore.getState();
+      if (e.key === "ArrowRight") tourStore.next();
+      else if (e.key === "ArrowLeft") tourStore.prev();
+      else if (e.key === "Escape") tourStore.exit();
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    window.addEventListener("keydown", onTourKeyDown, true);
+    return () => {
+      window.removeEventListener("keydown", onTourKeyDown, true);
+    };
+  }, [tourPlaying]);
+
+  useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (!(e.metaKey || e.ctrlKey)) {
         return;
@@ -481,6 +544,13 @@ export function App(): JSX.Element {
       label: "Reviews",
       onSelect: () => {
         setReviewsOpen(true);
+        setMenuOpen(false);
+      },
+    },
+    {
+      label: "Tours",
+      onSelect: () => {
+        setToursOpen(true);
         setMenuOpen(false);
       },
     },
@@ -764,6 +834,11 @@ export function App(): JSX.Element {
           }}
         >
           <ReviewPanel highlightId={highlightReview} />
+        </OverlayModal>
+      )}
+      {toursOpen && (
+        <OverlayModal width={600} onClose={() => setToursOpen(false)}>
+          <TourPanel onPlay={() => setToursOpen(false)} />
         </OverlayModal>
       )}
       {fallbackUrl && (

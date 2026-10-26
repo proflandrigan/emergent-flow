@@ -165,8 +165,8 @@ use one card per analysis question.
 
 ### Hand the human a focused link
 
-Mutating tools (`add_node`, `connect_ports`, `set_param`, `propose_mutation`, `add_result_card`)
-return a `view_url` focused on what they touched, when running inside `emergentflow serve`. Paste
+Mutating tools (`add_node`, `connect_ports`, `set_param`, `propose_mutation`, `add_result_card`,
+`set_tour`) return a `view_url` focused on what they touched, when running inside `emergentflow serve`. Paste
 that URL in your reply so the human lands on the change. To build a link for any explanation, call
 `view_link`:
 

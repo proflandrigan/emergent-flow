@@ -8,9 +8,11 @@ emergentflow. This script writes the contract artifacts the build consumes:
   ui/src/generated/mutation.schema.json    -- GraphMutation JSON Schema (Epic 14 Story 4)
   ui/src/generated/session_event.schema.json -- Session SSE event JSON Schema (Epic 14 Story 4)
   ui/src/generated/validity_rules.json     -- the experiment-validity rule pack (Epic 17 Story 2)
+  ui/src/generated/tour.schema.json        -- guided-tour JSON Schema (issue #171)
 
-All five are byte-identical to what the local server's GET /schema, GET /catalog,
-GET /mutation-schema, GET /session-event-schema, and GET /validity-rules serve, because this
+All six are byte-identical to what the local server's GET /schema, GET /catalog,
+GET /mutation-schema, GET /session-event-schema, GET /validity-rules, and GET /tour-schema
+serve, because this
 script and the server call the SAME emergentflow.server.service functions (ADR 0014 Dec. 5).
 
 Regenerate after changing the IR models or any node's spec:
@@ -28,6 +30,7 @@ from emergentflow.server.service import (
     get_mutation_schema,
     get_schema,
     get_session_event_schema,
+    get_tour_schema,
     get_validity_rules,
 )
 
@@ -44,12 +47,13 @@ def _write_json(path: pathlib.Path, data: dict[str, Any]) -> None:
 
 def export_ui_contracts(generated_dir: pathlib.Path = GENERATED_DIR) -> None:
     """Write ir.schema.json, catalog.json, mutation.schema.json,
-    session_event.schema.json, and validity_rules.json into *generated_dir*."""
+    session_event.schema.json, validity_rules.json, and tour.schema.json into *generated_dir*."""
     _write_json(generated_dir / "ir.schema.json", get_schema())
     _write_json(generated_dir / "catalog.json", get_catalog())
     _write_json(generated_dir / "mutation.schema.json", get_mutation_schema())
     _write_json(generated_dir / "session_event.schema.json", get_session_event_schema())
     _write_json(generated_dir / "validity_rules.json", get_validity_rules())
+    _write_json(generated_dir / "tour.schema.json", get_tour_schema())
 
 
 if __name__ == "__main__":

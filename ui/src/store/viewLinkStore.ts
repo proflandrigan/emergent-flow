@@ -6,9 +6,16 @@ import { create } from "zustand";
 
 import { buildViewUrl, isEmptyViewState, type ViewState } from "../io/viewLink";
 import { useSessionStore } from "../session/sessionStore";
+import { useTourStore } from "./tourStore";
 
 /** The canvas half of a view link: what Canvas applies once React Flow is ready. */
 export type CanvasViewRequest = Pick<ViewState, "focus" | "reach" | "route" | "lens" | "edge">;
+
+/** A tour deep link (`#tour=<id>&step=<n>`): which tour to open and at which step. */
+export interface TourViewRequest {
+  tourId: string;
+  step: number;
+}
 
 export interface ViewLinkStore {
   /** Canvas-side view waiting to be applied (null when nothing is pending). */
@@ -16,6 +23,8 @@ export interface ViewLinkStore {
   /** Proposal / review panel targets waiting for App to open them. */
   pendingProposal: string | null;
   pendingReview: string | null;
+  /** Tour waiting for App to open it; a tour link takes precedence over every other target. */
+  pendingTour: TourViewRequest | null;
   /** Single user-facing message (unknown ids, copied link, ...); null when none. */
   notice: string | null;
   /** URL to show in a select-all text box when clipboard access was denied. */
@@ -26,6 +35,7 @@ export interface ViewLinkStore {
   consumeCanvas: () => void;
   consumeProposal: () => void;
   consumeReview: () => void;
+  consumeTour: () => void;
   setNotice: (message: string | null) => void;
   /** Like setNotice but appends to a pending notice so simultaneous unknown-id reports survive. */
   addNotice: (message: string) => void;
@@ -36,11 +46,25 @@ export const useViewLinkStore = create<ViewLinkStore>((set) => ({
   pendingCanvas: null,
   pendingProposal: null,
   pendingReview: null,
+  pendingTour: null,
   notice: null,
   fallbackUrl: null,
 
   request(state) {
     if (isEmptyViewState(state)) return;
+    if (state.tour !== null) {
+      set({
+        pendingTour: { tourId: state.tour, step: state.step ?? 0 },
+        pendingCanvas: null,
+        pendingProposal: null,
+        pendingReview: null,
+      });
+      return;
+    }
+    // A newly clicked external view link exits any running tour, then applies the requested view.
+    if (useTourStore.getState().playing !== null) {
+      useTourStore.getState().exit({ restore: false });
+    }
     const hasCanvas =
       state.focus.length > 0 ||
       state.reach !== null ||
@@ -72,6 +96,10 @@ export const useViewLinkStore = create<ViewLinkStore>((set) => ({
 
   consumeReview() {
     set({ pendingReview: null });
+  },
+
+  consumeTour() {
+    set({ pendingTour: null });
   },
 
   setNotice(message) {

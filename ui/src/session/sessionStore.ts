@@ -49,6 +49,7 @@ import {
   type ReviewThread,
   type SessionEventSubscription,
   type StoredProposal,
+  type Tour,
 } from "./sessionClient";
 
 export type SessionConnectionStatus =
@@ -66,6 +67,8 @@ export interface SessionStoreState {
   chat: ChatState;
   attempts: Record<string, Attempt>;
   checkpoints: Record<string, Checkpoint>;
+  // Guided tours (issue #171): collaboration state beside the graph -- never loaded into graphStore.
+  tours: Record<string, Tour>;
   status: SessionConnectionStatus;
   error: string | null;
   // Set when a PUT .../graph call is rejected for a stale expected_version (someone else's
@@ -126,13 +129,30 @@ function errorMessage(err: unknown): string {
 // The six chat_* event types (chat_turn_started, chat_narration_added, chat_turn_completed,
 // chat_turn_failed, chat_turn_interrupted, chat_ended) need no special case here -- they flow
 // through this same full refetch, which is how live narration/replies actually reach the UI as
-// a spawned chat backend streams output in the background.
+// a spawned chat backend streams output in the background. The tour_added / tour_updated /
+// tour_deleted events likewise flow through this full refetch (refreshing `tours`) and never
+// call loadIR, since tours do not change the graph.
+const GRAPH_EVENT_TYPES = new Set<SessionEvent["type"]>([
+  "graph_replaced",
+  "proposal_accepted",
+  "graph_changed",
+  "graph_reverted",
+]);
+
+function isGraphEvent(e: SessionEvent): boolean {
+  return GRAPH_EVENT_TYPES.has(e.type);
+}
+
 async function refreshFromServer(
   sessionId: string,
   event: SessionEvent,
 ): Promise<void> {
   try {
     const session = await getSession(sessionId);
+    // The user left or switched sessions while the GET was in flight; drop the stale response.
+    if (useSessionStore.getState().sessionId !== sessionId) {
+      return;
+    }
     const chat =
       event.type === "graph_changed" || event.type === "graph_reverted"
         ? appendAgentTurn(session.collab?.chat ?? idleChatState, event)
@@ -145,19 +165,18 @@ async function refreshFromServer(
       chat,
       attempts: session.collab?.attempts ?? {},
       checkpoints: session.collab?.checkpoints ?? {},
+      tours: session.collab?.tours ?? {},
     });
-    if (
-      event.type === "graph_replaced" ||
-      event.type === "proposal_accepted" ||
-      event.type === "graph_changed" ||
-      event.type === "graph_reverted"
-    ) {
+    if (isGraphEvent(event)) {
       useGraphStore.getState().loadIR(session.graph, {
         reflow:
           event.type === "proposal_accepted" || event.type === "graph_changed",
       });
     }
   } catch (err) {
+    if (useSessionStore.getState().sessionId !== sessionId) {
+      return;
+    }
     useSessionStore.setState({ error: errorMessage(err) });
   }
 }
@@ -183,8 +202,10 @@ function appendAgentTurn(chat: ChatState, event: SessionEvent): ChatState {
 // server round-trip (e.g. an agent posting several proposals/review comments back to back)
 // would otherwise fire one full-session GET per event, racing each other for which response's
 // setState lands last. Instead, an event that arrives while a refresh is already in flight is
-// queued (only the LATEST one, since each refresh re-fetches the full session state) and
-// triggers exactly one trailing refresh once the in-flight one completes.
+// queued and triggers exactly one trailing refresh once the in-flight one completes. The
+// trailing refresh refetches the whole session, so any queued event refreshes tours/chat too;
+// only the graph reload is event-type dependent. Hence the latest event wins, EXCEPT that a
+// non-graph event never overwrites a queued graph event (that would lose the loadIR).
 let inFlightRefresh: Promise<void> | null = null;
 let queuedEvent: SessionEvent | null = null;
 
@@ -202,7 +223,9 @@ async function handleSessionEvent(event: SessionEvent): Promise<void> {
     return;
   }
   if (inFlightRefresh) {
-    queuedEvent = event;
+    if (!(queuedEvent && isGraphEvent(queuedEvent) && !isGraphEvent(event))) {
+      queuedEvent = event;
+    }
     await inFlightRefresh;
     return;
   }
@@ -272,6 +295,7 @@ const idleConnectionState: ConnectionState = {
   chat: idleChatState,
   attempts: {},
   checkpoints: {},
+  tours: {},
   status: "idle",
   error: null,
   rebaseNeeded: false,
@@ -281,6 +305,7 @@ const idleConnectionState: ConnectionState = {
 function resetConnectionState(): ConnectionState {
   activeSubscription?.close();
   activeSubscription = null;
+  queuedEvent = null;
   return idleConnectionState;
 }
 
@@ -295,6 +320,7 @@ function applySession(session: GraphSession): ConnectionState {
     chat: session.collab?.chat ?? idleChatState,
     attempts: session.collab?.attempts ?? {},
     checkpoints: session.collab?.checkpoints ?? {},
+    tours: session.collab?.tours ?? {},
     status: "connected",
   };
 }

@@ -8,6 +8,7 @@ import { postJson } from "../promptlab/httpJson";
 import type { Graph } from "../generated/ir";
 import type { GraphMutation } from "../generated/mutation";
 import type { SessionEvent } from "../generated/session_event";
+import type { Tour as TourInput, TourStep } from "../generated/tour";
 import { validateSessionEvent } from "../store/validateMutation";
 import type { Diagnostic, Diagnostics } from "../store/validation";
 
@@ -113,6 +114,11 @@ export interface Checkpoint {
   mutation: GraphMutation;
 }
 
+export type { TourInput, TourStep };
+
+/** A tour as stored/returned by the server: id is always present. */
+export type Tour = TourInput & { id: string };
+
 export interface GraphSession {
   id: string;
   graph: Graph;
@@ -124,6 +130,7 @@ export interface GraphSession {
     chat: ChatState;
     attempts?: Record<string, Attempt>;
     checkpoints?: Record<string, Checkpoint>;
+    tours?: Record<string, Tour>;
   };
 }
 
@@ -355,6 +362,51 @@ export async function listCheckpoints(
   return (await res.json()) as { checkpoints: Checkpoint[] };
 }
 
+// Lists every tour stored on the session.
+export async function listTours(sessionId: string): Promise<Tour[]> {
+  const res = await requestJson(`/sessions/${sessionId}/tours`, {
+    method: "GET",
+  });
+  const body = (await res.json()) as { tours: Tour[] };
+  return body.tours;
+}
+
+// Creates a tour (id optional; the server generates one) and returns the stored tour.
+export async function createTour(
+  sessionId: string,
+  tour: TourInput,
+): Promise<Tour> {
+  const res = await postJson(`/sessions/${sessionId}/tours`, tour);
+  return (await res.json()) as Tour;
+}
+
+// Replaces an existing tour wholesale (PUT) and returns the stored tour.
+export async function replaceTour(
+  sessionId: string,
+  tour: Tour,
+): Promise<Tour> {
+  const res = await requestJson(
+    `/sessions/${sessionId}/tours/${encodeURIComponent(tour.id)}`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(tour),
+    },
+  );
+  return (await res.json()) as Tour;
+}
+
+// Deletes a tour by id.
+export async function deleteTour(
+  sessionId: string,
+  tourId: string,
+): Promise<void> {
+  await requestJson(
+    `/sessions/${sessionId}/tours/${encodeURIComponent(tourId)}`,
+    { method: "DELETE" },
+  );
+}
+
 export async function getAvailableAgents(): Promise<string[]> {
   const res = await requestJson("/agents", { method: "GET" });
   const body = (await res.json()) as { agents: string[] };
@@ -369,7 +421,8 @@ export interface SessionEventSubscription {
 // (matches the server's plain `data: <json>\n\n` SSE frames with no custom event name, so
 // `onmessage` receives every frame directly). Falls back to polling GET /sessions/{id} when
 // EventSource is unavailable (e.g. some test/SSR environments): on every version bump it
-// synthesizes a `graph_replaced` event, and on any change to the chat state (which never
+// synthesizes a `graph_replaced` event, on any change to the tours (which never bump
+// `version`) a `tour_updated` event, and on any change to the chat state (which also never
 // bumps `version` -- see the poll loop below) a `chat_narration_added` event, so callers
 // behave the same regardless of transport.
 export function subscribeToSessionEvents(
@@ -403,6 +456,10 @@ export function subscribeToSessionEvents(
   // reach the UI (it would sit on "working..." until an unrelated version bump happened to
   // trigger a refetch).
   let lastChatSnapshot: string | null = null;
+  // Tour writes never bump `session.version` either, so track a tours snapshot the same way.
+  // If tours AND chat change in the same tick only one event fires -- fine, because every
+  // event triggers a full-session refetch that picks up both.
+  let lastToursSnapshot: string | null = null;
   let stopped = false;
   const intervalMs = options?.pollIntervalMs ?? 2000;
 
@@ -414,9 +471,16 @@ export function subscribeToSessionEvents(
       try {
         const session = await getSession(sessionId);
         const chatSnapshot = JSON.stringify(session.collab?.chat ?? null);
+        const toursSnapshot = JSON.stringify(session.collab?.tours ?? {});
         if (lastVersion !== null && session.version !== lastVersion) {
           onEvent({
             type: "graph_replaced",
+            session_id: sessionId,
+            version: session.version,
+          });
+        } else if (lastToursSnapshot !== null && toursSnapshot !== lastToursSnapshot) {
+          onEvent({
+            type: "tour_updated",
             session_id: sessionId,
             version: session.version,
           });
@@ -429,6 +493,7 @@ export function subscribeToSessionEvents(
         }
         lastVersion = session.version;
         lastChatSnapshot = chatSnapshot;
+        lastToursSnapshot = toursSnapshot;
       } catch {
         // Network hiccup -- try again next tick rather than tearing down the subscription.
       }

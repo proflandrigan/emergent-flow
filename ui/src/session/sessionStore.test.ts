@@ -1116,3 +1116,131 @@ describe("chat", () => {
     expect(useSessionStore.getState().chat.turns).toEqual([turn]);
   });
 });
+
+describe("tours", () => {
+  const tour: sessionClient.Tour = {
+    id: "t1",
+    title: "T",
+    conclusion: "C",
+    author: "a",
+    steps: [{ focus: ["n1"], note: "x" }],
+  };
+  const baseCollab = fakeSession().collab!;
+
+  test("join hydrates tours, falls back to {} and leave clears them", async () => {
+    vi.mocked(sessionClient.getSession).mockResolvedValue(
+      fakeSession({
+        id: "abc",
+        collab: { ...baseCollab, tours: { t1: tour } },
+      }),
+    );
+    await useSessionStore.getState().join("abc");
+    expect(useSessionStore.getState().tours.t1).toEqual(tour);
+
+    useSessionStore.getState().leave();
+    expect(useSessionStore.getState().tours).toEqual({});
+
+    vi.mocked(sessionClient.getSession).mockResolvedValue(
+      fakeSession({ id: "abc" }),
+    );
+    await useSessionStore.getState().join("abc");
+    expect(useSessionStore.getState().tours).toEqual({});
+  });
+
+  test("tour_added refreshes tours without reloading the canvas graph", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+
+    vi.mocked(sessionClient.getSession).mockResolvedValue(
+      fakeSession({
+        id: "abc",
+        collab: { ...baseCollab, tours: { t1: tour } },
+      }),
+    );
+    const loadIRSpy = vi.spyOn(useGraphStore.getState(), "loadIR");
+
+    await capturedOnEvent?.({
+      type: "tour_added",
+      session_id: "abc",
+      tour_id: "t1",
+    });
+
+    expect(useSessionStore.getState().tours.t1).toEqual(tour);
+    expect(loadIRSpy).not.toHaveBeenCalled();
+  });
+
+  test("a tour event queued after a graph event does not mask the graph reload", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+
+    let resolveFirst: (session: sessionClient.GraphSession) => void = () => {};
+    const first = new Promise<sessionClient.GraphSession>((resolve) => {
+      resolveFirst = resolve;
+    });
+    vi.mocked(sessionClient.getSession)
+      .mockReturnValueOnce(first)
+      .mockResolvedValue(fakeSession({ id: "abc", version: 3 }));
+    const loadIRSpy = vi.spyOn(useGraphStore.getState(), "loadIR");
+
+    capturedOnEvent?.({
+      type: "proposal_added",
+      session_id: "abc",
+      proposal_id: "p1",
+    });
+    capturedOnEvent?.({
+      type: "graph_changed",
+      session_id: "abc",
+      checkpoint_id: "cp-1",
+      author: "agent",
+      version: 3,
+    });
+    capturedOnEvent?.({
+      type: "tour_updated",
+      session_id: "abc",
+      tour_id: "t1",
+    });
+
+    resolveFirst(fakeSession({ id: "abc", version: 1 }));
+    await waitFor(() => expect(useSessionStore.getState().version).toBe(3));
+
+    expect(sessionClient.getSession).toHaveBeenCalledTimes(2);
+    expect(loadIRSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test("a refresh response arriving after leave() is dropped", async () => {
+    vi.mocked(sessionClient.createSession).mockResolvedValue(
+      fakeSession({ id: "abc", version: 0 }),
+    );
+    await useSessionStore.getState().createAndJoin();
+
+    let resolveFirst: (session: sessionClient.GraphSession) => void = () => {};
+    const first = new Promise<sessionClient.GraphSession>((resolve) => {
+      resolveFirst = resolve;
+    });
+    vi.mocked(sessionClient.getSession).mockReturnValueOnce(first);
+
+    capturedOnEvent?.({
+      type: "tour_added",
+      session_id: "abc",
+      tour_id: "t1",
+    });
+    useSessionStore.getState().leave();
+
+    resolveFirst(
+      fakeSession({
+        id: "abc",
+        version: 7,
+        collab: { ...baseCollab, tours: { t1: tour } },
+      }),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+
+    const state = useSessionStore.getState();
+    expect(state.tours).toEqual({});
+    expect(state.version).toBeNull();
+  });
+});

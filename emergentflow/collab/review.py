@@ -20,18 +20,14 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
 
 from emergentflow.codegen.validation import Diagnostic
+from emergentflow.collab.anchors import AnchorError
 from emergentflow.collab.chat import ChatState
 from emergentflow.collab.checkpoints import Checkpoint
 from emergentflow.collab.gates import Gate
+from emergentflow.collab.tours import Tour
 from emergentflow.ir.common import new_id
 from emergentflow.ir.graph import Graph
 from emergentflow.ir.mutation import GraphMutation
-
-
-class AnchorError(Exception):
-    """Raised when a review finding's node_id/edge_id/port_id doesn't resolve against the
-    session's graph -- the server rejects unanchored findings rather than storing a review
-    thread that points at nothing (or, worse, at some OTHER graph's element)."""
 
 
 class ReviewStatus(str, Enum):
@@ -104,7 +100,8 @@ class CollaborationState(BaseModel):
     critiques (Story 6), ``gates`` are workflow checkpoints an agent opens and the human
     (or another agent) closes/skips, with ``Decision`` s recording what was decided along
     the way (Story 9). ``chat`` holds the transcript and lifecycle state of any spawned
-    coding-agent chat session (emergentflow/collab/chat.py).
+    coding-agent chat session (emergentflow/collab/chat.py). ``tours`` are agent-authored
+    guided walkthroughs of the graph (issue #171).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -114,6 +111,7 @@ class CollaborationState(BaseModel):
     chat: ChatState = Field(default_factory=ChatState)
     attempts: dict[str, Attempt] = Field(default_factory=dict)
     checkpoints: dict[str, Checkpoint] = Field(default_factory=dict)
+    tours: dict[str, Tour] = Field(default_factory=dict)
 
 
 def validate_anchors(graph: Graph, findings: list[Diagnostic]) -> None:

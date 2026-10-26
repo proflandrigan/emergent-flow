@@ -5,9 +5,10 @@
 import { create } from "zustand";
 
 import type { TraceDirection } from "../canvas/trace";
+import type { TourStep } from "../generated/tour";
 
 /** Which highlight the canvas computes. "selection-downstream" is the default (downstream of selection). */
-export type TraceStoreMode = "selection-downstream" | "reach" | "route" | "lens";
+export type TraceStoreMode = "selection-downstream" | "reach" | "route" | "lens" | "tour";
 
 export interface TraceStore {
   mode: TraceStoreMode;
@@ -20,6 +21,13 @@ export interface TraceStore {
   routePicking: boolean;
   /** Families highlighted by the lens; only meaningful when mode === "lens". */
   families: string[];
+  /**
+   * The guided-tour step driving the highlight; only meaningful when mode === "tour". The canvas
+   * resolves it with resolveTourStep (exact focus, forward-only route).
+   */
+  tourStep: TourStep | null;
+  /** Drive the highlight from a guided-tour step (replaces any other trace). */
+  setTourStep: (step: TourStep) => void;
   setReach: (direction: TraceDirection) => void;
   startRoutePick: (fromId: string) => void;
   setRoute: (fromId: string, toId: string) => void;
@@ -36,10 +44,15 @@ const INITIAL = {
   routeTo: null as string | null,
   routePicking: false,
   families: [] as string[],
+  tourStep: null as TourStep | null,
 };
 
 export const useTraceStore = create<TraceStore>((set, get) => ({
   ...INITIAL,
+
+  setTourStep(step) {
+    set({ ...INITIAL, mode: "tour", tourStep: step });
+  },
 
   setReach(direction) {
     set({
@@ -49,6 +62,7 @@ export const useTraceStore = create<TraceStore>((set, get) => ({
       routeTo: null,
       routePicking: false,
       families: [],
+      tourStep: null,
     });
   },
 
@@ -60,6 +74,7 @@ export const useTraceStore = create<TraceStore>((set, get) => ({
       routeTo: null,
       routePicking: true,
       families: [],
+      tourStep: null,
     });
   },
 
@@ -71,6 +86,7 @@ export const useTraceStore = create<TraceStore>((set, get) => ({
       routeTo: toId,
       routePicking: false,
       families: [],
+      tourStep: null,
     });
   },
 
@@ -92,6 +108,7 @@ export const useTraceStore = create<TraceStore>((set, get) => ({
       routeTo: null,
       routePicking: false,
       families,
+      tourStep: null,
     });
   },
 
@@ -110,6 +127,7 @@ export const useTraceStore = create<TraceStore>((set, get) => ({
       routeTo: null,
       routePicking: false,
       families,
+      tourStep: null,
     });
   },
 

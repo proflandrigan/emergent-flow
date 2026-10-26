@@ -138,6 +138,18 @@
       "title": "Session Id",
       "type": "string"
     },
+    "tour_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tour Id"
+    },
     "turn_id": {
       "anyOf": [
         {
@@ -171,7 +183,10 @@
         "chat_turn_interrupted",
         "chat_ended",
         "persona_changed",
-        "run_completed"
+        "run_completed",
+        "tour_added",
+        "tour_updated",
+        "tour_deleted"
       ],
       "title": "Type",
       "type": "string"
