@@ -104,3 +104,30 @@ describe("reset", () => {
     expect(s.families).toEqual([]);
   });
 });
+
+describe("tour mode", () => {
+  const step = { note: "n", focus: ["a"] };
+
+  test("setTourStep sets tour mode and the step", () => {
+    useTraceStore.getState().setTourStep(step);
+    const s = useTraceStore.getState();
+    expect(s.mode).toBe("tour");
+    expect(s.tourStep).toEqual(step);
+  });
+
+  test("setReach after a tour step clears tourStep", () => {
+    useTraceStore.getState().setTourStep(step);
+    useTraceStore.getState().setReach("upstream");
+    const s = useTraceStore.getState();
+    expect(s.mode).toBe("reach");
+    expect(s.tourStep).toBeNull();
+  });
+
+  test("reset clears tourStep", () => {
+    useTraceStore.getState().setTourStep(step);
+    useTraceStore.getState().reset();
+    const s = useTraceStore.getState();
+    expect(s.mode).toBe("selection-downstream");
+    expect(s.tourStep).toBeNull();
+  });
+});

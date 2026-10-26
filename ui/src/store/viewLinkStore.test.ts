@@ -9,6 +9,7 @@ beforeEach(() => {
     pendingCanvas: null,
     pendingProposal: null,
     pendingReview: null,
+    pendingTour: null,
     notice: null,
     fallbackUrl: null,
   });
@@ -42,6 +43,24 @@ describe("request", () => {
     expect(s.pendingCanvas).toBeNull();
     expect(s.pendingProposal).toBeNull();
     expect(s.pendingReview).toBeNull();
+  });
+});
+
+describe("tour requests", () => {
+  test("a tour link takes precedence over other targets", () => {
+    useViewLinkStore.getState().request(parseViewHash("#focus=n1&review=r1&tour=t1&step=2"));
+    const s = useViewLinkStore.getState();
+    expect(s.pendingTour).toEqual({ tourId: "t1", step: 2 });
+    expect(s.pendingCanvas).toBeNull();
+    expect(s.pendingProposal).toBeNull();
+    expect(s.pendingReview).toBeNull();
+  });
+
+  test("step defaults to 0 and consumeTour clears it", () => {
+    useViewLinkStore.getState().request(parseViewHash("#tour=t1"));
+    expect(useViewLinkStore.getState().pendingTour).toEqual({ tourId: "t1", step: 0 });
+    useViewLinkStore.getState().consumeTour();
+    expect(useViewLinkStore.getState().pendingTour).toBeNull();
   });
 });
 

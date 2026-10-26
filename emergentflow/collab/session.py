@@ -26,10 +26,11 @@ SAME per-session subscriber queues, instead of one generator being drained.
 
 from __future__ import annotations
 
+import builtins
 import queue
 import threading
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -56,6 +57,7 @@ from emergentflow.collab.review import (
     ReviewThread,
     validate_anchors,
 )
+from emergentflow.collab.tours import Tour, validate_tour_anchors
 from emergentflow.ir.common import new_id
 from emergentflow.ir.graph import Graph
 from emergentflow.ir.mutation import (
@@ -122,6 +124,14 @@ class UnknownReviewError(SessionError):
 
 class UnknownCheckpointError(SessionError):
     """Raised when a checkpoint id does not exist on a session."""
+
+
+class UnknownTourError(SessionError):
+    """Raised when a tour id does not exist on a session."""
+
+
+class DuplicateTourError(SessionError):
+    """Raised when creating a tour whose id already exists."""
 
 
 class ProposalStatus(str, Enum):
@@ -635,6 +645,118 @@ class SessionStore:
                 },
             )
             return thread
+
+    def _write_tour(
+        self,
+        session_id: str,
+        tour: Tour,
+        *,
+        mode: Literal["create", "replace", "upsert"],
+    ) -> Tour:
+        """Shared locked write path: validate anchors against the CURRENT graph, store a deep
+        copy, publish ``tour_added`` / ``tour_updated``. Order: lookup session -> mode check ->
+        anchors -> store -> publish, so a failed write leaves state and events untouched."""
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            exists = tour.id in session.collab.tours
+            if mode == "create" and exists:
+                raise DuplicateTourError(f"session {session_id!r} already has tour {tour.id!r}.")
+            if mode == "replace" and not exists:
+                raise UnknownTourError(f"session {session_id!r} has no tour {tour.id!r}.")
+            validate_tour_anchors(session.graph, tour)
+            stored = tour.model_copy(deep=True)
+            session.collab.tours[tour.id] = stored
+            self._publish(
+                session_id,
+                {
+                    "type": "tour_updated" if exists else "tour_added",
+                    "session_id": session_id,
+                    "tour_id": tour.id,
+                },
+            )
+            return stored.model_copy(deep=True)
+
+    def create_tour(self, session_id: str, tour: Tour) -> Tour:
+        """Store a new *tour* and publish ``tour_added``.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        DuplicateTourError
+            If a tour with that id already exists on the session.
+        TourAnchorError
+            If a step names node ids absent from the session graph.
+        """
+        return self._write_tour(session_id, tour, mode="create")
+
+    def replace_tour(self, session_id: str, tour: Tour) -> Tour:
+        """Replace the existing tour with the same id and publish ``tour_updated``.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        UnknownTourError
+            If no tour with that id exists on the session.
+        TourAnchorError
+            If a step names node ids absent from the session graph.
+        """
+        return self._write_tour(session_id, tour, mode="replace")
+
+    def upsert_tour(self, session_id: str, tour: Tour) -> Tour:
+        """Create or replace *tour* by id (a retry with the same id updates, never duplicates).
+        Publishes ``tour_added`` or ``tour_updated``.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        TourAnchorError
+            If a step names node ids absent from the session graph.
+        """
+        return self._write_tour(session_id, tour, mode="upsert")
+
+    def list_tours(self, session_id: str) -> builtins.list[Tour]:
+        """Return deep copies of the session's tours, sorted by tour id.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            return [
+                session.collab.tours[tid].model_copy(deep=True)
+                for tid in sorted(session.collab.tours)
+            ]
+
+    def delete_tour(self, session_id: str, tour_id: str) -> None:
+        """Remove tour *tour_id* and publish ``tour_deleted``.
+
+        Raises
+        ------
+        UnknownSessionError
+            If no session with that id exists.
+        UnknownTourError
+            If no tour with that id exists on the session.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                raise UnknownSessionError(f"no session with id {session_id!r}.")
+            if tour_id not in session.collab.tours:
+                raise UnknownTourError(f"session {session_id!r} has no tour {tour_id!r}.")
+            del session.collab.tours[tour_id]
+            self._publish(
+                session_id,
+                {"type": "tour_deleted", "session_id": session_id, "tour_id": tour_id},
+            )
 
     def open_gate(self, session_id: str, gate: Gate) -> Gate:
         """Store *gate* (status forced to OPEN regardless of what the caller passed --

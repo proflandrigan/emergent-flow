@@ -2,7 +2,8 @@ import { describe, expect, test } from "vitest";
 
 import type { Payload } from "../store/execution";
 import type { NodeModel } from "../store/model";
-import { buildReportHtml, collectReportCards } from "./reportHtml";
+import type { Tour } from "../session/sessionClient";
+import { buildReportHtml, collectReportCards, describeTourStepAnchors } from "./reportHtml";
 
 function card(
   id: string,
@@ -93,5 +94,73 @@ describe("buildReportHtml", () => {
     expect(html).toContain('sandbox=""');
     expect(html).not.toContain("allow-scripts");
     expect(html).not.toContain("<script>");
+  });
+});
+
+describe("tours in report", () => {
+  const tour: Tour = {
+    id: "t1",
+    title: "Walkthrough",
+    author: "agent",
+    conclusion: "CONCLUSION-TEXT",
+    steps: [
+      { note: "STEP-ONE", focus: ["a", "b"], unknowns: ["Why is x null?"] },
+      { note: "STEP-TWO", route: ["a", "c"] },
+    ],
+  };
+
+  test("tours-only report lists conclusion before steps", () => {
+    const html = buildReportHtml({ graphName: "g", cards: [], results: {}, tours: [tour] });
+    expect(html).toContain("Guided tours");
+    expect(html).toContain("<h3>Walkthrough</h3>");
+    expect(html).not.toContain("No result cards");
+    expect(html.indexOf("CONCLUSION-TEXT")).toBeLessThan(html.indexOf("STEP-ONE"));
+    expect(html.indexOf("STEP-ONE")).toBeLessThan(html.indexOf("STEP-TWO"));
+    expect(html).toContain('<ol class="tour-steps">');
+    expect(html).toContain("Open questions");
+    expect(html).toContain("Why is x null?");
+  });
+
+  test("absent tours is identical to empty tours and keeps the placeholder", () => {
+    const a = buildReportHtml({ graphName: "g", cards: [], results: {} });
+    const b = buildReportHtml({ graphName: "g", cards: [], results: {}, tours: [] });
+    expect(a).toBe(b);
+    expect(a).toContain("No result cards in this graph.");
+  });
+
+  test("escapes hostile strings", () => {
+    const evil: Tour = {
+      id: "e",
+      title: "<script>alert(1)</script>",
+      author: '"><img src=x onerror=alert(1)>',
+      conclusion: "ok",
+      steps: [{ note: "n", focus: ["<b>x</b>"], unknowns: ["<script>"] }],
+    };
+    const html = buildReportHtml({ graphName: "g", cards: [], results: {}, tours: [evil] });
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("<b>x</b>");
+    expect(html).toContain("script-src 'none'");
+  });
+
+  test("unsafe markdown is neutralised", () => {
+    const bad: Tour = {
+      id: "m",
+      title: "T",
+      author: "a",
+      conclusion: "c",
+      steps: [{ note: "[click](javascript:alert(1))\n\n<iframe src=x></iframe>" }],
+    };
+    const html = buildReportHtml({ graphName: "g", cards: [], results: {}, tours: [bad] });
+    expect(html).not.toContain('href="javascript:');
+    expect(html).not.toContain("<iframe src=x");
+  });
+
+  test("describeTourStepAnchors", () => {
+    expect(describeTourStepAnchors({ note: "n", focus: ["a", "b"] })).toBe("Focus: a, b");
+    expect(describeTourStepAnchors({ note: "n", focus: ["a"], reach: "down" })).toBe(
+      "Focus: a (reach down)",
+    );
+    expect(describeTourStepAnchors({ note: "n", route: ["a", "b"] })).toBe("Route: a \u2192 b");
   });
 });

@@ -90,3 +90,6 @@ stream for the verdict — all per the collaborator protocol.
   or a single `ml.train_classifier` with a plain estimator — comes first, always. Complexity is
   something you earn by showing the baseline isn't good enough, not something you reach for
   because it's more interesting.
+- **Walk them through it.** After a change touching more than ~3 nodes, or when asked to explain
+  the pipeline, author a guided tour (`set_tour`) that leads with the conclusion and ends with its
+  link — see "Walk the human through it" in [`emergent-flow-collaborator.md`](./emergent-flow-collaborator.md).

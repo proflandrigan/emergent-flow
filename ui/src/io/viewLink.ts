@@ -16,6 +16,9 @@ export interface ViewState {
   edge: string | null;
   proposal: string | null;
   review: string | null;
+  tour: string | null;
+  /** Step index within `tour`; null when omitted (consumers treat null as 0). */
+  step: number | null;
 }
 
 export const EMPTY_VIEW_STATE: ViewState = {
@@ -26,6 +29,8 @@ export const EMPTY_VIEW_STATE: ViewState = {
   edge: null,
   proposal: null,
   review: null,
+  tour: null,
+  step: null,
 };
 
 export function isEmptyViewState(state: ViewState): boolean {
@@ -36,7 +41,8 @@ export function isEmptyViewState(state: ViewState): boolean {
     state.lens.length === 0 &&
     state.edge === null &&
     state.proposal === null &&
-    state.review === null
+    state.review === null &&
+    state.tour === null
   );
 }
 
@@ -127,6 +133,14 @@ export function parseViewHash(hash: string): ViewState {
   const review = params.get("review");
   if (review !== undefined) state.review = decodeOne(review);
 
+  const tour = params.get("tour");
+  if (tour !== undefined) state.tour = decodeOne(tour);
+  const step = params.get("step");
+  if (state.tour !== null && step !== undefined && /^\d+$/.test(step)) {
+    const n = Number(step);
+    state.step = Number.isSafeInteger(n) ? n : null;
+  }
+
   return state;
 }
 
@@ -149,6 +163,11 @@ export function formatViewHash(state: Partial<ViewState>): string {
   if (state.edge) parts.push(`edge=${encodeId(state.edge)}`);
   if (state.proposal) parts.push(`proposal=${encodeId(state.proposal)}`);
   if (state.review) parts.push(`review=${encodeId(state.review)}`);
+  if (state.tour) {
+    parts.push(`tour=${encodeId(state.tour)}`);
+    const step = state.step;
+    parts.push(`step=${step != null && Number.isSafeInteger(step) && step >= 0 ? step : 0}`);
+  }
   return parts.length > 0 ? `#${parts.join("&")}` : "";
 }
 

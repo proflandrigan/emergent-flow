@@ -12,6 +12,7 @@ export type RevertedCheckpointId = string | null;
 export type ReviewId = string | null;
 export type RunId = string | null;
 export type SessionId = string;
+export type TourId = string | null;
 export type TurnId = string | null;
 export type Type =
   | "graph_replaced"
@@ -33,7 +34,10 @@ export type Type =
   | "chat_turn_interrupted"
   | "chat_ended"
   | "persona_changed"
-  | "run_completed";
+  | "run_completed"
+  | "tour_added"
+  | "tour_updated"
+  | "tour_deleted";
 export type Version = number | null;
 
 /**
@@ -52,6 +56,7 @@ export interface SessionEvent {
   review_id?: ReviewId;
   run_id?: RunId;
   session_id: SessionId;
+  tour_id?: TourId;
   turn_id?: TurnId;
   type: Type;
   version?: Version;

@@ -86,6 +86,10 @@ Header toolbar (left to right):
 - **Clear cache** — empties the on-disk execution cache (`--cache-dir`).
 - **Undo / Redo** — canvas edit history (`Cmd/Ctrl-Z` / `Cmd/Ctrl-Shift-Z` also work, except
   inside text inputs where native undo applies instead).
+- **Tours** (overflow menu) — lists agent-authored guided tours for the session; **Play** opens a
+  caption beside the graph (conclusion first, then `Step N/M`, the note and any open questions)
+  with Prev/Next/Exit and ←/→/Esc. Tours live on the session, not in saved flows. REST:
+  `GET/POST /sessions/{id}/tours`, `PUT/DELETE /sessions/{id}/tours/{tour_id}`.
 
 Per-node feedback:
 - Border color: grey = not run, green = ok, blue = **cached** (also shown as a 💾 badge —

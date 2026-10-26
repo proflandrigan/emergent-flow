@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { useSessionStore } from "../session/sessionStore";
 import { useGraphStore } from "../store/graphStore";
 import { useViewLinkStore } from "../store/viewLinkStore";
 import { startDirtyTracking, stopDirtyTracking, useFlowStore } from "./flowStore";
@@ -152,6 +153,27 @@ describe("File menu", () => {
     render(<IRToolbar />);
     fireEvent.click(screen.getByTestId("file-menu-toggle"));
     expect(screen.getByTestId("file-menu-export-report")).toBeDisabled();
+  });
+
+  test("Export report is enabled when the session has tours even without result cards", () => {
+    useSessionStore.setState({
+      tours: {
+        t1: {
+          id: "t1",
+          title: "T",
+          author: "a",
+          conclusion: "c",
+          steps: [{ note: "n", focus: ["x"] }],
+        },
+      },
+    });
+    try {
+      render(<IRToolbar />);
+      fireEvent.click(screen.getByTestId("file-menu-toggle"));
+      expect(screen.getByTestId("file-menu-export-report")).not.toBeDisabled();
+    } finally {
+      useSessionStore.setState({ tours: {} });
+    }
   });
 
   test("Rename is disabled when there is no current flow", () => {

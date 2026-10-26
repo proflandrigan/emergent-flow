@@ -92,3 +92,31 @@ def test_bad_route_raises(route) -> None:
 def test_base_read_at_call_time(monkeypatch) -> None:
     monkeypatch.setattr(mcp_mod, "OPEN_IN_UI_BASE", "http://127.0.0.1:9000")
     assert mcp_mod.build_view_url("s1") == "http://127.0.0.1:9000/?session=s1"
+
+
+def test_tour_defaults_step_zero() -> None:
+    assert mcp_mod.build_view_url("s1", tour="t1") == BASE + "#tour=t1&step=0"
+
+
+def test_tour_with_step() -> None:
+    assert mcp_mod.build_view_url("s1", tour="t1", step=2) == BASE + "#tour=t1&step=2"
+
+
+def test_tour_id_is_encoded() -> None:
+    assert mcp_mod.build_view_url("s1", tour="a b~c") == BASE + "#tour=a%20b%7Ec&step=0"
+
+
+def test_tour_after_focus() -> None:
+    url = mcp_mod.build_view_url("s1", focus="n1", tour="t1", step=1)
+    assert url == BASE + "#focus=n1&tour=t1&step=1"
+
+
+def test_step_without_tour_raises() -> None:
+    with pytest.raises(ValueError, match="step requires tour"):
+        mcp_mod.build_view_url("s1", step=1)
+
+
+@pytest.mark.parametrize("step", [-1, True])
+def test_bad_step_raises(step) -> None:
+    with pytest.raises(ValueError, match="non-negative integer"):
+        mcp_mod.build_view_url("s1", tour="t1", step=step)

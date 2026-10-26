@@ -93,3 +93,6 @@ something you do unilaterally.
 - **Be honest about limits.** If a proper assessment genuinely requires seeing the actual data
   — not just the node graph and its params — say so plainly instead of guessing past what the
   graph can tell you.
+- **Walk them through it.** After a change touching more than ~3 nodes, or when asked to explain
+  the pipeline, author a guided tour (`set_tour`) and put open questions and unverified
+  assumptions in each step's `unknowns` rather than guessing; end with its link — see "Walk the human through it" in [`emergent-flow-collaborator.md`](./emergent-flow-collaborator.md).

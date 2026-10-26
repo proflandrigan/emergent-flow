@@ -127,3 +127,47 @@ def test_mcp_invoke_requires_auth_when_auth_enabled() -> None:
             assert r.status_code == 200, r.text
     finally:
         configure_session_auth(required=False)
+
+
+def test_mcp_tools_lists_tour_tools(client: TestClient) -> None:
+    names = {t["name"] for t in client.get("/mcp/tools").json()["tools"]}
+    assert {"set_tour", "list_tours"} <= names
+
+
+def test_mcp_invoke_set_tour_hits_shared_store(client: TestClient) -> None:
+    node = {
+        "id": "n1",
+        "type": "data.load_csv",
+        "label": "Load",
+        "paradigm": "functional",
+        "params": [{"name": "path", "type_token": "str", "value": "a.csv", "default": None}],
+        "ports": [
+            {
+                "id": "p1",
+                "name": "frame",
+                "direction": "out",
+                "data_type": "DataFrame",
+                "cardinality": "one",
+            }
+        ],
+        "position": {"x": 0.0, "y": 0.0},
+        "group_id": None,
+    }
+    created = client.post("/sessions", json={"graph": {"nodes": {"n1": node}, "edges": {}}})
+    assert created.status_code == 200, created.text
+    session_id = created.json()["id"]
+    tour = {
+        "title": "Tour",
+        "conclusion": "Done.",
+        "author": "agent",
+        "steps": [{"focus": ["n1"], "note": "first"}],
+    }
+    r = client.post(
+        "/mcp/invoke",
+        json={"tool_name": "set_tour", "arguments": {"session_id": session_id, "tour": tour}},
+    )
+    assert r.status_code == 200, r.text
+    tour_id = r.json()["id"]
+    listed = client.get(f"/sessions/{session_id}/tours")
+    assert listed.status_code == 200, listed.text
+    assert [t["id"] for t in listed.json()["tours"]] == [tour_id]

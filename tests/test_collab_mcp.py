@@ -1231,3 +1231,93 @@ class TestViewUrl:
         mcp, _session = self._setup(monkeypatch, True)
         result = _run_async(_call_tool(mcp, "create_session", {}))
         assert "#" not in result["open_in_ui"]
+
+
+class TestTours:
+    """``set_tour`` / ``list_tours`` MCP tools and tour deep links (issue #171)."""
+
+    BASE = "http://127.0.0.1:8765"
+
+    def _setup(self, monkeypatch, attached: bool):
+        from emergentflow.collab import mcp as mcp_mod
+
+        monkeypatch.setattr(mcp_mod, "OPEN_IN_UI_BASE", self.BASE)
+        monkeypatch.setattr(mcp_mod, "CANVAS_ATTACHED", attached)
+        session = session_mod.get_default_store().create()
+        mcp = mcp_mod.create_mcp_server()
+        ids = []
+        for _ in range(2):
+            added = _run_async(
+                _call_tool(
+                    mcp,
+                    "add_node",
+                    {
+                        "session_id": session.id,
+                        "node_type": "data.load_csv",
+                        "params": {"path": "a.csv"},
+                    },
+                )
+            )
+            ids.append(added["node_id"])
+        return mcp, session, ids
+
+    @staticmethod
+    def _tour(ids: list[str], **overrides: Any) -> dict[str, Any]:
+        n1, n2 = ids
+        body: dict[str, Any] = {
+            "title": "Tour",
+            "conclusion": "Done.",
+            "author": "agent",
+            "steps": [
+                {"focus": [n1], "note": "first"},
+                {"focus": [n1], "reach": "down", "note": "second"},
+                {"route": [n1, n2], "note": "third", "unknowns": ["why?"]},
+            ],
+        }
+        body.update(overrides)
+        return body
+
+    def _set(self, mcp, session_id: str, tour: dict) -> dict:
+        return _run_async(_call_tool(mcp, "set_tour", {"session_id": session_id, "tour": tour}))
+
+    def _list(self, mcp, session_id: str) -> dict:
+        return _run_async(_call_tool(mcp, "list_tours", {"session_id": session_id}))
+
+    def test_set_and_list(self, monkeypatch) -> None:
+        mcp, session, ids = self._setup(monkeypatch, False)
+        result = self._set(mcp, session.id, self._tour(ids))
+        assert result["id"]
+        assert len(result["steps"]) == 3
+        assert "view_url" not in result
+        listed = self._list(mcp, session.id)["tours"]
+        assert [t["id"] for t in listed] == [result["id"]]
+        assert "view_url" not in listed[0]
+
+    def test_same_id_replaces(self, monkeypatch) -> None:
+        mcp, session, ids = self._setup(monkeypatch, False)
+        first = self._set(mcp, session.id, self._tour(ids))
+        self._set(mcp, session.id, self._tour(ids, id=first["id"], title="Renamed"))
+        listed = self._list(mcp, session.id)["tours"]
+        assert len(listed) == 1
+        assert listed[0]["title"] == "Renamed"
+
+    def test_unknown_node_id_errors(self, monkeypatch) -> None:
+        mcp, session, ids = self._setup(monkeypatch, False)
+        bad = self._tour(ids, steps=[{"focus": ["nope"], "note": "x"}])
+        with pytest.raises(Exception) as exc:
+            self._set(mcp, session.id, bad)
+        assert "unknown node ids" in str(exc.value)
+
+    def test_view_url_when_attached(self, monkeypatch) -> None:
+        mcp, session, ids = self._setup(monkeypatch, True)
+        result = self._set(mcp, session.id, self._tour(ids))
+        assert result["view_url"].endswith(f"#tour={result['id']}&step=0")
+        listed = self._list(mcp, session.id)["tours"]
+        assert listed[0]["view_url"].endswith(f"#tour={result['id']}&step=0")
+
+    def test_view_link_with_tour_and_step(self, monkeypatch) -> None:
+        mcp, session, _ids = self._setup(monkeypatch, True)
+        result = _run_async(
+            _call_tool(mcp, "view_link", {"session_id": session.id, "tour": "t1", "step": 2})
+        )
+        assert result["view_url"] == f"{self.BASE}/?session={session.id}#tour=t1&step=2"

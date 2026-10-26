@@ -73,8 +73,43 @@ describe("formatViewHash", () => {
       edge: "e&1=2",
       proposal: "p#1",
       review: "r/1",
+      tour: null,
+      step: null,
     };
     expect(parseViewHash(formatViewHash(state))).toEqual(state);
+  });
+});
+
+describe("tour links", () => {
+  test("tour and step parse", () => {
+    const a = parseViewHash("#tour=t1");
+    expect(a.tour).toBe("t1");
+    expect(a.step).toBeNull();
+    expect(parseViewHash("#tour=t1&step=3").step).toBe(3);
+  });
+
+  test("step rejects non-integer syntax", () => {
+    for (const bad of ["-1", "1.5", "+2", "abc", "1e3"]) {
+      expect(parseViewHash(`#tour=t1&step=${bad}`).step).toBeNull();
+    }
+  });
+
+  test("step alone is ignored and the state stays empty", () => {
+    const s = parseViewHash("#step=2");
+    expect(s.step).toBeNull();
+    expect(isEmptyViewState(s)).toBe(true);
+  });
+
+  test("percent-encoded id round-trips", () => {
+    expect(formatViewHash({ tour: "a b~c", step: 2 })).toBe("#tour=a%20b%7Ec&step=2");
+    const s = parseViewHash("#tour=a%20b%7Ec&step=2");
+    expect(s.tour).toBe("a b~c");
+    expect(s.step).toBe(2);
+  });
+
+  test("step defaults to 0 and follows the Python key order", () => {
+    expect(formatViewHash({ tour: "t1" })).toBe("#tour=t1&step=0");
+    expect(formatViewHash({ focus: ["n1"], tour: "t1", step: 1 })).toBe("#focus=n1&tour=t1&step=1");
   });
 });
 

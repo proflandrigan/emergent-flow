@@ -11,6 +11,7 @@ import {
   type ResultCardBlock,
 } from "../canvas/resultCardBlocks";
 import { PayloadView } from "../inspector/PayloadView";
+import type { Tour, TourStep } from "../session/sessionClient";
 import type { Payload } from "../store/execution";
 import type { NodeModel } from "../store/model";
 
@@ -67,16 +68,61 @@ img { max-width: 100%; }
 pre { background: var(--surface-2); padding: 0.5rem; overflow-x: auto; }
 .muted, .caption { color: var(--text-secondary); }
 .caption { font-size: 0.85rem; }
+.conclusion { border-left: 3px solid var(--border-subtle); padding-left: 0.75rem; }
+.open-questions { border-left: 3px solid #d97706; padding-left: 0.75rem; }
+.anchors { font-size: 0.85rem; }
 `;
+
+function renderMarkdown(text: string): string {
+  return lockDownIframes(
+    renderToStaticMarkup(<ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>),
+  );
+}
+
+// Plain-text (unescaped) description of where a tour step points; callers must escape it.
+export function describeTourStepAnchors(step: TourStep): string {
+  if (step.route) {
+    return `Route: ${step.route[0]} \u2192 ${step.route[1]}`;
+  }
+  if (step.focus && step.focus.length > 0) {
+    const reach = step.reach ? ` (reach ${step.reach})` : "";
+    return `Focus: ${step.focus.join(", ")}${reach}`;
+  }
+  return "";
+}
+
+function renderTour(tour: Tour): string {
+  const steps = tour.steps
+    .map((step) => {
+      const anchors = describeTourStepAnchors(step);
+      const unknowns = step.unknowns ?? [];
+      return (
+        "<li>" +
+        (anchors !== "" ? `<p class="muted anchors">${escapeHtml(anchors)}</p>` : "") +
+        renderMarkdown(step.note) +
+        (unknowns.length > 0
+          ? `<div class="open-questions"><strong>Open questions</strong><ul>${unknowns
+              .map((u) => `<li>${escapeHtml(u)}</li>`)
+              .join("")}</ul></div>`
+          : "") +
+        "</li>"
+      );
+    })
+    .join("\n");
+  return (
+    `<article class="tour"><h3>${escapeHtml(tour.title)}</h3>` +
+    `<p class="muted">by ${escapeHtml(tour.author)}</p>` +
+    `<div class="conclusion"><strong>Conclusion</strong>${renderMarkdown(tour.conclusion)}</div>` +
+    `<ol class="tour-steps">${steps}</ol></article>`
+  );
+}
 
 function renderBlock(
   block: ResultCardBlock,
   results: Record<string, Record<string, Payload>>,
 ): string {
   if (block.kind === "markdown") {
-    return lockDownIframes(
-      renderToStaticMarkup(<ReactMarkdown remarkPlugins={[remarkGfm]}>{block.text}</ReactMarkdown>),
-    );
+    return renderMarkdown(block.text);
   }
   const split = splitSource(block.source);
   const payload = split ? results[split.nodeId]?.[split.port] : undefined;
@@ -93,10 +139,14 @@ export function buildReportHtml(opts: {
   graphName: string;
   cards: ReportCard[];
   results: Record<string, Record<string, Payload>>;
+  tours?: Tour[];
 }): string {
-  const body =
+  const tours = opts.tours ?? [];
+  const cardsBody =
     opts.cards.length === 0
-      ? "<p>No result cards in this graph.</p>"
+      ? tours.length === 0
+        ? "<p>No result cards in this graph.</p>"
+        : ""
       : opts.cards
           .map(
             (card) =>
@@ -105,6 +155,11 @@ export function buildReportHtml(opts: {
                 .join("\n")}</section>`,
           )
           .join("\n");
+  const toursBody =
+    tours.length === 0
+      ? ""
+      : `<section class="tours"><h2>Guided tours</h2>${tours.map(renderTour).join("\n")}</section>`;
+  const body = cardsBody !== "" && toursBody !== "" ? `${cardsBody}\n${toursBody}` : cardsBody + toursBody;
   return `<!doctype html>
 <html lang="en">
 <head>

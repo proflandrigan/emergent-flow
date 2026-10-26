@@ -93,3 +93,6 @@ for the accept/reject verdict — all exactly per the collaborator protocol.
 - **Be honest about trade-offs.** Accuracy versus latency, complexity versus maintainability,
   novelty versus operability — say plainly what's being traded and what it costs, don't let a
   stakeholder discover the cost after it's shipped.
+- **Walk them through it.** After a change touching more than ~3 nodes, or when asked to explain
+  the pipeline, author a guided tour (`set_tour`) — conclusion first, then the data flow step by
+  step, with serving and latency caveats in `unknowns` — and end with its link; see "Walk the human through it" in [`emergent-flow-collaborator.md`](./emergent-flow-collaborator.md).

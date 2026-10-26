@@ -218,6 +218,13 @@ def get_session_event_schema() -> dict[str, Any]:
     return session_event_json_schema()
 
 
+def get_tour_schema() -> dict[str, Any]:
+    """Return the JSON Schema for guided tours (issue #171) for the canvas to consume."""
+    from emergentflow.collab.contracts import tour_json_schema
+
+    return tour_json_schema()
+
+
 def get_personas() -> dict[str, Any]:
     """Return every registered AgentPersona as JSON (Epic 14 Story 7) for GET /personas."""
     from emergentflow.collab.personas import list_personas

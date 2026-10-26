@@ -8,7 +8,9 @@ import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
 import { useSubgraphStore } from "../store/subgraphStore";
+import { useTourStore } from "../store/tourStore";
 import { useTraceStore } from "../store/traceStore";
+import type { Tour } from "../session/sessionClient";
 import { useViewLinkStore } from "../store/viewLinkStore";
 import { parseViewHash } from "../io/viewLink";
 import { Canvas } from "./Canvas";
@@ -928,6 +930,185 @@ describe("Canvas trace modes (issue #167)", () => {
       expect(screen.queryByTestId("trace-banner")).toBeNull();
     });
     expect(screen.queryByTestId("lens-chip-ml")).toBeNull();
+  });
+});
+
+describe("Canvas guided tours (issue #171)", () => {
+  const add = (x = 0, y = 0): string =>
+    useGraphStore.getState().addNodeFromSpec(loadCsv, { x, y });
+
+  const link = (a: string, b: string): void => {
+    const nodes = useGraphStore.getState().nodes;
+    useGraphStore.getState().connect(
+      { node_id: a, port_id: nodes[a].ports[0].id },
+      { node_id: b, port_id: nodes[b].ports[0].id },
+    );
+  };
+
+  const traceOf = (container: HTMLElement, id: string): string | null | undefined =>
+    container
+      .querySelector(`.react-flow__node[data-id="${id}"] [data-trace]`)
+      ?.getAttribute("data-trace");
+
+  const makeTour = (steps: Tour["steps"]): Tour => ({
+    id: "tour-1",
+    title: "T",
+    author: "agent",
+    conclusion: "Done",
+    steps,
+  });
+
+  const startTour = (tour: Tour, index = 0): void => {
+    act(() => useTourStore.getState().start(tour, index));
+  };
+
+  function chain(): { a: string; b: string; c: string } {
+    const a = add(0, 0);
+    const b = add(200, 0);
+    const c = add(400, 0);
+    link(a, b);
+    link(b, c);
+    return { a, b, c };
+  }
+
+  beforeEach(() => {
+    useTourStore.setState({
+      playing: null,
+      snapshot: null,
+      pendingViewportRestore: null,
+      announcement: null,
+    });
+  });
+
+  afterEach(() => {
+    act(() => useTourStore.getState().exit({ restore: false }));
+  });
+
+  test("exiting restores the pre-tour selection and reach trace", async () => {
+    const { a, b, c } = chain();
+    const { container } = render(<Canvas />);
+    act(() => {
+      useSelectionStore.getState().replaceSelection([b]);
+      useTraceStore.getState().setReach("upstream");
+    });
+    startTour(makeTour([{ note: "n", focus: [c] }]));
+    await waitFor(() => expect(traceOf(container, c)).toBe("traced"));
+    expect(useSelectionStore.getState().nodes[b]).toBeFalsy();
+
+    act(() => useTourStore.getState().exit());
+
+    await waitFor(() => expect(traceOf(container, a)).toBe("traced"));
+    expect(useTraceStore.getState().mode).toBe("reach");
+    expect(useTraceStore.getState().direction).toBe("upstream");
+    expect(useSelectionStore.getState().nodes[b]).toBe(true);
+    expect(traceOf(container, c)).toBe("dimmed");
+  });
+
+  test("focus-only step highlights exactly the focus node", async () => {
+    const { a, b, c } = chain();
+    const { container } = render(<Canvas />);
+    startTour(makeTour([{ note: "n", focus: [b] }]));
+    await waitFor(() => expect(traceOf(container, b)).toBe("traced"));
+    expect(traceOf(container, a)).toBe("dimmed");
+    expect(traceOf(container, c)).toBe("dimmed");
+  });
+
+  test("reach down step highlights the focus and its descendants", async () => {
+    const { a, b, c } = chain();
+    const { container } = render(<Canvas />);
+    startTour(makeTour([{ note: "n", focus: [b], reach: "down" }]));
+    await waitFor(() => expect(traceOf(container, b)).toBe("traced"));
+    expect(traceOf(container, c)).toBe("traced");
+    expect(traceOf(container, a)).toBe("dimmed");
+  });
+
+  test("a reversed route shows no path and does not retry in reverse", async () => {
+    const { a, b, c } = chain();
+    const { container } = render(<Canvas />);
+    startTour(makeTour([{ note: "n", route: [c, a] }]));
+    await waitFor(() => expect(screen.getByTestId("tour-no-path")).toBeTruthy());
+    expect(traceOf(container, a)).toBe("traced");
+    expect(traceOf(container, c)).toBe("traced");
+    expect(traceOf(container, b)).toBe("dimmed");
+  });
+
+  test("a route step on a diamond highlights both branches", async () => {
+    const s = add(0, 0);
+    const l = add(200, -100);
+    const r = add(200, 100);
+    const t = add(400, 0);
+    const x = add(0, 300);
+    link(s, l);
+    link(s, r);
+    link(l, t);
+    link(r, t);
+    const { container } = render(<Canvas />);
+    startTour(makeTour([{ note: "n", route: [s, t] }]));
+    await waitFor(() => expect(traceOf(container, s)).toBe("traced"));
+    for (const id of [l, r, t]) expect(traceOf(container, id)).toBe("traced");
+    expect(traceOf(container, x)).toBe("dimmed");
+  });
+
+  test("a removed anchor shows a badge and deleting a focused node mid-playback does not crash", async () => {
+    const { a, b } = chain();
+    const { container } = render(<Canvas />);
+    startTour(makeTour([{ note: "n", focus: [a, "gone"] }]));
+    await waitFor(() =>
+      expect(screen.getByTestId("tour-removed-badge")).toHaveTextContent("Node removed: gone"),
+    );
+    expect(traceOf(container, a)).toBe("traced");
+    act(() => {
+      useTourStore.getState().exit({ restore: false });
+    });
+    startTour(makeTour([{ note: "n", focus: [b] }]));
+    await waitFor(() => expect(traceOf(container, b)).toBe("traced"));
+    act(() => useGraphStore.getState().removeNode(b));
+    await waitFor(() =>
+      expect(screen.getByTestId("tour-removed-badge")).toHaveTextContent(`Node removed: ${b}`),
+    );
+  });
+
+  test("no trace banner and no U shortcut while a tour plays", async () => {
+    const { b } = chain();
+    useSelectionStore.getState().setNodeSelected(b, true);
+    render(<Canvas />);
+    startTour(makeTour([{ note: "n", focus: [b] }]));
+    await waitFor(() => expect(screen.getByTestId("tour-player")).toBeTruthy());
+    expect(screen.queryByTestId("trace-banner")).toBeNull();
+    fireEvent.keyDown(document, { key: "u" });
+    expect(useTraceStore.getState().mode).toBe("tour");
+  });
+
+  test("next advances the step and exit restores the default trace mode", async () => {
+    const { a, b, c } = chain();
+    render(<Canvas />);
+    startTour(
+      makeTour([
+        { note: "1", focus: [a] },
+        { note: "2", focus: [b] },
+        { note: "3", focus: [c] },
+      ]),
+    );
+    await waitFor(() => expect(screen.getByTestId("tour-step-counter")).toHaveTextContent("Step 1/3"));
+    fireEvent.click(screen.getByTestId("tour-next"));
+    await waitFor(() => expect(screen.getByTestId("tour-step-counter")).toHaveTextContent("Step 2/3"));
+    fireEvent.click(screen.getByTestId("tour-exit"));
+    await waitFor(() => expect(useTourStore.getState().playing).toBeNull());
+    expect(useTraceStore.getState().mode).toBe("selection-downstream");
+  });
+
+  test("playback does not touch the graph or its undo history", async () => {
+    const { a, b } = chain();
+    const before = JSON.stringify(useGraphStore.getState().toIR());
+    const pastBefore = useGraphStore.getState().past.length;
+    render(<Canvas />);
+    startTour(makeTour([{ note: "1", focus: [a] }, { note: "2", route: [a, b] }]));
+    await waitFor(() => expect(screen.getByTestId("tour-player")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("tour-next"));
+    fireEvent.click(screen.getByTestId("tour-exit"));
+    await waitFor(() => expect(useTourStore.getState().playing).toBeNull());
+    expect(JSON.stringify(useGraphStore.getState().toIR())).toBe(before);
+    expect(useGraphStore.getState().past.length).toBe(pastBefore);
   });
 });
 

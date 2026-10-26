@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Graph } from "../generated/ir";
+import { useSessionStore } from "../session/sessionStore";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
 import { useViewLinkStore } from "../store/viewLinkStore";
@@ -52,6 +53,7 @@ export function IRToolbar(): JSX.Element {
   const name = useGraphStore((s) => s.name);
   const nodes = useGraphStore((s) => s.nodes);
   const hasResultCards = collectReportCards(nodes).length > 0;
+  const hasTours = useSessionStore((s) => Object.keys(s.tours).length > 0);
   const currentSlug = useFlowStore((s) => s.currentSlug);
   const isDirty = useFlowStore((s) => s.isDirty);
   const flows = useFlowStore((s) => s.flows);
@@ -117,6 +119,9 @@ export function IRToolbar(): JSX.Element {
       graphName,
       cards: collectReportCards(useGraphStore.getState().nodes),
       results: useExecutionStore.getState().results,
+      tours: Object.values(useSessionStore.getState().tours).sort((a, b) =>
+        a.id.localeCompare(b.id),
+      ),
     });
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
@@ -341,7 +346,7 @@ export function IRToolbar(): JSX.Element {
     {
       label: "Export report (HTML)",
       onSelect: handleExportReport,
-      disabled: !hasResultCards,
+      disabled: !hasResultCards && !hasTours,
       testId: "file-menu-export-report",
     },
     {
