@@ -111,3 +111,49 @@ def test_resolve_dependency_versions_skips_missing_packages():
     versions = resolve_dependency_versions(["pandas", "this-package-does-not-exist-xyz"])
     assert "pandas" in versions
     assert "this-package-does-not-exist-xyz" not in versions
+
+
+def test_fingerprint_source_detects_changed_bytes_at_same_path(tmp_path) -> None:
+    from emergentflow.research.reproducibility import fingerprint_source
+
+    path = tmp_path / "terms.csv"
+    path.write_text("term,n\na,1\n")
+    first = fingerprint_source(str(path))
+    path.write_text("term,n\na,2\n")
+    second = fingerprint_source(str(path))
+
+    assert first.kind == "file"
+    assert first.sha256 != second.sha256
+    assert first.size == len("term,n\na,1\n")
+    assert first.fingerprinted_at.endswith("+00:00")
+    assert is_inspectable(first)
+
+
+def test_fingerprint_source_missing_file_is_unverifiable_not_an_error(tmp_path) -> None:
+    from emergentflow.research.reproducibility import fingerprint_source
+
+    result = fingerprint_source(str(tmp_path / "nope.csv"))
+
+    assert result.kind == "unverifiable"
+    assert result.sha256 is None
+    assert result.reason
+    assert "unverifiable" in result.describe()
+
+
+def test_fingerprint_source_remote_uses_store_metadata(monkeypatch) -> None:
+    import pytest
+
+    fsspec = pytest.importorskip("fsspec")
+    from emergentflow import data as ef_data
+    from emergentflow.research.reproducibility import fingerprint_source
+
+    monkeypatch.setattr(ef_data, "REMOTE_URI_SCHEMES", ("memory://",))
+    fs = fsspec.filesystem("memory")
+    fs.pipe("/bucket/terms.parquet", b"abc")
+
+    result = fingerprint_source("memory://bucket/terms.parquet", hash_remote=True)
+
+    assert result.kind == "object"
+    assert result.size == 3
+    assert result.sha256 is not None
+    assert "memory://bucket/terms.parquet" in result.describe()

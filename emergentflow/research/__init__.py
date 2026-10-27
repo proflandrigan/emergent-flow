@@ -39,7 +39,9 @@ from emergentflow.research.report import (
 from emergentflow.research.reproducibility import (
     SEED_PARAM_NAMES,
     ReproducibilityCapture,
+    SourceFingerprint,
     capture_run,
+    fingerprint_source,
     resolve_dependency_versions,
 )
 
@@ -56,10 +58,12 @@ __all__ = [
     "ResearchError",
     "SEED_PARAM_NAMES",
     "Section",
+    "SourceFingerprint",
     "UnknownNodeError",
     "build_report",
     "capture_run",
     "check_data_quality",
+    "fingerprint_source",
     "resolve_dependency_versions",
     "section_from_value",
     "sections_from_values",
