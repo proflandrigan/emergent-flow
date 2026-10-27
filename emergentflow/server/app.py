@@ -26,6 +26,8 @@ Routes:
 - ``POST /export/eval_set``  -- ``{"rows": [...]}`` -> eval-set JSONL file download (Epic 9 Story 7)
 - ``POST /export/finetune``  -- ``{"rows": [...]}`` -> fine-tune JSONL download (Epic 9 Story 7)
 - ``POST /export/mermaid``   -- IR JSON -> ``{"mermaid": ...}`` Mermaid flowchart (issue #169)
+- ``POST /scratch/run``      -- ``{"node_id", "port", "revision", "code"}`` -> scratch run of a
+  ``transform`` against a stored output; loopback/token only (issue #178)
 - ``POST /validate``         -- IR JSON -> ``{"diagnostics": ...}``
 - ``GET  /connections``      -- list local connection profiles (Epic 13 Story 10)
 - ``POST /connections/{name}/test`` -- probe one connection profile
@@ -56,6 +58,7 @@ import time
 import webbrowser
 from collections.abc import AsyncIterator, Awaitable, Callable, Generator
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
@@ -121,6 +124,7 @@ from emergentflow.server.runs import (
     configure_runs,
     get_default_runs,
 )
+from emergentflow.server.scratch import run_scratch
 from emergentflow.server.service import (
     clear_cache,
     column_lineage_for,
@@ -244,8 +248,15 @@ _POST_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "/knowledge": save_knowledge,
     "/lineage": lineage_for_node,
     "/lineage/column": column_lineage_for,
+    "/scratch/run": run_scratch,
     "/validate": validate_graph,
 }
+
+
+# POST routes that execute caller-supplied Python in the server process; gated by
+# ``_require_code_exec_access`` (defined with the session-auth gate below).
+_CODE_EXEC_ROUTES = frozenset({"/scratch/run"})
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 
 def _error_json(status_code: int, message: str) -> JSONResponse:
@@ -390,6 +401,31 @@ async def _require_session_auth(request: Request) -> None:
         return
     if request.headers.get("authorization") != f"Bearer {_session_auth_token}":
         raise HTTPException(status_code=401, detail="missing or invalid bearer token")
+
+
+async def _require_code_exec_access(request: Request) -> None:
+    """FastAPI dependency for routes that run arbitrary code (``_CODE_EXEC_ROUTES``).
+
+    Allowed only for a loopback client (the trusted-local-app model) or a request bearing
+    the configured session token -- binding to a non-loopback host does NOT open these
+    routes to the network on its own. A cross-origin browser request (``Origin`` host differs
+    from ``Host``) is refused even from loopback, so a web page the user visits cannot drive
+    it, and a proxy-forwarded request (``X-Forwarded-For``/``Forwarded``) is not trusted as
+    loopback. The token path is the same bearer token as ``/sessions*``.
+    """
+    headers = request.headers
+    if _session_auth_token and headers.get("authorization") == f"Bearer {_session_auth_token}":
+        return
+    client = request.client
+    forwarded = "x-forwarded-for" in headers or "forwarded" in headers
+    if client is None or client.host not in _LOOPBACK_HOSTS or forwarded:
+        raise HTTPException(
+            status_code=403,
+            detail="code execution is limited to loopback clients or a bearer token",
+        )
+    origin = headers.get("origin")
+    if origin and urlsplit(origin).netloc != headers.get("host"):
+        raise HTTPException(status_code=403, detail="cross-origin code execution is refused")
 
 
 async def _safe_download(fn: Callable[[], bytes], filename: str) -> Response:
@@ -624,7 +660,14 @@ def create_app() -> FastAPI:
         return await _safe_download(lambda: export_finetune_bytes(body_dict), "finetune.jsonl")
 
     for path, fn in _POST_ROUTES.items():
-        application.add_api_route(path, _make_post_handler(fn), methods=["POST"])
+        application.add_api_route(
+            path,
+            _make_post_handler(fn),
+            methods=["POST"],
+            dependencies=[Depends(_require_code_exec_access)]
+            if path in _CODE_EXEC_ROUTES
+            else None,
+        )
 
     @application.get("/connections")
     async def connections() -> Response:

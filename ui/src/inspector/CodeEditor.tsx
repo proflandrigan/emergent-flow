@@ -1,7 +1,7 @@
 import CodeMirror from "@uiw/react-codemirror";
 import { python } from "@codemirror/lang-python";
 import { sql } from "@codemirror/lang-sql";
-import { EditorView } from "@codemirror/view";
+import { Decoration, EditorView } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
 
 import { useDomTheme } from "../theme/useDomTheme";
@@ -15,6 +15,8 @@ export interface CodeEditorProps {
   testId?: string;
   minHeight?: string;
   placeholder?: string;
+  /** 1-based line to highlight as the source of an error (e.g. a failed scratch run). */
+  errorLine?: number | null;
 }
 
 export function CodeEditor({
@@ -24,6 +26,7 @@ export function CodeEditor({
   testId,
   minHeight = "160px",
   placeholder,
+  errorLine,
 }: CodeEditorProps): JSX.Element {
   const theme = useDomTheme();
   const langExtension: Extension = language === "python" ? python() : sql();
@@ -32,6 +35,19 @@ export function CodeEditor({
     EditorView.lineWrapping,
     ...codeEditorExtensions(theme),
   ];
+  if (errorLine) {
+    extensions.push(
+      EditorView.decorations.compute(["doc"], (state) =>
+        errorLine <= state.doc.lines
+          ? Decoration.set([
+              Decoration.line({ class: "ef-code-error-line" }).range(
+                state.doc.line(errorLine).from,
+              ),
+            ])
+          : Decoration.none,
+      ),
+    );
+  }
 
   const editor = (
     <CodeMirror
