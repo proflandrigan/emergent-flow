@@ -127,6 +127,16 @@ def build_view_url(
     return base + "#" + "&".join(parts) if parts else base
 
 
+def _position_from(position: dict[str, float]) -> Any:
+    """Build a canvas ``Position`` from an MCP ``{"x": ..., "y": ...}`` dict, with a clear error."""
+    from emergentflow.ir.node import Position
+
+    missing = [key for key in ("x", "y") if key not in position]
+    if missing:
+        raise ValueError(f"position must have 'x' and 'y' keys; missing {', '.join(missing)}")
+    return Position(x=position["x"], y=position["y"])
+
+
 def _with_view_url(result: dict[str, Any], session_id: str, **view: Any) -> dict[str, Any]:
     """Add a focused ``view_url`` to a mutating tool's *result* when a canvas shares the store.
 
@@ -169,7 +179,6 @@ def create_mcp_server() -> Any:
     from emergentflow.ir.common import Direction, new_id
     from emergentflow.ir.edge import Edge, PortRef
     from emergentflow.ir.mutation import GraphMutation
-    from emergentflow.ir.node import Position
     from emergentflow.nodes import registry as default_node_registry
     from emergentflow.server.service import (
         compile_graph,
@@ -819,7 +828,7 @@ def create_mcp_server() -> Any:
         definition_cls = default_node_registry.get(node_type)
         node = definition_cls().instantiate(label=label or definition_cls.label, **(params or {}))
         if position is not None:
-            node.position = Position(x=position["x"], y=position["y"])
+            node.position = _position_from(position)
         mutation = GraphMutation(
             base_version=session.version,
             add_nodes=[node],
@@ -986,7 +995,7 @@ def create_mcp_server() -> Any:
         if errors:
             raise ValueError("; ".join(errors))
         if position is not None:
-            note.position = Position(x=position["x"], y=position["y"])
+            note.position = _position_from(position)
         description = reason or f"Added note: {content[:80]}"
         mutation = GraphMutation(
             base_version=session.version,

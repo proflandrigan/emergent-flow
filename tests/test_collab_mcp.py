@@ -906,6 +906,25 @@ class TestEditingTools:
         stored = session_mod.get_default_store().get(session.id)
         assert not stored.graph.nodes
 
+    def test_add_note_partial_position_raises_clear_error(self) -> None:
+        from fastmcp.exceptions import ToolError
+
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        with pytest.raises(ToolError, match="missing y"):
+            _run_async(
+                _call_tool(
+                    mcp,
+                    "add_note",
+                    {"session_id": session.id, "content": "x", "position": {"x": 1.0}},
+                )
+            )
+        stored = session_mod.get_default_store().get(session.id)
+        assert not stored.graph.nodes
+
     def test_open_question_note_round_trips_and_leaves_computation_unchanged(self) -> None:
         from emergentflow.codegen.compiler import compile_to_code
         from emergentflow.collab.mcp import create_mcp_server
