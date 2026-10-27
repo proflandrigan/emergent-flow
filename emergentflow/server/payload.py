@@ -47,6 +47,37 @@ def _sanitize_nonfinite(value: Any) -> Any:
     return value
 
 
+def frame_window_to_records(
+    window: Any, *, max_cell_chars: int | None = None
+) -> list[dict[str, Any]]:
+    """Serialise a DataFrame window to JSON-safe row records (NaN/inf -> ``None``).
+
+    Shared by ``to_payload``'s ``head`` and the frame browser. With *max_cell_chars*, string
+    cells and list/array cells (e.g. embedding vectors) longer than that are cut and marked
+    with an ellipsis so a very wide cell cannot bloat the response.
+    """
+    try:
+        # to_json(orient="records") requires unique column labels; most
+        # DataFrames satisfy that, but a duplicate-column frame (e.g. from a
+        # merge/pivot upstream) would otherwise raise and crash the whole
+        # /execute response instead of degrading this one OUT port.
+        records: list[dict[str, Any]] = json.loads(window.to_json(orient="records"))
+    except ValueError:
+        rows = [
+            {str(col): cell for col, cell in zip(window.columns, row, strict=True)}
+            for row in window.itertuples(index=False, name=None)
+        ]
+        records = json.loads(json.dumps(_sanitize_nonfinite(rows), default=str))
+    if max_cell_chars is not None:
+        for record in records:
+            for key, cell in record.items():
+                if isinstance(cell, (list, dict)):
+                    cell = json.dumps(cell)
+                if isinstance(cell, str) and len(cell) > max_cell_chars:
+                    record[key] = cell[:max_cell_chars] + "…"
+    return records
+
+
 def to_payload(value: Any) -> dict[str, Any]:
     """Coerce an ``execute()`` artifact into a JSON-safe tagged-union payload.
 
@@ -163,19 +194,7 @@ def to_payload(value: Any) -> dict[str, Any]:
                 describe_stats[col_name] = col_stats
             describe_stats = _sanitize_nonfinite(describe_stats)
 
-        sample = value.head(MAX_HEAD_ROWS)
-        try:
-            # to_json(orient="records") requires unique column labels; most
-            # DataFrames satisfy that, but a duplicate-column frame (e.g. from a
-            # merge/pivot upstream) would otherwise raise and crash the whole
-            # /execute response instead of degrading this one OUT port.
-            head = json.loads(sample.to_json(orient="records"))
-        except ValueError:
-            head = [
-                {str(col): cell for col, cell in zip(value.columns, row, strict=True)}
-                for row in sample.itertuples(index=False, name=None)
-            ]
-            head = json.loads(json.dumps(_sanitize_nonfinite(head), default=str))
+        head = frame_window_to_records(value.head(MAX_HEAD_ROWS))
         return {
             "kind": "table",
             "columns": [str(c) for c in value.columns],

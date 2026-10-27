@@ -102,6 +102,7 @@ from emergentflow.server.artifacts import (
     DEFAULT_ARTIFACT_MAX_MB,
     configure_artifacts,
 )
+from emergentflow.server.browse import browse_frame
 from emergentflow.server.cache import DEFAULT_CACHE_DIRNAME, DEFAULT_CACHE_MAX_MB, configure_cache
 from emergentflow.server.flows import (
     DEFAULT_FLOW_DIRNAME,
@@ -232,6 +233,7 @@ _INDEX_HTML = """<!doctype html>
 # keep the event loop responsive (the whole point of the FastAPI upgrade).
 _POST_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "/cache/clear": clear_cache,
+    "/browse/frame": browse_frame,
     "/compile": compile_graph,
     "/compile-spec": compile_query_spec,
     "/eval/label": label_eval,
