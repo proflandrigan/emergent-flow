@@ -20,6 +20,7 @@ import threading
 import time
 from collections.abc import Generator, Iterator
 from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
 import pandas as pd
@@ -51,7 +52,7 @@ from emergentflow.server.artifacts import get_default_artifacts
 from emergentflow.server.cache import get_default_cache
 from emergentflow.server.payload import PAYLOAD_CONTRACT_VERSION, to_payload
 from emergentflow.server.reports import get_default_store
-from emergentflow.server.runs import get_default_runs
+from emergentflow.server.runs import _generate_run_id, get_default_runs
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -908,16 +909,19 @@ def _save_run_record(
     try:
         from emergentflow.research.reproducibility import (
             capture_run,
+            default_dependency_packages,
+            fingerprint_data_sources,
             resolve_dependency_versions,
         )
 
-        deps = resolve_dependency_versions([])
+        deps = resolve_dependency_versions(default_dependency_packages())
         # Record every graph-level param's RESOLVED value (stored value with any request
         # override applied), not just the override keys -- a partial map would make a
         # multi-param run's reproducibility record incomplete.
         repro = capture_run(
             graph,
             dependency_versions=deps,
+            data_fingerprints=fingerprint_data_sources(graph),
             params=resolve_graph_params(graph, overrides=params) if params else None,
         )
         run_data["reproducibility"] = {
@@ -925,6 +929,7 @@ def _save_run_record(
             "content_hashes": repro.content_hashes,
             "dependency_versions": repro.dependency_versions,
             "params": repro.params,
+            "data_fingerprints": repro.data_fingerprints,
         }
     except Exception:
         pass  # reproducibility capture is best-effort
@@ -1228,6 +1233,10 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
         "type": "run_complete",
         "total_ms": int((time.monotonic() - start_time) * 1000),
         "artifact_revisions": stream_revisions,
+        # Identity of this streamed run for result-card evidence ("Run <id> · <time>"). Streams
+        # are not persisted to the run store, so this id has no ``/runs/{id}`` record.
+        "run_id": _generate_run_id(),
+        "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "payload_version": PAYLOAD_CONTRACT_VERSION,
     }
 

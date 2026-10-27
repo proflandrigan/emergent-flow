@@ -264,6 +264,43 @@ def test_graph_hash_includes_param_overrides(tmp_path) -> None:
     assert h_default != h_diff, "different param overrides must change the hash"
 
 
+def test_run_record_captures_data_fingerprints_and_dependencies(tmp_path, monkeypatch) -> None:
+    """Changed bytes at the same path give a different fingerprint in the saved run record, and
+    dependency_versions is no longer empty."""
+    import emergentflow.server.runs as runs_mod
+    from emergentflow.ir.common import Direction
+    from emergentflow.ir.graph import Graph
+    from emergentflow.ir.node import Node
+    from emergentflow.ir.params import Param
+    from emergentflow.ir.port import Port
+    from emergentflow.server.service import _save_run_record
+
+    monkeypatch.setattr(runs_mod, "_default_runs", RunStore(tmp_path / "runs", keep=50))
+    data = tmp_path / "t.csv"
+    loader = Node(
+        id="load",
+        type="data.load_csv",
+        params=[Param(name="path", type_token="str", value=str(data))],
+        ports=[Port(id="p1", name="frame", direction=Direction.OUT, data_type="DataFrame")],
+    )
+    graph = Graph(name="g", nodes={"load": loader})
+
+    def record(text: str) -> dict:
+        data.write_text(text)
+        run_id = _save_run_record(graph, {"name": "g"}, {}, {})
+        assert run_id is not None
+        return runs_mod.get_default_runs().get(run_id)["reproducibility"]
+
+    first, second = record("a\n1\n"), record("a\n2\n")
+    assert first["content_hashes"] == second["content_hashes"]
+    assert first["data_fingerprints"]["load"]["kind"] == "file"
+    assert (
+        first["data_fingerprints"]["load"]["sha256"]
+        != second["data_fingerprints"]["load"]["sha256"]
+    )
+    assert first["dependency_versions"].get("emergentflow")
+
+
 def test_routes_list_empty(runs_client: TestClient) -> None:
     resp = runs_client.get("/runs")
     assert resp.status_code == 200

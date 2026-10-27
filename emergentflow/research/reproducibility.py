@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field
+import re
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -29,6 +31,8 @@ __all__ = [
     "ReproducibilityCapture",
     "SourceFingerprint",
     "capture_run",
+    "default_dependency_packages",
+    "fingerprint_data_sources",
     "fingerprint_source",
     "resolve_dependency_versions",
 ]
@@ -60,17 +64,21 @@ class ReproducibilityCapture:
     seeds: node id -> the seed/random_state value captured from that node's params.
     content_hashes: node id -> a stable content hash of that source node's (type, params),
         for every node whose type looks like a data loader (``node.type`` starting with
-        ``"data."``).
+        ``"data."``). This is a CONFIG hash, not a data fingerprint: the same path with
+        different bytes hashes identically. See ``data_fingerprints`` for the bytes.
     dependency_versions: package name -> resolved version string, exactly as supplied by the
         caller (see ``resolve_dependency_versions``).
     params: resolved graph-level parameter values this run used; defaults to the graph's
         stored param values when not supplied.
+    data_fingerprints: node id -> ``SourceFingerprint`` (as a dict) of the source that node read,
+        as supplied by the caller (see ``fingerprint_data_sources``); empty if not supplied.
     """
 
     seeds: dict[str, int | float] = field(default_factory=dict)
     content_hashes: dict[str, str] = field(default_factory=dict)
     dependency_versions: dict[str, str] = field(default_factory=dict)
     params: dict[str, Any] = field(default_factory=dict)
+    data_fingerprints: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 @public_op(name="ef.research.capture_run")
@@ -79,6 +87,7 @@ def capture_run(
     *,
     dependency_versions: dict[str, str] | None = None,
     params: dict[str, Any] | None = None,
+    data_fingerprints: Mapping[str, SourceFingerprint | dict[str, Any]] | None = None,
 ) -> ReproducibilityCapture:
     """Capture a reproducibility snapshot of *graph*.
 
@@ -95,6 +104,10 @@ def capture_run(
         ``None``, records each graph-level param's stored value. Callers that ran with runtime
         overrides (``ef.execute(..., params=...)``, the CLI ``--param`` flag) should pass the
         RESOLVED values so the snapshot says what the run was actually given.
+    data_fingerprints:
+        Optional caller-supplied map of node id -> :class:`SourceFingerprint` (see
+        :func:`fingerprint_data_sources`). Recorded verbatim as dicts; ``capture_run`` never
+        reads the sources itself.
 
     Returns
     -------
@@ -130,6 +143,10 @@ def capture_run(
         content_hashes=content_hashes,
         dependency_versions=dict(dependency_versions or {}),
         params=dict(params),
+        data_fingerprints={
+            nid: asdict(fp) if isinstance(fp, SourceFingerprint) else dict(fp)
+            for nid, fp in (data_fingerprints or {}).items()
+        },
     )
 
 
@@ -302,3 +319,95 @@ def fingerprint_source(
         last_modified=_utc_iso(info.get("LastModified") or info.get("mtime")),
         fingerprinted_at=now,
     )
+
+
+# Source-reading ``data.*`` nodes whose ``path`` param names a local file or object-store URI.
+_PATH_SOURCE_TYPES = frozenset(
+    {
+        "data.load_csv",
+        "data.load_parquet",
+        "data.load_json",
+        "data.load_excel",
+        "data.load_documents",
+    }
+)
+# ``data.*`` nodes that read from somewhere with no byte-addressable file: recorded as
+# unverifiable rather than silently omitted.
+_REMOTE_SOURCE_REASONS = {
+    "data.http_fetch": "http source: response bytes are not fingerprinted",
+    "data.sql_query": "warehouse source: no byte-level fingerprint",
+    "data.query_builder": "warehouse source: no byte-level fingerprint",
+    "data.describe_relation": "warehouse source: no byte-level fingerprint",
+    "data.load_google_sheet": "google sheet source: no byte-level fingerprint",
+}
+_GLOB_CHARS = set("*?[")
+
+
+def fingerprint_data_sources(graph: Graph) -> dict[str, SourceFingerprint]:
+    """Impure edge helper: fingerprint the source each ``data.*`` loader node reads.
+
+    Local files are hashed (streamed); remote object URIs are identified by store metadata only
+    (``hash_remote`` is never set, so no remote bytes are downloaded); globs, directories and
+    warehouse/http/sheet sources are recorded as ``kind="unverifiable"`` with a ``reason``.
+    Sinks (``save_frame``, ``write_table``) and built-in samples are skipped. Never raises:
+    a failure on one node yields an ``unverifiable`` entry (or omits it) and the run proceeds.
+    """
+    out: dict[str, SourceFingerprint] = {}
+    for node_id in sorted(graph.nodes):
+        node = graph.nodes[node_id]
+        try:
+            values = {p.name: p.value for p in node.params}
+            if node.type in _REMOTE_SOURCE_REASONS:
+                out[node_id] = SourceFingerprint(
+                    uri=str(values.get("url") or values.get("path") or node.type),
+                    kind="unverifiable",
+                    fingerprinted_at=_utc_iso(datetime.now(UTC)) or "",
+                    reason=_REMOTE_SOURCE_REASONS[node.type],
+                )
+                continue
+            if node.type not in _PATH_SOURCE_TYPES:
+                continue
+            uri = values.get("path")
+            if not isinstance(uri, str) or not uri:
+                continue
+            if _GLOB_CHARS & set(uri) or Path(uri).is_dir():
+                out[node_id] = SourceFingerprint(
+                    uri=uri,
+                    kind="unverifiable",
+                    fingerprinted_at=_utc_iso(datetime.now(UTC)) or "",
+                    reason="glob or directory source: fingerprint each file",
+                )
+                continue
+            connection = values.get("connection")
+            out[node_id] = fingerprint_source(
+                uri, connection=connection if isinstance(connection, str) else None
+            )
+        except Exception as exc:  # never let fingerprinting break a run
+            out[node_id] = SourceFingerprint(
+                uri=str(node.type),
+                kind="unverifiable",
+                fingerprinted_at=_utc_iso(datetime.now(UTC)) or "",
+                reason=f"{type(exc).__name__}: {exc}",
+            )
+    return out
+
+
+def default_dependency_packages() -> list[str]:
+    """Package names to record: ``emergentflow`` plus its declared direct requirements.
+
+    Cheaper and more relevant than every installed distribution (hundreds in a dev env); the
+    requirement names come from ``emergentflow``'s own metadata, extras included, and
+    :func:`resolve_dependency_versions` drops the ones not installed.
+    """
+    import importlib.metadata
+
+    names = ["emergentflow"]
+    try:
+        requires = importlib.metadata.requires("emergentflow") or []
+    except importlib.metadata.PackageNotFoundError:
+        requires = []
+    for req in requires:
+        match = re.match(r"[A-Za-z0-9][A-Za-z0-9._-]*", req)
+        if match and match.group(0) not in names:
+            names.append(match.group(0))
+    return names

@@ -36,7 +36,7 @@ function renderCard(blocks: ResultCardBlock[], title = "My Card") {
 }
 
 beforeEach(() => {
-  useExecutionStore.setState({ results: {}, statuses: {} });
+  useExecutionStore.setState({ results: {}, statuses: {}, runMeta: null });
   useGraphStore.getState().reset();
 });
 
@@ -129,6 +129,25 @@ describe("ResultCardNode", () => {
     });
     renderCard([{ kind: "result", source: "n1:out", caption: "" }]);
     expect(screen.getByTestId("result-card-error")).toHaveTextContent("Source failed");
+  });
+
+  test("shows run id and timestamp evidence under an ok result only", () => {
+    useExecutionStore.setState({
+      results: { n1: { out: { kind: "scalar", value: 42 } } },
+      runMeta: { runId: "2026-07-30T14-02-11Z-ab12", finishedAt: "2026-07-30T14:02:11+00:00" },
+    });
+    renderCard([{ kind: "result", source: "n1:out", caption: "" }]);
+    expect(screen.getByTestId("result-card-evidence")).toHaveTextContent(
+      "Run ab12 \u00b7 2026-07-30T14:02:11+00:00",
+    );
+  });
+
+  test("shows no evidence when the block is not ok", () => {
+    useExecutionStore.setState({
+      runMeta: { runId: "r", finishedAt: "2026-07-30T14:02:11+00:00" },
+    });
+    renderCard([{ kind: "result", source: "n1:out", caption: "" }]);
+    expect(screen.queryByTestId("result-card-evidence")).toBeNull();
   });
 
   test("shows the empty-card placeholder", () => {

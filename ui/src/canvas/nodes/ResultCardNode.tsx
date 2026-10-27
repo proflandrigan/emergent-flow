@@ -8,7 +8,12 @@ import "./ResultCardNode.css";
 import { PayloadView } from "../../inspector/PayloadView";
 import { useExecutionStore } from "../../store/executionStore";
 import { useGraphStore } from "../../store/graphStore";
-import { serializeBlocks, splitSource, type ResultCardBlock } from "../resultCardBlocks";
+import {
+  formatRunEvidence,
+  resolveBlockState,
+  serializeBlocks,
+  type ResultCardBlock,
+} from "../resultCardBlocks";
 
 export interface ResultCardNodeData extends Record<string, unknown> {
   title: string;
@@ -61,15 +66,15 @@ function ResultBlockView({
 }): JSX.Element {
   const results = useExecutionStore((s) => s.results);
   const statuses = useExecutionStore((s) => s.statuses);
+  const runMeta = useExecutionStore((s) => s.runMeta);
 
-  const parts = splitSource(block.source);
-  const payload = parts ? results[parts.nodeId]?.[parts.port] : undefined;
-  const status = parts ? statuses[parts.nodeId] : undefined;
+  const resolved = resolveBlockState(block, results, statuses, runMeta);
+  const evidence = formatRunEvidence(resolved.runId, resolved.finishedAt);
 
   let content: JSX.Element;
-  if (payload) {
-    content = <PayloadView payload={payload} />;
-  } else if (status?.status === "error") {
+  if (resolved.state === "ok" && resolved.payload) {
+    content = <PayloadView payload={resolved.payload} />;
+  } else if (resolved.state === "failed") {
     content = (
       <span data-testid="result-card-error" style={mutedStyle}>
         Source failed
@@ -86,6 +91,14 @@ function ResultBlockView({
   return (
     <div data-testid="result-card-block-result" style={{ margin: "var(--space-1) 0" }}>
       {content}
+      {resolved.state === "ok" && evidence !== "" ? (
+        <div
+          data-testid="result-card-evidence"
+          style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 2 }}
+        >
+          {evidence}
+        </div>
+      ) : null}
       {block.caption ? (
         <div
           data-testid="result-card-caption"

@@ -41,6 +41,8 @@ from emergentflow.research.reproducibility import (
     ReproducibilityCapture,
     SourceFingerprint,
     capture_run,
+    default_dependency_packages,
+    fingerprint_data_sources,
     fingerprint_source,
     resolve_dependency_versions,
 )
@@ -62,6 +64,8 @@ __all__ = [
     "UnknownNodeError",
     "build_report",
     "capture_run",
+    "default_dependency_packages",
+    "fingerprint_data_sources",
     "check_data_quality",
     "fingerprint_source",
     "resolve_dependency_versions",

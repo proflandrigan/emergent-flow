@@ -7,7 +7,7 @@
 
 import { create } from "zustand";
 
-import type { NodeRunStatus, Payload } from "./execution";
+import type { NodeRunStatus, Payload, RunMeta } from "./execution";
 
 export interface ProgressState {
   current: number;
@@ -23,6 +23,8 @@ export interface ExecutionStore {
   nodeRevisions: Record<string, string>;
   error: string | null;
   lastRunAt: number | null;
+  /** Identity of the most recent completed run (id + UTC finish time), for result evidence. */
+  runMeta: RunMeta | null;
   progress: ProgressState | null;
   setRunning: () => void;
   setNodeStart: (label: string, current: number, total: number) => void;
@@ -38,7 +40,7 @@ export interface ExecutionStore {
   ) => void;
   setNodeError: (nodeId: string, error: string) => void;
   setNodeSkipped: (nodeId: string, reason?: string) => void;
-  setRunComplete: () => void;
+  setRunComplete: (meta?: { runId?: string | null; finishedAt?: string }) => void;
   setError: (message: string) => void;
   clear: () => void;
 }
@@ -58,6 +60,7 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
   nodeRevisions: {},
   error: null,
   lastRunAt: null,
+  runMeta: null,
   progress: null,
 
   setRunning() {
@@ -102,8 +105,17 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
     });
   },
 
-  setRunComplete() {
-    set({ running: false, error: null, lastRunAt: Date.now(), progress: null });
+  setRunComplete(meta) {
+    set({
+      running: false,
+      error: null,
+      lastRunAt: Date.now(),
+      runMeta: {
+        runId: meta?.runId ?? null,
+        finishedAt: meta?.finishedAt ?? new Date().toISOString(),
+      },
+      progress: null,
+    });
   },
 
   setError(message) {
@@ -118,6 +130,7 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
       nodeRevisions: {},
       error: null,
       lastRunAt: null,
+      runMeta: null,
       progress: null,
     });
   },

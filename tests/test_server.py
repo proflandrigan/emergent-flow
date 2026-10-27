@@ -957,6 +957,8 @@ def test_http_execute_stream_two_node_graph(client: TestClient) -> None:
     assert events[0]["node_id"] == "n-load"
     assert events[2]["node_id"] == "n-impute"
     assert "total_ms" in events[-1]
+    assert events[-1]["run_id"]
+    assert events[-1]["finished_at"].endswith("+00:00")
     assert all(e["payload_version"] == PAYLOAD_CONTRACT_VERSION for e in events)
 
 

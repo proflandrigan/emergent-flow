@@ -119,6 +119,11 @@ export function IRToolbar(): JSX.Element {
       graphName,
       cards: collectReportCards(useGraphStore.getState().nodes),
       results: useExecutionStore.getState().results,
+      statuses: useExecutionStore.getState().statuses,
+      runMeta: useExecutionStore.getState().runMeta,
+      nodeLabels: Object.fromEntries(
+        Object.values(useGraphStore.getState().nodes).map((n) => [n.id, n.label ?? n.type]),
+      ),
       tours: Object.values(useSessionStore.getState().tours).sort((a, b) =>
         a.id.localeCompare(b.id),
       ),
