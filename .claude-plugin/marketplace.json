@@ -1,0 +1,15 @@
+{
+  "name": "emergent-flow-marketplace",
+  "owner": { "name": "proflandrigan" },
+  "metadata": {
+    "description": "Claude Code plugins for Emergent Flow."
+  },
+  "plugins": [
+    {
+      "name": "emergent-flow",
+      "source": "./agents",
+      "description": "Co-author Emergent Flow pipelines with a human on the live canvas (skill + HTTP-backed MCP bridge).",
+      "version": "0.3.7"
+    }
+  ]
+}

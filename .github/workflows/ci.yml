@@ -60,6 +60,9 @@ jobs:
       - name: Verify generated agent reply contract is up to date
         run: uv run python scripts/export_agent_contract.py --check
 
+      - name: Packaged agent skill/plugin smoke check (sdist -> wheel, outside the checkout)
+        run: uv run python scripts/check_agent_package.py
+
       - name: Column-effect coverage report (Epic 18 lineage)
         # Gate is on the tracer-resolvable fraction (~19% today), not the
         # broader advisory "declared" set (~27%), so --min-pct is set low.

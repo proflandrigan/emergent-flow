@@ -15,3 +15,7 @@ prune ui/node_modules
 prune ui/dist
 global-exclude *.tsbuildinfo
 graft agents
+# Claude Code marketplace manifest (repo root) for `claude plugin install ... --marketplace`;
+# agents/ (skill + plugin root, hidden files included) is covered by `graft agents` above.
+include .claude-plugin/marketplace.json
+include scripts/export_agent_contract.py

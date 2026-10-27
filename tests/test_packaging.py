@@ -71,3 +71,43 @@ def test_build_ui_swallows_npm_failure(tmp_path, monkeypatch) -> None:
 
     monkeypatch.setattr(build_backend.subprocess, "run", boom)
     build_backend._build_ui()  # must not raise
+
+
+def test_copy_agents_ships_plugin_resources(tmp_path, monkeypatch) -> None:
+    src = tmp_path / "agents"
+    (src / ".claude-plugin").mkdir(parents=True)
+    (src / "SKILL.md").write_text("# skill")
+    (src / ".mcp.json").write_text("{}")
+    (src / ".claude-plugin" / "plugin.json").write_text("{}")
+    dest = tmp_path / "dest"
+    monkeypatch.setattr(build_backend, "_AGENTS_SRC", src)
+    monkeypatch.setattr(build_backend, "_AGENTS_DEST", dest)
+    build_backend._copy_agents()
+    assert (dest / "SKILL.md").is_file()
+    assert (dest / ".mcp.json").is_file()
+    assert (dest / ".claude-plugin" / "plugin.json").is_file()
+
+
+def test_package_data_lists_hidden_agent_resources() -> None:
+    package_data = _pyproject()["tool"]["setuptools"]["package-data"]["emergentflow"]
+    assert "agents/.mcp.json" in package_data
+    assert "agents/.claude-plugin/plugin.json" in package_data
+
+
+def test_manifest_includes_marketplace() -> None:
+    manifest = (_REPO / "MANIFEST.in").read_text(encoding="utf-8")
+    assert ".claude-plugin/marketplace.json" in manifest
+
+
+def test_build_ui_respects_skip_env(tmp_path, monkeypatch) -> None:
+    ui = tmp_path / "ui"
+    ui.mkdir()
+    (ui / "package.json").write_text("{}")
+    monkeypatch.setenv("EMERGENTFLOW_SKIP_UI_BUILD", "1")
+    monkeypatch.setattr(build_backend, "_UI_DIR", ui)
+
+    def must_not_run(*args, **kwargs):
+        raise AssertionError("must not run")
+
+    monkeypatch.setattr(build_backend.subprocess, "run", must_not_run)
+    build_backend._build_ui()  # must not raise

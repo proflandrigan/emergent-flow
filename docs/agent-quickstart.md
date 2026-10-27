@@ -1,8 +1,8 @@
 # Agent Quickstart — from an empty server to a run with metrics
 
 The happy path for onboarding a new agent without re-deriving the collaboration protocol: start the
-server (`emergentflow serve`), register the MCP bridge, `create_session` (and grab the `open_in_ui`
-URL), read `/catalog` to learn the node types and their params, build the graph with the editing
+server (`emergentflow serve`), install the agent plugin (or register the MCP bridge),
+`create_session` (and grab the `open_in_ui` URL), read `/catalog` to learn the node types and their params, build the graph with the editing
 tools, `/validate` + `compile_preview` as a preflight, `execute_session_tool` to get a persisted
 `run_id`, then `get_results` / `get_metric` to read it back. This guide is the hands-on companion to
 the reference docs — see [See also](#see-also) for the full HTTP route table and the canonical
@@ -44,11 +44,61 @@ Session bearer token: <token>  (pass it to the agent as its Authorization: Beare
 In that mode every `/sessions*` request (HTTP or MCP) must carry
 `Authorization: Bearer <token>` from the agent.
 
-## 1. Register the MCP bridge
+## 1. Install with one command
 
-The collaboration surface is exposed as MCP tools behind the optional `emergentflow[mcp]` extra
-(`fastmcp`, stdio transport). To make the tools available to a client that supports `.mcp.json`-style
-stdio registration (Claude Code, Gemini, Codex, OpenCode, …), register this entry:
+Prerequisites: `pip install 'emergentflow[server,mcp]'`, then `emergentflow serve` (section 0).
+Neither install below provides the Python runtime.
+
+Claude Code (v2.1.292 or newer):
+
+```bash
+claude plugin install emergent-flow --marketplace proflandrigan/emergent-flow
+```
+
+Older clients:
+
+```bash
+claude plugin marketplace add proflandrigan/emergent-flow
+claude plugin install emergent-flow@emergent-flow-marketplace
+```
+
+Then start (or restart) the Claude Code session so it loads the plugin's skill and MCP server.
+
+**Other agents** (Codex, Cursor, OpenCode, Claude Code, ...): install the skill with
+
+```bash
+npx skills add proflandrigan/emergent-flow --skill emergent-flow -g
+```
+
+(`--list` shows what is discoverable; `-a <agent>` targets a specific agent.) This installs the
+instructions ONLY and does not register MCP for every host. Without MCP the agent drives the HTTP
+API with curl per the collaborator protocol, or you register the bridge below in that host's MCP
+settings.
+
+### Manual: register the HTTP-backed bridge
+
+```json
+{
+  "mcpServers": {
+    "emergent-flow": {
+      "command": "emergentflow",
+      "args": ["mcp", "--base-url", "http://127.0.0.1:8765"]
+    }
+  }
+}
+```
+
+The `emergentflow` executable must be on the PATH the agent host launches with; if not (e.g.
+installed in a venv), replace `"command": "emergentflow"` with the absolute path
+(`which emergentflow`). For a non-default server address change `--base-url`. The token defaults
+to `$EMERGENTFLOW_SESSION_TOKEN` (only needed on a non-loopback bind, or pass `--session-token`);
+never put a real token in config files or links.
+
+Start `emergentflow serve` BEFORE the agent connects; if the bridge started first and failed,
+reconnect it (`/mcp` in Claude Code) after the server is up. Sessions created through the bridge
+appear on the canvas and `view_url` links resolve.
+
+### Advanced: standalone in-process server
 
 ```json
 {
@@ -65,23 +115,8 @@ stdio registration (Claude Code, Gemini, Codex, OpenCode, …), register this en
 }
 ```
 
-This requires `emergentflow[mcp]` installed (`uv sync --extra mcp` or
-`pip install 'emergentflow[mcp]'`).
-
-**Critical limitation — one surface at a time.** The MCP stdio server launched this way runs in a
-**separate process** from `emergentflow serve`, and the session store (`get_default_store()` in
-`emergentflow/collab/session.py`) is a process-wide singleton. A session created through the MCP
-tools is therefore **NOT visible to the server's HTTP routes, and vice versa**. For a single-canvas
-happy path, pick ONE surface and stay on it:
-
-- **(a)** run everything through the MCP tools (this quickstart's default), or
-- **(b)** drive the HTTP routes directly.
-
-The `open_in_ui` link from `create_session` is for when the MCP bridge and the server share a session
-store (currently not wired per ADR 0019 "one behavior, two doors"), so treat it as informational here.
-The same caveat applies to the focused `view_url` links (issue #168): mutating tools only return
-`view_url` when they run inside `emergentflow serve` (the HTTP bridge or in-app chat), and
-`view_link` reports `canvas_reachable: false` otherwise.
+This runs a separate process with its own session store: its sessions are not visible to the
+canvas, and mutating tools omit `view_url` (`view_link` reports `canvas_reachable: false`).
 
 ## 2. Create a session
 

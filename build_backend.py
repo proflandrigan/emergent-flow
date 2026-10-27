@@ -7,11 +7,13 @@ release runner) it is skipped and the wheel ships without ``_static/`` -- the se
 falls back to its v0 demo page (ADR 0013). This mirrors ``torch`` being optional and lazily
 used: the Python toolchain never depends on the Node toolchain. Only ``build_wheel`` is
 hooked; the **editable** build path is the unmodified setuptools one, so ``uv sync`` /
-``pip install -e`` never invoke Node.
+``pip install -e`` never invoke Node. Setting ``EMERGENTFLOW_SKIP_UI_BUILD`` skips the ui/
+compile entirely (the packaging smoke check uses it to keep CI fast).
 """
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -31,10 +33,15 @@ _ROOT = Path(__file__).resolve().parent
 _UI_DIR = _ROOT / "ui"
 _AGENTS_SRC = _ROOT / "agents"
 _AGENTS_DEST = _ROOT / "emergentflow" / "agents"
+# Non-markdown plugin resources (hidden paths: never rely on a glob to pick these up).
+_AGENTS_EXTRA = (Path(".mcp.json"), Path(".claude-plugin") / "plugin.json")
 
 
 def _build_ui() -> None:
     """Best-effort: compile ui/ into emergentflow/_static/. Never raises out of the build."""
+    if os.environ.get("EMERGENTFLOW_SKIP_UI_BUILD"):
+        print("emergentflow build: EMERGENTFLOW_SKIP_UI_BUILD set; skipping ui/ build.")
+        return
     if not (_UI_DIR / "package.json").is_file():
         return
     npm = shutil.which("npm")
@@ -55,13 +62,19 @@ def _build_ui() -> None:
 def _copy_agents() -> None:
     """Best-effort: copy repo-root agents/*.md into emergentflow/agents/ so the wheel ships the
     chat protocol doc + persona markdown as package data (chat_runner resolves it there).
-    Never raises out of the build."""
+    Also copies the plugin manifest (agents/.claude-plugin/plugin.json) and MCP config
+    (agents/.mcp.json) listed in _AGENTS_EXTRA. Never raises out of the build."""
     if not _AGENTS_SRC.is_dir():
         return
     try:
         _AGENTS_DEST.mkdir(parents=True, exist_ok=True)
         for md in _AGENTS_SRC.glob("*.md"):
             shutil.copy2(md, _AGENTS_DEST / md.name)
+        for rel in _AGENTS_EXTRA:
+            src = _AGENTS_SRC / rel
+            if src.is_file():
+                (_AGENTS_DEST / rel).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, _AGENTS_DEST / rel)
     except OSError as exc:
         print(f"emergentflow build: agents/ copy skipped ({exc}).")
 
