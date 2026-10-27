@@ -94,6 +94,7 @@ function ResultBlockView({
       {resolved.state === "ok" && evidence !== "" ? (
         <div
           data-testid="result-card-evidence"
+          title={resolved.runId ? `Run ID: ${resolved.runId}` : undefined}
           style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 2 }}
         >
           {evidence}

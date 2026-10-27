@@ -130,7 +130,7 @@ function renderBlock(block: ResultCardBlock, ctx: RenderContext): string {
     return renderMarkdown(block.text);
   }
   const resolved = resolveBlockState(block, ctx.results, ctx.statuses, ctx.runMeta);
-  const evidence = formatRunEvidence(resolved.runId, resolved.finishedAt);
+  const evidence = formatRunEvidence(resolved.runId, resolved.finishedAt, true);
   const label = ctx.nodeLabels[resolved.nodeId];
   const sourceText = `Source: ${label ? `${label} (${resolved.nodeId})` : resolved.nodeId}, port ${resolved.port}`;
   let out: string;

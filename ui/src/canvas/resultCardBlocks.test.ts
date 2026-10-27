@@ -90,6 +90,9 @@ describe("resolveBlockState", () => {
     expect(formatRunEvidence(meta.runId, meta.finishedAt)).toBe(
       "Run ab12 \u00b7 2026-07-30T14:02:11+00:00",
     );
+    expect(formatRunEvidence(meta.runId, meta.finishedAt, true)).toBe(
+      "Run 2026-07-30T14-02-11Z-ab12 \u00b7 2026-07-30T14:02:11+00:00",
+    );
     expect(formatRunEvidence(null, "2026-01-01T00:00:00+00:00")).toBe(
       "Run \u00b7 2026-01-01T00:00:00+00:00",
     );

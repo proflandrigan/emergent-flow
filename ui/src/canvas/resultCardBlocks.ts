@@ -77,9 +77,18 @@ export function shortRunId(runId: string | null): string {
   return runId.length > 8 && tail.length >= 4 && tail.length < runId.length ? tail : runId.slice(0, 8);
 }
 
-/** One-line evidence text: `Run <short id> · <timestamp>`; empty when there is no run yet. */
-export function formatRunEvidence(runId: string | null, finishedAt: string | null): string {
-  const parts = [shortRunId(runId) !== "" ? `Run ${shortRunId(runId)}` : finishedAt ? "Run" : ""];
+/**
+ * One-line evidence text: `Run <short id> · <timestamp>`; empty when there is no run yet.
+ * With `full`, the complete run id is printed instead of the short form (exports: the short id
+ * cannot be used to look the run up via `GET /runs/{id}`).
+ */
+export function formatRunEvidence(
+  runId: string | null,
+  finishedAt: string | null,
+  full = false,
+): string {
+  const shown = full && runId ? runId : shortRunId(runId);
+  const parts = [shown !== "" ? `Run ${shown}` : finishedAt ? "Run" : ""];
   if (finishedAt) {
     parts.push(finishedAt);
   }

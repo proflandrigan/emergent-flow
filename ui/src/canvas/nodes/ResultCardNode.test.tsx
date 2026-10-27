@@ -140,6 +140,10 @@ describe("ResultCardNode", () => {
     expect(screen.getByTestId("result-card-evidence")).toHaveTextContent(
       "Run ab12 \u00b7 2026-07-30T14:02:11+00:00",
     );
+    expect(screen.getByTestId("result-card-evidence")).toHaveAttribute(
+      "title",
+      "Run ID: 2026-07-30T14-02-11Z-ab12",
+    );
   });
 
   test("shows no evidence when the block is not ok", () => {

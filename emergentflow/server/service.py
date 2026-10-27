@@ -16,6 +16,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import logging
 import threading
 import time
 from collections.abc import Generator, Iterator
@@ -98,6 +99,8 @@ def _execute_node(definition: Any, node: Node, inputs: dict[str, Any]) -> dict[s
         "threading is a later story."
     )
 
+
+logger = logging.getLogger(__name__)
 
 # Per-node execution status reported to the canvas (Epic 4 Story 2). A node is
 # "ok" if it ran, "error" if its execute() raised, "skipped" if an upstream node
@@ -859,8 +862,9 @@ def _save_run_record(
     node_elapsed: dict[str, int] | None = None,
     started_at: float | None = None,
     params: dict[str, Any] | None = None,
+    run_id: str | None = None,
 ) -> str | None:
-    """Returns the generated ``run_id``, or ``None`` if saving failed."""
+    """Returns the ``run_id`` (pre-allocated if given), or ``None`` if saving failed."""
     # Hash the graph payload together with any RESOLVED graph-level param
     # overrides, so two runs that share a graph but apply different --param /
     # ?params values get distinct hashes. Otherwise the run store (and the "run
@@ -948,7 +952,7 @@ def _save_run_record(
                 payloads_data[node_id][port_name] = payload
 
     try:
-        return get_default_runs().save(run_data, graph_payload, payloads_data)
+        return get_default_runs().save(run_data, graph_payload, payloads_data, run_id=run_id)
     except Exception:
         return None
 
@@ -1142,13 +1146,30 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
     graph = _to_graph(graph_payload)
     validate_api_keys_present(graph)
     start_time = time.monotonic()
+    started_at = time.time()
     stream_revisions: dict[str, str] = {}
+    run_results: dict[str, dict[str, Any]] = {}
+    run_statuses: dict[str, dict[str, Any]] = {}
+    run_elapsed: dict[str, int] = {}
     try:
         if graph.paradigm is Paradigm.FUNCTIONAL:
             if params is not None or has_graph_param_refs(graph):
                 graph = materialize_graph(graph, params=params)
             only, wiring_map = _resolve_run_scope(graph, scope)
             for event in _execute_functional_stream(graph, only=only, wiring_map=wiring_map):
+                if event.phase == "ok":
+                    run_results[event.node_id] = event.results or {}
+                    run_statuses[event.node_id] = {
+                        "status": _STATUS_CACHED if event.cached else _STATUS_OK
+                    }
+                    run_elapsed[event.node_id] = event.elapsed_ms or 0
+                elif event.phase == "error":
+                    run_statuses[event.node_id] = {"status": _STATUS_ERROR, "error": event.error}
+                    run_elapsed[event.node_id] = event.elapsed_ms or 0
+                elif event.phase == "skip":
+                    run_statuses[event.node_id] = {"status": _STATUS_SKIPPED}
+                    if event.reason is not None:
+                        run_statuses[event.node_id]["reason"] = event.reason
                 if event.phase == "start":
                     yield {
                         "type": "node_start",
@@ -1199,6 +1220,8 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
             # one node_start/node_ok pair per produced node (mirrors
             # execute_graph's all-"ok" statuses on success).
             results = execute(graph, params=params)
+            run_results = results
+            run_statuses = {node_id: {"status": _STATUS_OK} for node_id in results}
             for node_id, ports in results.items():
                 yield {
                     "type": "node_start",
@@ -1229,13 +1252,37 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
             "payload_version": PAYLOAD_CONTRACT_VERSION,
         }
         return
+    # Persist the same run record /execute writes, under the id run_complete reports, so the
+    # result card's "Run <id>" is resolvable via GET /runs/{id}. Same rule as the non-stream
+    # path: only unscoped (full-graph) runs; node errors still persist (statuses record them);
+    # a terminal run_error / disconnect / cancel returns before here and writes nothing,
+    # matching /execute, which raises (no record) in those cases. The generator is drained on a
+    # worker thread (app._bridge_to_queue), so the fingerprinting here never blocks the event
+    # loop. Failure is logged and never breaks the stream.
+    run_id = _generate_run_id()
+    if not scope:
+        try:
+            saved = _save_run_record(
+                graph,
+                graph_payload,
+                run_results,
+                run_statuses,
+                node_elapsed=run_elapsed or None,
+                started_at=started_at,
+                params=params,
+                run_id=run_id,
+            )
+            if saved is None:
+                logger.warning("streamed run %s was not persisted", run_id)
+        except Exception:  # noqa: BLE001 - persistence must never break the stream
+            logger.exception("failed to persist streamed run %s", run_id)
     yield {
         "type": "run_complete",
         "total_ms": int((time.monotonic() - start_time) * 1000),
         "artifact_revisions": stream_revisions,
-        # Identity of this streamed run for result-card evidence ("Run <id> · <time>"). Streams
-        # are not persisted to the run store, so this id has no ``/runs/{id}`` record.
-        "run_id": _generate_run_id(),
+        # Identity of this streamed run for result-card evidence; full unscoped runs are
+        # persisted under this id (``/runs/{id}``), scoped ones are not.
+        "run_id": run_id,
         "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "payload_version": PAYLOAD_CONTRACT_VERSION,
     }

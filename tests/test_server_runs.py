@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -386,3 +387,56 @@ def test_routes_save_then_delete(runs_client: TestClient) -> None:
 
     resp = runs_client.get(f"/runs/{run_id}")
     assert resp.status_code == 404
+
+
+def _stream_events(client: TestClient, body: dict) -> list[dict]:
+    resp = client.post("/execute/stream", json=body)
+    assert resp.status_code == 200
+    return [
+        json.loads(line[len("data: ") :])
+        for line in resp.text.splitlines()
+        if line.startswith("data: ")
+    ]
+
+
+def _stream_csv_graph(path: str) -> dict:
+    from emergentflow.ir import Direction, Graph, Node, Paradigm, Param, Port
+    from emergentflow.ir.serialize import serialize_graph
+
+    load = Node(
+        id="load",
+        type="data.load_csv",
+        label="Load CSV",
+        paradigm=Paradigm.FUNCTIONAL,
+        params=[Param(name="path", type_token="str", value=path)],
+        ports=[Port(id="p1", name="frame", direction=Direction.OUT, data_type="DataFrame")],
+    )
+    graph = Graph(name="stream", paradigm=Paradigm.FUNCTIONAL, nodes={"load": load})
+    return json.loads(serialize_graph(graph))
+
+
+def test_stream_full_run_persists_record_under_reported_run_id(runs_client, tmp_path) -> None:
+    csv = tmp_path / "t.csv"
+    csv.write_text("a,b\n1,2\n3,4\n")
+    events = _stream_events(runs_client, _stream_csv_graph(str(csv)))
+    complete = events[-1]
+    assert complete["type"] == "run_complete"
+    run_id = complete["run_id"]
+
+    resp = runs_client.get(f"/runs/{run_id}")
+    assert resp.status_code == 200
+    record = resp.json()
+    assert record["run_id"] == run_id
+    assert record["statuses"]["load"]["status"] == "ok"
+    repro = record["reproducibility"]
+    assert len(repro["data_fingerprints"]["load"]["sha256"]) == 64
+    assert repro["dependency_versions"]
+
+
+def test_stream_scoped_run_writes_no_record(runs_client, tmp_path) -> None:
+    csv = tmp_path / "t.csv"
+    csv.write_text("a\n1\n")
+    for scope in ({"run_only": "load"}, {"run_from": "load"}):
+        events = _stream_events(runs_client, {"graph": _stream_csv_graph(str(csv)), **scope})
+        assert events[-1]["type"] == "run_complete"
+    assert runs_client.get("/runs").json()["runs"] == []

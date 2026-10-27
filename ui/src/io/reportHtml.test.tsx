@@ -83,7 +83,7 @@ describe("buildReportHtml", () => {
       nodeLabels: { n1: "Load <csv>" },
     });
     expect(html).toContain(
-      "Source: Load &lt;csv&gt; (n1), port out \u00b7 Run ab12 \u00b7 2026-07-30T14:02:11+00:00",
+      "Source: Load &lt;csv&gt; (n1), port out \u00b7 Run 2026-07-30T14-02-11Z-ab12 \u00b7 2026-07-30T14:02:11+00:00",
     );
     expect(html).toContain("Source failed \u2014 no result available.");
     expect(html).toContain("Source: bad, port out");
