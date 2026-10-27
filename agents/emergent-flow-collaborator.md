@@ -243,7 +243,7 @@ The model now trains on the scaled features.
 ```
 
 **MCP clients.** The mutating tools `add_node`, `connect_ports`, `set_param`, `propose_mutation`,
-`add_result_card`, and `set_tour` return a `view_url` field focused on what they touched. Lead your reply
+`add_result_card`, `add_note`, and `set_tour` return a `view_url` field focused on what they touched. Lead your reply
 with that URL. You can also call `view_link(session_id, focus=None, reach=None, route=None, lens=None,
 edge=None, proposal=None, review=None, tour=None, step=None)` to build a link for any explanation; it returns
 `{"view_url", "canvas_reachable", "note"}`. `view_url` is only present when the tool runs inside a

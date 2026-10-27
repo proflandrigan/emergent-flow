@@ -198,11 +198,20 @@ add_result_card(session_id, "Churn drivers", [
 Recommended: put the conclusion in the first markdown block, then the supporting result blocks;
 use one card per analysis question.
 
+Put open questions and unverified assumptions on the canvas, beside the node they affect:
+
+```python
+add_note(session_id, content, *, anchor_id=None, color="yellow", kind="note", position=None)
+# e.g. kind="open-question", color="orange", anchor_id=join_id, position={"x": 460, "y": 120}
+```
+
+See `agents/emergent-flow-collaborator.md` section 9 for details.
+
 ### Hand the human a focused link
 
 Mutating tools (`add_node`, `connect_ports`, `set_param`, `propose_mutation`, `add_result_card`,
-`set_tour`) return a `view_url` focused on what they touched, when running inside `emergentflow serve`. Paste
-that URL in your reply so the human lands on the change. To build a link for any explanation, call
+`add_note`, `set_tour`) return a `view_url` focused on what they touched, when running inside
+`emergentflow serve`. Lead your reply with that URL so the human lands on the change. To build a link for any explanation, call
 `view_link`:
 
 ```python
