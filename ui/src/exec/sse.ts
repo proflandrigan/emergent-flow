@@ -23,6 +23,7 @@ export type StreamEvent =
       elapsed_ms: number;
       results: Record<string, Payload>;
       cached: boolean;
+      revision?: string;
       payload_version?: number;
     }
   | {
@@ -33,7 +34,12 @@ export type StreamEvent =
       payload_version?: number;
     }
   | { type: "node_skip"; node_id: string; reason?: string; payload_version?: number }
-  | { type: "run_complete"; total_ms: number; payload_version?: number }
+  | {
+      type: "run_complete";
+      total_ms: number;
+      artifact_revisions?: Record<string, string>;
+      payload_version?: number;
+    }
   | { type: "run_error"; error: string; payload_version?: number };
 
 function parseFrame(frame: string): StreamEvent | null {

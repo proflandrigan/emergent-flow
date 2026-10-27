@@ -19,13 +19,23 @@ export interface ExecutionStore {
   running: boolean;
   results: Record<string, Record<string, Payload>>;
   statuses: Record<string, NodeRunStatus>;
+  /** Artifact-store revision of each node's last stored output, to detect replacement later. */
+  nodeRevisions: Record<string, string>;
   error: string | null;
   lastRunAt: number | null;
   progress: ProgressState | null;
   setRunning: () => void;
   setNodeStart: (label: string, current: number, total: number) => void;
-  setNodeResult: (nodeId: string, results: Record<string, Payload>) => void;
-  setNodeCached: (nodeId: string, results: Record<string, Payload>) => void;
+  setNodeResult: (
+    nodeId: string,
+    results: Record<string, Payload>,
+    revision?: string,
+  ) => void;
+  setNodeCached: (
+    nodeId: string,
+    results: Record<string, Payload>,
+    revision?: string,
+  ) => void;
   setNodeError: (nodeId: string, error: string) => void;
   setNodeSkipped: (nodeId: string, reason?: string) => void;
   setRunComplete: () => void;
@@ -33,10 +43,19 @@ export interface ExecutionStore {
   clear: () => void;
 }
 
+function withRevision(
+  revisions: Record<string, string>,
+  nodeId: string,
+  revision: string | undefined,
+): Record<string, string> {
+  return revision === undefined ? revisions : { ...revisions, [nodeId]: revision };
+}
+
 export const useExecutionStore = create<ExecutionStore>((set) => ({
   running: false,
   results: {},
   statuses: {},
+  nodeRevisions: {},
   error: null,
   lastRunAt: null,
   progress: null,
@@ -49,17 +68,19 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
     set({ progress: { current, total, label } });
   },
 
-  setNodeResult(nodeId, results) {
+  setNodeResult(nodeId, results, revision) {
     set((state) => ({
       results: { ...state.results, [nodeId]: results },
       statuses: { ...state.statuses, [nodeId]: { status: "ok" } },
+      nodeRevisions: withRevision(state.nodeRevisions, nodeId, revision),
     }));
   },
 
-  setNodeCached(nodeId, results) {
+  setNodeCached(nodeId, results, revision) {
     set((state) => ({
       results: { ...state.results, [nodeId]: results },
       statuses: { ...state.statuses, [nodeId]: { status: "cached" } },
+      nodeRevisions: withRevision(state.nodeRevisions, nodeId, revision),
     }));
   },
 
@@ -94,6 +115,7 @@ export const useExecutionStore = create<ExecutionStore>((set) => ({
       running: false,
       results: {},
       statuses: {},
+      nodeRevisions: {},
       error: null,
       lastRunAt: null,
       progress: null,

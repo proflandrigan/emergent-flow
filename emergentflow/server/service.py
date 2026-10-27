@@ -463,6 +463,7 @@ class _NodeEvent:
     cached: bool = False  # "ok" only; True when served from the execution cache
     error: str | None = None  # "error" only
     reason: str | None = None  # "skip" only; why the node was skipped (e.g. upstream not run)
+    revision: str | None = None  # "ok" only; artifact-store revision of this run's put, if any
 
 
 # Sentinel for "no value available" from :func:`_resolve_upstream_value`. A bare
@@ -692,8 +693,9 @@ def _execute_functional_stream(
             # can reuse it even when the content-hash cache never stored it
             # (issue #105 Gap 3). Same suppress-exception contract as the cache
             # write: a failed persistence must not turn a success into an error.
+            revision: str | None = None
             with contextlib.suppress(Exception):
-                artifacts.put(node_id, outputs, label=node.label or "")
+                revision = artifacts.put(node_id, outputs, label=node.label or "")
             yield _NodeEvent(
                 phase="ok",
                 node_id=node_id,
@@ -701,6 +703,7 @@ def _execute_functional_stream(
                 elapsed_ms=elapsed_ms,
                 results=outputs,
                 cached=is_cache_hit,
+                revision=revision,
             )
         except Exception as exc:  # noqa: BLE001 - any node-runtime failure -> error event
             elapsed_ms = int((time.monotonic() - start) * 1000)
@@ -719,6 +722,7 @@ def _execute_functional_with_status(
     graph: Graph,
     only: set[str] | None = None,
     wiring_map: WiringMap | None = None,
+    revisions: dict[str, str] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], dict[str, int]]:
     """Walk a FUNCTIONAL graph node by node, capturing a per-node run status.
 
@@ -736,6 +740,9 @@ def _execute_functional_with_status(
     Drains ``_execute_functional_stream`` (Epic 7 Story 4 seam) rather than
     walking the graph itself, so this function and the SSE streaming path
     stay equivalent by construction.
+
+    *revisions*, if given, is filled in place with ``{node_id: artifact revision}``
+    for every node whose output was stored in the ``ArtifactStore`` during the run.
     """
     results: dict[str, dict[str, Any]] = {}
     statuses: dict[str, dict[str, Any]] = {}
@@ -750,6 +757,8 @@ def _execute_functional_with_status(
             results[event.node_id] = event.results or {}
             statuses[event.node_id] = {"status": _STATUS_CACHED if event.cached else _STATUS_OK}
             node_elapsed[event.node_id] = event.elapsed_ms or 0
+            if revisions is not None and event.revision is not None:
+                revisions[event.node_id] = event.revision
         elif event.phase == "error":
             statuses[event.node_id] = {"status": _STATUS_ERROR, "error": event.error}
             node_elapsed[event.node_id] = event.elapsed_ms or 0
@@ -976,8 +985,9 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
         if params is not None or has_graph_param_refs(graph):
             graph = materialize_graph(graph, params=params)
         only, wiring_map = _resolve_run_scope(graph, scope)
+        artifact_revisions: dict[str, str] = {}
         results, statuses, node_elapsed = _execute_functional_with_status(
-            graph, only=only, wiring_map=wiring_map
+            graph, only=only, wiring_map=wiring_map, revisions=artifact_revisions
         )
         if not scope:
             run_id = _save_run_record(
@@ -994,6 +1004,7 @@ def execute_graph(payload: dict[str, Any]) -> dict[str, Any]:
             "results": _results_to_payloads(results),
             "statuses": statuses,
             "run_id": run_id,
+            "artifact_revisions": artifact_revisions,
         }
     if scope:
         raise CodegenError("partial-run scopes are only supported for FUNCTIONAL graphs")
@@ -1126,6 +1137,7 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
     graph = _to_graph(graph_payload)
     validate_api_keys_present(graph)
     start_time = time.monotonic()
+    stream_revisions: dict[str, str] = {}
     try:
         if graph.paradigm is Paradigm.FUNCTIONAL:
             if params is not None or has_graph_param_refs(graph):
@@ -1142,7 +1154,7 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
                         "payload_version": PAYLOAD_CONTRACT_VERSION,
                     }
                 elif event.phase == "ok":
-                    yield {
+                    ok_event: dict[str, Any] = {
                         "type": "node_ok",
                         "node_id": event.node_id,
                         "elapsed_ms": event.elapsed_ms,
@@ -1153,6 +1165,10 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
                         "cached": event.cached,
                         "payload_version": PAYLOAD_CONTRACT_VERSION,
                     }
+                    if event.revision is not None:
+                        ok_event["revision"] = event.revision
+                        stream_revisions[event.node_id] = event.revision
+                    yield ok_event
                 elif event.phase == "error":
                     yield {
                         "type": "node_error",
@@ -1211,6 +1227,7 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
     yield {
         "type": "run_complete",
         "total_ms": int((time.monotonic() - start_time) * 1000),
+        "artifact_revisions": stream_revisions,
         "payload_version": PAYLOAD_CONTRACT_VERSION,
     }
 

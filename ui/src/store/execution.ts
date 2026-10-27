@@ -30,4 +30,6 @@ export interface ExecuteResponse {
   payload_version: number;
   results: Record<string, Record<string, Payload>>;
   statuses: Record<string, NodeRunStatus>;
+  /** Artifact-store revision per node stored during this run (additive; absent on older servers). */
+  artifact_revisions?: Record<string, string>;
 }

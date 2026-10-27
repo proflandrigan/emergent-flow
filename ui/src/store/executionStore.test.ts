@@ -148,3 +148,28 @@ describe("executionStore", () => {
     expect(useExecutionStore.getState().lastRunAt).toBe(ts);
   });
 });
+
+describe("executionStore nodeRevisions", () => {
+  beforeEach(() => {
+    useExecutionStore.getState().clear();
+  });
+
+  it("records a revision per node and replaces it on a re-run", () => {
+    const payload: Payload = { kind: "scalar", value: 1 };
+    const s = useExecutionStore.getState();
+    s.setNodeResult("n1", { out: payload }, "r1");
+    s.setNodeCached("n2", { out: payload }, "r2");
+    expect(useExecutionStore.getState().nodeRevisions).toEqual({ n1: "r1", n2: "r2" });
+    useExecutionStore.getState().setNodeResult("n1", { out: payload }, "r3");
+    expect(useExecutionStore.getState().nodeRevisions.n1).toBe("r3");
+  });
+
+  it("keeps the previous revision when the event carries none, and clear() resets", () => {
+    const payload: Payload = { kind: "scalar", value: 1 };
+    useExecutionStore.getState().setNodeResult("n1", { out: payload }, "r1");
+    useExecutionStore.getState().setNodeResult("n1", { out: payload });
+    expect(useExecutionStore.getState().nodeRevisions).toEqual({ n1: "r1" });
+    useExecutionStore.getState().clear();
+    expect(useExecutionStore.getState().nodeRevisions).toEqual({});
+  });
+});

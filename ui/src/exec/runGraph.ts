@@ -112,11 +112,11 @@ export async function runGraph(options: RunGraphOptions = {}): Promise<void> {
           if (event.cached) {
             useExecutionStore
               .getState()
-              .setNodeCached(event.node_id, event.results);
+              .setNodeCached(event.node_id, event.results, event.revision);
           } else {
             useExecutionStore
               .getState()
-              .setNodeResult(event.node_id, event.results);
+              .setNodeResult(event.node_id, event.results, event.revision);
           }
           break;
         case "node_error":
