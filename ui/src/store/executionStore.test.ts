@@ -102,6 +102,20 @@ describe("executionStore", () => {
     expect(state.progress).toBeNull();
   });
 
+  it("setRunComplete records run identity, defaulting finishedAt to a UTC ISO timestamp", () => {
+    useExecutionStore.getState().setRunComplete({ runId: "r1", finishedAt: "2026-01-01T00:00:00+00:00" });
+    expect(useExecutionStore.getState().runMeta).toEqual({
+      runId: "r1",
+      finishedAt: "2026-01-01T00:00:00+00:00",
+    });
+    useExecutionStore.getState().setRunComplete();
+    const meta = useExecutionStore.getState().runMeta;
+    expect(meta?.runId).toBeNull();
+    expect(meta?.finishedAt).toMatch(/Z$/);
+    useExecutionStore.getState().clear();
+    expect(useExecutionStore.getState().runMeta).toBeNull();
+  });
+
   it("setError sets error and running: false but does NOT clear previously-set results", () => {
     useExecutionStore
       .getState()

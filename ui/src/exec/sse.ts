@@ -38,6 +38,8 @@ export type StreamEvent =
       type: "run_complete";
       total_ms: number;
       artifact_revisions?: Record<string, string>;
+      run_id?: string;
+      finished_at?: string;
       payload_version?: number;
     }
   | { type: "run_error"; error: string; payload_version?: number };

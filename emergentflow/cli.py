@@ -255,7 +255,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         from emergentflow import __version__, execute
         from emergentflow.codegen.params import resolve_graph_params
         from emergentflow.ir.serialize import deserialize_graph
-        from emergentflow.research.reproducibility import capture_run, resolve_dependency_versions
+        from emergentflow.research.reproducibility import (
+            capture_run,
+            default_dependency_packages,
+            fingerprint_data_sources,
+            resolve_dependency_versions,
+        )
         from emergentflow.server.payload import to_payload
 
         graph = deserialize_graph(raw_text)
@@ -337,10 +342,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         # Capture reproducibility
         try:
-            deps = resolve_dependency_versions([])
+            deps = resolve_dependency_versions(default_dependency_packages())
             repro = capture_run(
                 graph,
                 dependency_versions=deps,
+                data_fingerprints=fingerprint_data_sources(graph),
                 # Record every graph-level param's RESOLVED value (stored value with any
                 # --param override applied), not just the override keys -- a partial map
                 # would make a multi-param run's record incomplete.
@@ -351,6 +357,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "content_hashes": repro.content_hashes,
                 "dependency_versions": repro.dependency_versions,
                 "params": repro.params,
+                "data_fingerprints": repro.data_fingerprints,
             }
         except Exception:
             pass

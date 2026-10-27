@@ -127,7 +127,9 @@ export async function runGraph(options: RunGraphOptions = {}): Promise<void> {
           break;
         case "run_complete":
           settled = true;
-          useExecutionStore.getState().setRunComplete();
+          useExecutionStore
+            .getState()
+            .setRunComplete({ runId: event.run_id, finishedAt: event.finished_at });
           break;
         case "run_error":
           settled = true;
