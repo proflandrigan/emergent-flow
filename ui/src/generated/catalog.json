@@ -12098,7 +12098,8 @@
               "pink",
               "blue",
               "green",
-              "purple"
+              "purple",
+              "orange"
             ],
             "connection_kind": null,
             "max": null,
@@ -12114,11 +12115,34 @@
           "name": "color",
           "required": false,
           "type_token": "str"
+        },
+        {
+          "default": "note",
+          "help": "What the note is. \"open-question\" marks an unverified assumption or open question, shown with a ? badge; it does not depend on the color.",
+          "hints": {
+            "choices": [
+              "note",
+              "open-question"
+            ],
+            "connection_kind": null,
+            "max": null,
+            "max_length": null,
+            "min": null,
+            "min_length": null,
+            "pattern": null,
+            "ref_supported": false,
+            "step": null,
+            "widget": "select"
+          },
+          "label": "Kind",
+          "name": "kind",
+          "required": false,
+          "type_token": "str"
         }
       ],
       "ports": [],
       "type": "notes.markdown",
-      "version": 1
+      "version": 2
     },
     {
       "advisor_persona": null,

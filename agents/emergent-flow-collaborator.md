@@ -345,11 +345,45 @@ Write each open question beside the claim it affects, with what would resolve it
 Questions the human must see go on the canvas, not only in chat:
 
 - Inside a tour: the step's `unknowns` (rendered as "Open questions").
-- Otherwise: an anchored open-question note placed beside the affected node. See *Open-question
-  notes* below for the `add_note` call.
+- Otherwise: an anchored open-question note placed beside the affected node. See
+  *Open-question notes* below.
 
 In the reply, mention open questions briefly beside the claim they qualify, per the
 [reply contract](./_reply-contract.md).
+
+### Open-question notes
+
+Over MCP, record a question that belongs on the canvas beside the node it affects with `add_note`:
+
+```python
+add_note(
+    session_id,
+    "`customer_id` uniqueness has not been checked; this join may fan out. "
+    "Check duplicate keys on the right-hand input before trusting row counts.",
+    anchor_id=join_node_id,
+    kind="open-question",
+    color="orange",
+    position={"x": join_x + 260, "y": join_y},
+    reason="Flag unchecked join cardinality",
+)
+```
+
+- `kind="open-question"` shows a "?" **Open question** badge whatever the color. `color="orange"`
+  is the conventional swatch; an orange note with `kind="note"` is an ordinary note.
+- `anchor_id` is the affected node or edge and draws a dashed leader line. If that item is
+  later deleted, the note stays and shows "Anchor unavailable".
+- `position` places the note. Put it beside the affected node (`x + 260`, same `y`), or every
+  note lands at the origin.
+- `reason` is mutation and audit text only. It is not stored on the note.
+- The call returns `node_id` and, when a canvas is attached, a `view_url` focused on the note.
+- Resolve a question with `set_param(session_id, note_id, "content", ...)` or
+  `set_param(..., "kind", "note")`, or remove it with `delete_note`.
+- Over plain HTTP, propose a `notes.markdown` node in `add_nodes` with params `content`,
+  `anchor_id`, `color`, and `kind`. It has zero ports.
+- Notes are part of the graph IR. They survive Save Flow and reopen, and they change graph JSON
+  and mutation history, but never the computation: execution results are unchanged, and in
+  compiled code an anchored note appears only as a comment.
+- Inside a tour, use the step's `unknowns` instead. Do not copy tour unknowns into notes.
 
 ## Review workflow
 

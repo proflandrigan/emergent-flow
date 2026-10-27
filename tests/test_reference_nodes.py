@@ -1557,7 +1557,7 @@ class TestMarkdownNote:
         spec = defn.to_spec()
         assert spec.type == "notes.markdown"
         assert spec.ports == []
-        assert {p.name for p in spec.params} == {"content", "anchor_id", "color"}
+        assert {p.name for p in spec.params} == {"content", "anchor_id", "color", "kind"}
 
     def test_instantiate_defaults(self):
         defn = MarkdownNote()
@@ -1567,6 +1567,22 @@ class TestMarkdownNote:
         assert values["content"] == ""
         assert values["anchor_id"] is None
         assert values["color"] == "yellow"
+        assert values["kind"] == "note"
+
+    def test_open_question_kind_and_orange(self):
+        defn = MarkdownNote()
+        node = defn.instantiate(content="q?", kind="open-question", color="orange")
+        values = {p.name: p.value for p in node.params}
+        assert values["kind"] == "open-question"
+        assert values["color"] == "orange"
+        assert defn.execute(node, inputs={}) == {}
+        assert defn.preview(node).body == ""
+
+    def test_invalid_kind_rejected(self):
+        defn = MarkdownNote()
+        node = defn.instantiate(kind="todo")
+        errors = defn.validate_param_values(node)
+        assert any("kind" in e for e in errors)
 
     def test_codegen_is_true_noop(self):
         defn = MarkdownNote()

@@ -259,6 +259,7 @@ export function toRFNode(
     const content = paramValue("content");
     const color = paramValue("color");
     const anchorId = paramValue("anchor_id");
+    const kind = paramValue("kind");
     return {
       id: node.id,
       type: "noteNode",
@@ -269,6 +270,7 @@ export function toRFNode(
         content: typeof content === "string" ? content : "",
         color: typeof color === "string" ? color : "yellow",
         anchorId: typeof anchorId === "string" ? anchorId : null,
+        kind: kind === "open-question" ? "open-question" : "note",
       },
     };
   }

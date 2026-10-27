@@ -91,6 +91,23 @@ describe("toRFNode (notes.markdown)", () => {
     }
   });
 
+  test("kind defaults to note, maps open-question, and unknown values fall back to note", () => {
+    const base = { name: "content", typeToken: "str", value: "hi" };
+    const kindOf = (params: NodeModel["params"]) => {
+      const rf = toRFNode(
+        noteModel({ params }),
+        false, null, null, null, null, "none",
+      ) as ReturnType<typeof toRFNode>;
+      return rf.type === "noteNode" ? rf.data.kind : undefined;
+    };
+
+    expect(kindOf(noteModel().params)).toBe("note");
+    expect(
+      kindOf([base, { name: "kind", typeToken: "str", value: "open-question" }]),
+    ).toBe("open-question");
+    expect(kindOf([base, { name: "kind", typeToken: "str", value: "bogus" }])).toBe("note");
+  });
+
   test("missing color param falls back to yellow", () => {
     const rf = toRFNode(
       noteModel({ params: [{ name: "content", typeToken: "str", value: "hi" }] }),

@@ -961,21 +961,32 @@ def create_mcp_server() -> Any:
         *,
         anchor_id: str | None = None,
         color: str = "yellow",
+        kind: str = "note",
+        position: dict[str, float] | None = None,
         author: str = "agent",
         reason: str = "",
     ) -> dict:
         """Add a ``notes.markdown`` annotation node to *session_id*'s graph.
 
-        Returns the common success shape plus the new ``node_id``.
+        *kind* is ``"note"`` (default) or ``"open-question"`` -- an open question renders with a
+        ``?`` "Open question" badge whatever its *color* (``"orange"`` is the conventional
+        swatch). *anchor_id* ties it to a node or edge; *position* (``{"x", "y"}``) places it,
+        ideally beside the anchored node. *reason* is audit text on the mutation, not a note
+        param. Returns the common success shape plus the new ``node_id``, plus ``view_url``
+        (a canvas link focused on the note) when a live canvas shares the session store.
 
         For an unverified assumption or open question, anchor the note to the affected node so it
         stays visible on the canvas; mention it beside the claim in your reply.
         """
         store = get_default_session_store()
         session = store.get(session_id)
-        note = default_node_registry.get("notes.markdown")().instantiate(
-            content=content, anchor_id=anchor_id, color=color
-        )
+        definition = default_node_registry.get("notes.markdown")()
+        note = definition.instantiate(content=content, anchor_id=anchor_id, color=color, kind=kind)
+        errors = definition.validate_param_values(note)
+        if errors:
+            raise ValueError("; ".join(errors))
+        if position is not None:
+            note.position = Position(x=position["x"], y=position["y"])
         description = reason or f"Added note: {content[:80]}"
         mutation = GraphMutation(
             base_version=session.version,
@@ -983,7 +994,11 @@ def create_mcp_server() -> Any:
             description=description,
             author=author,
         )
-        return _apply_mutation(session_id, mutation, extra={"node_id": note.id})
+        return _with_view_url(
+            _apply_mutation(session_id, mutation, extra={"node_id": note.id}),
+            session_id,
+            focus=note.id,
+        )
 
     @mcp.tool()
     def delete_note(

@@ -55,6 +55,7 @@ test("first step shows conclusion, counter, disabled Prev, no open questions", (
 test("last step shows open questions and disables Next", () => {
   setup({ index: 2 });
   expect(screen.getByTestId("tour-open-questions").textContent).toContain("Why is b slow?");
+  expect(screen.getByTestId("open-question-badge").textContent).toContain("Open questions");
   expect((screen.getByTestId("tour-next") as HTMLButtonElement).disabled).toBe(true);
 });
 

@@ -75,6 +75,61 @@ describe("NoteNode", () => {
     );
   });
 
+  test("legacy data without kind shows no open-question badge", () => {
+    renderNoteNode("n1", { content: "hi", color: "yellow", anchorId: null });
+
+    expect(screen.queryByTestId("open-question-badge")).not.toBeInTheDocument();
+  });
+
+  test("open-question kind shows the badge regardless of color", () => {
+    renderNoteNode("n1", {
+      content: "why?",
+      color: "yellow",
+      anchorId: null,
+      kind: "open-question",
+    });
+
+    expect(screen.getByTestId("open-question-badge").textContent).toContain("Open question");
+    expect(screen.getByTestId("note-node").getAttribute("data-kind")).toBe("open-question");
+    expect(screen.getByRole("note", { name: "Open question" })).toBeInTheDocument();
+  });
+
+  test("orange ordinary note uses the orange swatch and no badge", () => {
+    renderNoteNode("n1", { content: "hi", color: "orange", anchorId: null, kind: "note" });
+
+    expect(screen.queryByTestId("open-question-badge")).not.toBeInTheDocument();
+    expect(screen.getByTestId("note-node").style.background).toBe("rgb(255, 237, 213)");
+  });
+
+  test("open question still enters edit mode and keeps the badge", () => {
+    renderNoteNode("n1", {
+      content: "why?",
+      color: "yellow",
+      anchorId: null,
+      kind: "open-question",
+    });
+
+    fireEvent.doubleClick(screen.getByTestId("note-node-preview"));
+
+    expect(screen.getByTestId("note-node-editor")).toBeInTheDocument();
+    expect(screen.getByTestId("open-question-badge")).toBeInTheDocument();
+  });
+
+  test("anchor to a missing id shows the unavailable line and keeps the note", () => {
+    renderNoteNode("n1", { content: "still here", color: "yellow", anchorId: "ghost" });
+
+    expect(screen.getByTestId("note-anchor-missing")).toBeInTheDocument();
+    expect(screen.getByText("still here")).toBeInTheDocument();
+  });
+
+  test("anchor to an existing node does not show the unavailable line", () => {
+    const anchorId = useGraphStore.getState().addNodeFromSpec(markdownNote, { x: 0, y: 0 });
+
+    renderNoteNode("n1", { content: "hi", color: "yellow", anchorId });
+
+    expect(screen.queryByTestId("note-anchor-missing")).not.toBeInTheDocument();
+  });
+
   test("unknown color falls back to the yellow swatch", () => {
     renderNoteNode("n1", { content: "hi", color: "not-a-real-color", anchorId: null });
 
