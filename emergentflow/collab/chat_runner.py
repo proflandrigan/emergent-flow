@@ -16,7 +16,8 @@ block, then sends just the human's new message on every later turn (relying on t
 agents/emergent-flow-collaborator.md is resolved package-dir-first (emergentflow/agents/, what a
 wheel install ships via package-data) with a repo-root agents/ fallback for a source checkout /
 editable install (see _resolve_agents_dir); if neither copy can be read, a minimal embedded
-protocol string is used instead so a missing doc never 422s the chat.
+protocol string is used instead so a missing doc never 422s the chat. The shared reply contract
+(emergentflow.collab.reply_contract) is folded into the first-turn and persona-switch prompts.
 
 Text events accumulate across a turn and are only published as the turn's final agent_message
 once the process exits -- narration (tool-call) events publish live, one per line, as they
@@ -44,6 +45,7 @@ from typing import IO
 
 from emergentflow.collab.agents import AgentAdapter, get_adapter, list_available_adapter_names
 from emergentflow.collab.chat import ChatTurn, ChatTurnAlreadyResolvedError
+from emergentflow.collab.reply_contract import REPLY_CONTRACT
 from emergentflow.collab.session import (
     SessionStore,
     UnknownSessionError,
@@ -85,7 +87,7 @@ _FALLBACK_PROTOCOL = (
     "- `POST /sessions/{id}/proposals` -- propose a graph mutation for the human to accept.\n"
     "- `GET /schema`, `GET /catalog`, `GET /mutation-schema` -- discover node/mutation shapes.\n\n"
     "Reply conversationally in plain text; when you take an action, do it via curl as described "
-    "above, then tell the human what you did and why in your reply. Keep replies concise."
+    "above. Follow the reply contract below for what to say back."
 )
 
 
@@ -195,9 +197,9 @@ def _build_first_turn_prompt(
         f"- Session id: {session_id}\n"
         f"{auth_line}"
         f"{persona_block}"
-        "Reply conversationally in plain text. When you take an action (propose a mutation, "
-        "run validate, etc.), do it via curl as described above, then tell the human what you "
-        "did and why in your reply. Keep replies concise.\n\n"
+        "Act via curl as described above. Your replies to the human follow this contract, which "
+        "overrides any conflicting reply instruction above (including a persona's):\n\n"
+        f"{REPLY_CONTRACT}\n\n"
         "The human says:\n\n"
         f"{user_message}"
     )
@@ -363,6 +365,9 @@ def start_chat_turn(
             "The human has activated a new persona. From now on, adopt the following identity "
             "and follow its behavioral rules:\n\n"
             f"{persona_md}\n\n"
+            "Your replies to the human still follow this contract, which overrides any "
+            "conflicting reply instruction in the persona:\n\n"
+            f"{REPLY_CONTRACT}\n\n"
             "---\n\n"
             "The human says:\n\n"
             f"{user_message}"

@@ -9,6 +9,11 @@ you never edit files, you only call HTTP routes on the local server.
 pre-flight your idea, submit a proposal, and watch for the human's verdict. No MCP, no SDK
 import, no embedded LLM — every call below is a `curl` command against a local FastAPI server.
 
+**Replies to the human follow the [reply contract](./_reply-contract.md)**: lead with the link,
+then the conclusion; disclose what changes how it should be read; claim only what was
+validated, executed, equivalence-checked or human-reviewed; no recaps; name uncertainty beside
+the claim. It overrides any conflicting reply style in this file.
+
 ## 1. Find the server
 
 The server binds to `http://127.0.0.1:8765` by default (`emergentflow serve`). Confirm it's up:
@@ -197,7 +202,8 @@ built by hand.
 
 ## 7. Point the human at the change
 
-End each turn with a focused link rather than a prose recap. The human clicks once and lands on
+Lead each reply with a focused link, then the conclusion — never a prose recap (see the
+[reply contract](./_reply-contract.md)). The human clicks once and lands on
 exactly what changed: the node selected and centred, its reach highlighted, the proposal open, or
 the path between two nodes lit up. Links are built from the session URL plus a hash of view state:
 
@@ -219,22 +225,26 @@ http://127.0.0.1:8765/?session=<id>#<key>=<value>[&<key>=<value>]
 Ids are percent-encoded when they contain reserved characters. The hash is view state only: it
 never changes the graph. An unknown id shows one toast, never an error.
 
-Example reply line:
+Example reply:
 
 ```
-Rewired the feature step so scaling happens after the split. [See the change](http://127.0.0.1:8765/?session=sess-abc123#focus=n-scale&reach=down)
+[See the change](http://127.0.0.1:8765/?session=sess-abc123#focus=n-scale&reach=down)
+Scaling now happens after the split, so the leakage warning is gone. Validated; not yet executed.
 ```
 
 Proposal and route examples:
 
 ```
-I've proposed a fix for the leakage warning. [Review proposal p1](http://127.0.0.1:8765/?session=sess-abc123#proposal=p1)
-The model now trains on the scaled features. [Trace the path](http://127.0.0.1:8765/?session=sess-abc123#route=n-load~n-model)
+[Review proposal p1](http://127.0.0.1:8765/?session=sess-abc123#proposal=p1)
+Proposed a fix for the leakage warning; it is pending your review.
+
+[Trace the path](http://127.0.0.1:8765/?session=sess-abc123#route=n-load~n-model)
+The model now trains on the scaled features.
 ```
 
 **MCP clients.** The mutating tools `add_node`, `connect_ports`, `set_param`, `propose_mutation`,
-`add_result_card`, and `set_tour` return a `view_url` field focused on what they touched. Paste that URL as
-the link. You can also call `view_link(session_id, focus=None, reach=None, route=None, lens=None,
+`add_result_card`, and `set_tour` return a `view_url` field focused on what they touched. Lead your reply
+with that URL. You can also call `view_link(session_id, focus=None, reach=None, route=None, lens=None,
 edge=None, proposal=None, review=None, tour=None, step=None)` to build a link for any explanation; it returns
 `{"view_url", "canvas_reachable", "note"}`. `view_url` is only present when the tool runs inside a
 live `emergentflow serve` process (the HTTP bridge, the stdio bridge `emergentflow.collab.mcp_bridge`,
@@ -310,16 +320,36 @@ curl -X POST http://127.0.0.1:8765/sessions/<id>/tours -H 'Content-Type: applica
 remove one. Auth is the same as the other `/sessions/*` routes. A duplicate `POST` id returns 409;
 `PUT`/`DELETE` on an unknown id returns 404.
 
-End the turn with the returned `view_url`:
+Lead your reply with the returned `view_url`:
 
 ```
-Walked the pipeline end to end, conclusion first. [Play the tour](http://127.0.0.1:8765/?session=sess-abc123#tour=tour-1&step=0)
+[Play the tour](http://127.0.0.1:8765/?session=sess-abc123#tour=tour-1&step=0)
+Walked the pipeline end to end, conclusion first.
 ```
 
 `#tour=<id>&step=<n>` is zero-based; an omitted step means 0, and an out-of-range step falls back
 to 0 with a notice. A tour link takes precedence over other keys in the same hash. As with the
 other links, `view_url` only appears when the MCP tools run inside `emergentflow serve`; the
 standalone stdio server has its own session store.
+
+## 9. Name uncertainty
+
+Separate what you observed (a run's output, a validate diagnostic, a schema you read) from what
+you assumed. Never turn a label, column name, or param value into an unobserved fact.
+
+Write each open question beside the claim it affects, with what would resolve it. For example:
+
+- "Assumed `signup_date` is UTC; not verified."
+- "`customer_id` uniqueness not checked; the join may fan out."
+
+Questions the human must see go on the canvas, not only in chat:
+
+- Inside a tour: the step's `unknowns` (rendered as "Open questions").
+- Otherwise: an anchored open-question note placed beside the affected node. See *Open-question
+  notes* below for the `add_note` call.
+
+In the reply, mention open questions briefly beside the claim they qualify, per the
+[reply contract](./_reply-contract.md).
 
 ## Review workflow
 

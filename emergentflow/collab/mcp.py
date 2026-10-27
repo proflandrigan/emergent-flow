@@ -353,6 +353,9 @@ def create_mcp_server() -> Any:
 
         Returns {"payload_version", "results", "statuses"} on success,
         or {"blocked_by_gates": [...]} if any gate is OPEN.
+
+        Reply with the metric that answers the question and a canvas link, not this payload; check
+        ``statuses`` before saying the run succeeded.
         """
         payload: dict[str, Any] = {}
         if run_to is not None:
@@ -382,6 +385,8 @@ def create_mcp_server() -> Any:
 
         Returns bounded summaries: scalars verbatim, tables as shape+head,
         images as presence markers. Raises UnknownRunError if run_id doesn't exist.
+
+        Quote the conclusion (metric, split, baseline) in your reply, not the digest.
         """
         from emergentflow.collab.digest import digest_results
         from emergentflow.server.runs import UnknownRunError, get_default_runs
@@ -466,6 +471,8 @@ def create_mcp_server() -> Any:
         """Extract a named scalar metric from a run's payloads.
 
         Returns {"run_id", "node_id", "metric_name", "value"} or error if not found.
+
+        Say which split the metric came from; a training-set metric must be disclosed as such.
         """
         from emergentflow.collab.metrics import extract_metric
         from emergentflow.server.runs import UnknownRunError, get_default_runs
@@ -584,6 +591,8 @@ def create_mcp_server() -> Any:
 
         Returns the proposal plus ``view_url`` (a canvas link focused on the change) when a
         live canvas shares the session store.
+
+        Lead your reply with ``view_url``; the change is pending until the human accepts it.
         """
         mutation_obj = GraphMutation.model_validate(mutation)
         proposal = get_default_session_store().add_proposal(session_id, mutation_obj)
@@ -958,6 +967,9 @@ def create_mcp_server() -> Any:
         """Add a ``notes.markdown`` annotation node to *session_id*'s graph.
 
         Returns the common success shape plus the new ``node_id``.
+
+        For an unverified assumption or open question, anchor the note to the affected node so it
+        stays visible on the canvas; mention it beside the claim in your reply.
         """
         store = get_default_session_store()
         session = store.get(session_id)
@@ -1012,6 +1024,8 @@ def create_mcp_server() -> Any:
         mutation. Returns the common success shape plus the new ``node_id``, plus
         ``view_url`` (a canvas link focused on the change) when a live canvas shares the
         session store.
+
+        Lead your reply with ``view_url`` and put the conclusion in the first markdown block.
         """
         store = get_default_session_store()
         session = store.get(session_id)
