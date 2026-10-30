@@ -925,7 +925,17 @@ def _save_run_record(
         repro = capture_run(
             graph,
             dependency_versions=deps,
-            data_fingerprints=fingerprint_data_sources(graph),
+            # Only sources whose loader actually ran (ok/cached): an errored or skipped loader
+            # read nothing, so fingerprinting its path would misstate the run's inputs.
+            data_fingerprints=fingerprint_data_sources(
+                graph,
+                params=params,
+                node_ids={
+                    nid
+                    for nid, entry in statuses.items()
+                    if entry.get("status") in (_STATUS_OK, _STATUS_CACHED)
+                },
+            ),
             params=resolve_graph_params(graph, overrides=params) if params else None,
         )
         run_data["reproducibility"] = {
@@ -1259,10 +1269,13 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
     # matching /execute, which raises (no record) in those cases. The generator is drained on a
     # worker thread (app._bridge_to_queue), so the fingerprinting here never blocks the event
     # loop. Failure is logged and never breaks the stream.
-    run_id = _generate_run_id()
+    # ``run_id`` in run_complete is the id the record was SAVED under, or ``None`` -- for a
+    # scoped (run_only/run_from/run_to) run, which is never persisted, or when saving failed --
+    # matching ``/execute``'s ``run_id`` semantics, so a client never cites an unresolvable id.
+    run_id: str | None = None
     if not scope:
         try:
-            saved = _save_run_record(
+            run_id = _save_run_record(
                 graph,
                 graph_payload,
                 run_results,
@@ -1270,18 +1283,19 @@ def execute_graph_stream(payload: dict[str, Any]) -> Generator[dict[str, Any], N
                 node_elapsed=run_elapsed or None,
                 started_at=started_at,
                 params=params,
-                run_id=run_id,
+                run_id=_generate_run_id(),
             )
-            if saved is None:
-                logger.warning("streamed run %s was not persisted", run_id)
+            if run_id is None:
+                logger.warning("streamed run was not persisted")
         except Exception:  # noqa: BLE001 - persistence must never break the stream
-            logger.exception("failed to persist streamed run %s", run_id)
+            run_id = None
+            logger.exception("failed to persist streamed run")
     yield {
         "type": "run_complete",
         "total_ms": int((time.monotonic() - start_time) * 1000),
         "artifact_revisions": stream_revisions,
-        # Identity of this streamed run for result-card evidence; full unscoped runs are
-        # persisted under this id (``/runs/{id}``), scoped ones are not.
+        # Identity of the persisted run (``/runs/{id}``) for result-card evidence; ``None`` for
+        # scoped runs and for runs whose record could not be saved.
         "run_id": run_id,
         "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "payload_version": PAYLOAD_CONTRACT_VERSION,

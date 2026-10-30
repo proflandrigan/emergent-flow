@@ -288,7 +288,7 @@ def test_run_record_captures_data_fingerprints_and_dependencies(tmp_path, monkey
 
     def record(text: str) -> dict:
         data.write_text(text)
-        run_id = _save_run_record(graph, {"name": "g"}, {}, {})
+        run_id = _save_run_record(graph, {"name": "g"}, {}, {"load": {"status": "ok"}})
         assert run_id is not None
         return runs_mod.get_default_runs().get(run_id)["reproducibility"]
 
@@ -439,4 +439,47 @@ def test_stream_scoped_run_writes_no_record(runs_client, tmp_path) -> None:
     for scope in ({"run_only": "load"}, {"run_from": "load"}):
         events = _stream_events(runs_client, {"graph": _stream_csv_graph(str(csv)), **scope})
         assert events[-1]["type"] == "run_complete"
+        # Scoped runs are never persisted, so run_complete reports no id (like /execute).
+        assert events[-1]["run_id"] is None
     assert runs_client.get("/runs").json()["runs"] == []
+
+
+def test_stream_unsaved_run_reports_null_run_id(runs_client, tmp_path, monkeypatch) -> None:
+    import emergentflow.server.service as service
+
+    monkeypatch.setattr(service, "_save_run_record", lambda *a, **k: None)
+    csv = tmp_path / "t.csv"
+    csv.write_text("a\n1\n")
+    events = _stream_events(runs_client, _stream_csv_graph(str(csv)))
+    assert events[-1]["type"] == "run_complete"
+    assert events[-1]["run_id"] is None
+
+
+def test_stream_errored_loader_is_not_fingerprinted(runs_client, tmp_path) -> None:
+    """A loader that errored read nothing; its source must not appear as a run input."""
+    missing = tmp_path / "missing.csv"
+    events = _stream_events(runs_client, _stream_csv_graph(str(missing)))
+    assert any(e["type"] == "node_error" for e in events)
+    run_id = events[-1]["run_id"]
+    assert run_id is not None
+    record = runs_client.get(f"/runs/{run_id}").json()
+    assert record["statuses"]["load"]["status"] == "error"
+    assert "load" not in record["reproducibility"]["data_fingerprints"]
+
+
+def test_save_run_record_skips_errored_loaders(tmp_path, monkeypatch) -> None:
+    """The shared /execute + stream persistence path only fingerprints ok/cached loaders."""
+    import emergentflow.server.runs as runs_mod
+    from emergentflow.server.service import _save_run_record
+
+    monkeypatch.setattr(runs_mod, "_default_runs", RunStore(tmp_path / "runs", keep=50))
+    csv = tmp_path / "t.csv"
+    csv.write_text("a\n1\n")
+    from emergentflow.ir.serialize import deserialize_graph
+
+    graph = deserialize_graph(json.dumps(_stream_csv_graph(str(csv))))
+    for status, expected in (("ok", True), ("cached", True), ("error", False), ("skipped", False)):
+        run_id = _save_run_record(graph, {"name": "g"}, {}, {"load": {"status": status}})
+        assert run_id is not None
+        fps = runs_mod.get_default_runs().get(run_id)["reproducibility"]["data_fingerprints"]
+        assert ("load" in fps) is expected, status

@@ -340,13 +340,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             for port_name, value in ports.items():
                 payloads[node_id][port_name] = to_payload(value)
 
-        # Capture reproducibility
+        # Capture reproducibility against the graph that was actually EXECUTED: ref'd node
+        # params baked to their resolved values (stored value + any --param override), so a
+        # ref'd loader path is fingerprinted (and config-hashed) as the run read it, not as the
+        # stale literal in the file.
         try:
+            from emergentflow.codegen.params import has_graph_param_refs, materialize_graph
+
+            run_graph = (
+                materialize_graph(graph, params=params)
+                if params or has_graph_param_refs(graph)
+                else graph
+            )
             deps = resolve_dependency_versions(default_dependency_packages())
             repro = capture_run(
-                graph,
+                run_graph,
                 dependency_versions=deps,
-                data_fingerprints=fingerprint_data_sources(graph),
+                data_fingerprints=fingerprint_data_sources(run_graph, params=params),
                 # Record every graph-level param's RESOLVED value (stored value with any
                 # --param override applied), not just the override keys -- a partial map
                 # would make a multi-param run's record incomplete.

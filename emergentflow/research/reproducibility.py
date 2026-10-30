@@ -17,7 +17,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -235,12 +235,46 @@ def _sha256_stream(handle: Any) -> str:
     return digest.hexdigest()
 
 
+class _RemoteTimeout(Exception):
+    """A remote metadata read exceeded its timeout."""
+
+
+def _call_with_timeout(fn: Any, timeout: float | None) -> Any:
+    """Run *fn* and return its result, giving up after *timeout* seconds (``None``: no limit).
+
+    The call runs on a daemon thread so a hung network read can never block the caller (or
+    interpreter exit) past *timeout*; an abandoned read simply finishes or dies in the
+    background.
+    """
+    if timeout is None:
+        return fn()
+    import threading
+
+    box: dict[str, Any] = {}
+
+    def _target() -> None:
+        try:
+            box["value"] = fn()
+        except BaseException as exc:  # noqa: BLE001 - re-raised on the calling thread
+            box["error"] = exc
+
+    worker = threading.Thread(target=_target, name="ef-fingerprint", daemon=True)
+    worker.start()
+    worker.join(timeout)
+    if worker.is_alive():
+        raise _RemoteTimeout
+    if "error" in box:
+        raise box["error"]
+    return box["value"]
+
+
 @public_op(name="ef.research.fingerprint_source")
 def fingerprint_source(
     uri: str,
     *,
     connection: str | None = None,
     hash_remote: bool = False,
+    timeout: float | None = None,
 ) -> SourceFingerprint:
     """Fingerprint one data source's actual bytes (or its object-store version tag).
 
@@ -264,6 +298,10 @@ def fingerprint_source(
         the ``ef.data.load_*`` loaders. ``None`` uses the ambient credential chain.
     hash_remote:
         Also stream and hash the remote object's bytes.
+    timeout:
+        Seconds to wait for the remote metadata (and optional hash) read before recording the
+        source as ``unverifiable``; ``None`` waits indefinitely. Local files ignore it. A timed
+        out read is abandoned on a daemon worker thread, never joined.
     """
     from emergentflow.data import _is_remote_uri, _require_extra, _resolve_storage_options
 
@@ -291,15 +329,26 @@ def fingerprint_source(
     _require_extra("emergentflow[cloud]")
     import fsspec
 
-    try:
+    def _read_remote() -> tuple[dict[str, Any], str | None]:
         fs, fs_path = fsspec.core.url_to_fs(uri, **_resolve_storage_options(connection))
-        info = fs.info(fs_path)
-        remote_digest: str | None = None
+        remote_info = fs.info(fs_path)
+        digest: str | None = None
         if hash_remote:
             with fs.open(fs_path, "rb") as handle:
-                remote_digest = _sha256_stream(handle)
+                digest = _sha256_stream(handle)
+        return remote_info, digest
+
+    try:
+        info, remote_digest = _call_with_timeout(_read_remote, timeout)
     except ImportError:
         raise
+    except _RemoteTimeout:
+        return SourceFingerprint(
+            uri=uri,
+            kind="unverifiable",
+            fingerprinted_at=now,
+            reason=f"timed out after {timeout}s reading remote metadata",
+        )
     except Exception as exc:  # network/credential/not-found: record, don't raise
         return SourceFingerprint(
             uri=uri,
@@ -341,54 +390,131 @@ _REMOTE_SOURCE_REASONS = {
     "data.load_google_sheet": "google sheet source: no byte-level fingerprint",
 }
 _GLOB_CHARS = set("*?[")
+# Default bound on each remote metadata read made while recording a run, so a slow or
+# unreachable object store cannot delay the run record (and the stream's run_complete).
+DEFAULT_REMOTE_TIMEOUT_S = 5.0
 
 
-def fingerprint_data_sources(graph: Graph) -> dict[str, SourceFingerprint]:
+def _looks_like_glob(uri: str) -> bool:
+    """Same rule the local loaders use (``emergentflow.data``): a path is a glob only if it has
+    glob characters AND does not exist as a literal file, so ``sales[2024].csv`` is a file."""
+    return bool(_GLOB_CHARS & set(uri)) and not Path(uri).exists()
+
+
+def _now_iso() -> str:
+    return _utc_iso(datetime.now(UTC)) or ""
+
+
+def _fingerprint_node(
+    node: Any, unresolved_ref: bool, timeout: float | None
+) -> SourceFingerprint | None:
+    values = {p.name: p.value for p in node.params}
+    path_value = values.get("url") or values.get("path")
+    try:
+        if node.type in _REMOTE_SOURCE_REASONS:
+            return SourceFingerprint(
+                uri=str(path_value or node.type),
+                kind="unverifiable",
+                fingerprinted_at=_now_iso(),
+                reason=_REMOTE_SOURCE_REASONS[node.type],
+            )
+        if node.type not in _PATH_SOURCE_TYPES:
+            return None
+        path_param = next((p for p in node.params if p.name == "path"), None)
+        if unresolved_ref and path_param is not None and path_param.ref is not None:
+            return SourceFingerprint(
+                uri=str(path_param.value) if path_param.value is not None else "",
+                kind="unverifiable",
+                fingerprinted_at=_now_iso(),
+                reason=f"path references unresolved graph parameter {path_param.ref!r}",
+            )
+        uri = values.get("path")
+        if not isinstance(uri, str) or not uri:
+            return None
+        # Remote URIs with glob chars are always expanded by the loaders; local paths only
+        # when no literal file of that name exists (``data._is_glob`` + ``exists`` rule).
+        remote = _is_remote(uri)
+        is_glob = bool(_GLOB_CHARS & set(uri)) if remote else _looks_like_glob(uri)
+        if is_glob or (not remote and Path(uri).is_dir()):
+            return SourceFingerprint(
+                uri=uri,
+                kind="unverifiable",
+                fingerprinted_at=_now_iso(),
+                reason="glob or directory source: fingerprint each file",
+            )
+        connection = values.get("connection")
+        return fingerprint_source(
+            uri,
+            connection=connection if isinstance(connection, str) else None,
+            timeout=timeout,
+        )
+    except Exception as exc:  # never let fingerprinting break a run
+        return SourceFingerprint(
+            uri=str(path_value) if path_value is not None else str(node.type),
+            kind="unverifiable",
+            fingerprinted_at=_now_iso(),
+            reason=f"{type(exc).__name__}: {exc}",
+        )
+
+
+def _is_remote(uri: str) -> bool:
+    from emergentflow.data import _is_remote_uri
+
+    return bool(_is_remote_uri(uri))
+
+
+def fingerprint_data_sources(
+    graph: Graph,
+    *,
+    params: dict[str, Any] | None = None,
+    node_ids: Collection[str] | None = None,
+    remote_timeout: float | None = DEFAULT_REMOTE_TIMEOUT_S,
+) -> dict[str, SourceFingerprint]:
     """Impure edge helper: fingerprint the source each ``data.*`` loader node reads.
 
     Local files are hashed (streamed); remote object URIs are identified by store metadata only
-    (``hash_remote`` is never set, so no remote bytes are downloaded); globs, directories and
-    warehouse/http/sheet sources are recorded as ``kind="unverifiable"`` with a ``reason``.
-    Sinks (``save_frame``, ``write_table``) and built-in samples are skipped. Never raises:
-    a failure on one node yields an ``unverifiable`` entry (or omits it) and the run proceeds.
+    (``hash_remote`` is never set, so no remote bytes are downloaded), each read bounded by
+    *remote_timeout* seconds; globs, directories and warehouse/http/sheet sources are recorded
+    as ``kind="unverifiable"`` with a ``reason``. Sinks (``save_frame``, ``write_table``) and
+    built-in samples are skipped. Never raises: a failure on one node yields an
+    ``unverifiable`` entry (or omits it) and the run proceeds.
+
+    Ref'd node params are resolved against the graph-level params (with *params* overrides
+    applied, exactly as ``materialize_graph`` does for execution), so the fingerprinted path is
+    the one the run read. Pass the same *params* the run was executed with; re-resolving an
+    already-materialized graph with the same *params* is idempotent. A ref that cannot be
+    resolved is recorded as ``unverifiable`` rather than fingerprinting a stale literal.
+
+    Composite (``layout.composite``) subgraphs are walked recursively; an inner node is keyed
+    ``"<outer id>/<inner id>"``. *node_ids*, when given, restricts fingerprinting to those
+    top-level node ids (and everything nested in them) -- e.g. only the nodes that actually
+    ran ok, so a loader that errored is not recorded as a source the run read.
     """
-    out: dict[str, SourceFingerprint] = {}
-    for node_id in sorted(graph.nodes):
-        node = graph.nodes[node_id]
+    from emergentflow.codegen.params import has_graph_param_refs, materialize_graph
+
+    unresolved_ref = False
+    if params or has_graph_param_refs(graph):
         try:
-            values = {p.name: p.value for p in node.params}
-            if node.type in _REMOTE_SOURCE_REASONS:
-                out[node_id] = SourceFingerprint(
-                    uri=str(values.get("url") or values.get("path") or node.type),
-                    kind="unverifiable",
-                    fingerprinted_at=_utc_iso(datetime.now(UTC)) or "",
-                    reason=_REMOTE_SOURCE_REASONS[node.type],
-                )
+            graph = materialize_graph(graph, params=params)
+        except Exception:
+            unresolved_ref = True
+
+    allowed = set(node_ids) if node_ids is not None else None
+    out: dict[str, SourceFingerprint] = {}
+
+    def _walk(g: Graph, prefix: str) -> None:
+        for node_id in sorted(g.nodes):
+            node = g.nodes[node_id]
+            key = f"{prefix}{node_id}"
+            if not prefix and allowed is not None and node_id not in allowed:
                 continue
-            if node.type not in _PATH_SOURCE_TYPES:
-                continue
-            uri = values.get("path")
-            if not isinstance(uri, str) or not uri:
-                continue
-            if _GLOB_CHARS & set(uri) or Path(uri).is_dir():
-                out[node_id] = SourceFingerprint(
-                    uri=uri,
-                    kind="unverifiable",
-                    fingerprinted_at=_utc_iso(datetime.now(UTC)) or "",
-                    reason="glob or directory source: fingerprint each file",
-                )
-                continue
-            connection = values.get("connection")
-            out[node_id] = fingerprint_source(
-                uri, connection=connection if isinstance(connection, str) else None
-            )
-        except Exception as exc:  # never let fingerprinting break a run
-            out[node_id] = SourceFingerprint(
-                uri=str(node.type),
-                kind="unverifiable",
-                fingerprinted_at=_utc_iso(datetime.now(UTC)) or "",
-                reason=f"{type(exc).__name__}: {exc}",
-            )
+            if node.subgraph is not None:
+                _walk(node.subgraph, f"{key}/")
+            fp = _fingerprint_node(node, unresolved_ref, remote_timeout)
+            if fp is not None:
+                out[key] = fp
+
+    _walk(graph, "")
     return out
 
 
