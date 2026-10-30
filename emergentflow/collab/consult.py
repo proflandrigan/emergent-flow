@@ -3,7 +3,9 @@ emergentflow.collab.consult
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Mode-B one-shot consult (Epic 14 Story 8): composes a persona's system prompt +
 a graph slice + catalog context into an LLM call, parses the structured response
-into a ``set_params``-only ``GraphMutation``.
+into a ``set_params``-only ``GraphMutation``. The system prompt also carries the shared
+reply contract (``emergentflow.collab.reply_contract``) plus a JSON-only machine-mode
+instruction.
 
 Works without agents: never imported by ``emergentflow/__init__.py``,
 ``emergentflow/ir/__init__.py``, or anything under ``emergentflow/codegen/`` --
@@ -15,6 +17,7 @@ from __future__ import annotations
 from typing import Any
 
 from emergentflow.collab.personas import get_persona
+from emergentflow.collab.reply_contract import REPLY_CONTRACT
 from emergentflow.ir.graph import Graph
 from emergentflow.ir.mutation import GraphMutation
 from emergentflow.llm.protocol import LLMClient
@@ -37,6 +40,17 @@ _SET_PARAMS_RESPONSE_SCHEMA: dict[str, Any] = {
         "set_params": {"type": "object"},
     },
 }
+
+# A consult is a machine-mode response (issue #173): the shared reply contract travels with the
+# persona so its evidence rules apply, but the required JSON shape always wins -- no links,
+# prose, or extra keys. Human-facing disclosure belongs to the surrounding collaborator turn.
+_MACHINE_MODE_INSTRUCTION = (
+    "This consult is a machine-readable response. Apply the reply contract above only to "
+    "decide what you can support with evidence: return ONLY the JSON object "
+    '{"set_params": {...}} -- no links, no prose, no extra keys such as "unknowns". Leave out '
+    "any change the graph slice does not support; if nothing is supported, return "
+    '{"set_params": {}}.'
+)
 
 
 def _catalog_entry_for(node_type: str) -> dict[str, Any] | None:
@@ -80,9 +94,10 @@ def build_consult_messages(
             }
         )
 
-    system = persona.system_prompt or (
+    persona_prompt = persona.system_prompt or (
         f"You are {persona.label}, an assistant that fills in graph node parameters."
     )
+    system = f"{persona_prompt}\n\n{REPLY_CONTRACT}\n\n{_MACHINE_MODE_INSTRUCTION}"
     user = (
         f"Task: {ask}\n\n"
         f"Target nodes (fill params ONLY for these ids, using ONLY the legal_params "

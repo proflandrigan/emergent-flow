@@ -193,6 +193,37 @@ def test_bridge_reparses_stringified_dict_arg() -> None:
     assert args["session_id"] == "s1"
 
 
+def test_bridge_add_note_forwards_kind_and_stringified_position() -> None:
+    """``kind`` is forwarded and a stringified ``position`` is parsed back to a dict."""
+    from emergentflow.collab.mcp_bridge import _make_wrapper
+
+    received: dict[str, object] = {}
+
+    async def invoke(tool_name: str, arguments: dict[str, object]) -> object:
+        received["arguments"] = arguments
+        return {}
+
+    wrapper = _make_wrapper(
+        "add_note",
+        ["session_id", "content", "anchor_id", "color", "kind", "position"],
+        {"session_id", "content"},
+        invoke,
+        {"position"},
+    )
+
+    async def _scenario() -> None:
+        await wrapper("s1", "q", None, "orange", "open-question", '{"x": 1, "y": 2}')
+
+    asyncio.run(_scenario())
+    assert received["arguments"] == {
+        "session_id": "s1",
+        "content": "q",
+        "color": "orange",
+        "kind": "open-question",
+        "position": {"x": 1, "y": 2},
+    }
+
+
 def test_bridge_add_node_forwards_stringified_params() -> None:
     """A stringified ``params`` arg reaches the server and mutates its store."""
     from emergentflow.collab.mcp_bridge import create_bridge_mcp_server

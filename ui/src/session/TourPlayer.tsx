@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 
 import type { ResolvedTourStep } from "../canvas/tourResolve";
 import { Button } from "../ui/Button";
+import { OpenQuestionBadge } from "../ui/OpenQuestionBadge";
 import type { Tour } from "./sessionClient";
 
 export interface TourPlayerProps {
@@ -119,7 +120,9 @@ export function TourPlayer({
             fontSize: "var(--text-xs)",
           }}
         >
-          <strong>Open questions</strong>
+          <div style={{ marginBottom: 2 }}>
+            <OpenQuestionBadge label="Open questions" />
+          </div>
           <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
             {unknowns.map((u, i) => (
               <li key={i}>{u}</li>

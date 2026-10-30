@@ -286,8 +286,15 @@ include = ["emergentflow*"]
 # The built canvas (vite build ui/ -> emergentflow/_static/, ADR 0013 Decision 1) ships in
 # the wheel as package data. Absent in a source build (no Node) -> nothing is bundled and
 # the server serves its demo page. Two globs cover top-level and nested asset files.
+# Hidden-path agent resources (plugin manifest, MCP config) are listed explicitly.
 [tool.setuptools.package-data]
-emergentflow = ["_static/*", "_static/**/*", "agents/*.md"]
+emergentflow = [
+    "_static/*",
+    "_static/**/*",
+    "agents/*.md",
+    "agents/.mcp.json",
+    "agents/.claude-plugin/plugin.json",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

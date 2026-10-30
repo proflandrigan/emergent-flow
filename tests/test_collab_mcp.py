@@ -842,6 +842,127 @@ class TestEditingTools:
         assert params["anchor_id"] == anchor["node_id"]
         assert params["color"] == "yellow"
 
+    def test_add_note_defaults_to_ordinary_note(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        result = _run_async(
+            _call_tool(mcp, "add_note", {"session_id": session.id, "content": "plain"})
+        )
+        stored = session_mod.get_default_store().get(session.id)
+        params = {p.name: p.value for p in stored.graph.nodes[result["node_id"]].params}
+        assert params["kind"] == "note"
+        assert params["color"] == "yellow"
+
+    def test_add_note_open_question_persists_kind_color_anchor_position(self) -> None:
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        anchor = self._add_node(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "add_note",
+                {
+                    "session_id": session.id,
+                    "content": "Is the join one-to-one?",
+                    "kind": "open-question",
+                    "color": "orange",
+                    "anchor_id": anchor["node_id"],
+                    "position": {"x": 120.0, "y": -40.0},
+                    "reason": "Flag unchecked join cardinality",
+                },
+            )
+        )
+        stored = session_mod.get_default_store().get(session.id)
+        note = stored.graph.nodes[result["node_id"]]
+        params = {p.name: p.value for p in note.params}
+        assert params["kind"] == "open-question"
+        assert params["color"] == "orange"
+        assert params["content"] == "Is the join one-to-one?"
+        assert params["anchor_id"] == anchor["node_id"]
+        assert note.position.x == 120.0 and note.position.y == -40.0
+
+    def test_add_note_invalid_kind_raises(self) -> None:
+        from fastmcp.exceptions import ToolError
+
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        with pytest.raises(ToolError):
+            _run_async(
+                _call_tool(
+                    mcp,
+                    "add_note",
+                    {"session_id": session.id, "content": "x", "kind": "todo"},
+                )
+            )
+        stored = session_mod.get_default_store().get(session.id)
+        assert not stored.graph.nodes
+
+    def test_add_note_partial_position_raises_clear_error(self) -> None:
+        from fastmcp.exceptions import ToolError
+
+        from emergentflow.collab.mcp import create_mcp_server
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        with pytest.raises(ToolError, match="missing y"):
+            _run_async(
+                _call_tool(
+                    mcp,
+                    "add_note",
+                    {"session_id": session.id, "content": "x", "position": {"x": 1.0}},
+                )
+            )
+        stored = session_mod.get_default_store().get(session.id)
+        assert not stored.graph.nodes
+
+    def test_open_question_note_round_trips_and_leaves_computation_unchanged(self) -> None:
+        from emergentflow.codegen.compiler import compile_to_code
+        from emergentflow.collab.mcp import create_mcp_server
+        from emergentflow.ir.serialize import deserialize_graph, serialize_graph
+
+        session = session_mod.get_default_store().create()
+        mcp = create_mcp_server()
+
+        anchor = self._add_node(mcp, session.id, "data.load_csv", {"path": "a.csv"})
+        code_before = compile_to_code(session_mod.get_default_store().get(session.id).graph)
+
+        result = _run_async(
+            _call_tool(
+                mcp,
+                "add_note",
+                {
+                    "session_id": session.id,
+                    "content": "Open?",
+                    "kind": "open-question",
+                    "color": "orange",
+                    "anchor_id": anchor["node_id"],
+                },
+            )
+        )
+        new_graph = session_mod.get_default_store().get(session.id).graph
+
+        # An anchored note narrates the code as a comment; computation must be unchanged.
+        def _statements(code: str) -> list[str]:
+            return [ln for ln in code.splitlines() if not ln.strip().startswith("#")]
+
+        code_after = compile_to_code(new_graph)
+        assert "# Open?" in code_after
+        assert _statements(code_after) == _statements(code_before)
+
+        restored = deserialize_graph(serialize_graph(new_graph))
+        note = restored.nodes[result["node_id"]]
+        assert {p.name: p.value for p in note.params}["kind"] == "open-question"
+
     @staticmethod
     def _out_port_name(session_id: str, node_id: str) -> str:
         from emergentflow.ir.common import Direction
@@ -1146,6 +1267,16 @@ class TestViewUrl:
         mcp, session = self._setup(monkeypatch, True)
         result = self._add(mcp, session.id, "data.load_csv", {"path": "a.csv"})
         assert result["view_url"] == f"{self.BASE}/?session={session.id}#focus={result['node_id']}"
+
+    def test_add_note_view_url_focuses_note(self, monkeypatch) -> None:
+        mcp, session = self._setup(monkeypatch, True)
+        result = _run_async(_call_tool(mcp, "add_note", {"session_id": session.id, "content": "q"}))
+        assert result["view_url"] == f"{self.BASE}/?session={session.id}#focus={result['node_id']}"
+
+    def test_add_note_omits_view_url_without_canvas(self, monkeypatch) -> None:
+        mcp, session = self._setup(monkeypatch, False)
+        result = _run_async(_call_tool(mcp, "add_note", {"session_id": session.id, "content": "q"}))
+        assert "view_url" not in result
 
     def test_propose_mutation_view_url_opens_proposal(self, monkeypatch) -> None:
         mcp, session = self._setup(monkeypatch, True)

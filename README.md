@@ -84,6 +84,17 @@ pip install emergentflow[mcp]       # MCP tool wrapper for agent collaboration
 Combine extras as needed: `pip install emergentflow[server,llm,explain]`, or use
 `pip install emergentflow[all]` to get everything in one shot.
 
+### Pair an AI agent with the canvas
+
+```bash
+pip install 'emergentflow[server,mcp]'
+claude plugin install emergent-flow --marketplace proflandrigan/emergent-flow   # Claude Code
+npx skills add proflandrigan/emergent-flow --skill emergent-flow -g             # Codex, Cursor, OpenCode, …
+emergentflow serve
+```
+
+See the [Agent Quickstart](./docs/agent-quickstart.md#1-install-with-one-command).
+
 ---
 
 ## Why Emergent Flow

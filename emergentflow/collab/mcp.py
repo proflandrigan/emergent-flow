@@ -127,6 +127,16 @@ def build_view_url(
     return base + "#" + "&".join(parts) if parts else base
 
 
+def _position_from(position: dict[str, float]) -> Any:
+    """Build a canvas ``Position`` from an MCP ``{"x": ..., "y": ...}`` dict, with a clear error."""
+    from emergentflow.ir.node import Position
+
+    missing = [key for key in ("x", "y") if key not in position]
+    if missing:
+        raise ValueError(f"position must have 'x' and 'y' keys; missing {', '.join(missing)}")
+    return Position(x=position["x"], y=position["y"])
+
+
 def _with_view_url(result: dict[str, Any], session_id: str, **view: Any) -> dict[str, Any]:
     """Add a focused ``view_url`` to a mutating tool's *result* when a canvas shares the store.
 
@@ -169,7 +179,6 @@ def create_mcp_server() -> Any:
     from emergentflow.ir.common import Direction, new_id
     from emergentflow.ir.edge import Edge, PortRef
     from emergentflow.ir.mutation import GraphMutation
-    from emergentflow.ir.node import Position
     from emergentflow.nodes import registry as default_node_registry
     from emergentflow.server.service import (
         compile_graph,
@@ -353,6 +362,9 @@ def create_mcp_server() -> Any:
 
         Returns {"payload_version", "results", "statuses"} on success,
         or {"blocked_by_gates": [...]} if any gate is OPEN.
+
+        Reply with the metric that answers the question and a canvas link, not this payload; check
+        ``statuses`` before saying the run succeeded.
         """
         payload: dict[str, Any] = {}
         if run_to is not None:
@@ -382,6 +394,8 @@ def create_mcp_server() -> Any:
 
         Returns bounded summaries: scalars verbatim, tables as shape+head,
         images as presence markers. Raises UnknownRunError if run_id doesn't exist.
+
+        Quote the conclusion (metric, split, baseline) in your reply, not the digest.
         """
         from emergentflow.collab.digest import digest_results
         from emergentflow.server.runs import UnknownRunError, get_default_runs
@@ -466,6 +480,8 @@ def create_mcp_server() -> Any:
         """Extract a named scalar metric from a run's payloads.
 
         Returns {"run_id", "node_id", "metric_name", "value"} or error if not found.
+
+        Say which split the metric came from; a training-set metric must be disclosed as such.
         """
         from emergentflow.collab.metrics import extract_metric
         from emergentflow.server.runs import UnknownRunError, get_default_runs
@@ -584,6 +600,8 @@ def create_mcp_server() -> Any:
 
         Returns the proposal plus ``view_url`` (a canvas link focused on the change) when a
         live canvas shares the session store.
+
+        Lead your reply with ``view_url``; the change is pending until the human accepts it.
         """
         mutation_obj = GraphMutation.model_validate(mutation)
         proposal = get_default_session_store().add_proposal(session_id, mutation_obj)
@@ -810,7 +828,7 @@ def create_mcp_server() -> Any:
         definition_cls = default_node_registry.get(node_type)
         node = definition_cls().instantiate(label=label or definition_cls.label, **(params or {}))
         if position is not None:
-            node.position = Position(x=position["x"], y=position["y"])
+            node.position = _position_from(position)
         mutation = GraphMutation(
             base_version=session.version,
             add_nodes=[node],
@@ -952,18 +970,32 @@ def create_mcp_server() -> Any:
         *,
         anchor_id: str | None = None,
         color: str = "yellow",
+        kind: str = "note",
+        position: dict[str, float] | None = None,
         author: str = "agent",
         reason: str = "",
     ) -> dict:
         """Add a ``notes.markdown`` annotation node to *session_id*'s graph.
 
-        Returns the common success shape plus the new ``node_id``.
+        *kind* is ``"note"`` (default) or ``"open-question"`` -- an open question renders with a
+        ``?`` "Open question" badge whatever its *color* (``"orange"`` is the conventional
+        swatch). *anchor_id* ties it to a node or edge; *position* (``{"x", "y"}``) places it,
+        ideally beside the anchored node. *reason* is audit text on the mutation, not a note
+        param. Returns the common success shape plus the new ``node_id``, plus ``view_url``
+        (a canvas link focused on the note) when a live canvas shares the session store.
+
+        For an unverified assumption or open question, anchor the note to the affected node so it
+        stays visible on the canvas; mention it beside the claim in your reply.
         """
         store = get_default_session_store()
         session = store.get(session_id)
-        note = default_node_registry.get("notes.markdown")().instantiate(
-            content=content, anchor_id=anchor_id, color=color
-        )
+        definition = default_node_registry.get("notes.markdown")()
+        note = definition.instantiate(content=content, anchor_id=anchor_id, color=color, kind=kind)
+        errors = definition.validate_param_values(note)
+        if errors:
+            raise ValueError("; ".join(errors))
+        if position is not None:
+            note.position = _position_from(position)
         description = reason or f"Added note: {content[:80]}"
         mutation = GraphMutation(
             base_version=session.version,
@@ -971,7 +1003,11 @@ def create_mcp_server() -> Any:
             description=description,
             author=author,
         )
-        return _apply_mutation(session_id, mutation, extra={"node_id": note.id})
+        return _with_view_url(
+            _apply_mutation(session_id, mutation, extra={"node_id": note.id}),
+            session_id,
+            focus=note.id,
+        )
 
     @mcp.tool()
     def delete_note(
@@ -1012,6 +1048,8 @@ def create_mcp_server() -> Any:
         mutation. Returns the common success shape plus the new ``node_id``, plus
         ``view_url`` (a canvas link focused on the change) when a live canvas shares the
         session store.
+
+        Lead your reply with ``view_url`` and put the conclusion in the first markdown block.
         """
         store = get_default_session_store()
         session = store.get(session_id)

@@ -15,6 +15,10 @@ rather than floating freely. This node type does not itself validate or
 resolve ``anchor_id`` against the graph (no cross-reference check here,
 mirroring how ``ir.edge.Edge`` documents that cross-reference validation is a
 graph-level concern) — a stale or unset ``anchor_id`` is not an error.
+
+An optional ``kind`` param (``"note"`` default, or ``"open-question"``) marks a note
+as an open question (issue #173). It is presentation-only metadata — codegen and
+execute stay no-ops, and a note saved before ``kind`` existed is an ordinary note.
 """
 
 from __future__ import annotations
@@ -36,7 +40,7 @@ class MarkdownNote(NodeDefinition):
     """A markdown note for narrating the pipeline; no data flows through it."""
 
     type = "notes.markdown"
-    version = 1
+    version = 2
     family = "notes"
     label = "Note"
     category = "Annotation"
@@ -73,7 +77,22 @@ class MarkdownNote(NodeDefinition):
             help="Background color swatch for the note.",
             hints=ValidationHints(
                 widget="select",
-                choices=["yellow", "pink", "blue", "green", "purple"],
+                choices=["yellow", "pink", "blue", "green", "purple", "orange"],
+            ),
+        ),
+        ParamSpec(
+            name="kind",
+            type_token="str",
+            default="note",
+            required=False,
+            label="Kind",
+            help=(
+                'What the note is. "open-question" marks an unverified assumption or open '
+                "question, shown with a ? badge; it does not depend on the color."
+            ),
+            hints=ValidationHints(
+                widget="select",
+                choices=["note", "open-question"],
             ),
         ),
     ]

@@ -36,43 +36,37 @@ The full route surface the agent talks to:
 ## MCP config for Claude Code
 
 The same collaboration surface is also available as MCP tools behind the optional
-`emergentflow[mcp]` extra. `create_mcp_server()` in
-[`emergentflow/collab/mcp.py`](../emergentflow/collab/mcp.py) builds a `fastmcp.FastMCP`
-instance exposing 8 tools (`get_graph`, `list_sessions`, `get_catalog_tool`,
-`validate_graph_tool`, `compile_preview`, `propose_mutation`, `post_review`,
-`await_verdict`) that delegate to the same functions the HTTP routes call.
+`emergentflow[mcp]` extra: the collaboration tools (sessions, catalog, validate/compile,
+editing, notes, result cards, tours, runs, reviews), delegating to the same functions the
+HTTP routes call.
 
-To expose these tools to Claude Code, add an entry to your Claude Code MCP config
-(`~/.claude/settings.json` or project `.claude/settings.json`):
+**One-command install (Claude Code):** `claude plugin install emergent-flow --marketplace
+proflandrigan/emergent-flow`. See
+[`agent-quickstart.md`](./agent-quickstart.md#1-install-with-one-command) for prerequisites,
+older-client fallbacks, and other agents.
+
+**Manual config:** register the HTTP-backed stdio bridge in your MCP config
+(`~/.claude/settings.json`, project `.claude/settings.json`, or `.mcp.json`):
 
 ```json
 {
   "mcpServers": {
     "emergent-flow": {
-      "command": "uv",
-      "args": [
-        "run", "--extra", "mcp",
-        "python", "-c",
-        "from emergentflow.collab.mcp import create_mcp_server; create_mcp_server().run()"
-      ]
+      "command": "emergentflow",
+      "args": ["mcp", "--base-url", "http://127.0.0.1:8765"]
     }
   }
 }
 ```
 
-`FastMCP.run()` defaults to `stdio` transport, which is what Claude Code's MCP client
-expects. This requires `emergentflow[mcp]` to be installed (`uv sync --extra mcp` or
-`pip install 'emergentflow[mcp]'`).
+The bridge forwards to the running `emergentflow serve`, so sessions are shared with the
+canvas. Start the server first. A non-loopback bind needs `--session-token` or
+`$EMERGENTFLOW_SESSION_TOKEN`; never put a real token in config files.
 
-**Important limitation:** The MCP server launched this way runs in a **separate process**
-from `emergentflow serve`. The session store (`get_default_store()` in
-`emergentflow/collab/session.py`) is a process-wide singleton — each process gets its own
-empty `SessionStore`. Sessions you create via `emergentflow serve`'s HTTP routes will NOT be
-visible to the MCP tools, and vice versa. If you need both surfaces to share sessions, they
-must run inside the same process — e.g. by calling `create_mcp_server()` inside the server's
-startup lifecycle (not currently wired; Epic 14 ships the MCP wrapper as detached by design,
-per ADR 0019's "one behavior, two doors" principle). For now, choose one surface — HTTP or
-MCP — per process.
+**Standalone `create_mcp_server().run()`:** launching `create_mcp_server().run()` directly
+(`uv run --extra mcp python -c "from emergentflow.collab.mcp import create_mcp_server; ..."`)
+runs a separate in-process server with its own session store. Its sessions are not visible to
+the canvas, and mutating tools omit `view_url`. Prefer the bridge above.
 
 ## Persona-file authoring
 

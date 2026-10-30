@@ -10,6 +10,7 @@ which are never spawned in tests.
 from __future__ import annotations
 
 import json
+import pathlib
 import sys
 import time
 from typing import ClassVar
@@ -19,6 +20,7 @@ import pytest
 from emergentflow.collab import chat_runner
 from emergentflow.collab.agents.base import AdapterEvent, AgentAdapter, register_adapter
 from emergentflow.collab.chat import ChatTurnStatus
+from emergentflow.collab.reply_contract import REPLY_CONTRACT
 from emergentflow.collab.session import SessionStore
 
 _HAPPY_SCRIPT = (
@@ -412,3 +414,99 @@ class TestStopChatTurn:
 
         status = _wait_for_status(store, session.id, turn.id, timeout=10.0)
         assert status == ChatTurnStatus.INTERRUPTED
+
+
+class TestReplyContractInjection:
+    @pytest.mark.parametrize(
+        "persona_filename",
+        [
+            None,
+            "data-modeller.md",
+            "data-scientist.md",
+            "researcher.md",
+            "ml-engineer.md",
+            "emergent-flow-experimenter.md",
+        ],
+    )
+    def test_first_turn_prompt_contains_contract_for_each_persona(
+        self, persona_filename: str | None
+    ) -> None:
+        prompt = chat_runner._build_first_turn_prompt(
+            session_id="s1",
+            base_url="http://x",
+            auth_token=None,
+            user_message="hi",
+            persona_filename=persona_filename,
+        )
+        assert REPLY_CONTRACT in prompt
+        if persona_filename is not None:
+            assert prompt.index(REPLY_CONTRACT) > prompt.index("## Your persona")
+        assert prompt.index(REPLY_CONTRACT) < prompt.index("The human says:")
+        assert "tell the human what you did and why" not in prompt
+
+    def test_contract_survives_missing_protocol_and_persona_docs(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+    ) -> None:
+        monkeypatch.setattr(chat_runner, "_PROTOCOL_DOC_PATH", tmp_path / "missing.md")
+        monkeypatch.setattr(chat_runner, "_AGENTS_DIR", tmp_path)
+        prompt = chat_runner._build_first_turn_prompt(
+            session_id="s1",
+            base_url="http://x",
+            auth_token=None,
+            user_message="hi",
+            persona_filename="data-scientist.md",
+        )
+        assert "Emergent Flow collaborator" in prompt
+        assert REPLY_CONTRACT in prompt
+        assert "tell the human what you did and why" not in prompt
+
+    def test_fallback_protocol_has_no_conflicting_reply_rule(self) -> None:
+        assert "tell the human what you did and why" not in chat_runner._FALLBACK_PROTOCOL
+
+    def test_resumed_persona_switch_reasserts_contract(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store = SessionStore()
+        monkeypatch.setattr(chat_runner, "get_default_store", lambda: store)
+        session = store.create()
+
+        first = chat_runner.start_chat_turn(
+            session.id, "fake-chat-echo", "first message", base_url="http://127.0.0.1:8765"
+        )
+        _wait_for_status(store, session.id, first.id)
+        store.set_chat_thread_id(session.id, "resume-abc")
+
+        second = chat_runner.start_chat_turn(
+            session.id,
+            "fake-chat-echo",
+            "/ml-engineer check the serving path",
+            base_url="http://127.0.0.1:8765",
+        )
+        _wait_for_status(store, session.id, second.id)
+        echoed = store.get(session.id).collab.chat.turns[1].agent_message
+        assert echoed is not None
+        assert REPLY_CONTRACT in echoed
+        assert echoed.index(REPLY_CONTRACT) < echoed.index("The human says:")
+
+    def test_ordinary_resume_does_not_repeat_contract(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        store = SessionStore()
+        monkeypatch.setattr(chat_runner, "get_default_store", lambda: store)
+        session = store.create()
+
+        first = chat_runner.start_chat_turn(
+            session.id, "fake-chat-echo", "/researcher hello", base_url="http://127.0.0.1:8765"
+        )
+        _wait_for_status(store, session.id, first.id)
+        store.set_chat_thread_id(session.id, "resume-abc")
+
+        second = chat_runner.start_chat_turn(
+            session.id,
+            "fake-chat-echo",
+            "continue our conversation",
+            base_url="http://127.0.0.1:8765",
+        )
+        _wait_for_status(store, session.id, second.id)
+        echoed = store.get(session.id).collab.chat.turns[1].agent_message
+        assert echoed == "continue our conversation"

@@ -5,12 +5,14 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { useGraphStore } from "../../store/graphStore";
+import { OpenQuestionBadge } from "../../ui/OpenQuestionBadge";
 import "./NoteNode.css";
 
 export interface NoteNodeData extends Record<string, unknown> {
   content: string;
   color: string;
   anchorId: string | null;
+  kind?: "note" | "open-question";
 }
 
 type NoteNodeType = Node<NoteNodeData, "noteNode">;
@@ -21,6 +23,7 @@ const NOTE_COLORS: Record<string, { background: string; border: string }> = {
   blue: { background: "#dbeafe", border: "#3b82f6" },
   green: { background: "#dcfce7", border: "#22c55e" },
   purple: { background: "#f3e8ff", border: "#a855f7" },
+  orange: { background: "#ffedd5", border: "#f97316" },
 };
 
 const NOTE_TEXT_COLOR = "#1f2937";
@@ -43,7 +46,14 @@ export function NoteNode({ id, data }: NodeProps<NoteNodeType>): JSX.Element {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(data.content);
   const nodes = useGraphStore((s) => s.nodes);
+  const edges = useGraphStore((s) => s.edges);
   const [showAnchorPicker, setShowAnchorPicker] = useState(false);
+
+  const isQuestion = data.kind === "open-question";
+  const anchorMissing =
+    Boolean(data.anchorId) &&
+    !nodes[data.anchorId as string] &&
+    !edges[data.anchorId as string];
 
   const swatch = NOTE_COLORS[data.color] ?? NOTE_COLORS[DEFAULT_COLOR];
   const boxStyle: CSSProperties = {
@@ -73,7 +83,17 @@ export function NoteNode({ id, data }: NodeProps<NoteNodeType>): JSX.Element {
   }
 
   return (
-    <div style={boxStyle} data-testid="note-node">
+    <div
+      style={boxStyle}
+      data-testid="note-node"
+      data-kind={isQuestion ? "open-question" : "note"}
+      {...(isQuestion ? { role: "note", "aria-label": "Open question" } : {})}
+    >
+      {isQuestion && (
+        <div style={{ marginBottom: 4 }}>
+          <OpenQuestionBadge />
+        </div>
+      )}
       {showAnchorPicker && (
         <div className="nodrag" style={{ marginBottom: 4 }}>
           <select
@@ -142,6 +162,14 @@ export function NoteNode({ id, data }: NodeProps<NoteNodeType>): JSX.Element {
           )}
         </div>
       )}
+      {anchorMissing && (
+        <div
+          data-testid="note-anchor-missing"
+          style={{ fontSize: "var(--text-xs)", opacity: 0.75, marginTop: 4 }}
+        >
+          Anchor unavailable — the linked item was removed.
+        </div>
+      )}
       {data.anchorId ? (
         <div
           className="nodrag"
@@ -157,7 +185,11 @@ export function NoteNode({ id, data }: NodeProps<NoteNodeType>): JSX.Element {
             e.stopPropagation();
             setShowAnchorPicker((v) => !v);
           }}
-          title="Anchored to a node. Click to change."
+          title={
+            anchorMissing
+              ? "Anchored item was removed. Click to re-link."
+              : "Anchored to a node. Click to change."
+          }
         >
           <Link size={12} />
         </div>

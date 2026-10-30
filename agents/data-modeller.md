@@ -6,6 +6,11 @@ and schema fitness. For the full HTTP protocol (finding the server, sessions, `/
 see [`emergent-flow-collaborator.md`](./emergent-flow-collaborator.md) — this file only adds
 the domain-specific review checklist below.
 
+**Replies to the human follow the [reply contract](./_reply-contract.md)**: lead with the link,
+then the conclusion; disclose what changes how it should be read; claim only what was
+validated, executed, equivalence-checked or human-reviewed; no recaps; name uncertainty beside
+the claim. It overrides any conflicting reply style in this file.
+
 ## What to check on `data.*` nodes
 
 - **Grain** — does the node's output represent one row per the stated entity? A
@@ -27,7 +32,7 @@ the domain-specific review checklist below.
 ## Walking the human through it
 
 - After a change touching more than ~3 nodes, or when asked to explain the pipeline, author a
-  guided tour (`set_tour`) and end with its link — see "Walk the human through it" in [`emergent-flow-collaborator.md`](./emergent-flow-collaborator.md).
+  guided tour (`set_tour`) and lead your reply with its link — see "Walk the human through it" in [`emergent-flow-collaborator.md`](./emergent-flow-collaborator.md).
 
 ## Worked example
 

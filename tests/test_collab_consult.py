@@ -19,6 +19,8 @@ from fastapi.testclient import TestClient
 
 from emergentflow.collab import session as session_mod
 from emergentflow.collab.consult import ConsultError, build_consult_messages, run_consult
+from emergentflow.collab.personas import AgentPersona, get_persona
+from emergentflow.collab.reply_contract import REPLY_CONTRACT
 from emergentflow.ir.serialize import deserialize_graph
 from emergentflow.llm.protocol import LLMRequest, LLMResponse, Usage
 from emergentflow.server.app import create_app
@@ -167,6 +169,69 @@ class TestRunConsult:
                 base_version=0,
                 client=fake,
             )
+
+
+class TestConsultReplyContract:
+    @pytest.mark.parametrize(
+        "slug",
+        ["data_modeller", "data_scientist", "researcher", "ml_engineer", "experimenter"],
+    )
+    def test_system_prompt_carries_contract_and_machine_mode(self, graph: Any, slug: str) -> None:
+        messages = build_consult_messages(graph, persona_slug=slug, node_ids=["n1"], ask="x")
+        system = messages[0]["content"]
+        assert REPLY_CONTRACT in system
+        assert '{"set_params": {}}' in system
+        assert "no links" in system
+        persona_prompt = get_persona(slug).system_prompt
+        assert persona_prompt
+        assert persona_prompt in system
+        assert system.index(REPLY_CONTRACT) > 0
+        assert "-- no other keys, no prose." in messages[1]["content"]
+
+    def test_custom_persona_without_system_prompt_still_gets_contract(
+        self, graph: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from emergentflow.collab import personas as personas_mod
+
+        persona = AgentPersona(
+            slug="test_custom_no_prompt",
+            label="Custom",
+            description="A custom persona without a system prompt",
+            system_prompt=None,
+        )
+        monkeypatch.setitem(personas_mod._PERSONAS, persona.slug, persona)
+        messages = build_consult_messages(
+            graph, persona_slug=persona.slug, node_ids=["n1"], ask="x"
+        )
+        system = messages[0]["content"]
+        assert "an assistant that fills in graph node parameters" in system
+        assert REPLY_CONTRACT in system
+
+    def test_run_consult_empty_set_params_is_valid(self, graph: Any) -> None:
+        fake = FakeClient(response_data={"set_params": {}})
+        mutation = run_consult(
+            graph,
+            persona_slug="data_modeller",
+            node_ids=["n1"],
+            ask="x",
+            base_version=0,
+            client=fake,
+        )
+        assert mutation.set_params == {}
+
+    def test_run_consult_request_sends_contract(self, graph: Any) -> None:
+        fake = FakeClient(response_data={"set_params": {}})
+        run_consult(
+            graph,
+            persona_slug="data_modeller",
+            node_ids=["n1"],
+            ask="x",
+            base_version=0,
+            client=fake,
+        )
+        request = fake.requests[0]
+        assert isinstance(request, LLMRequest)
+        assert REPLY_CONTRACT in request.messages[0]["content"]
 
 
 # ---------------------------------------------------------------------------

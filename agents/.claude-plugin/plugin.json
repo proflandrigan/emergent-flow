@@ -1,0 +1,12 @@
+{
+  "name": "emergent-flow",
+  "version": "0.3.7",
+  "description": "Co-author Emergent Flow data/ML pipelines with a human on the live canvas: the collaborator protocol, reply contract and personas as a skill, plus the HTTP-backed MCP bridge.",
+  "author": { "name": "proflandrigan" },
+  "homepage": "https://github.com/proflandrigan/emergent-flow",
+  "repository": "https://github.com/proflandrigan/emergent-flow",
+  "license": "Apache-2.0",
+  "keywords": ["data", "ml", "pipelines", "canvas", "mcp"],
+  "skills": ["./"],
+  "mcpServers": "./.mcp.json"
+}
