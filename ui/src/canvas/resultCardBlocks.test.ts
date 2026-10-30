@@ -1,8 +1,11 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  formatRunEvidence,
   parseBlocks,
+  resolveBlockState,
   serializeBlocks,
+  shortRunId,
   splitSource,
   type ResultCardBlock,
 } from "./resultCardBlocks";
@@ -45,5 +48,78 @@ describe("resultCardBlocks", () => {
     expect(splitSource("nocolon")).toBeNull();
     expect(splitSource(":b")).toBeNull();
     expect(splitSource("a:")).toBeNull();
+  });
+});
+
+describe("resolveBlockState", () => {
+  const block: Extract<ResultCardBlock, { kind: "result" }> = {
+    kind: "result",
+    source: "n1:out",
+    caption: "",
+  };
+  const meta = { runId: "2026-07-30T14-02-11Z-ab12", finishedAt: "2026-07-30T14:02:11+00:00" };
+
+  test("ok when a payload exists, carrying run identity", () => {
+    const r = resolveBlockState(
+      block,
+      { n1: { out: { kind: "scalar", value: 1 } } },
+      { n1: { status: "ok" } },
+      { n1: meta },
+    );
+    expect(r).toMatchObject({ state: "ok", nodeId: "n1", port: "out", ...meta });
+  });
+
+  test("evidence uses the source node's own run meta, not another node's", () => {
+    const r = resolveBlockState(
+      block,
+      { n1: { out: { kind: "scalar", value: 1 } } },
+      { n1: { status: "ok" } },
+      { n2: meta },
+    );
+    expect(r.state).toBe("ok");
+    expect(r.runId).toBeNull();
+    expect(r.finishedAt).toBeNull();
+  });
+
+  test("failed when the source errored without a payload", () => {
+    expect(
+      resolveBlockState(block, {}, { n1: { status: "error", error: "x" } }, { n1: meta }).state,
+    ).toBe("failed");
+  });
+
+  test("failed (not ok) when the source errored but an old payload is still held", () => {
+    const r = resolveBlockState(
+      block,
+      { n1: { out: { kind: "scalar", value: 1 } } },
+      { n1: { status: "error", error: "x" } },
+      { n1: meta },
+    );
+    expect(r.state).toBe("failed");
+    expect(r.payload).toBeUndefined();
+    expect(r.runId).toBeNull();
+  });
+
+  test("unrun when missing, skipped, or the source is malformed", () => {
+    expect(resolveBlockState(block, {}, {}, {}).state).toBe("unrun");
+    expect(resolveBlockState(block, {}, { n1: { status: "skipped" } }, {}).state).toBe("unrun");
+    const bad = resolveBlockState({ ...block, source: "nocolon" }, {}, {}, {});
+    expect(bad.state).toBe("unrun");
+    expect(bad.runId).toBeNull();
+  });
+
+  test("shortRunId and formatRunEvidence", () => {
+    expect(shortRunId(meta.runId)).toBe("ab12");
+    expect(shortRunId("abcdefghijkl")).toBe("abcdefgh");
+    expect(shortRunId(null)).toBe("");
+    expect(formatRunEvidence(meta.runId, meta.finishedAt)).toBe(
+      "Run ab12 \u00b7 2026-07-30T14:02:11+00:00",
+    );
+    expect(formatRunEvidence(meta.runId, meta.finishedAt, true)).toBe(
+      "Run 2026-07-30T14-02-11Z-ab12 \u00b7 2026-07-30T14:02:11+00:00",
+    );
+    expect(formatRunEvidence(null, "2026-01-01T00:00:00+00:00")).toBe(
+      "Run \u00b7 2026-01-01T00:00:00+00:00",
+    );
+    expect(formatRunEvidence(null, null)).toBe("");
   });
 });

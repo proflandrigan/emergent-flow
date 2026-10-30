@@ -111,3 +111,255 @@ def test_resolve_dependency_versions_skips_missing_packages():
     versions = resolve_dependency_versions(["pandas", "this-package-does-not-exist-xyz"])
     assert "pandas" in versions
     assert "this-package-does-not-exist-xyz" not in versions
+
+
+def test_fingerprint_source_detects_changed_bytes_at_same_path(tmp_path) -> None:
+    from emergentflow.research.reproducibility import fingerprint_source
+
+    path = tmp_path / "terms.csv"
+    path.write_text("term,n\na,1\n")
+    first = fingerprint_source(str(path))
+    path.write_text("term,n\na,2\n")
+    second = fingerprint_source(str(path))
+
+    assert first.kind == "file"
+    assert first.sha256 != second.sha256
+    assert first.size == len("term,n\na,1\n")
+    assert first.fingerprinted_at.endswith("+00:00")
+    assert is_inspectable(first)
+
+
+def test_fingerprint_source_missing_file_is_unverifiable_not_an_error(tmp_path) -> None:
+    from emergentflow.research.reproducibility import fingerprint_source
+
+    result = fingerprint_source(str(tmp_path / "nope.csv"))
+
+    assert result.kind == "unverifiable"
+    assert result.sha256 is None
+    assert result.reason
+    assert "unverifiable" in result.describe()
+
+
+def test_fingerprint_source_remote_uses_store_metadata(monkeypatch) -> None:
+    import pytest
+
+    fsspec = pytest.importorskip("fsspec")
+    from emergentflow import data as ef_data
+    from emergentflow.research.reproducibility import fingerprint_source
+
+    monkeypatch.setattr(ef_data, "REMOTE_URI_SCHEMES", ("memory://",))
+    fs = fsspec.filesystem("memory")
+    fs.pipe("/bucket/terms.parquet", b"abc")
+
+    result = fingerprint_source("memory://bucket/terms.parquet", hash_remote=True)
+
+    assert result.kind == "object"
+    assert result.size == 3
+    assert result.sha256 is not None
+    assert "memory://bucket/terms.parquet" in result.describe()
+
+
+def _loader_graph(path: str, node_type: str = "data.load_csv") -> Graph:
+    loader = Node(
+        id="load",
+        type=node_type,
+        params=[Param(name="path", type_token="str", value=path)],
+        ports=[Port(id="p1", name="frame", direction=Direction.OUT, data_type="DataFrame")],
+    )
+    return Graph(name="g", nodes={"load": loader})
+
+
+def test_fingerprint_data_sources_changed_bytes_same_path_same_config_hash(tmp_path) -> None:
+    from emergentflow.research.reproducibility import fingerprint_data_sources
+
+    path = tmp_path / "t.csv"
+    path.write_text("a\n1\n")
+    graph = _loader_graph(str(path))
+    first = capture_run(graph, data_fingerprints=fingerprint_data_sources(graph))
+    path.write_text("a\n2\n")
+    second = capture_run(graph, data_fingerprints=fingerprint_data_sources(graph))
+
+    assert first.content_hashes == second.content_hashes  # config hash is blind to bytes
+    assert first.data_fingerprints["load"]["kind"] == "file"
+    assert first.data_fingerprints["load"]["sha256"] != second.data_fingerprints["load"]["sha256"]
+
+
+def test_fingerprint_data_sources_unverifiable_cases(tmp_path) -> None:
+    from emergentflow.research.reproducibility import fingerprint_data_sources
+
+    glob = fingerprint_data_sources(_loader_graph(str(tmp_path / "*.csv")))["load"]
+    assert glob.kind == "unverifiable" and "glob" in (glob.reason or "")
+    directory = fingerprint_data_sources(_loader_graph(str(tmp_path)))["load"]
+    assert directory.kind == "unverifiable"
+    http = fingerprint_data_sources(_loader_graph("https://x.test/a.csv", "data.http_fetch"))
+    assert http["load"].kind == "unverifiable" and "http" in (http["load"].reason or "")
+    sink = fingerprint_data_sources(_loader_graph(str(tmp_path / "o.csv"), "data.save_frame"))
+    assert sink == {}
+
+
+def test_fingerprint_data_sources_remote_does_not_hash_bytes(monkeypatch) -> None:
+    from emergentflow.research import reproducibility as repro
+
+    seen: dict = {}
+
+    def fake(uri, *, connection=None, hash_remote=False, timeout=None):
+        seen.update(uri=uri, hash_remote=hash_remote)
+        return repro.SourceFingerprint(uri=uri, kind="object", etag="e1")
+
+    monkeypatch.setattr(repro, "fingerprint_source", fake)
+    out = repro.fingerprint_data_sources(_loader_graph("s3://b/k.parquet", "data.load_parquet"))
+    assert out["load"].etag == "e1"
+    assert seen == {"uri": "s3://b/k.parquet", "hash_remote": False}
+
+
+def test_fingerprint_data_sources_never_raises(monkeypatch) -> None:
+    from emergentflow.research import reproducibility as repro
+
+    def boom(*a, **k):
+        raise RuntimeError("nope")
+
+    monkeypatch.setattr(repro, "fingerprint_source", boom)
+    out = repro.fingerprint_data_sources(_loader_graph("x.csv"))
+    assert out["load"].kind == "unverifiable" and "nope" in (out["load"].reason or "")
+
+
+def test_default_dependency_packages_resolve_non_empty() -> None:
+    from emergentflow.research.reproducibility import default_dependency_packages
+
+    names = default_dependency_packages()
+    assert names[0] == "emergentflow"
+    versions = resolve_dependency_versions(names)
+    assert versions.get("emergentflow")
+    assert "pandas" in versions
+
+
+def _ref_loader_graph(literal: str, stored: str) -> Graph:
+    loader = Node(
+        id="load",
+        type="data.load_csv",
+        params=[Param(name="path", type_token="str", value=literal, ref="src")],
+        ports=[Port(id="p1", name="frame", direction=Direction.OUT, data_type="DataFrame")],
+    )
+    return Graph(
+        name="g",
+        nodes={"load": loader},
+        params={"src": Param(name="src", type_token="str", value=stored)},
+    )
+
+
+def test_fingerprint_data_sources_resolves_refs_and_overrides(tmp_path) -> None:
+    """A ref'd path is fingerprinted as resolved (stored value / override), never the literal."""
+    import hashlib
+
+    from emergentflow.research.reproducibility import fingerprint_data_sources
+
+    a, b = tmp_path / "a.csv", tmp_path / "b.csv"
+    a.write_text("x\n1\n")
+    b.write_text("x\n999\n")
+    graph = _ref_loader_graph(str(a), str(a))
+    stored = fingerprint_data_sources(graph)["load"]
+    assert stored.uri == str(a)
+    overridden = fingerprint_data_sources(graph, params={"src": str(b)})["load"]
+    assert overridden.uri == str(b)
+    assert overridden.sha256 == hashlib.sha256(b.read_bytes()).hexdigest()
+    # Unresolvable ref: flagged, not a stale literal fingerprint.
+    bad = _ref_loader_graph(str(a), str(a))
+    bad.nodes["load"].params[0].ref = "missing"
+    flagged = fingerprint_data_sources(bad)["load"]
+    assert flagged.kind == "unverifiable" and "missing" in (flagged.reason or "")
+
+
+def test_cli_run_fingerprints_materialized_graph(tmp_path, monkeypatch) -> None:
+    """`emergentflow run --param src=b.csv` records b.csv's fingerprint, not the stale a.csv."""
+    import hashlib
+    import json
+
+    import emergentflow.server.runs as runs_mod
+    from emergentflow.cli import main
+    from emergentflow.ir.serialize import serialize_graph
+
+    monkeypatch.setattr(runs_mod, "_default_runs", None)
+    monkeypatch.setattr(runs_mod, "_configured_runs_root", None)
+    a, b = tmp_path / "a.csv", tmp_path / "b.csv"
+    a.write_text("x\n1\n")
+    b.write_text("x\n999\n")
+    graph_file = tmp_path / "g.json"
+    graph_file.write_text(serialize_graph(_ref_loader_graph(str(a), str(a))))
+    monkeypatch.chdir(tmp_path)
+    assert main(["run", str(graph_file), "--param", f"src={b}"]) == 0
+    record = json.loads(next((tmp_path / ".ef-runs").rglob("run.json")).read_text())
+    fp = record["reproducibility"]["data_fingerprints"]["load"]
+    assert fp["uri"] == str(b)
+    assert fp["sha256"] == hashlib.sha256(b.read_bytes()).hexdigest()
+
+
+def test_fingerprint_data_sources_recurses_into_composites(tmp_path) -> None:
+    from emergentflow.research.reproducibility import fingerprint_data_sources
+
+    path = tmp_path / "a.csv"
+    path.write_text("x\n1\n")
+    inner = _loader_graph(str(path))
+    comp = Node(id="comp", type="layout.composite", subgraph=inner)
+    out = fingerprint_data_sources(Graph(name="g", nodes={"comp": comp}))
+    assert out["comp/load"].kind == "file"
+    assert fingerprint_data_sources(Graph(name="g", nodes={"comp": comp}), node_ids=set()) == {}
+
+
+def test_fingerprint_data_sources_literal_bracket_file_is_not_a_glob(tmp_path) -> None:
+    from emergentflow.research.reproducibility import fingerprint_data_sources
+
+    literal = tmp_path / "sales[2024].csv"
+    literal.write_text("x\n1\n")
+    assert fingerprint_data_sources(_loader_graph(str(literal)))["load"].kind == "file"
+    missing = fingerprint_data_sources(_loader_graph(str(tmp_path / "sales[0-9].csv")))["load"]
+    assert missing.kind == "unverifiable" and "glob" in (missing.reason or "")
+
+
+def test_fingerprint_data_sources_node_ids_filter(tmp_path) -> None:
+    from emergentflow.research.reproducibility import fingerprint_data_sources
+
+    path = tmp_path / "a.csv"
+    path.write_text("x\n1\n")
+    graph = _loader_graph(str(path))
+    assert fingerprint_data_sources(graph, node_ids={"other"}) == {}
+    assert "load" in fingerprint_data_sources(graph, node_ids={"load"})
+
+
+def test_fingerprint_source_remote_metadata_times_out(monkeypatch) -> None:
+    """A hung remote fs.info is abandoned after the timeout and recorded unverifiable."""
+    import threading
+    import time
+
+    import pytest
+
+    fsspec = pytest.importorskip("fsspec")
+    from emergentflow import data as ef_data
+    from emergentflow.research import reproducibility as repro
+
+    release = threading.Event()
+
+    class HangingFS:
+        def info(self, path):
+            release.wait(10)
+            return {"size": 1}
+
+    monkeypatch.setattr(ef_data, "_require_extra", lambda extra: None)
+    monkeypatch.setattr(fsspec.core, "url_to_fs", lambda uri, **kw: (HangingFS(), "b/k.csv"))
+    started = time.monotonic()
+    try:
+        fp = repro.fingerprint_source("s3://b/k.csv", timeout=0.2)
+    finally:
+        release.set()
+    assert time.monotonic() - started < 2
+    assert fp.kind == "unverifiable" and "timed out" in (fp.reason or "")
+
+
+def test_fingerprint_data_sources_fallback_records_real_path(monkeypatch) -> None:
+    from emergentflow.research import reproducibility as repro
+
+    def boom(*a, **k):
+        raise RuntimeError("nope")
+
+    monkeypatch.setattr(repro, "fingerprint_source", boom)
+    out = repro.fingerprint_data_sources(_loader_graph("x.csv"))
+    assert out["load"].uri == "x.csv"

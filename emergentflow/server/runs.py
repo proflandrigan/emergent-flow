@@ -166,6 +166,7 @@ class RunStore:
         run_data: dict[str, Any],
         graph_data: dict[str, Any],
         payloads_data: dict[str, Any],
+        run_id: str | None = None,
     ) -> str:
         """Write a run entry atomically.
 
@@ -174,9 +175,10 @@ class RunStore:
         all three files under ``.ef-runs/<run_id>/``, then evicts oldest
         entries until the store is under the ``keep`` cap.
 
-        Returns the generated ``run_id``.
+        Returns the ``run_id`` (generated unless the caller pre-allocated one, e.g. a
+        streamed run that must report the same id in its ``run_complete`` event).
         """
-        run_id = _generate_run_id()
+        run_id = run_id or _generate_run_id()
         run_dir = self._run_dir(run_id)
         run_data["run_id"] = run_id
 

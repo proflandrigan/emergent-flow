@@ -26,6 +26,8 @@ Routes:
 - ``POST /export/eval_set``  -- ``{"rows": [...]}`` -> eval-set JSONL file download (Epic 9 Story 7)
 - ``POST /export/finetune``  -- ``{"rows": [...]}`` -> fine-tune JSONL download (Epic 9 Story 7)
 - ``POST /export/mermaid``   -- IR JSON -> ``{"mermaid": ...}`` Mermaid flowchart (issue #169)
+- ``POST /scratch/run``      -- ``{"node_id", "port", "revision", "code"}`` -> scratch run of a
+  ``transform`` against a stored output; loopback/token only (issue #178)
 - ``POST /validate``         -- IR JSON -> ``{"diagnostics": ...}``
 - ``GET  /connections``      -- list local connection profiles (Epic 13 Story 10)
 - ``POST /connections/{name}/test`` -- probe one connection profile
@@ -45,6 +47,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hmac
 import json
 import mimetypes
 import os
@@ -56,6 +59,7 @@ import time
 import webbrowser
 from collections.abc import AsyncIterator, Awaitable, Callable, Generator
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
@@ -102,6 +106,7 @@ from emergentflow.server.artifacts import (
     DEFAULT_ARTIFACT_MAX_MB,
     configure_artifacts,
 )
+from emergentflow.server.browse import browse_frame
 from emergentflow.server.cache import DEFAULT_CACHE_DIRNAME, DEFAULT_CACHE_MAX_MB, configure_cache
 from emergentflow.server.flows import (
     DEFAULT_FLOW_DIRNAME,
@@ -120,6 +125,7 @@ from emergentflow.server.runs import (
     configure_runs,
     get_default_runs,
 )
+from emergentflow.server.scratch import run_scratch
 from emergentflow.server.service import (
     clear_cache,
     column_lineage_for,
@@ -232,6 +238,7 @@ _INDEX_HTML = """<!doctype html>
 # keep the event loop responsive (the whole point of the FastAPI upgrade).
 _POST_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "/cache/clear": clear_cache,
+    "/browse/frame": browse_frame,
     "/compile": compile_graph,
     "/compile-spec": compile_query_spec,
     "/eval/label": label_eval,
@@ -242,8 +249,15 @@ _POST_ROUTES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
     "/knowledge": save_knowledge,
     "/lineage": lineage_for_node,
     "/lineage/column": column_lineage_for,
+    "/scratch/run": run_scratch,
     "/validate": validate_graph,
 }
+
+
+# POST routes that execute caller-supplied Python in the server process; gated by
+# ``_require_code_exec_access`` (defined with the session-auth gate below).
+_CODE_EXEC_ROUTES = frozenset({"/scratch/run"})
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 
 def _error_json(status_code: int, message: str) -> JSONResponse:
@@ -386,8 +400,65 @@ async def _require_session_auth(request: Request) -> None:
     """
     if not _session_auth_required:
         return
-    if request.headers.get("authorization") != f"Bearer {_session_auth_token}":
+    if not _bearer_matches(request):
         raise HTTPException(status_code=401, detail="missing or invalid bearer token")
+
+
+def _bearer_matches(request: Request) -> bool:
+    """Constant-time check of *request*'s ``Authorization`` header against the session token."""
+    token = _session_auth_token
+    if not token:
+        return False
+    presented = request.headers.get("authorization", "")
+    return hmac.compare_digest(presented.encode(), f"Bearer {token}".encode())
+
+
+def _hostname(netloc: str | None) -> str | None:
+    """Lower-cased hostname of a ``Host``-style *netloc* (brackets stripped), or None."""
+    if not netloc:
+        return None
+    try:
+        return urlsplit(f"//{netloc}").hostname
+    except ValueError:
+        return None
+
+
+async def _require_code_exec_access(request: Request) -> None:
+    """FastAPI dependency for routes that run arbitrary code (``_CODE_EXEC_ROUTES``).
+
+    Allowed only for a loopback client (the trusted-local-app model) or a request bearing
+    the configured session token -- binding to a non-loopback host does NOT open these
+    routes to the network on its own. On the loopback path the request must also *name*
+    a loopback host: ``Host`` must be a loopback name and any ``Origin`` must be a loopback
+    origin equal to ``Host``, so neither a cross-origin page nor a DNS-rebinding page
+    (``attacker.example`` resolved to 127.0.0.1, same-origin from the browser's view) can
+    drive it; ``Sec-Fetch-Site: cross-site`` and a proxy-forwarded request
+    (``X-Forwarded-For``/``Forwarded``) are refused too. The token path is the same bearer
+    token as ``/sessions*``.
+    """
+    if _bearer_matches(request):
+        return
+    headers = request.headers
+    client = request.client
+    forwarded = "x-forwarded-for" in headers or "forwarded" in headers
+    if client is None or client.host not in _LOOPBACK_HOSTS or forwarded:
+        raise HTTPException(
+            status_code=403,
+            detail="code execution is limited to loopback clients or a bearer token",
+        )
+    host = headers.get("host")
+    if _hostname(host) not in _LOOPBACK_HOSTS:
+        raise HTTPException(
+            status_code=403, detail="code execution requires a loopback Host header"
+        )
+    origin = headers.get("origin")
+    if origin is not None:
+        origin_netloc = urlsplit(origin).netloc.lower()
+        same_host = origin_netloc == (host or "").lower()
+        if _hostname(origin_netloc) not in _LOOPBACK_HOSTS or not same_host:
+            raise HTTPException(status_code=403, detail="cross-origin code execution is refused")
+    if headers.get("sec-fetch-site", "").lower() == "cross-site":
+        raise HTTPException(status_code=403, detail="cross-origin code execution is refused")
 
 
 async def _safe_download(fn: Callable[[], bytes], filename: str) -> Response:
@@ -622,7 +693,14 @@ def create_app() -> FastAPI:
         return await _safe_download(lambda: export_finetune_bytes(body_dict), "finetune.jsonl")
 
     for path, fn in _POST_ROUTES.items():
-        application.add_api_route(path, _make_post_handler(fn), methods=["POST"])
+        application.add_api_route(
+            path,
+            _make_post_handler(fn),
+            methods=["POST"],
+            dependencies=[Depends(_require_code_exec_access)]
+            if path in _CODE_EXEC_ROUTES
+            else None,
+        )
 
     @application.get("/connections")
     async def connections() -> Response:

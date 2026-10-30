@@ -67,6 +67,59 @@ describe("buildReportHtml", () => {
     expect(html).toContain("No result available (graph not run).");
   });
 
+  test("prints evidence for ok blocks and distinct wording for failed vs not run", () => {
+    const blk = [
+      { kind: "result", source: "n1:out", caption: "" },
+      { kind: "result", source: "bad:out", caption: "" },
+      { kind: "result", source: "never:out", caption: "" },
+    ];
+    const cards = collectReportCards({ a: card("a", 0, 0, "C", blk) });
+    const html = buildReportHtml({
+      graphName: "g",
+      cards,
+      results,
+      statuses: { bad: { status: "error", error: "boom" } },
+      nodeRunMeta: { n1: { runId: "2026-07-30T14-02-11Z-ab12", finishedAt: "2026-07-30T14:02:11+00:00" } },
+      nodeLabels: { n1: "Load <csv>" },
+    });
+    expect(html).toContain(
+      "Source: Load &lt;csv&gt; (n1), port out \u00b7 Run 2026-07-30T14-02-11Z-ab12 \u00b7 2026-07-30T14:02:11+00:00",
+    );
+    expect(html).toContain("Source failed \u2014 no result available.");
+    expect(html).toContain("Source: bad, port out");
+    expect(html).toContain("No result available (graph not run).");
+    expect(html).toContain("Source: never, port out");
+    expect(html).not.toContain("Load <csv>");
+  });
+
+  test("a source that errored in the latest run is not stamped with the newer run", () => {
+    const blk = [{ kind: "result", source: "n1:out", caption: "" }];
+    const cards = collectReportCards({ a: card("a", 0, 0, "C", blk) });
+    const html = buildReportHtml({
+      graphName: "g",
+      cards,
+      // n1 still holds a payload from run 1, but errored in run 2.
+      results,
+      statuses: { n1: { status: "error", error: "boom" } },
+      nodeRunMeta: { n1: { runId: "run-1111", finishedAt: "2026-01-01T00:00:00+00:00" } },
+    });
+    expect(html).toContain("Source failed \u2014 no result available.");
+    expect(html).not.toContain("run-2222");
+    expect(html).not.toContain("12345");
+  });
+
+  test("evidence for a partial run shows the timestamp but no run id", () => {
+    const blk = [{ kind: "result", source: "n1:out", caption: "" }];
+    const cards = collectReportCards({ a: card("a", 0, 0, "C", blk) });
+    const html = buildReportHtml({
+      graphName: "g",
+      cards,
+      results,
+      nodeRunMeta: { n1: { runId: null, finishedAt: "2026-01-03T00:00:00+00:00" } },
+    });
+    expect(html).toContain("Source: n1, port out \u00b7 Run \u00b7 2026-01-03T00:00:00+00:00");
+  });
+
   test("empty graph shows placeholder", () => {
     const html = buildReportHtml({ graphName: "g", cards: [], results: {} });
     expect(html).toContain("No result cards in this graph.");

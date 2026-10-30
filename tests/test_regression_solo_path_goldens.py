@@ -117,6 +117,10 @@ def test_execute_response_golden(client: TestClient, snapshot) -> None:
     # comparison -- the rest of the response must stay byte-identical to the snapshot.
     assert isinstance(body, dict) and "run_id" in body and isinstance(body["run_id"], str)
     body.pop("run_id")
+    # ``artifact_revisions`` (issue #178) is additive and per-put unique, so likewise
+    # non-deterministic: check its shape, then keep it out of the golden.
+    revisions = body.pop("artifact_revisions")
+    assert revisions and all(isinstance(v, str) for v in revisions.values())
     assert body == snapshot
 
 

@@ -101,6 +101,32 @@ Per-node feedback:
   downstream dependents; untouched upstream nodes serve cached results (this is the DAG
   incremental-execution behavior from Epic 7 Story 6).
 
+**Explore this output (scratch loop).** In the Inspector's Results tab, *Explore this output*
+opens a Scratch tab: write a `def transform(value):` against that port's *stored* output and
+Run it (Cmd/Ctrl-Enter) to answer a one-off question (a grouped calculation, a fix for an
+error). It is bound to one node/port/revision; if the node is re-run or the stored output is
+evicted the run says so and asks you to re-run -- it never rebinds silently. *Save as code
+node* adds a `script.custom_code` node wired from that port (one undo step); *Discard* clears
+the scratch only. Drafts are in-memory, not part of the saved graph. REST: `POST /scratch/run`
+`{node_id, port, revision, code}` -> `{status: ok|error|expired|revision_mismatch, ...}`.
+
+Trust model: `/scratch/run` executes arbitrary Python in the server process, unsandboxed (like
+`custom_code`). It is refused (403) unless the client is a loopback address or presents the
+session bearer token (`EMERGENTFLOW_SESSION_TOKEN` / `--session-token`, the same token as
+`/sessions*`); binding `--host` to a non-loopback address does not by itself open it. A
+tokenless loopback request must also name a loopback host: its `Host` must be `localhost`,
+`127.0.0.1` or `[::1]`, any `Origin` must be that same loopback origin, and
+`Sec-Fetch-Site: cross-site` is refused -- so neither a cross-origin page nor a DNS-rebinding
+page (a hostile name resolved to 127.0.0.1) can drive it. Requests with an
+`X-Forwarded-For`/`Forwarded` header are not treated as loopback, so run the server behind a
+proxy only with the token configured. A run has a soft 30s timeout: Python cannot kill a
+thread, so a runaway `transform` is abandoned (the response returns a `TimeoutError`) but keeps
+consuming CPU until it finishes or the server restarts; at most 2 runs (abandoned ones
+included) are live at once, and a further run returns an `error` of type `ScratchBusy`.
+`exit()`/`SystemExit` in a transform is reported as an ordinary error. Each response also
+carries `promotable` / `promotable_reason`: whether the code is a top-level
+`def transform(value)` that *Save as code node* can turn into a compilable node.
+
 ## 4. Try it without the UI (API / CLI)
 
 The four REST endpoints are stable regardless of frontend:

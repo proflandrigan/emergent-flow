@@ -255,7 +255,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         from emergentflow import __version__, execute
         from emergentflow.codegen.params import resolve_graph_params
         from emergentflow.ir.serialize import deserialize_graph
-        from emergentflow.research.reproducibility import capture_run, resolve_dependency_versions
+        from emergentflow.research.reproducibility import (
+            capture_run,
+            default_dependency_packages,
+            fingerprint_data_sources,
+            resolve_dependency_versions,
+        )
         from emergentflow.server.payload import to_payload
 
         graph = deserialize_graph(raw_text)
@@ -335,12 +340,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             for port_name, value in ports.items():
                 payloads[node_id][port_name] = to_payload(value)
 
-        # Capture reproducibility
+        # Capture reproducibility against the graph that was actually EXECUTED: ref'd node
+        # params baked to their resolved values (stored value + any --param override), so a
+        # ref'd loader path is fingerprinted (and config-hashed) as the run read it, not as the
+        # stale literal in the file.
         try:
-            deps = resolve_dependency_versions([])
+            from emergentflow.codegen.params import has_graph_param_refs, materialize_graph
+
+            run_graph = (
+                materialize_graph(graph, params=params)
+                if params or has_graph_param_refs(graph)
+                else graph
+            )
+            deps = resolve_dependency_versions(default_dependency_packages())
             repro = capture_run(
-                graph,
+                run_graph,
                 dependency_versions=deps,
+                data_fingerprints=fingerprint_data_sources(run_graph, params=params),
                 # Record every graph-level param's RESOLVED value (stored value with any
                 # --param override applied), not just the override keys -- a partial map
                 # would make a multi-param run's record incomplete.
@@ -351,6 +367,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "content_hashes": repro.content_hashes,
                 "dependency_versions": repro.dependency_versions,
                 "params": repro.params,
+                "data_fingerprints": repro.data_fingerprints,
             }
         except Exception:
             pass

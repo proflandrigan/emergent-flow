@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from pathlib import Path
 
@@ -264,6 +265,43 @@ def test_graph_hash_includes_param_overrides(tmp_path) -> None:
     assert h_default != h_diff, "different param overrides must change the hash"
 
 
+def test_run_record_captures_data_fingerprints_and_dependencies(tmp_path, monkeypatch) -> None:
+    """Changed bytes at the same path give a different fingerprint in the saved run record, and
+    dependency_versions is no longer empty."""
+    import emergentflow.server.runs as runs_mod
+    from emergentflow.ir.common import Direction
+    from emergentflow.ir.graph import Graph
+    from emergentflow.ir.node import Node
+    from emergentflow.ir.params import Param
+    from emergentflow.ir.port import Port
+    from emergentflow.server.service import _save_run_record
+
+    monkeypatch.setattr(runs_mod, "_default_runs", RunStore(tmp_path / "runs", keep=50))
+    data = tmp_path / "t.csv"
+    loader = Node(
+        id="load",
+        type="data.load_csv",
+        params=[Param(name="path", type_token="str", value=str(data))],
+        ports=[Port(id="p1", name="frame", direction=Direction.OUT, data_type="DataFrame")],
+    )
+    graph = Graph(name="g", nodes={"load": loader})
+
+    def record(text: str) -> dict:
+        data.write_text(text)
+        run_id = _save_run_record(graph, {"name": "g"}, {}, {"load": {"status": "ok"}})
+        assert run_id is not None
+        return runs_mod.get_default_runs().get(run_id)["reproducibility"]
+
+    first, second = record("a\n1\n"), record("a\n2\n")
+    assert first["content_hashes"] == second["content_hashes"]
+    assert first["data_fingerprints"]["load"]["kind"] == "file"
+    assert (
+        first["data_fingerprints"]["load"]["sha256"]
+        != second["data_fingerprints"]["load"]["sha256"]
+    )
+    assert first["dependency_versions"].get("emergentflow")
+
+
 def test_routes_list_empty(runs_client: TestClient) -> None:
     resp = runs_client.get("/runs")
     assert resp.status_code == 200
@@ -349,3 +387,99 @@ def test_routes_save_then_delete(runs_client: TestClient) -> None:
 
     resp = runs_client.get(f"/runs/{run_id}")
     assert resp.status_code == 404
+
+
+def _stream_events(client: TestClient, body: dict) -> list[dict]:
+    resp = client.post("/execute/stream", json=body)
+    assert resp.status_code == 200
+    return [
+        json.loads(line[len("data: ") :])
+        for line in resp.text.splitlines()
+        if line.startswith("data: ")
+    ]
+
+
+def _stream_csv_graph(path: str) -> dict:
+    from emergentflow.ir import Direction, Graph, Node, Paradigm, Param, Port
+    from emergentflow.ir.serialize import serialize_graph
+
+    load = Node(
+        id="load",
+        type="data.load_csv",
+        label="Load CSV",
+        paradigm=Paradigm.FUNCTIONAL,
+        params=[Param(name="path", type_token="str", value=path)],
+        ports=[Port(id="p1", name="frame", direction=Direction.OUT, data_type="DataFrame")],
+    )
+    graph = Graph(name="stream", paradigm=Paradigm.FUNCTIONAL, nodes={"load": load})
+    return json.loads(serialize_graph(graph))
+
+
+def test_stream_full_run_persists_record_under_reported_run_id(runs_client, tmp_path) -> None:
+    csv = tmp_path / "t.csv"
+    csv.write_text("a,b\n1,2\n3,4\n")
+    events = _stream_events(runs_client, _stream_csv_graph(str(csv)))
+    complete = events[-1]
+    assert complete["type"] == "run_complete"
+    run_id = complete["run_id"]
+
+    resp = runs_client.get(f"/runs/{run_id}")
+    assert resp.status_code == 200
+    record = resp.json()
+    assert record["run_id"] == run_id
+    assert record["statuses"]["load"]["status"] == "ok"
+    repro = record["reproducibility"]
+    assert len(repro["data_fingerprints"]["load"]["sha256"]) == 64
+    assert repro["dependency_versions"]
+
+
+def test_stream_scoped_run_writes_no_record(runs_client, tmp_path) -> None:
+    csv = tmp_path / "t.csv"
+    csv.write_text("a\n1\n")
+    for scope in ({"run_only": "load"}, {"run_from": "load"}):
+        events = _stream_events(runs_client, {"graph": _stream_csv_graph(str(csv)), **scope})
+        assert events[-1]["type"] == "run_complete"
+        # Scoped runs are never persisted, so run_complete reports no id (like /execute).
+        assert events[-1]["run_id"] is None
+    assert runs_client.get("/runs").json()["runs"] == []
+
+
+def test_stream_unsaved_run_reports_null_run_id(runs_client, tmp_path, monkeypatch) -> None:
+    import emergentflow.server.service as service
+
+    monkeypatch.setattr(service, "_save_run_record", lambda *a, **k: None)
+    csv = tmp_path / "t.csv"
+    csv.write_text("a\n1\n")
+    events = _stream_events(runs_client, _stream_csv_graph(str(csv)))
+    assert events[-1]["type"] == "run_complete"
+    assert events[-1]["run_id"] is None
+
+
+def test_stream_errored_loader_is_not_fingerprinted(runs_client, tmp_path) -> None:
+    """A loader that errored read nothing; its source must not appear as a run input."""
+    missing = tmp_path / "missing.csv"
+    events = _stream_events(runs_client, _stream_csv_graph(str(missing)))
+    assert any(e["type"] == "node_error" for e in events)
+    run_id = events[-1]["run_id"]
+    assert run_id is not None
+    record = runs_client.get(f"/runs/{run_id}").json()
+    assert record["statuses"]["load"]["status"] == "error"
+    assert "load" not in record["reproducibility"]["data_fingerprints"]
+
+
+def test_save_run_record_skips_errored_loaders(tmp_path, monkeypatch) -> None:
+    """The shared /execute + stream persistence path only fingerprints ok/cached loaders."""
+    import emergentflow.server.runs as runs_mod
+    from emergentflow.server.service import _save_run_record
+
+    monkeypatch.setattr(runs_mod, "_default_runs", RunStore(tmp_path / "runs", keep=50))
+    csv = tmp_path / "t.csv"
+    csv.write_text("a\n1\n")
+    from emergentflow.ir.serialize import deserialize_graph
+
+    graph = deserialize_graph(json.dumps(_stream_csv_graph(str(csv))))
+    for status, expected in (("ok", True), ("cached", True), ("error", False), ("skipped", False)):
+        run_id = _save_run_record(graph, {"name": "g"}, {}, {"load": {"status": status}})
+        assert run_id is not None
+        fps = runs_mod.get_default_runs().get(run_id)["reproducibility"]["data_fingerprints"]
+        assert ("load" in fps) is expected, status

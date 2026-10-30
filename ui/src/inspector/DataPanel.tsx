@@ -6,11 +6,15 @@ import { useMemo, useState } from "react";
 import type { Payload } from "../store/execution";
 import { useExecutionStore } from "../store/executionStore";
 import { selectedNodeId, useSelectionStore } from "../store/selectionStore";
+import { FrameBrowser } from "./FrameBrowser";
 
 type SortDir = "asc" | "desc" | null;
 
 interface TableExplorerProps {
+  nodeId: string;
   portName: string;
+  /** Artifact-store revision of this node's last run; absent -> fall back to the labelled preview. */
+  revision?: string;
   payload: Extract<Payload, { kind: "table" }>;
 }
 
@@ -39,7 +43,7 @@ const filterInputStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
-function TableExplorer({ portName, payload }: TableExplorerProps): JSX.Element {
+function TableExplorer({ nodeId, portName, revision, payload }: TableExplorerProps): JSX.Element {
   const { columns, dtypes, head, shape, describe } = payload;
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
@@ -78,10 +82,33 @@ function TableExplorer({ portName, payload }: TableExplorerProps): JSX.Element {
     return rows;
   }, [head, filter, sortCol, sortDir, columns]);
 
+  if (revision !== undefined) {
+    return (
+      <div style={{ marginBottom: "1rem" }}>
+        <div style={{ fontWeight: 600, marginBottom: "0.25rem", fontSize: 12 }}>
+          {portName} — {shape[0]} rows × {shape[1]} cols
+        </div>
+        <FrameBrowser
+          nodeId={nodeId}
+          portName={portName}
+          revision={revision}
+          columns={columns}
+          dtypes={dtypes}
+        />
+      </div>
+    );
+  }
+
   return (
     <div style={{ marginBottom: "1rem" }}>
       <div style={{ fontWeight: 600, marginBottom: "0.25rem", fontSize: 12 }}>
         {portName} — {shape[0]} rows × {shape[1]} cols
+      </div>
+      <div data-testid="data-preview-label" style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: "0.25rem" }}>
+        Preview — first {head.length} of {shape[0]} rows; filter/sort apply to the preview only.{" "}
+        <span data-testid="data-preview-counts">
+          Showing {filtered.length} of {head.length} preview rows.
+        </span>
       </div>
       <input
         type="text"
@@ -178,6 +205,7 @@ export function DataPanel(): JSX.Element {
   const selNodes = useSelectionStore((s) => s.nodes);
   const nodeId = selectedNodeId({ nodes: selNodes });
   const results = useExecutionStore((s) => s.results);
+  const revision = useExecutionStore((s) => (nodeId ? s.nodeRevisions[nodeId] : undefined));
 
   if (!nodeId) {
     return (
@@ -211,7 +239,13 @@ export function DataPanel(): JSX.Element {
   return (
     <div data-testid="data-panel">
       {tableEntries.map(([portName, payload]) => (
-        <TableExplorer key={portName} portName={portName} payload={payload} />
+        <TableExplorer
+          key={portName}
+          nodeId={nodeId}
+          portName={portName}
+          revision={revision}
+          payload={payload}
+        />
       ))}
     </div>
   );

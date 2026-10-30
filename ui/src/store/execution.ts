@@ -24,10 +24,21 @@ export interface NodeRunStatus {
   reason?: string;
 }
 
+/** Identity of a completed run: `runId` is null when the server supplied none. */
+export interface RunMeta {
+  runId: string | null;
+  /** ISO-8601 UTC completion timestamp. */
+  finishedAt: string;
+}
+
 export const EXPECTED_PAYLOAD_VERSION = 2;
 
 export interface ExecuteResponse {
   payload_version: number;
   results: Record<string, Record<string, Payload>>;
   statuses: Record<string, NodeRunStatus>;
+  /** Artifact-store revision per node stored during this run (additive; absent on older servers). */
+  artifact_revisions?: Record<string, string>;
+  /** Id of the persisted run record; null for partial scopes or when saving failed. */
+  run_id?: string | null;
 }

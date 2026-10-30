@@ -11,6 +11,7 @@ import { ConsultAffordance } from "../session/ConsultAffordance";
 import { familyMeta } from "../theme/family";
 import { useExecutionStore } from "../store/executionStore";
 import { useGraphStore } from "../store/graphStore";
+import { useScratchStore } from "../store/scratchStore";
 import { selectedNodeId, useSelectionStore } from "../store/selectionStore";
 import { IconButton } from "../ui/IconButton";
 import { OverlayModal } from "../ui/OverlayModal";
@@ -23,12 +24,13 @@ import { FlowParamsPanel } from "./FlowParamsPanel";
 import { LineagePanel } from "./LineagePanel";
 import { PayloadView } from "./PayloadView";
 import { isRecommendationPayload, RecommendationsPanel } from "./RecommendationsPanel";
+import { ScratchPanel } from "./ScratchPanel";
 import { StepsPanel } from "./StepsPanel";
 import { DataPanel } from "./DataPanel";
 import type { Payload } from "../store/execution";
 import type { NodeModel } from "../store/model";
 
-type InspectorTab = "config" | "code" | "results" | "steps" | "lineage" | "data";
+type InspectorTab = "config" | "code" | "results" | "steps" | "lineage" | "data" | "scratch";
 
 export interface InspectorProps {
   // Panel-level chrome (App's collapse toggle) rendered alongside the expand button, so the
@@ -63,6 +65,7 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
   const results = useExecutionStore((s) => s.results);
   const statuses = useExecutionStore((s) => s.statuses);
   const lastRunAt = useExecutionStore((s) => s.lastRunAt);
+  const nodeRevisions = useExecutionStore((s) => s.nodeRevisions);
 
   // Close the expanded inspector modal whenever the selected node changes -- otherwise
   // switching to a node with no results unmounts the modal (its content vanishes) but
@@ -123,6 +126,7 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
             testId: "inspector-tab-results",
           },
           { value: "data", label: "Data", testId: "inspector-tab-data" },
+          { value: "scratch", label: "Scratch", testId: "inspector-tab-scratch" },
           {
             value: "lineage",
             label: "Lineage",
@@ -154,6 +158,7 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
     // Lineage is traced from the graph shape alone, so unlike Results it needs no prior run --
     // the panel POSTs to /lineage for whichever node is selected (Epic 16, Story 23).
     if (tab === "data") return <DataPanel />;
+    if (tab === "scratch") return <ScratchPanel onDone={() => setTab("results")} />;
     if (tab === "lineage") return <LineagePanel nodeId={nodeId} />;
     return renderResults();
   }
@@ -260,6 +265,25 @@ export function Inspector({ chrome }: InspectorProps): JSX.Element {
                   }}
                 >
                   <Pin size={12} />
+                </button>
+                <button
+                  type="button"
+                  data-testid={`explore-output-${portName}`}
+                  disabled={nodeRevisions[nodeId] === undefined}
+                  title={
+                    nodeRevisions[nodeId] === undefined
+                      ? "Re-run the graph to explore this output"
+                      : "Explore this output"
+                  }
+                  onClick={() => {
+                    useScratchStore
+                      .getState()
+                      .open(nodeId, portName, node?.label ?? node?.type ?? nodeId, nodeRevisions[nodeId]);
+                    setTab("scratch");
+                  }}
+                  style={{ marginLeft: "auto", fontSize: 11 }}
+                >
+                  Explore this output
                 </button>
               </div>
               {isRecommendation ? (

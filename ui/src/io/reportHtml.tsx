@@ -6,13 +6,14 @@ import remarkGfm from "remark-gfm";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
+  formatRunEvidence,
   parseBlocks,
-  splitSource,
+  resolveBlockState,
   type ResultCardBlock,
 } from "../canvas/resultCardBlocks";
 import { PayloadView } from "../inspector/PayloadView";
 import type { Tour, TourStep } from "../session/sessionClient";
-import type { Payload } from "../store/execution";
+import type { NodeRunStatus, Payload, RunMeta } from "../store/execution";
 import type { NodeModel } from "../store/model";
 
 export interface ReportCard {
@@ -70,7 +71,7 @@ pre { background: var(--surface-2); padding: 0.5rem; overflow-x: auto; }
 .caption { font-size: 0.85rem; }
 .conclusion { border-left: 3px solid var(--border-subtle); padding-left: 0.75rem; }
 .open-questions { border-left: 3px solid #d97706; padding-left: 0.75rem; }
-.anchors { font-size: 0.85rem; }
+.anchors, .evidence { font-size: 0.85rem; }
 `;
 
 function renderMarkdown(text: string): string {
@@ -117,18 +118,32 @@ function renderTour(tour: Tour): string {
   );
 }
 
-function renderBlock(
-  block: ResultCardBlock,
-  results: Record<string, Record<string, Payload>>,
-): string {
+interface RenderContext {
+  results: Record<string, Record<string, Payload>>;
+  statuses: Record<string, NodeRunStatus>;
+  nodeRunMeta: Record<string, RunMeta>;
+  nodeLabels: Record<string, string>;
+}
+
+function renderBlock(block: ResultCardBlock, ctx: RenderContext): string {
   if (block.kind === "markdown") {
     return renderMarkdown(block.text);
   }
-  const split = splitSource(block.source);
-  const payload = split ? results[split.nodeId]?.[split.port] : undefined;
-  let out = payload
-    ? `<div>${lockDownIframes(renderToStaticMarkup(<PayloadView payload={payload} />))}</div>`
-    : `<p class="muted">No result available (graph not run).</p>`;
+  const resolved = resolveBlockState(block, ctx.results, ctx.statuses, ctx.nodeRunMeta);
+  const evidence = formatRunEvidence(resolved.runId, resolved.finishedAt, true);
+  const label = ctx.nodeLabels[resolved.nodeId];
+  const sourceText = `Source: ${label ? `${label} (${resolved.nodeId})` : resolved.nodeId}, port ${resolved.port}`;
+  let out: string;
+  if (resolved.state === "ok" && resolved.payload) {
+    out = `<div>${lockDownIframes(renderToStaticMarkup(<PayloadView payload={resolved.payload} />))}</div>`;
+    out += `<p class="muted evidence">${escapeHtml(sourceText)}${evidence !== "" ? ` \u00b7 ${escapeHtml(evidence)}` : ""}</p>`;
+  } else if (resolved.state === "failed") {
+    out = `<p class="muted">Source failed \u2014 no result available.</p>`;
+    out += `<p class="muted evidence">${escapeHtml(sourceText)}</p>`;
+  } else {
+    out = `<p class="muted">No result available (graph not run).</p>`;
+    out += `<p class="muted evidence">${escapeHtml(sourceText)}</p>`;
+  }
   if (block.caption !== "") {
     out += `<p class="caption">${escapeHtml(block.caption)}</p>`;
   }
@@ -139,9 +154,21 @@ export function buildReportHtml(opts: {
   graphName: string;
   cards: ReportCard[];
   results: Record<string, Record<string, Payload>>;
+  /** Per-node run statuses; lets the report tell a failed source from one never run. */
+  statuses?: Record<string, NodeRunStatus>;
+  /** Per-node identity (run id + UTC finish time) of the run each node's result came from. */
+  nodeRunMeta?: Record<string, RunMeta>;
+  /** node id -> display label, used for the evidence line. */
+  nodeLabels?: Record<string, string>;
   tours?: Tour[];
 }): string {
   const tours = opts.tours ?? [];
+  const ctx: RenderContext = {
+    results: opts.results,
+    statuses: opts.statuses ?? {},
+    nodeRunMeta: opts.nodeRunMeta ?? {},
+    nodeLabels: opts.nodeLabels ?? {},
+  };
   const cardsBody =
     opts.cards.length === 0
       ? tours.length === 0
@@ -151,7 +178,7 @@ export function buildReportHtml(opts: {
           .map(
             (card) =>
               `<section><h2>${escapeHtml(card.title)}</h2>${card.blocks
-                .map((b) => renderBlock(b, opts.results))
+                .map((b) => renderBlock(b, ctx))
                 .join("\n")}</section>`,
           )
           .join("\n");

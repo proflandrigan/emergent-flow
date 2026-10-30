@@ -62,7 +62,7 @@ class ArtifactStore:
 
     Each entry is two files under ``root``: ``<node_id>.pkl`` (the pickled
     outputs dict) and ``<node_id>.meta.json`` (a sidecar with ``node_id``,
-    ``label``, ``sdk_version``, and ``timestamp``). Eviction is LRU by file
+    ``label``, ``sdk_version``, ``timestamp``, and a per-put ``revision``). Eviction is LRU by file
     mtime, run after every ``put()`` so the store stays under ``max_mb``
     continuously during a long-running server session. A read (``get``) also
     refreshes the entry's mtime, so a frequently-reused artifact is protected
@@ -76,6 +76,7 @@ class ArtifactStore:
         self._root = root
         self._max_mb = max_mb
         self._lock = threading.Lock()
+        self._last_revision = 0
 
     @property
     def root(self) -> Path:
@@ -96,6 +97,16 @@ class ArtifactStore:
         never crash a graph run. Takes ``self._lock`` for the whole read so it
         can't race a concurrent ``put()``'s eviction pass.
         """
+        hit = self.get_with_revision(node_id)
+        return None if hit is None else hit[0]
+
+    def get_with_revision(self, node_id: str) -> tuple[dict[str, Any], str | None] | None:
+        """Return ``(outputs, revision)`` for *node_id*, or ``None`` on a miss.
+
+        The unpickle and the revision read happen under one lock hold, so the
+        pair is always consistent with a single ``put``. ``revision`` is ``None``
+        only for a legacy entry written before revisions existed.
+        """
         pkl_path = self._pkl_path(node_id)
         with self._lock:
             if not pkl_path.is_file():
@@ -105,36 +116,84 @@ class ArtifactStore:
                     outputs = pickle.load(f)
             except Exception:
                 return None
+            revision = self._read_revision(node_id)
             now = time.time()
             os.utime(pkl_path, (now, now))
             meta_path = self._meta_path(node_id)
             if meta_path.is_file():
                 os.utime(meta_path, (now, now))
-        return outputs
+        return outputs, revision
 
-    def put(self, node_id: str, outputs: dict[str, Any], *, label: str = "") -> None:
-        """Store *outputs* for *node_id*, with a ``.meta.json`` sidecar.
+    def get_meta(self, node_id: str) -> dict[str, Any] | None:
+        """Return the ``.meta.json`` sidecar for *node_id* without unpickling.
 
-        Idempotent by node id (a re-put overwrites in place). Runs LRU
-        eviction to ``max_mb`` afterward, unconditionally.
+        ``None`` on a miss (no pickle, or an unreadable sidecar). Does not
+        refresh LRU recency: peeking at metadata is not a use of the output.
         """
         with self._lock:
+            if not self._pkl_path(node_id).is_file():
+                return None
+            return self._read_meta(node_id)
+
+    def _read_meta(self, node_id: str) -> dict[str, Any] | None:
+        try:
+            meta = json.loads(self._meta_path(node_id).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        return meta if isinstance(meta, dict) else None
+
+    def _read_revision(self, node_id: str) -> str | None:
+        meta = self._read_meta(node_id)
+        revision = meta.get("revision") if meta else None
+        return revision if isinstance(revision, str) else None
+
+    def put(self, node_id: str, outputs: dict[str, Any], *, label: str = "") -> str:
+        """Store *outputs* for *node_id*, with a ``.meta.json`` sidecar.
+
+        Idempotent by node id (a re-put overwrites in place). Returns a fresh
+        revision id (also written to the sidecar) that changes on every put, so
+        a caller can later detect that the stored output was replaced or evicted.
+        Both files are written via tmp + ``os.replace``. Runs LRU eviction to
+        ``max_mb`` afterward, unconditionally.
+        """
+        with self._lock:
+            revision = self._next_revision()
             pkl_path = self._pkl_path(node_id)
-            with pkl_path.open("wb") as f:
-                pickle.dump(outputs, f)
+            pkl_tmp = pkl_path.with_name(pkl_path.name + ".tmp")
             meta_path = self._meta_path(node_id)
-            meta_path.write_text(
-                json.dumps(
-                    {
-                        "node_id": node_id,
-                        "label": label,
-                        "sdk_version": __version__,
-                        "timestamp": time.time(),
-                    }
-                ),
-                encoding="utf-8",
-            )
+            meta_tmp = meta_path.with_name(meta_path.name + ".tmp")
+            try:
+                with pkl_tmp.open("wb") as f:
+                    pickle.dump(outputs, f)
+                meta_tmp.write_text(
+                    json.dumps(
+                        {
+                            "node_id": node_id,
+                            "label": label,
+                            "sdk_version": __version__,
+                            "timestamp": time.time(),
+                            "revision": revision,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                os.replace(pkl_tmp, pkl_path)
+                os.replace(meta_tmp, meta_path)
+            finally:
+                pkl_tmp.unlink(missing_ok=True)
+                meta_tmp.unlink(missing_ok=True)
             self._evict_to_cap()
+        return revision
+
+    def _next_revision(self) -> str:
+        """A revision id strictly greater than every earlier one from this store.
+
+        Must be called with ``self._lock`` held. ``time_ns`` alone can repeat on
+        a coarse clock, so bump past the previous value when it does.
+        """
+        value = max(time.time_ns(), self._last_revision + 1)
+        self._last_revision = value
+        return f"{value:x}"
 
     def clear(self) -> None:
         """Remove every store file (both ``.pkl`` and ``.meta.json``) under ``root``."""
