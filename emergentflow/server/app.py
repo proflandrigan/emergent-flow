@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hmac
 import json
 import mimetypes
 import os
@@ -399,8 +400,27 @@ async def _require_session_auth(request: Request) -> None:
     """
     if not _session_auth_required:
         return
-    if request.headers.get("authorization") != f"Bearer {_session_auth_token}":
+    if not _bearer_matches(request):
         raise HTTPException(status_code=401, detail="missing or invalid bearer token")
+
+
+def _bearer_matches(request: Request) -> bool:
+    """Constant-time check of *request*'s ``Authorization`` header against the session token."""
+    token = _session_auth_token
+    if not token:
+        return False
+    presented = request.headers.get("authorization", "")
+    return hmac.compare_digest(presented.encode(), f"Bearer {token}".encode())
+
+
+def _hostname(netloc: str | None) -> str | None:
+    """Lower-cased hostname of a ``Host``-style *netloc* (brackets stripped), or None."""
+    if not netloc:
+        return None
+    try:
+        return urlsplit(f"//{netloc}").hostname
+    except ValueError:
+        return None
 
 
 async def _require_code_exec_access(request: Request) -> None:
@@ -408,14 +428,17 @@ async def _require_code_exec_access(request: Request) -> None:
 
     Allowed only for a loopback client (the trusted-local-app model) or a request bearing
     the configured session token -- binding to a non-loopback host does NOT open these
-    routes to the network on its own. A cross-origin browser request (``Origin`` host differs
-    from ``Host``) is refused even from loopback, so a web page the user visits cannot drive
-    it, and a proxy-forwarded request (``X-Forwarded-For``/``Forwarded``) is not trusted as
-    loopback. The token path is the same bearer token as ``/sessions*``.
+    routes to the network on its own. On the loopback path the request must also *name*
+    a loopback host: ``Host`` must be a loopback name and any ``Origin`` must be a loopback
+    origin equal to ``Host``, so neither a cross-origin page nor a DNS-rebinding page
+    (``attacker.example`` resolved to 127.0.0.1, same-origin from the browser's view) can
+    drive it; ``Sec-Fetch-Site: cross-site`` and a proxy-forwarded request
+    (``X-Forwarded-For``/``Forwarded``) are refused too. The token path is the same bearer
+    token as ``/sessions*``.
     """
-    headers = request.headers
-    if _session_auth_token and headers.get("authorization") == f"Bearer {_session_auth_token}":
+    if _bearer_matches(request):
         return
+    headers = request.headers
     client = request.client
     forwarded = "x-forwarded-for" in headers or "forwarded" in headers
     if client is None or client.host not in _LOOPBACK_HOSTS or forwarded:
@@ -423,8 +446,18 @@ async def _require_code_exec_access(request: Request) -> None:
             status_code=403,
             detail="code execution is limited to loopback clients or a bearer token",
         )
+    host = headers.get("host")
+    if _hostname(host) not in _LOOPBACK_HOSTS:
+        raise HTTPException(
+            status_code=403, detail="code execution requires a loopback Host header"
+        )
     origin = headers.get("origin")
-    if origin and urlsplit(origin).netloc != headers.get("host"):
+    if origin is not None:
+        origin_netloc = urlsplit(origin).netloc.lower()
+        same_host = origin_netloc == (host or "").lower()
+        if _hostname(origin_netloc) not in _LOOPBACK_HOSTS or not same_host:
+            raise HTTPException(status_code=403, detail="cross-origin code execution is refused")
+    if headers.get("sec-fetch-site", "").lower() == "cross-site":
         raise HTTPException(status_code=403, detail="cross-origin code execution is refused")
 
 

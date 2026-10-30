@@ -22,7 +22,12 @@ import threading
 import time
 from typing import Any
 
-from emergentflow.script import CaptureResult, TransformError, run_transform_capture
+from emergentflow.script import (
+    CaptureResult,
+    TransformError,
+    run_transform_capture,
+    transform_def_problem,
+)
 from emergentflow.server.artifacts import get_default_artifacts
 from emergentflow.server.service import _payload_for
 
@@ -32,6 +37,10 @@ SCRATCH_TIMEOUT_S = 30.0
 MAX_RESULT_BYTES = 4 * 1024 * 1024  # cap on the serialised result payload
 MAX_OUTPUT_CHARS = 65536  # cap on captured stdout / stderr each
 MAX_REPR_CHARS = 2000
+# Cap on live scratch workers, including ones abandoned by a timeout (they still hold a
+# slot until they really finish), so runaway code cannot pile up unbounded threads.
+MAX_CONCURRENT_RUNS = 2
+_run_slots = threading.BoundedSemaphore(MAX_CONCURRENT_RUNS)
 
 
 def _copy_for_transform(value: Any) -> Any:
@@ -43,16 +52,34 @@ def _copy_for_transform(value: Any) -> Any:
     return value
 
 
+def _error(type_: str, msg: str) -> CaptureResult:
+    return CaptureResult(None, "", "", TransformError(type_, msg, msg, None))
+
+
 def _run_with_timeout(code: str, value: Any, timeout_s: float) -> CaptureResult:
+    slots = _run_slots
+    if not slots.acquire(blocking=False):
+        return _error(
+            "ScratchBusy",
+            f"{MAX_CONCURRENT_RUNS} scratch runs are still running (possibly abandoned after "
+            "a timeout); wait for them to finish and retry",
+        )
     box: list[CaptureResult] = []
-    worker = threading.Thread(
-        target=lambda: box.append(run_transform_capture(code, value)), daemon=True
-    )
+
+    def work() -> None:
+        try:
+            box.append(run_transform_capture(code, value))
+        finally:
+            slots.release()
+
+    worker = threading.Thread(target=work, daemon=True)
     worker.start()
     worker.join(timeout_s)
-    if not box:
+    if worker.is_alive():
         msg = f"transform did not finish within {timeout_s:g}s (the thread cannot be killed)"
-        return CaptureResult(None, "", "", TransformError("TimeoutError", msg, msg, None))
+        return _error("TimeoutError", msg)
+    if not box:  # the worker died without a result (e.g. KeyboardInterrupt)
+        return _error("RuntimeError", "transform exited without producing a result")
     return box[0]
 
 
@@ -82,19 +109,25 @@ def run_scratch(payload: dict[str, Any]) -> dict[str, Any]:
     ``status`` is ``ok`` | ``error`` (user code failed; ``error`` has type/message/
     traceback/line) | ``expired`` (no stored output) | ``revision_mismatch`` (stored output
     replaced; ``current_revision`` says which). All four are HTTP 200; only a malformed
-    request raises (-> 422).
+    request raises (-> 422). Too many live runs (``MAX_CONCURRENT_RUNS``) is an ``error``
+    with type ``ScratchBusy``. Every envelope carries ``promotable`` (whether *code* is a
+    top-level ``def transform(value)`` a ``script.custom_code`` node can compile) and
+    ``promotable_reason`` (why not; ``None`` when promotable).
     """
     node_id, port, code = payload.get("node_id"), payload.get("port"), payload.get("code")
     if not isinstance(node_id, str) or not isinstance(port, str) or not isinstance(code, str):
         raise ValueError("scratch run requires string 'node_id', 'port' and 'code'")
     revision = payload.get("revision")
     started = time.perf_counter()
+    promotable_reason = transform_def_problem(code)
 
     def envelope(status: str, **extra: Any) -> dict[str, Any]:
         return {
             "status": status,
             "revision": revision,
             "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
+            "promotable": promotable_reason is None,
+            "promotable_reason": promotable_reason,
             **extra,
         }
 

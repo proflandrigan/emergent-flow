@@ -113,11 +113,19 @@ the scratch only. Drafts are in-memory, not part of the saved graph. REST: `POST
 Trust model: `/scratch/run` executes arbitrary Python in the server process, unsandboxed (like
 `custom_code`). It is refused (403) unless the client is a loopback address or presents the
 session bearer token (`EMERGENTFLOW_SESSION_TOKEN` / `--session-token`, the same token as
-`/sessions*`); binding `--host` to a non-loopback address does not by itself open it. Requests
-with a cross-origin `Origin` or an `X-Forwarded-For`/`Forwarded` header are not treated as
-loopback, so run the server behind a proxy only with the token configured. A run has a soft
-30s timeout: Python cannot kill a thread, so a runaway `transform` is abandoned (the response
-returns a `TimeoutError`) but keeps consuming CPU until it finishes or the server restarts.
+`/sessions*`); binding `--host` to a non-loopback address does not by itself open it. A
+tokenless loopback request must also name a loopback host: its `Host` must be `localhost`,
+`127.0.0.1` or `[::1]`, any `Origin` must be that same loopback origin, and
+`Sec-Fetch-Site: cross-site` is refused -- so neither a cross-origin page nor a DNS-rebinding
+page (a hostile name resolved to 127.0.0.1) can drive it. Requests with an
+`X-Forwarded-For`/`Forwarded` header are not treated as loopback, so run the server behind a
+proxy only with the token configured. A run has a soft 30s timeout: Python cannot kill a
+thread, so a runaway `transform` is abandoned (the response returns a `TimeoutError`) but keeps
+consuming CPU until it finishes or the server restarts; at most 2 runs (abandoned ones
+included) are live at once, and a further run returns an `error` of type `ScratchBusy`.
+`exit()`/`SystemExit` in a transform is reported as an ordinary error. Each response also
+carries `promotable` / `promotable_reason`: whether the code is a top-level
+`def transform(value)` that *Save as code node* can turn into a compilable node.
 
 ## 4. Try it without the UI (API / CLI)
 

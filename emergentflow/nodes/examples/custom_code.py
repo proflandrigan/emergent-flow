@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING, Any, cast
 from emergentflow.codegen.errors import CodegenError
 from emergentflow.ir.common import Direction
 from emergentflow.ir.node import Node
+from emergentflow.script import TRANSFORM_SIGNATURE_PROBLEM, find_transform_def
 from emergentflow.script import run_code as script_run_code
 
 from ..contract import CodeFragment, NodeDefinition
@@ -42,8 +43,6 @@ from ..spec import ParamSpec, PortSpec, ValidationHints
 
 if TYPE_CHECKING:
     from emergentflow.codegen.context import CodegenContext
-
-_REQUIRED_FUNCTION_NAME = "transform"
 
 
 @register
@@ -96,21 +95,10 @@ class CustomCode(NodeDefinition):
         fn_name = f"_transform_{ctx.out_var('result')}"
 
         tree = ast.parse(code)
-        renamed = False
-        for stmt in tree.body:
-            if (
-                isinstance(stmt, ast.FunctionDef)
-                and stmt.name == _REQUIRED_FUNCTION_NAME
-                and len(stmt.args.args) == 1
-            ):
-                stmt.name = fn_name
-                renamed = True
-                break
-        if not renamed:
-            raise CodegenError(
-                f"{self.type!r}: 'code' must define a top-level function "
-                f"'{_REQUIRED_FUNCTION_NAME}(value)' taking exactly one argument."
-            )
+        transform_def = find_transform_def(tree)
+        if transform_def is None:
+            raise CodegenError(f"{self.type!r}: 'code' {TRANSFORM_SIGNATURE_PROBLEM}")
+        transform_def.name = fn_name
 
         # AST-based renaming (rather than re-indenting the raw text and nesting it
         # inside a wrapper) so multi-line strings/docstrings in the user's code are
@@ -140,15 +128,6 @@ class CustomCode(NodeDefinition):
         except SyntaxError as exc:
             errors.append(f"param 'code' failed to parse: {exc}")
             return errors
-        has_transform = any(
-            isinstance(stmt, ast.FunctionDef)
-            and stmt.name == _REQUIRED_FUNCTION_NAME
-            and len(stmt.args.args) == 1
-            for stmt in tree.body
-        )
-        if not has_transform:
-            errors.append(
-                f"param 'code' must define a top-level function "
-                f"'{_REQUIRED_FUNCTION_NAME}(value)' taking exactly one argument."
-            )
+        if find_transform_def(tree) is None:
+            errors.append(f"param 'code' {TRANSFORM_SIGNATURE_PROBLEM}")
         return errors

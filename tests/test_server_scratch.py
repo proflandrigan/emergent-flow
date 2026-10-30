@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
@@ -9,12 +11,14 @@ from fastapi.testclient import TestClient
 from emergentflow.codegen.executor import execute
 from emergentflow.ir import Direction, Edge, Graph, PortRef
 from emergentflow.nodes.examples import CustomCode, LoadCsv
-from emergentflow.script import run_transform_capture
+from emergentflow.script import CaptureResult, run_transform_capture
 from emergentflow.server import artifacts as artifacts_mod
+from emergentflow.server import scratch as scratch_mod
 from emergentflow.server.app import configure_session_auth, create_app
 from emergentflow.server.artifacts import ArtifactStore
 from tests.test_codegen_equivalence import assert_equivalent
 
+LOOPBACK_URL = "http://127.0.0.1:8765"
 GROUPBY = "def transform(value):\n    return value.groupby('g', as_index=False)['x'].sum()"
 
 
@@ -27,8 +31,9 @@ def store(monkeypatch, tmp_path) -> ArtifactStore:
 
 @pytest.fixture
 def client(store) -> TestClient:
-    # TestClient's default peer is "testclient"; scratch runs are loopback-only, so say so.
-    return TestClient(create_app(), client=("127.0.0.1", 50000))
+    # TestClient's default peer is "testclient" and Host "testserver"; scratch runs need a
+    # loopback peer AND a loopback Host (DNS-rebinding guard), so say both.
+    return TestClient(create_app(), base_url=LOOPBACK_URL, client=("127.0.0.1", 50000))
 
 
 def _frame() -> pd.DataFrame:
@@ -153,8 +158,117 @@ def test_cross_origin_and_forwarded_loopback_requests_are_refused(client, store)
     assert cross.status_code == 403
     fwd = client.post("/scratch/run", json=body, headers={"X-Forwarded-For": "203.0.113.9"})
     assert fwd.status_code == 403
-    same = client.post("/scratch/run", json=body, headers={"Origin": "http://testserver"})
+    same = client.post("/scratch/run", json=body, headers={"Origin": LOOPBACK_URL})
     assert same.status_code == 200
+    null = client.post("/scratch/run", json=body, headers={"Origin": "null"})
+    assert null.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        # DNS rebinding: attacker.example resolves to 127.0.0.1, so the page is same-origin.
+        {"Host": "attacker.example:8765", "Origin": "http://attacker.example:8765"},
+        {"Host": "attacker.example:8765"},  # no Origin (e.g. a simple request)
+        {"Origin": "http://attacker.example:8765"},  # loopback Host, foreign Origin
+        {"Origin": "http://localhost:9999"},  # loopback Origin but not this Host
+        {"Sec-Fetch-Site": "cross-site"},
+    ],
+)
+def test_dns_rebinding_and_cross_site_loopback_requests_are_refused(client, store, headers) -> None:
+    body = {"node_id": "n1", "port": "frame", "revision": "x", "code": "x"}
+    assert client.post("/scratch/run", json=body, headers=headers).status_code == 403
+
+
+@pytest.mark.parametrize("host", ["localhost:8765", "127.0.0.1:8765", "[::1]:8765", "LOCALHOST"])
+def test_loopback_host_names_are_allowed(client, store, host) -> None:
+    body = {"node_id": "gone", "port": "frame", "revision": "x", "code": "x"}
+    headers = {"Host": host, "Origin": f"http://{host}", "Sec-Fetch-Site": "same-origin"}
+    r = client.post("/scratch/run", json=body, headers=headers)
+    assert (r.status_code, r.json()["status"]) == (200, "expired")
+
+
+def test_foreign_host_with_token_is_allowed(store) -> None:
+    configure_session_auth(required=True, token="secret")
+    try:
+        c = TestClient(create_app(), base_url="http://box.lan:8765", client=("203.0.113.9", 1))
+        body = {"node_id": "gone", "port": "frame", "revision": "x", "code": "x"}
+        ok = c.post("/scratch/run", json=body, headers={"Authorization": "Bearer secret"})
+        assert ok.status_code == 200
+    finally:
+        configure_session_auth(required=False)
+
+
+# -- user-code edge cases ---------------------------------------------------------------
+
+
+@pytest.mark.parametrize("stmt", ["raise SystemExit(1)", "exit()", "import sys; sys.exit('bye')"])
+def test_system_exit_is_an_error_not_a_timeout(client, store, monkeypatch, stmt) -> None:
+    monkeypatch.setattr(scratch_mod, "SCRATCH_TIMEOUT_S", 5.0)
+    out = _run(client, store, f"def transform(value):\n    {stmt}")
+    assert out["status"] == "error"
+    assert out["error"]["type"] == "SystemExit"
+    assert out["elapsed_ms"] < 5000
+
+
+def test_print_to_sys_stdout_is_captured() -> None:
+    code = "import sys\ndef transform(value):\n    print('hi', file=sys.stdout)\n    return 1"
+    assert run_transform_capture(code, None).stdout == "hi\n"
+
+
+def test_runaway_workers_are_capped_and_reported_busy(monkeypatch) -> None:
+    release = threading.Event()
+
+    def stuck(code: str, value: object) -> CaptureResult:
+        release.wait(10)  # bounded, so a failing test can never hang the suite
+        return CaptureResult(1, "", "", None)
+
+    monkeypatch.setattr(scratch_mod, "run_transform_capture", stuck)
+    monkeypatch.setattr(scratch_mod, "_run_slots", threading.BoundedSemaphore(2))
+    started = threading.active_count()
+    try:
+        for _ in range(2):
+            timed_out = scratch_mod._run_with_timeout("x", None, 0.05)
+            assert timed_out.error is not None and timed_out.error.type == "TimeoutError"
+        busy = scratch_mod._run_with_timeout("x", None, 0.05)
+        assert busy.error is not None and busy.error.type == "ScratchBusy"
+        assert threading.active_count() <= started + 2  # no third thread was spawned
+    finally:
+        release.set()
+    # once the abandoned workers finish, their slots free up again
+    for _ in range(100):
+        if scratch_mod._run_slots.acquire(blocking=False):
+            scratch_mod._run_slots.release()
+            break
+        threading.Event().wait(0.02)
+    assert scratch_mod._run_with_timeout("x", None, 1.0).value == 1
+
+
+# -- promotability ----------------------------------------------------------------------
+
+
+def test_promotable_def_transform(client, store) -> None:
+    out = _run(client, store, GROUPBY)
+    assert (out["promotable"], out["promotable_reason"]) == (True, None)
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "transform = lambda v: v",
+        "def transform(value, scale=2):\n    return value",
+        "x = 1",
+        "def transform(value:\n    return value",
+    ],
+)
+def test_unpromotable_code_is_flagged_and_matches_custom_code_validation(
+    client, store, code
+) -> None:
+    out = _run(client, store, code)
+    assert out["promotable"] is False
+    assert isinstance(out["promotable_reason"], str) and out["promotable_reason"]
+    node = CustomCode().instantiate(code=code)
+    assert CustomCode().validate_node(node)  # the node built from it would not validate
 
 
 # -- promoted code is equivalent via scratch, execute() and codegen ------------------------

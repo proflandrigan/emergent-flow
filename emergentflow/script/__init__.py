@@ -17,6 +17,7 @@ delegates to an injected client.
 
 from __future__ import annotations
 
+import ast
 import builtins
 import io
 import sys
@@ -33,6 +34,9 @@ __all__ = [
     "CaptureResult",
     "CustomCodeError",
     "TransformError",
+    "TRANSFORM_SIGNATURE_PROBLEM",
+    "find_transform_def",
+    "transform_def_problem",
 ]
 
 _REQUIRED_FUNCTION_NAME = "transform"
@@ -89,6 +93,42 @@ def _load_transform(code: str, namespace: dict[str, Any]) -> Callable[[Any], Any
     return transform
 
 
+TRANSFORM_SIGNATURE_PROBLEM = (
+    f"must define a top-level function '{_REQUIRED_FUNCTION_NAME}(value)' "
+    "taking exactly one argument."
+)
+
+
+def find_transform_def(tree: ast.Module) -> ast.FunctionDef | None:
+    """The first top-level ``def transform(value)`` (exactly one positional parameter).
+
+    The single definition of "promotable" custom code: a ``script.custom_code`` node's
+    ``validate_node`` and ``codegen`` both use it, and ``/scratch/run`` reports it, so a
+    scratch the UI offers to save as a node is one that node can compile. ``run_code``
+    itself is looser (any callable ``transform``, e.g. a lambda), so execute semantics
+    are unchanged.
+    """
+    for stmt in tree.body:
+        if (
+            isinstance(stmt, ast.FunctionDef)
+            and stmt.name == _REQUIRED_FUNCTION_NAME
+            and len(stmt.args.args) == 1
+        ):
+            return stmt
+    return None
+
+
+def transform_def_problem(code: str) -> str | None:
+    """Why *code* is not a node-compilable ``def transform(value)``, or None if it is."""
+    try:
+        tree = ast.parse(code)
+    except (SyntaxError, ValueError) as exc:
+        return f"code failed to parse: {exc}"
+    if find_transform_def(tree) is None:
+        return f"code {TRANSFORM_SIGNATURE_PROBLEM}"
+    return None
+
+
 @dataclass(frozen=True)
 class TransformError:
     """A structured custom-code failure: what went wrong and where in the user's code."""
@@ -131,20 +171,24 @@ def run_transform_capture(code: str, value: Any) -> CaptureResult:
     exec namespace's builtins, rather than swapping ``sys.stdout`` -- that is
     process-global, so concurrent calls would interleave, and a call abandoned by a
     timeout would leave ``sys.stdout`` redirected. Output written straight to
-    ``sys.stdout``/``sys.stderr`` bypasses capture; ``print(..., file=sys.stderr)``
-    is captured as stderr. Any ``Exception`` from compile or ``transform`` becomes a
-    ``TransformError`` carrying the type, message, traceback, and the line in *code*.
+    ``sys.stdout``/``sys.stderr`` bypasses capture; ``print(..., file=sys.stdout)`` and
+    ``print(..., file=sys.stderr)`` are captured as stdout/stderr. Any exception from
+    compile or ``transform`` -- including ``SystemExit`` (``exit()``/``sys.exit()``), but
+    not ``KeyboardInterrupt`` -- becomes a ``TransformError`` carrying the type, message,
+    traceback, and the line in *code*.
     """
     out, err = io.StringIO(), io.StringIO()
 
     def _print(*args: Any, file: Any = None, **kwargs: Any) -> None:
-        target = err if file is sys.stderr else out if file is None else file
+        target = err if file is sys.stderr else out if file is None or file is sys.stdout else file
         builtins.print(*args, file=target, **kwargs)
 
     namespace: dict[str, Any] = {"__builtins__": {**vars(builtins), "print": _print}}
     try:
         result = _load_transform(code, namespace)(value)
-    except Exception as exc:  # noqa: BLE001 - user code may raise anything; report it
+    except KeyboardInterrupt:
+        raise
+    except BaseException as exc:  # noqa: BLE001 - user code may raise anything (even exit()); report it
         text = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
         error = TransformError(type(exc).__name__, str(exc), text, _custom_code_line(exc))
         return CaptureResult(None, out.getvalue(), err.getvalue(), error)
