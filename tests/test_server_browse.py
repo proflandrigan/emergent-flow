@@ -178,3 +178,94 @@ def test_limit_is_capped(store: ArtifactStore, client: TestClient) -> None:
     _put(store)
     body = _post(client, limit=100000).json()
     assert body["limit"] == browse.MAX_LIMIT == len(body["rows"])
+
+
+def test_non_string_column_labels(store: ArtifactStore, client: TestClient) -> None:
+    # int labels (from an ndarray / a pivot on years) and MultiIndex tuples are addressed by
+    # their stringified name, matching the 50-row preview's ``str(label)`` keys.
+    _put(
+        store,
+        pd.DataFrame({"a": [1, 2, 3], "b": [30, 10, 20]}).rename(columns={"a": 2020, "b": 2021}),
+    )
+    body = _post(
+        client,
+        filters=[{"column": "2020", "operator": ">", "value": 1}],
+        sort=[{"column": "2021", "ascending": True}],
+        columns=["2021"],
+    ).json()
+    assert body["columns"] == ["2021"] and body["dtypes"] == ["int64"]
+    assert body["rows"] == [{"2021": 10, "_row": 1}, {"2021": 20, "_row": 2}]
+    multi = pd.DataFrame(
+        [[1, 2], [3, 4]], columns=pd.MultiIndex.from_tuples([("x", "a"), ("x", "b")])
+    )
+    _put(store, multi)
+    body = _post(client, filters=[{"column": "('x', 'b')", "operator": "==", "value": 4}]).json()
+    assert body["columns"] == ["('x', 'a')", "('x', 'b')"]
+    assert body["rows"] == [{"('x', 'a')": 3, "('x', 'b')": 4, "_row": 1}]
+
+
+def test_duplicate_column_names(store: ArtifactStore, client: TestClient) -> None:
+    _put(store, pd.DataFrame([[1, 2.5, "s"]], columns=["a", "a", "b"]))
+    body = _post(client).json()
+    assert body["status"] == "ok"
+    assert body["columns"] == ["a", "a", "b"] and body["dtypes"] == ["int64", "float64", "object"]
+    # Filtering / sorting / projecting by the ambiguous name is a clear 422, not a crash.
+    for extra in (
+        {"filters": [{"column": "a", "operator": "==", "value": 1}]},
+        {"sort": [{"column": "a"}]},
+        {"columns": ["a"]},
+    ):
+        resp = _post(client, **extra)
+        assert resp.status_code == 422 and "ambiguous" in resp.json()["error"]
+    assert _post(client, sort=[{"column": "b"}]).status_code == 200
+
+
+def test_large_int_filter_is_exact(store: ArtifactStore, client: TestClient) -> None:
+    big = 2**62
+    _put(store, pd.DataFrame({"x": [big, big + 1]}))
+    for value in (big + 1, str(big + 1)):
+        body = _post(client, filters=[{"column": "x", "operator": "==", "value": value}]).json()
+        assert [r["_row"] for r in body["rows"]] == [1]
+    # a non-integral string on an int column still falls back to float
+    body = _post(client, filters=[{"column": "x", "operator": ">", "value": "1.5"}]).json()
+    assert body["filtered_rows"] == 2
+
+
+@pytest.mark.parametrize("ascending", ["false", 0, None])
+def test_sort_ascending_must_be_bool(
+    store: ArtifactStore, client: TestClient, ascending: Any
+) -> None:
+    _put(store)
+    resp = _post(client, sort=[{"column": "n", "ascending": ascending}])
+    assert resp.status_code == 422 and "ascending" in resp.json()["error"]
+
+
+def test_user_column_named_like_internal_row_is_preserved(
+    store: ArtifactStore, client: TestClient
+) -> None:
+    _put(store, pd.DataFrame({"__ef_row__": [9, 8], "x": [1, 2]}))
+    body = _post(client, sort=[{"column": "__ef_row__", "ascending": True}]).json()
+    assert body["rows"] == [
+        {"__ef_row__": 8, "x": 2, "_row": 1},
+        {"__ef_row__": 9, "x": 1, "_row": 0},
+    ]
+
+
+def test_tz_mismatched_datetime_filters(store: ArtifactStore, client: TestClient) -> None:
+    naive = pd.DataFrame({"t": pd.to_datetime(["2024-01-01", "2024-02-01"])})
+    _put(store, naive)
+    body = _post(
+        client, filters=[{"column": "t", "operator": ">", "value": "2024-01-15T00:00:00+05:00"}]
+    ).json()
+    assert [r["_row"] for r in body["rows"]] == [1]
+    aware = pd.DataFrame({"t": pd.to_datetime(["2024-01-01", "2024-02-01"]).tz_localize("UTC")})
+    _put(store, aware)
+    for value in ("2024-01-15T00:00:00-05:00", "2024-01-15"):
+        body = _post(client, filters=[{"column": "t", "operator": ">", "value": value}]).json()
+        assert [r["_row"] for r in body["rows"]] == [1]
+
+
+def test_port_must_be_string(store: ArtifactStore, client: TestClient) -> None:
+    _put(store)
+    resp = _post(client, port=["frame"])
+    assert resp.status_code == 422 and "'port' must be a string" in resp.json()["error"]
