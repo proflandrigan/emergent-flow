@@ -4,9 +4,9 @@
 // graph, and it does so in a single undo step; "Discard" clears scratch state only.
 
 import { useCatalog } from "../catalog/useCatalog";
-import { useGraphStore } from "../store/graphStore";
+import { HISTORY_LIMIT, useGraphStore } from "../store/graphStore";
 import { useSelectionStore } from "../store/selectionStore";
-import { useScratchStore } from "../store/scratchStore";
+import { isPromotable, useScratchStore } from "../store/scratchStore";
 import { CodeEditor } from "./CodeEditor";
 import { PayloadView } from "./PayloadView";
 
@@ -36,13 +36,16 @@ export function ScratchPanel({ onDone }: ScratchPanelProps): JSX.Element {
   const { outcome } = draft;
   const current = outcome !== null && outcome.code === draft.code;
   const stale = outcome?.status === "expired" || outcome?.status === "revision_mismatch";
-  // Promotable only once this exact code has run and compiled: a syntax error or a missing
-  // `transform` surfaces as CustomCodeError, which would also fail the new node's validation.
-  const parses =
-    current && outcome.status !== "expired" && outcome.status !== "revision_mismatch" &&
-    !(outcome.status === "error" && (outcome.error?.type === "CustomCodeError" || outcome.error?.type === "RequestError"));
+  // Promotable only once THIS exact code has run and the server says it can become a code node
+  // (`promotable` on the /scratch/run response; see isPromotable for the older-server fallback).
+  const promotable = current && isPromotable(outcome);
   const spec = catalog.nodes.find((n) => n.type === CUSTOM_CODE_TYPE);
-  const canSave = parses && spec !== undefined;
+  const canSave = promotable && spec !== undefined;
+  const saveBlockedReason = canSave
+    ? undefined
+    : current && !stale && outcome.promotableReason
+      ? outcome.promotableReason
+      : "Run code that parses and defines transform() first";
 
   const run = (): void => {
     void useScratchStore.getState().run(activeKey);
@@ -73,10 +76,11 @@ export function ScratchPanel({ onDone }: ScratchPanelProps): JSX.Element {
         { node_id: nodeId, port_id: inPort.id },
       );
     }
-    useGraphStore.setState({
-      past: first ? [...pastBefore, first] : pastBefore,
-      _lastTxn: "promoteScratch",
-    });
+    const past = first ? [...pastBefore, first] : [...pastBefore];
+    if (past.length > HISTORY_LIMIT) {
+      past.shift();
+    }
+    useGraphStore.setState({ past, _lastTxn: "promoteScratch" });
     useSelectionStore.getState().replaceSelection([nodeId]);
     useScratchStore.getState().discard(activeKey);
     onDone?.();
@@ -116,7 +120,7 @@ export function ScratchPanel({ onDone }: ScratchPanelProps): JSX.Element {
           type="button"
           data-testid="scratch-save"
           disabled={!canSave}
-          title={canSave ? undefined : "Run code that parses and defines transform() first"}
+          title={saveBlockedReason}
           onClick={saveAsNode}
         >
           Save as code node
@@ -125,12 +129,18 @@ export function ScratchPanel({ onDone }: ScratchPanelProps): JSX.Element {
           Discard
         </button>
       </div>
+      {!canSave && current && !stale && outcome.promotableReason ? (
+        <div data-testid="scratch-save-reason" style={{ ...mutedStyle, fontSize: 11 }}>
+          Can’t save as a code node: {outcome.promotableReason}
+        </div>
+      ) : null}
       {stale ? (
         <div data-testid="scratch-stale" style={{ color: "var(--danger)" }}>
           {outcome.status === "expired"
-            ? "This output is no longer stored. Re-run the node, then explore it again."
-            : "This node was re-run, so the output you explored was replaced. Re-run and explore " +
-              "the new output; this scratch stays bound to the old one."}
+            ? "This output is no longer stored. Re-run the node, then use “Explore this output” " +
+              "again to rebind this scratch (your code is kept)."
+            : "This node was re-run, so the output you explored was replaced. Use “Explore this " +
+              "output” on the new result to rebind this scratch to it (your code is kept)."}
         </div>
       ) : null}
       {outcome?.status === "error" && outcome.error ? (

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import { useExecutionStore } from "../store/executionStore";
@@ -6,6 +6,7 @@ import type { Payload } from "../store/execution";
 import { useSelectionStore } from "../store/selectionStore";
 import { DataPanel } from "./DataPanel";
 import { FrameBrowser } from "./FrameBrowser";
+import { useFrameBrowse, type BrowseQuery } from "./useFrameBrowse";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -99,6 +100,47 @@ test("a stale slow response does not overwrite a newer one", async () => {
   resolveFirst(reply(okWindow({ rows: [{ term: "old", n: 1, _row: 0 }] })));
   await new Promise((r) => setTimeout(r, 20));
   expect(screen.queryByText("old")).toBeNull();
+});
+
+test("a superseded response never becomes the previous window shown while loading", async () => {
+  let resolveFirst: (r: Response) => void = () => undefined;
+  let calls = 0;
+  vi.spyOn(globalThis, "fetch").mockImplementation(() => {
+    calls += 1;
+    if (calls === 1) {
+      return new Promise<Response>((r) => {
+        resolveFirst = r;
+      });
+    }
+    if (calls === 2) {
+      return Promise.resolve(reply(okWindow({ offset: 100 })));
+    }
+    return new Promise<Response>(() => undefined); // third request stays loading
+  });
+  const base: BrowseQuery = {
+    nodeId: "n1",
+    port: "frame",
+    revision: "r1",
+    filters: [],
+    sort: [],
+    offset: 0,
+    limit: 100,
+  };
+  const { result, rerender } = renderHook(({ q }) => useFrameBrowse(q, 0), {
+    initialProps: { q: base },
+  });
+  await waitFor(() => expect(calls).toBe(1));
+  rerender({ q: { ...base, offset: 100 } });
+  await waitFor(() => expect(result.current.phase).toBe("ok"));
+  // The stale first response lands after the newer one.
+  await act(async () => {
+    resolveFirst(reply(okWindow({ offset: 0 })));
+    await new Promise((r) => setTimeout(r, 10));
+  });
+  rerender({ q: { ...base, offset: 200 } });
+  await waitFor(() => expect(result.current.phase).toBe("loading"));
+  const state = result.current;
+  expect(state.phase === "loading" ? state.prev?.offset : undefined).toBe(100);
 });
 
 const tablePayload: Payload = {

@@ -64,21 +64,45 @@ describe("resolveBlockState", () => {
       block,
       { n1: { out: { kind: "scalar", value: 1 } } },
       { n1: { status: "ok" } },
-      meta,
+      { n1: meta },
     );
     expect(r).toMatchObject({ state: "ok", nodeId: "n1", port: "out", ...meta });
   });
 
-  test("failed when the source errored without a payload", () => {
-    expect(resolveBlockState(block, {}, { n1: { status: "error", error: "x" } }, meta).state).toBe(
-      "failed",
+  test("evidence uses the source node's own run meta, not another node's", () => {
+    const r = resolveBlockState(
+      block,
+      { n1: { out: { kind: "scalar", value: 1 } } },
+      { n1: { status: "ok" } },
+      { n2: meta },
     );
+    expect(r.state).toBe("ok");
+    expect(r.runId).toBeNull();
+    expect(r.finishedAt).toBeNull();
+  });
+
+  test("failed when the source errored without a payload", () => {
+    expect(
+      resolveBlockState(block, {}, { n1: { status: "error", error: "x" } }, { n1: meta }).state,
+    ).toBe("failed");
+  });
+
+  test("failed (not ok) when the source errored but an old payload is still held", () => {
+    const r = resolveBlockState(
+      block,
+      { n1: { out: { kind: "scalar", value: 1 } } },
+      { n1: { status: "error", error: "x" } },
+      { n1: meta },
+    );
+    expect(r.state).toBe("failed");
+    expect(r.payload).toBeUndefined();
+    expect(r.runId).toBeNull();
   });
 
   test("unrun when missing, skipped, or the source is malformed", () => {
-    expect(resolveBlockState(block, {}, {}, null).state).toBe("unrun");
-    expect(resolveBlockState(block, {}, { n1: { status: "skipped" } }, null).state).toBe("unrun");
-    const bad = resolveBlockState({ ...block, source: "nocolon" }, {}, {}, null);
+    expect(resolveBlockState(block, {}, {}, {}).state).toBe("unrun");
+    expect(resolveBlockState(block, {}, { n1: { status: "skipped" } }, {}).state).toBe("unrun");
+    const bad = resolveBlockState({ ...block, source: "nocolon" }, {}, {}, {});
     expect(bad.state).toBe("unrun");
     expect(bad.runId).toBeNull();
   });

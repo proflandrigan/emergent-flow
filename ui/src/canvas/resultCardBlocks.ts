@@ -63,7 +63,10 @@ export interface ResolvedBlock {
   payload: Payload | undefined;
   nodeId: string;
   port: string;
-  /** Run identity of the last completed run (null when no run has completed). */
+  /**
+   * Run identity of the run that produced THIS source node's payload (null when unknown, or for
+   * a partial run whose record was not persisted -- then only `finishedAt` is shown).
+   */
   runId: string | null;
   finishedAt: string | null;
 }
@@ -97,25 +100,28 @@ export function formatRunEvidence(
 
 /**
  * Pure resolver: what a result block can honestly show given the execution state.
- * `ok` = a payload exists; `failed` = the source node errored with no payload; otherwise `unrun`
- * (never run, skipped, or an unparseable source).
+ * `failed` = the source node's CURRENT status is error (a payload kept from an earlier run is
+ * stale and never presented as ok); `ok` = a payload exists; otherwise `unrun` (never run,
+ * skipped, or an unparseable source). Evidence comes from the source node's own run meta.
  */
 export function resolveBlockState(
   block: Extract<ResultCardBlock, { kind: "result" }>,
   results: Record<string, Record<string, Payload>>,
   statuses: Record<string, NodeRunStatus>,
-  runMeta: RunMeta | null,
+  nodeRunMeta: Record<string, RunMeta>,
 ): ResolvedBlock {
   const parts = splitSource(block.source);
-  const payload = parts ? results[parts.nodeId]?.[parts.port] : undefined;
   const status = parts ? statuses[parts.nodeId] : undefined;
-  const state: BlockState = payload ? "ok" : status?.status === "error" ? "failed" : "unrun";
+  const failed = status?.status === "error";
+  const payload = parts && !failed ? results[parts.nodeId]?.[parts.port] : undefined;
+  const state: BlockState = failed ? "failed" : payload ? "ok" : "unrun";
+  const meta = parts && payload ? nodeRunMeta[parts.nodeId] : undefined;
   return {
     state,
     payload,
     nodeId: parts?.nodeId ?? "",
     port: parts?.port ?? "",
-    runId: runMeta?.runId ?? null,
-    finishedAt: runMeta?.finishedAt ?? null,
+    runId: meta?.runId ?? null,
+    finishedAt: meta?.finishedAt ?? null,
   };
 }

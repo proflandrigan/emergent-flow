@@ -66,9 +66,9 @@ function ResultBlockView({
 }): JSX.Element {
   const results = useExecutionStore((s) => s.results);
   const statuses = useExecutionStore((s) => s.statuses);
-  const runMeta = useExecutionStore((s) => s.runMeta);
+  const nodeRunMeta = useExecutionStore((s) => s.nodeRunMeta);
 
-  const resolved = resolveBlockState(block, results, statuses, runMeta);
+  const resolved = resolveBlockState(block, results, statuses, nodeRunMeta);
   const evidence = formatRunEvidence(resolved.runId, resolved.finishedAt);
 
   let content: JSX.Element;

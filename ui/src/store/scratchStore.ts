@@ -27,6 +27,27 @@ export interface ScratchOutcome {
   error?: ScratchError;
   currentRevision?: string | null;
   elapsedMs?: number;
+  /**
+   * Server verdict on whether this code can become a `script.custom_code` node. Absent from older
+   * servers; see `isPromotable` for the conservative fallback.
+   */
+  promotable?: boolean;
+  promotableReason?: string | null;
+}
+
+/**
+ * Whether "Save as code node" may be enabled for this outcome. Uses the server's `promotable`
+ * verdict when present. An older server omits it: then only a plain `ok` run is promotable
+ * (conservative -- any error, including a runtime one, blocks), never a stale or failed one.
+ */
+export function isPromotable(outcome: ScratchOutcome): boolean {
+  if (outcome.status === "expired" || outcome.status === "revision_mismatch") {
+    return false;
+  }
+  if (typeof outcome.promotable === "boolean") {
+    return outcome.promotable;
+  }
+  return outcome.status === "ok";
 }
 
 export interface ScratchDraft {
@@ -61,6 +82,8 @@ interface RunResponse {
   error?: ScratchError | string;
   current_revision?: string | null;
   elapsed_ms?: number;
+  promotable?: boolean;
+  promotable_reason?: string | null;
 }
 
 function failure(code: string, message: string): ScratchOutcome {
@@ -77,24 +100,32 @@ export const useScratchStore = create<ScratchStore>((set, get) => ({
 
   open(nodeId, port, nodeLabel, revision) {
     const key = scratchKey(nodeId, port);
-    set((state) => ({
-      activeKey: key,
-      // An existing draft keeps its original revision: re-opening never rebinds it.
-      drafts: state.drafts[key]
-        ? state.drafts
-        : {
-            ...state.drafts,
-            [key]: {
-              nodeId,
-              port,
-              nodeLabel,
-              revision,
-              code: SCRATCH_TEMPLATE,
-              running: false,
-              outcome: null,
-            },
+    set((state) => {
+      const existing = state.drafts[key];
+      // A live draft keeps its original revision: re-opening never silently rebinds it. But once a
+      // run has reported the bound output replaced or evicted, re-exploring is the user's explicit
+      // request to move on: rebind to the current revision, keeping their code.
+      const stale =
+        existing?.outcome?.status === "revision_mismatch" || existing?.outcome?.status === "expired";
+      let drafts = state.drafts;
+      if (!existing) {
+        drafts = {
+          ...state.drafts,
+          [key]: {
+            nodeId,
+            port,
+            nodeLabel,
+            revision,
+            code: SCRATCH_TEMPLATE,
+            running: false,
+            outcome: null,
           },
-    }));
+        };
+      } else if (stale) {
+        drafts = { ...state.drafts, [key]: { ...existing, nodeLabel, revision, outcome: null } };
+      }
+      return { activeKey: key, drafts };
+    });
   },
 
   setCode(key, code) {
@@ -138,6 +169,8 @@ export const useScratchStore = create<ScratchStore>((set, get) => ({
           error: body.error as ScratchError | undefined,
           currentRevision: body.current_revision,
           elapsedMs: body.elapsed_ms,
+          promotable: body.promotable,
+          promotableReason: body.promotable_reason ?? null,
         };
       }
     } catch (err) {

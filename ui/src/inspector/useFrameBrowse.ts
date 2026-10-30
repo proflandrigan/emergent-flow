@@ -76,7 +76,6 @@ export function useFrameBrowse(query: BrowseQuery, debounceMs = 300): BrowseStat
           if (!res.ok || body.error) {
             next = { phase: "error", message: body.error ?? `Server error ${res.status}` };
           } else if (body.status === "ok") {
-            last.current = body as BrowseWindow;
             next = { phase: "ok", data: body as BrowseWindow };
           } else if (body.status === "expired") {
             next = { phase: "expired" };
@@ -92,6 +91,11 @@ export function useFrameBrowse(query: BrowseQuery, debounceMs = 300): BrowseStat
           next = { phase: "error", message: "Could not reach server: " + msg };
         }
         if (id === counter.current) {
+          // Only the latest request may become the "previous window": a superseded response
+          // must not be shown as the loading placeholder for a newer query.
+          if (next.phase === "ok") {
+            last.current = next.data;
+          }
           setState(next);
         }
       })();

@@ -121,7 +121,7 @@ function renderTour(tour: Tour): string {
 interface RenderContext {
   results: Record<string, Record<string, Payload>>;
   statuses: Record<string, NodeRunStatus>;
-  runMeta: RunMeta | null;
+  nodeRunMeta: Record<string, RunMeta>;
   nodeLabels: Record<string, string>;
 }
 
@@ -129,7 +129,7 @@ function renderBlock(block: ResultCardBlock, ctx: RenderContext): string {
   if (block.kind === "markdown") {
     return renderMarkdown(block.text);
   }
-  const resolved = resolveBlockState(block, ctx.results, ctx.statuses, ctx.runMeta);
+  const resolved = resolveBlockState(block, ctx.results, ctx.statuses, ctx.nodeRunMeta);
   const evidence = formatRunEvidence(resolved.runId, resolved.finishedAt, true);
   const label = ctx.nodeLabels[resolved.nodeId];
   const sourceText = `Source: ${label ? `${label} (${resolved.nodeId})` : resolved.nodeId}, port ${resolved.port}`;
@@ -156,8 +156,8 @@ export function buildReportHtml(opts: {
   results: Record<string, Record<string, Payload>>;
   /** Per-node run statuses; lets the report tell a failed source from one never run. */
   statuses?: Record<string, NodeRunStatus>;
-  /** Identity (run id + UTC finish time) of the run the results came from. */
-  runMeta?: RunMeta | null;
+  /** Per-node identity (run id + UTC finish time) of the run each node's result came from. */
+  nodeRunMeta?: Record<string, RunMeta>;
   /** node id -> display label, used for the evidence line. */
   nodeLabels?: Record<string, string>;
   tours?: Tour[];
@@ -166,7 +166,7 @@ export function buildReportHtml(opts: {
   const ctx: RenderContext = {
     results: opts.results,
     statuses: opts.statuses ?? {},
-    runMeta: opts.runMeta ?? null,
+    nodeRunMeta: opts.nodeRunMeta ?? {},
     nodeLabels: opts.nodeLabels ?? {},
   };
   const cardsBody =

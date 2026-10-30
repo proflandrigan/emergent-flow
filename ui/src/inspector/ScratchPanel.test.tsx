@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
-import { useGraphStore } from "../store/graphStore";
+import { HISTORY_LIMIT, useGraphStore } from "../store/graphStore";
 import { scratchKey, SCRATCH_TEMPLATE, useScratchStore } from "../store/scratchStore";
 import { ScratchPanel } from "./ScratchPanel";
 
@@ -126,7 +126,13 @@ test("Save as code node is blocked until the code has run and parsed", async () 
 });
 
 test("promote creates the code node and edge in ONE history step, then selects it", async () => {
-  mockServer({ status: "ok", revision: "abcdef0123", result: { kind: "scalar", value: 1 } });
+  mockServer({
+    status: "ok",
+    revision: "abcdef0123",
+    result: { kind: "scalar", value: 1 },
+    promotable: true,
+    promotable_reason: null,
+  });
   const onDone = vi.fn();
   render(<ScratchPanel onDone={onDone} />);
   const code = "def transform(value):\n    return value.head()";
@@ -165,4 +171,86 @@ test("Discard clears scratch state and leaves the graph untouched", () => {
   expect(after.past).toBe(before.past);
   expect(useScratchStore.getState().drafts).toEqual({});
   expect(screen.getByTestId("scratch-empty")).toBeTruthy();
+});
+
+test("Save is gated on the server's promotable verdict and shows its reason", async () => {
+  mockServer({
+    status: "ok",
+    revision: "abcdef0123",
+    result: { kind: "scalar", value: 1 },
+    promotable: false,
+    promotable_reason: "transform() result is not serializable",
+  });
+  render(<ScratchPanel />);
+  fireEvent.click(screen.getByTestId("scratch-run"));
+  await screen.findByTestId("scratch-result");
+  const save = screen.getByTestId("scratch-save") as HTMLButtonElement;
+  expect(save.disabled).toBe(true);
+  expect(save.title).toBe("transform() result is not serializable");
+  expect(screen.getByTestId("scratch-save-reason").textContent).toContain(
+    "transform() result is not serializable",
+  );
+});
+
+test("an older server without promotable: a runtime error still blocks Save", async () => {
+  mockServer({
+    status: "error",
+    revision: "abcdef0123",
+    error: { type: "KeyError", message: "'x'", traceback: "", line: 2 },
+  });
+  render(<ScratchPanel />);
+  fireEvent.click(screen.getByTestId("scratch-run"));
+  await screen.findByTestId("scratch-error");
+  expect((screen.getByTestId("scratch-save") as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("an older server without promotable: an ok run enables Save", async () => {
+  mockServer({ status: "ok", revision: "abcdef0123", result: { kind: "scalar", value: 1 } });
+  render(<ScratchPanel />);
+  fireEvent.click(screen.getByTestId("scratch-run"));
+  await screen.findByTestId("scratch-result");
+  const save = screen.getByTestId("scratch-save") as HTMLButtonElement;
+  await waitFor(() => expect(save.disabled).toBe(false));
+});
+
+test("promote keeps history within HISTORY_LIMIT", async () => {
+  mockServer({ status: "ok", revision: "abcdef0123", result: { kind: "scalar", value: 1 }, promotable: true });
+  const g = useGraphStore.getState();
+  for (let i = 0; i < HISTORY_LIMIT + 5; i += 1) {
+    g.pushHistory("filler");
+  }
+  expect(useGraphStore.getState().past.length).toBe(HISTORY_LIMIT);
+  render(<ScratchPanel />);
+  fireEvent.click(screen.getByTestId("scratch-run"));
+  await screen.findByTestId("scratch-result");
+  const save = screen.getByTestId("scratch-save") as HTMLButtonElement;
+  await waitFor(() => expect(save.disabled).toBe(false));
+  fireEvent.click(save);
+  expect(useGraphStore.getState().past.length).toBe(HISTORY_LIMIT);
+});
+
+test("re-exploring a stale draft rebinds it to the current revision and keeps the code", async () => {
+  mockServer({ status: "revision_mismatch", revision: "abcdef0123", current_revision: "fedcba9876" });
+  render(<ScratchPanel />);
+  act(() => setCode("def transform(value):\n    return 1"));
+  fireEvent.click(screen.getByTestId("scratch-run"));
+  expect((await screen.findByTestId("scratch-stale")).textContent).toMatch(/rebind/);
+  act(() => useScratchStore.getState().open(sourceId, "frame", "Load CSV", "fedcba9876"));
+  const draft = useScratchStore.getState().drafts[key()];
+  expect(draft.revision).toBe("fedcba9876");
+  expect(draft.code).toBe("def transform(value):\n    return 1");
+  expect(draft.outcome).toBeNull();
+  expect(screen.queryByTestId("scratch-stale")).toBeNull();
+});
+
+test("re-opening a live (non-stale) draft never rebinds it", () => {
+  useScratchStore.getState().open(sourceId, "frame", "Load CSV", "other-rev");
+  expect(useScratchStore.getState().drafts[key()].revision).toBe("abcdef0123");
+});
+
+test("graph reset drops scratch drafts and the active scratch", () => {
+  expect(useScratchStore.getState().activeKey).toBe(key());
+  useGraphStore.getState().reset();
+  expect(useScratchStore.getState().drafts).toEqual({});
+  expect(useScratchStore.getState().activeKey).toBeNull();
 });

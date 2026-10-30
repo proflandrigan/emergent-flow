@@ -36,7 +36,7 @@ function renderCard(blocks: ResultCardBlock[], title = "My Card") {
 }
 
 beforeEach(() => {
-  useExecutionStore.setState({ results: {}, statuses: {}, runMeta: null });
+  useExecutionStore.setState({ results: {}, statuses: {}, runMeta: null, nodeRunMeta: {} });
   useGraphStore.getState().reset();
 });
 
@@ -131,10 +131,35 @@ describe("ResultCardNode", () => {
     expect(screen.getByTestId("result-card-error")).toHaveTextContent("Source failed");
   });
 
+  test("does not show a stale payload as ok when the source errored in the latest run", () => {
+    useExecutionStore.setState({
+      results: { n1: { out: { kind: "scalar", value: 42 } } },
+      statuses: { n1: { status: "error", error: "boom" } },
+      nodeRunMeta: { n1: { runId: "run-1111", finishedAt: "2026-01-01T00:00:00+00:00" } },
+      runMeta: { runId: "run-2222", finishedAt: "2026-01-02T00:00:00+00:00" },
+    });
+    renderCard([{ kind: "result", source: "n1:out", caption: "" }]);
+    expect(screen.getByTestId("result-card-error")).toHaveTextContent("Source failed");
+    expect(screen.queryByTestId("result-card-evidence")).toBeNull();
+  });
+
+  test("evidence comes from the source node's own run, not the latest global run", () => {
+    useExecutionStore.setState({
+      results: { n1: { out: { kind: "scalar", value: 42 } } },
+      statuses: { n1: { status: "ok" } },
+      nodeRunMeta: { n1: { runId: "2026-01-01T00-00-00Z-aaaa", finishedAt: "2026-01-01T00:00:00+00:00" } },
+      runMeta: { runId: "2026-01-02T00-00-00Z-bbbb", finishedAt: "2026-01-02T00:00:00+00:00" },
+    });
+    renderCard([{ kind: "result", source: "n1:out", caption: "" }]);
+    expect(screen.getByTestId("result-card-evidence")).toHaveTextContent(
+      "Run aaaa \u00b7 2026-01-01T00:00:00+00:00",
+    );
+  });
+
   test("shows run id and timestamp evidence under an ok result only", () => {
     useExecutionStore.setState({
       results: { n1: { out: { kind: "scalar", value: 42 } } },
-      runMeta: { runId: "2026-07-30T14-02-11Z-ab12", finishedAt: "2026-07-30T14:02:11+00:00" },
+      nodeRunMeta: { n1: { runId: "2026-07-30T14-02-11Z-ab12", finishedAt: "2026-07-30T14:02:11+00:00" } },
     });
     renderCard([{ kind: "result", source: "n1:out", caption: "" }]);
     expect(screen.getByTestId("result-card-evidence")).toHaveTextContent(
@@ -148,7 +173,7 @@ describe("ResultCardNode", () => {
 
   test("shows no evidence when the block is not ok", () => {
     useExecutionStore.setState({
-      runMeta: { runId: "r", finishedAt: "2026-07-30T14:02:11+00:00" },
+      nodeRunMeta: { n1: { runId: "r", finishedAt: "2026-07-30T14:02:11+00:00" } },
     });
     renderCard([{ kind: "result", source: "n1:out", caption: "" }]);
     expect(screen.queryByTestId("result-card-evidence")).toBeNull();

@@ -120,7 +120,7 @@ export function IRToolbar(): JSX.Element {
       cards: collectReportCards(useGraphStore.getState().nodes),
       results: useExecutionStore.getState().results,
       statuses: useExecutionStore.getState().statuses,
-      runMeta: useExecutionStore.getState().runMeta,
+      nodeRunMeta: useExecutionStore.getState().nodeRunMeta,
       nodeLabels: Object.fromEntries(
         Object.values(useGraphStore.getState().nodes).map((n) => [n.id, n.label ?? n.type]),
       ),

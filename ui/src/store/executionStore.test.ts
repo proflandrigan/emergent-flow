@@ -178,12 +178,63 @@ describe("executionStore nodeRevisions", () => {
     expect(useExecutionStore.getState().nodeRevisions.n1).toBe("r3");
   });
 
-  it("keeps the previous revision when the event carries none, and clear() resets", () => {
+  it("drops the previous revision when the event carries none, and clear() resets", () => {
     const payload: Payload = { kind: "scalar", value: 1 };
     useExecutionStore.getState().setNodeResult("n1", { out: payload }, "r1");
-    useExecutionStore.getState().setNodeResult("n1", { out: payload });
-    expect(useExecutionStore.getState().nodeRevisions).toEqual({ n1: "r1" });
+    useExecutionStore.getState().setNodeResult("n2", { out: payload }, "r2");
+    // A new result with no stored revision must not sit next to the OLD revision.
+    useExecutionStore.getState().setNodeResult("n1", { out: { kind: "scalar", value: 2 } });
+    expect(useExecutionStore.getState().nodeRevisions).toEqual({ n2: "r2" });
+    useExecutionStore.getState().setNodeCached("n2", { out: payload });
+    expect(useExecutionStore.getState().nodeRevisions).toEqual({});
+    useExecutionStore.getState().setNodeResult("n1", { out: payload }, "r1");
     useExecutionStore.getState().clear();
     expect(useExecutionStore.getState().nodeRevisions).toEqual({});
+  });
+});
+
+describe("executionStore nodeRunMeta", () => {
+  beforeEach(() => {
+    useExecutionStore.getState().clear();
+  });
+
+  const p = (value: number): Payload => ({ kind: "scalar", value });
+
+  it("stamps only the nodes produced in a run with that run's identity", () => {
+    const s = useExecutionStore.getState();
+    s.setRunning();
+    s.setNodeResult("a", { out: p(1) }, "rev1");
+    s.setNodeCached("b", { out: p(1) });
+    s.setRunComplete({ runId: "run-1111", finishedAt: "2026-01-01T00:00:00+00:00" });
+    s.setRunning();
+    s.setNodeError("a", "boom");
+    s.setRunComplete({ runId: "run-2222", finishedAt: "2026-01-02T00:00:00+00:00" });
+    const st = useExecutionStore.getState();
+    // a's held payload is still attributed to run 1, never the newer run 2.
+    expect(st.nodeRunMeta.a).toEqual({ runId: "run-1111", finishedAt: "2026-01-01T00:00:00+00:00" });
+    expect(st.nodeRunMeta.b.runId).toBe("run-1111");
+    expect(st.runMeta?.runId).toBe("run-2222");
+    expect(st.pendingRunNodes).toEqual([]);
+  });
+
+  it("records a null run id for a partial run (timestamp only)", () => {
+    const s = useExecutionStore.getState();
+    s.setRunning();
+    s.setNodeResult("a", { out: p(1) });
+    s.setRunComplete({ runId: null, finishedAt: "2026-01-03T00:00:00+00:00" });
+    expect(useExecutionStore.getState().nodeRunMeta.a).toEqual({
+      runId: null,
+      finishedAt: "2026-01-03T00:00:00+00:00",
+    });
+  });
+
+  it("stamps results received before a run_error with no run id, and clear() resets", () => {
+    const s = useExecutionStore.getState();
+    s.setRunning();
+    s.setNodeResult("a", { out: p(1) });
+    s.setError("lost");
+    expect(useExecutionStore.getState().nodeRunMeta.a.runId).toBeNull();
+    useExecutionStore.getState().clear();
+    expect(useExecutionStore.getState().nodeRunMeta).toEqual({});
   });
 });

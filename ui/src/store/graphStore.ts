@@ -14,6 +14,7 @@ import { newId } from "./ids";
 import catalogJson from "../generated/catalog.json";
 import { serializeBlocks, type ResultCardBlock } from "../canvas/resultCardBlocks";
 import { edgeToIR, fromIR, nodeToIR, toIR } from "./ir";
+import { useScratchStore } from "./scratchStore";
 import { useValidationStore } from "./validationStore";
 import type {
   CanvasModel,
@@ -29,10 +30,13 @@ import type {
 // so without this a graph re-imported after a run would show stale results, node-status colours,
 // and red edges against the freshly loaded graph. Validation re-runs automatically via
 // useLiveValidation; clearing here just avoids the stale window. Execution has no live re-run,
-// so clearing is the only thing that drops its now-orphaned results.
+// so clearing is the only thing that drops its now-orphaned results. Scratch drafts are keyed by
+// node id + artifact revision of the previous graph, so they are dropped too (an open scratch
+// would otherwise keep running against, and offer to promote into, a graph that is gone).
 function clearDerivedStores(): void {
   useExecutionStore.getState().clear();
   useValidationStore.getState().clear();
+  useScratchStore.setState({ drafts: {}, activeKey: null });
 }
 
 function emptyGraph(): CanvasModel {
@@ -46,7 +50,7 @@ function emptyGraph(): CanvasModel {
 
 // Snapshot ONLY the model fields -- history must never leak into the IR (toIR builds its own
 // object already) and must never carry a live reference into past/future (hence structuredClone).
-const HISTORY_LIMIT = 100;
+export const HISTORY_LIMIT = 100;
 const GROUP_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7"];
 
 // Fixed offset so pasted nodes are visibly distinct from their originals
